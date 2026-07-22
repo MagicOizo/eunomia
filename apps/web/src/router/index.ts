@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
+import ResourceView from '../components/resource/ResourceView.vue';
+import { resourceConfigs } from '../resources/definitions';
 import { useAuthStore } from '../stores/auth';
 import DashboardView from '../views/DashboardView.vue';
 import LoginView from '../views/LoginView.vue';
@@ -15,27 +17,32 @@ declare module 'vue-router' {
   }
 }
 
-/** Placeholder routes are generated from the fixed nav config (see nav.ts). */
-const placeholderRoutes = [
-  ...mainNav.filter((item) => item.to !== '/'),
-  ...systemNav,
-].map((item) => ({
-  path: item.to,
-  name: item.to,
-  component: PlaceholderView,
-  meta: {
-    title: item.title,
-    requiresAuth: true,
-    requiresAdmin: item.to.startsWith('/system'),
-  },
-}));
+/**
+ * Routes are generated from the fixed nav config (see nav.ts). Entries with a
+ * resource config (Slice 4/7 master data) render the CRUD view; the rest stay
+ * placeholders until their slice lands.
+ */
+const navRoutes = [...mainNav.filter((item) => item.to !== '/'), ...systemNav].map((item) => {
+  const config = resourceConfigs[item.to];
+  return {
+    path: item.to,
+    name: item.to,
+    component: config ? ResourceView : PlaceholderView,
+    props: config ? { config } : undefined,
+    meta: {
+      title: item.title,
+      requiresAuth: true,
+      requiresAdmin: item.to.startsWith('/system'),
+    },
+  };
+});
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: LoginView, meta: { layout: 'blank', title: 'Anmelden' } },
     { path: '/', name: 'home', component: DashboardView, meta: { title: 'Startseite', requiresAuth: true } },
-    ...placeholderRoutes,
+    ...navRoutes,
     {
       path: '/styleguide',
       name: 'styleguide',

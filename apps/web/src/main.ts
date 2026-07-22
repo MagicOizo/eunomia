@@ -8,17 +8,19 @@ import './design-system/global.css';
 import { router } from './router';
 import { useAuthStore } from './stores/auth';
 
-const app = createApp(App);
-app.use(createPinia());
-app.use(router);
-
 /**
- * Restore any existing session from the refresh cookie before the first
- * navigation resolves, so route guards see the correct auth state and the user
- * is not bounced to the login page on every reload.
+ * Restore any existing session from the refresh cookie BEFORE installing the
+ * router, because `app.use(router)` immediately kicks off the initial
+ * navigation — and its auth guard must see the restored session, otherwise a
+ * reload of a protected page always bounces to /login even with a valid cookie.
  */
 async function bootstrap(): Promise<void> {
+  const app = createApp(App);
+  app.use(createPinia());
+
   await useAuthStore().initialize();
+
+  app.use(router);
   await router.isReady();
   app.mount('#app');
 }
