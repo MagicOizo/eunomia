@@ -10,9 +10,10 @@ thresholds and no-claims bonuses. It is built for home-lab operation, not as a p
 This repository is under active, from-scratch development. The full architecture, data model,
 and slice-based implementation roadmap are documented in
 [Notes/eunomia-plan.md](Notes/eunomia-plan.md); the sections below grow as each slice lands
-rather than being restructured later. Currently implemented: the project scaffold (npm
-workspaces for `apps/api`, `apps/web`, `packages/shared-types`; linting, formatting, tests,
-Docker, CI) — no business features yet.
+rather than being restructured later. Currently implemented: the project scaffold and design
+system, the database schema with migrations, authentication and the table-based rights model,
+the master-data API, the full invoice-workflow API, and the Vue SPA shell (login, navigation,
+light/dark) — the data-entry pages themselves are still being built.
 
 ## Getting Started
 
