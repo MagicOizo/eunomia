@@ -1,0 +1,26 @@
+/*
+ * Self-hosted brand fonts carried over from the first attempt at this
+ * project (see Notes/eunomia-plan.md, 2.7). The first attempt's stylesheet
+ * had a naming bug: the family name was spelled "FalingSky" (one L) while
+ * two unrelated rules referenced "FallingSky" (two Ls) and silently fell
+ * back to Arial. We fix that here by using the correct spelling,
+ * "FallingSky", consistently everywhere.
+ */
+@font-face {
+  font-family: 'FallingSky';
+  src: url('../assets/fonts/FallingSky-JKwK.otf') format('opentype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'FallingSkyBold';
+  src: url('../assets/fonts/FallingSkyBold-zemL.otf') format('opentype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Raleway';
+  src: url('../assets/fonts/Raleway-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-display: swap;
+}

@@ -1,0 +1,83 @@
+/*
+ * Design tokens. Colors are carried over from the first attempt at this
+ * project (brand blue #030088, accent blue, four-stage status scale — see
+ * Notes/eunomia-plan.md, 2.7) but re-derived so every text/background and
+ * every status pairing meets WCAG AA (>=4.5:1 for text, >=3:1 for large
+ * text and non-text UI components like focus rings). The original status
+ * pastels (lightcoral / #ffd900 / lightblue / lightgreen) and the original
+ * focus ring (#80bdff) failed AA as plain text/foreground colors on white;
+ * see CONTRAST.md in this folder for the full measured table.
+ *
+ * The sidebar keeps the brand blue background in both color schemes (a
+ * constant brand anchor); everything else (page canvas, card surface,
+ * status badges) adapts between the light and dark value sets below.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces */
+  --eu-color-page-bg: #030088;
+  --eu-color-surface-bg: #ffffff;
+  --eu-color-sidebar-bg: #030088;
+  --eu-color-border: #d8d8e0;
+
+  /* Text */
+  --eu-color-text: #1a1a2e;
+  --eu-color-text-muted: #595964;
+  --eu-color-text-inverse: #ffffff;
+  --eu-color-text-inverse-muted: #b8c4e8;
+
+  /* Accent / interaction */
+  --eu-color-accent: #0b57c7; /* buttons, links: >=4.5:1 on white */
+  --eu-color-accent-soft: #3395f3; /* original brand accent; hover fills, borders, large text only */
+  --eu-color-accent-selected: darkblue;
+  --eu-color-focus-ring: #1d6fd6; /* on light surfaces */
+  --eu-color-focus-ring-on-brand: #80bdff; /* on the brand-blue sidebar; original focus ring color */
+
+  /* Feedback */
+  --eu-color-error-bg: #fbe0df;
+  --eu-color-error-fg: #8f2317;
+
+  /* Status scale (invoice lifecycle) */
+  --eu-color-status-open-bg: #fbe0df;
+  --eu-color-status-open-fg: #8f2317;
+  --eu-color-status-submitted-bg: #fff1b8;
+  --eu-color-status-submitted-fg: #6b4e00;
+  --eu-color-status-billed-bg: #dbeeff;
+  --eu-color-status-billed-fg: #0b4a8f;
+  --eu-color-status-done-bg: #ddf3df;
+  --eu-color-status-done-fg: #146328;
+
+  /* Typography */
+  --eu-font-heading: FallingSkyBold, Arial, Helvetica, sans-serif;
+  --eu-font-body: FallingSky, Arial, Helvetica, sans-serif;
+  --eu-font-data: Raleway, ui-sans-serif, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --eu-color-page-bg: #12121b;
+    --eu-color-surface-bg: #1c1c28;
+    --eu-color-border: #34343f;
+
+    --eu-color-text: #e8e8f0;
+    --eu-color-text-muted: #a6a6b3;
+
+    --eu-color-accent: #2d6fd1; /* paired with white text: >=4.5:1 */
+    --eu-color-accent-soft: #8fc4ff;
+    --eu-color-focus-ring: #4da3ff;
+
+    --eu-color-error-bg: #4a1f1a;
+    --eu-color-error-fg: #ffb3a8;
+
+    --eu-color-status-open-bg: #4a1f1a;
+    --eu-color-status-open-fg: #ffb3a8;
+    --eu-color-status-submitted-bg: #4a3900;
+    --eu-color-status-submitted-fg: #ffd873;
+    --eu-color-status-billed-bg: #123a5c;
+    --eu-color-status-billed-fg: #a8d4ff;
+    --eu-color-status-done-bg: #163d1d;
+    --eu-color-status-done-fg: #9ee8ac;
+  }
+}

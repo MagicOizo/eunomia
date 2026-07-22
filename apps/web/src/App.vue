@@ -1,5 +1,7 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import StyleGuideView from './design-system/StyleGuideView.vue';
+</script>
 
 <template>
-  <main>Eunomia</main>
+  <StyleGuideView />
 </template>

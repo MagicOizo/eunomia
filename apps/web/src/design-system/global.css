@@ -1,0 +1,51 @@
+*,
+::after,
+::before {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--eu-font-body);
+  color: var(--eu-color-text);
+  background-color: var(--eu-color-page-bg);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--eu-font-heading);
+}
+
+/*
+ * Every interactive element gets a visible, WCAG-AA-contrast focus
+ * indicator (see tokens.css) — the first attempt's submenus relied on
+ * :hover only, which keyboard and touch users cannot trigger (see
+ * Notes/eunomia-plan.md, 2.7). :focus-visible avoids showing the ring on
+ * mouse clicks, matching modern browser default UX.
+ */
+:focus-visible {
+  outline: 3px solid var(--eu-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.eu-sidebar :focus-visible {
+  outline-color: var(--eu-color-focus-ring-on-brand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

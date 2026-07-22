@@ -5,3 +5,6 @@
 *.woff2 binary
 *.ico   binary
 *.png   binary
+
+# Vendored third-party fonts — exclude from GitHub's language statistics.
+apps/web/src/assets/fonts/** linguist-vendored
