@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+coverage/
+
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+
+.DS_Store
+
+# MariaDB bind-mount data (production)
+db_data/

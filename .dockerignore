@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+.vscode
+.claude
+Notes
+apps/web
+README.md
+*.md
+.env
+.env.*
+!.env.example
