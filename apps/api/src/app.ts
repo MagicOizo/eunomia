@@ -3,6 +3,11 @@ import type { Pool } from 'mariadb';
 
 import { createAuthRouter } from './auth/routes.js';
 import type { AppConfig } from './config/env.js';
+import { createAccountsRouter } from './domain/accounts.js';
+import { createCollectionAgenciesRouter } from './domain/collection-agencies.js';
+import { createContractsRouter } from './domain/contracts.js';
+import { createFacilitiesRouter } from './domain/facilities.js';
+import { createInsuranceCompaniesRouter } from './domain/insurance-companies.js';
 import { errorHandler } from './lib/error-handler.js';
 import { versionRouter } from './routes/version.js';
 
@@ -31,7 +36,13 @@ export function createApp(deps?: AppDependencies): Express {
   app.use('/api/v1', versionRouter);
 
   if (deps) {
-    app.use('/api/v1', createAuthRouter(deps.pool, deps.config));
+    const { pool, config } = deps;
+    app.use('/api/v1', createAuthRouter(pool, config));
+    app.use('/api/v1/accounts', createAccountsRouter(pool, config));
+    app.use('/api/v1/companies', createInsuranceCompaniesRouter(pool, config));
+    app.use('/api/v1/contracts', createContractsRouter(pool, config));
+    app.use('/api/v1/facilities', createFacilitiesRouter(pool, config));
+    app.use('/api/v1/agencies', createCollectionAgenciesRouter(pool, config));
   }
 
   app.use(errorHandler);

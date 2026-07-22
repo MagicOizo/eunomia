@@ -1,18 +1,10 @@
+import { ApiError } from '../lib/api-error.js';
+
 /**
- * Auth failures carry the HTTP status and a stable machine-readable `code` the
- * route layer turns into a JSON error response, so handlers can throw instead
- * of threading status codes through return values.
+ * Auth failures are ApiErrors with auth-specific codes; the shared error
+ * middleware renders them like any other ApiError.
  */
-export class AuthError extends Error {
-  constructor(
-    readonly httpStatus: number,
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'AuthError';
-  }
-}
+export class AuthError extends ApiError {}
 
 export const invalidCredentials = (): AuthError =>
   new AuthError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');

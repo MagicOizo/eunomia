@@ -9,7 +9,10 @@ import type { DatabaseConfig } from '../config/env.js';
  * than BigInt (matching the first attempt's convention and keeping call
  * sites simple), and `decimalAsNumber` returns money columns as numbers so
  * callers don't have to parse DECIMAL strings. Both are safe here because
- * the values stay well within Number's exact-integer range.
+ * the values stay well within Number's exact-integer range. `dateStrings`
+ * keeps DATE/DATETIME columns as plain strings (`YYYY-MM-DD`) instead of
+ * JS Date objects, so date-only fields round-trip through JSON unchanged and
+ * without timezone shifts.
  */
 export function createPool(config: DatabaseConfig): Pool {
   return mariadb.createPool({
@@ -21,6 +24,7 @@ export function createPool(config: DatabaseConfig): Pool {
     connectionLimit: 5,
     bigIntAsNumber: true,
     decimalAsNumber: true,
+    dateStrings: true,
   });
 }
 

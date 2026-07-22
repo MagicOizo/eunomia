@@ -1,7 +1,30 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 
-import { AuthError } from '../auth/errors.js';
+import { ApiError } from './api-error.js';
+
+/** MariaDB driver error shape we care about (a subset of SqlError). */
+interface SqlErrorLike {
+  errno: number;
+}
+
+function isSqlError(err: unknown): err is SqlErrorLike {
+  return typeof err === 'object' && err !== null && typeof (err as SqlErrorLike).errno === 'number';
+}
+
+/** Maps known MariaDB error numbers to a client-facing ApiError, or null. */
+function mapSqlError(err: SqlErrorLike): ApiError | null {
+  switch (err.errno) {
+    case 1062: // ER_DUP_ENTRY
+      return new ApiError(409, 'CONFLICT', 'A record with the same unique value already exists');
+    case 1451: // ER_ROW_IS_REFERENCED_2 — still referenced by another row
+      return new ApiError(409, 'CONFLICT', 'Record is still referenced by other records');
+    case 1452: // ER_NO_REFERENCED_ROW_2 — points at a missing row
+      return new ApiError(400, 'BAD_REQUEST', 'A referenced record does not exist');
+    default:
+      return null;
+  }
+}
 
 /**
  * Terminal error middleware turning known error types into a uniform JSON
@@ -15,8 +38,9 @@ export function errorHandler(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Express needs the 4-arg shape
   _next: NextFunction,
 ): void {
-  if (err instanceof AuthError) {
-    res.status(err.httpStatus).json({ error: { code: err.code, message: err.message } });
+  const apiError = err instanceof ApiError ? err : isSqlError(err) ? mapSqlError(err) : null;
+  if (apiError) {
+    res.status(apiError.httpStatus).json({ error: { code: apiError.code, message: apiError.message } });
     return;
   }
 

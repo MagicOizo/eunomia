@@ -81,6 +81,24 @@ a long-lived refresh token is set as an httpOnly cookie scoped to `/api/v1/auth`
 `POST /api/v1/auth/refresh` to obtain a new access token and `POST /api/v1/auth/logout` to
 revoke the session.
 
+### Master-data API
+
+CRUD endpoints for the base entities live under `/api/v1` and require a Bearer access token.
+Successful responses use the envelope `{ "data": … }`; failures use `{ "error": { code, message } }`.
+All entities are soft-deleted (a `DELETE` sets their status to deleted rather than removing the row).
+
+| Resource            | Path                  | Access                                                                    |
+| ------------------- | --------------------- | ------------------------------------------------------------------------- |
+| Accounts            | `/api/v1/accounts`    | Account-scoped: users see/manage only accounts they are granted.          |
+| Contracts           | `/api/v1/contracts`   | Account-scoped via the contract's account.                                |
+| Insurance companies | `/api/v1/companies`   | Any user may read; `MANAGE_COMPANIES` to change.                          |
+| Facilities          | `/api/v1/facilities`  | Any user may read; `MANAGE_FACILITIES` to change.                         |
+| Collection agencies | `/api/v1/agencies`    | Any user may read; `MANAGE_AGENCIES` to change.                          |
+
+Each resource supports `GET /` (list), `GET /:uid`, `POST /`, `PATCH /:uid` and `DELETE /:uid`.
+Creating an account requires a global `MANAGE_ACCOUNTS` grant; account-scoped users can edit the
+accounts and contracts they have been granted but cannot create new accounts.
+
 ## Environment Variables
 
 All variables are read from `.env` (see `.env.example` for the template — never commit the real

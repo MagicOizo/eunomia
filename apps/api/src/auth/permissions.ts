@@ -73,6 +73,38 @@ export async function hasPermission(
   return scopedRows.length > 0;
 }
 
+export interface AccountScope {
+  /** True when a global grant makes every account accessible for the permission. */
+  all: boolean;
+  /** The specific accounts reachable through account-scoped grants (when not `all`). */
+  accountUIDs: string[];
+}
+
+/**
+ * Determines which accounts a user may exercise a permission on — used to
+ * filter list endpoints. A global grant returns `all: true`; otherwise the
+ * distinct set of accounts granted via `UserAccountRoles` for that permission.
+ */
+export async function getAccessibleAccounts(
+  pool: Pool,
+  userId: number,
+  permission: PermissionKey,
+): Promise<AccountScope> {
+  if (await hasPermission(pool, userId, permission)) {
+    return { all: true, accountUIDs: [] };
+  }
+  const rows = await pool.query<Array<{ accountUID: string }>>(
+    `SELECT DISTINCT uar.accountUID
+       FROM UserAccountRoles uar
+       JOIN Roles r ON r.roleID = uar.roleID AND r.roleStatus = 1
+       JOIN RolePermissions rp ON rp.roleID = uar.roleID
+       JOIN Permissions p ON p.permissionID = rp.permissionID
+      WHERE uar.userID = ? AND p.permissionKey = ?`,
+    [userId, permission],
+  );
+  return { all: false, accountUIDs: rows.map((row) => row.accountUID) };
+}
+
 export interface EffectivePermissions {
   /** Permission keys granted globally (apply to every account). */
   global: string[];
