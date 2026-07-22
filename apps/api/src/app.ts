@@ -4,10 +4,15 @@ import type { Pool } from 'mariadb';
 import { createAuthRouter } from './auth/routes.js';
 import type { AppConfig } from './config/env.js';
 import { createAccountsRouter } from './domain/accounts.js';
+import { createAllocationsRouter } from './domain/allocations.js';
 import { createCollectionAgenciesRouter } from './domain/collection-agencies.js';
 import { createContractsRouter } from './domain/contracts.js';
 import { createFacilitiesRouter } from './domain/facilities.js';
 import { createInsuranceCompaniesRouter } from './domain/insurance-companies.js';
+import { createInvoicesRouter } from './domain/invoices.js';
+import { createReimbursementAnalysisRouter } from './domain/reimbursement-analysis.js';
+import { createServiceBillingsRouter } from './domain/service-billings.js';
+import { createSubmissionsRouter } from './domain/submissions.js';
 import { errorHandler } from './lib/error-handler.js';
 import { versionRouter } from './routes/version.js';
 
@@ -41,8 +46,13 @@ export function createApp(deps?: AppDependencies): Express {
     app.use('/api/v1/accounts', createAccountsRouter(pool, config));
     app.use('/api/v1/companies', createInsuranceCompaniesRouter(pool, config));
     app.use('/api/v1/contracts', createContractsRouter(pool, config));
+    app.use('/api/v1/contracts', createReimbursementAnalysisRouter(pool, config));
     app.use('/api/v1/facilities', createFacilitiesRouter(pool, config));
     app.use('/api/v1/agencies', createCollectionAgenciesRouter(pool, config));
+    app.use('/api/v1/invoices', createInvoicesRouter(pool, config));
+    app.use('/api/v1/submissions', createSubmissionsRouter(pool, config));
+    app.use('/api/v1/billings', createServiceBillingsRouter(pool, config));
+    app.use('/api/v1/allocations', createAllocationsRouter(pool, config));
   }
 
   app.use(errorHandler);

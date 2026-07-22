@@ -99,6 +99,28 @@ Each resource supports `GET /` (list), `GET /:uid`, `POST /`, `PATCH /:uid` and 
 Creating an account requires a global `MANAGE_ACCOUNTS` grant; account-scoped users can edit the
 accounts and contracts they have been granted but cannot create new accounts.
 
+### Invoice workflow
+
+The invoice lifecycle from `1.1.1` of the plan is available under `/api/v1`, all account-scoped via
+`VIEW_INVOICES` / `MANAGE_INVOICES`:
+
+| Step                | Endpoint                                             |
+| ------------------- | ---------------------------------------------------- |
+| Record an invoice   | `POST /api/v1/invoices`                              |
+| Submit invoices     | `POST /api/v1/submissions` (batch, transactional)   |
+| Record a billing    | `POST /api/v1/billings`                              |
+| Allocate a refund   | `POST /api/v1/allocations`                           |
+| Settle an invoice   | `PATCH /api/v1/invoices/:uid` (set `transferDate`)   |
+
+An invoice's workflow status (`offen`, `eingereicht`, `abgerechnet`, `erledigt`) is **derived**, never
+stored: it follows from whether it has been submitted, whether a service billing has been allocated to
+it, and whether it has been settled. A `submission` immutably binds a set of invoices to one contract,
+so an invoice can never be submitted twice; an `allocation` may only link an invoice and a billing that
+share the same submission.
+
+`GET /api/v1/contracts/:uid/reimbursement-analysis?year=YYYY` runs the deductible/bonus/cap
+calculation over that year's invoices and reports whether submitting is worthwhile.
+
 ## Environment Variables
 
 All variables are read from `.env` (see `.env.example` for the template — never commit the real
