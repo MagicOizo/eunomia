@@ -9,6 +9,30 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    services:
+      # Real MariaDB so the migration integration test actually runs in CI
+      # (it skips when these DB_* env vars are absent, e.g. on a dev machine).
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: eunomia_test
+          MARIADB_USER: eunomia
+          MARIADB_PASSWORD: eunomia
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: eunomia
+      DB_PASSWORD: eunomia
+      DB_NAME: eunomia_test
+
     steps:
       - uses: actions/checkout@v4
 

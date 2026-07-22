@@ -40,6 +40,20 @@ docker compose up -d
 The API is reachable at `http://localhost:3000` (`/` for a liveness check, `/api/v1/version`
 for the running backend version — also shown in the frontend footer once it exists).
 
+### Database migrations & seed data
+
+Schema migrations run automatically when the API container starts, so `docker compose up -d`
+always brings the database to the current schema version. To run them by hand (e.g. against a
+locally running MariaDB during development):
+
+```bash
+npm run migrate --workspace apps/api   # apply all pending migrations
+npm run seed    --workspace apps/api   # load anonymized dev data (refuses NODE_ENV=production)
+```
+
+Both read the `DB_*` variables from the environment. The seed is idempotent — running it twice
+does not duplicate rows.
+
 ## Environment Variables
 
 All variables are read from `.env` (see `.env.example` for the template — never commit the real
@@ -49,9 +63,12 @@ All variables are read from `.env` (see `.env.example` for the template — neve
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `NODE_ENV`                      | `production` or `development`. Controls things like secure cookies once auth exists.                         |
 | `PORT`                          | Port the API listens on inside its container (also the host port mapping in `docker-compose.yml`).           |
+| `DB_HOST` / `DB_PORT`           | Host and port the API uses to reach the database (`db` / `3306` in compose).                                 |
+| `DB_USER` / `DB_PASSWORD`       | Credentials the API connects with — the dedicated application user, never root.                              |
+| `DB_NAME`                       | Database/schema name the API connects to.                                                                    |
 | `MYSQL_ROOT_PASSWORD`           | Root password for the MariaDB container. Must be set explicitly — see the comment in `.env.example` for why. |
-| `MYSQL_DATABASE`                | Database schema created on first MariaDB start.                                                              |
-| `MYSQL_USER` / `MYSQL_PASSWORD` | Dedicated application database user (not root) created on first MariaDB start.                               |
+| `MYSQL_DATABASE`                | Database schema created on first MariaDB start (must equal `DB_NAME`).                                       |
+| `MYSQL_USER` / `MYSQL_PASSWORD` | Application database user created on first MariaDB start (must equal `DB_USER` / `DB_PASSWORD`).             |
 
 ## Updating
 

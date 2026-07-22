@@ -1,0 +1,219 @@
+import type { Pool } from 'mariadb';
+
+import { loadConfig } from '../config/env.js';
+import { runMigrations } from '../db/migrate.js';
+import { createPool, waitForDatabase } from '../db/pool.js';
+import { ENTITY_PREFIX, ID_ALPHABET, type EntityName } from '../lib/ids.js';
+
+/**
+ * Anonymized development seed data. Every row uses a DETERMINISTIC public ID
+ * (prefix + "SEED" + an index) so re-running the seed touches the same rows
+ * and never duplicates them — inserts are `ON DUPLICATE KEY UPDATE` no-ops on
+ * the UID unique key. Intended for local development only; it refuses to run
+ * against NODE_ENV=production.
+ */
+
+/** Builds a stable, valid public ID for a seed row from its entity and index. */
+function seedId(entity: EntityName, index: number): string {
+  // charAt returns a plain string (never undefined); indices stay well within
+  // the alphabet, so the body is always 7 valid characters.
+  const body = ID_ALPHABET.charAt(index % ID_ALPHABET.length).repeat(7);
+  return `${ENTITY_PREFIX[entity]}SEED${body}`;
+}
+
+/** Inserts a row if its UID is not already present; a repeat run is a no-op. */
+async function seedRow(
+  pool: Pool,
+  table: string,
+  row: Record<string, string | number | null>,
+): Promise<void> {
+  const columns = Object.keys(row);
+  const [firstColumn] = columns;
+  if (firstColumn === undefined) {
+    throw new Error(`seedRow called with no columns for table ${table}`);
+  }
+  const placeholders = columns.map(() => '?').join(', ');
+  await pool.query(
+    `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})
+     ON DUPLICATE KEY UPDATE ${firstColumn} = ${firstColumn}`,
+    Object.values(row),
+  );
+}
+
+/** Public IDs referenced across several rows, named for readability below. */
+const ids = {
+  accountAnna: seedId('account', 0),
+  accountBen: seedId('account', 1),
+  company: seedId('company', 0),
+  contractAnna: seedId('contract', 0),
+  facilityDoctor: seedId('facility', 0),
+  facilityRadiology: seedId('facility', 1),
+  agency: seedId('agency', 0),
+  submission: seedId('submission', 0),
+  invoiceOpen: seedId('invoice', 0),
+  invoiceSubmitted: seedId('invoice', 1),
+  invoiceBilled: seedId('invoice', 2),
+  invoiceDone: seedId('invoice', 3),
+  invoiceBenOpen: seedId('invoice', 4),
+  billing: seedId('serviceBilling', 0),
+  allocationBilled: seedId('allocation', 0),
+  allocationDone: seedId('allocation', 1),
+};
+
+/** Inserts the full seed dataset (invoices spanning every lifecycle state). */
+export async function seedDatabase(pool: Pool): Promise<void> {
+  await seedRow(pool, 'Accounts', {
+    accountUID: ids.accountAnna,
+    surname: 'Muster',
+    firstname: 'Anna',
+    birthDate: '1985-04-12',
+  });
+  await seedRow(pool, 'Accounts', {
+    accountUID: ids.accountBen,
+    surname: 'Muster',
+    firstname: 'Ben',
+    birthDate: '2014-09-30',
+    leadAccountUID: ids.accountAnna,
+  });
+
+  await seedRow(pool, 'InsuranceCompanies', {
+    companyUID: ids.company,
+    companyName: 'Beispiel Krankenversicherung AG',
+    addressCity: 'Musterstadt',
+  });
+
+  await seedRow(pool, 'Contracts', {
+    contractUID: ids.contractAnna,
+    contractNumber: 'PKV-2020-0001',
+    companyUID: ids.company,
+    accountUID: ids.accountAnna,
+    contractBegin: '2020-01-01',
+    deductible: 300.0,
+    reimbursementCap: 5000.0,
+    monthlyRate: 420.0,
+    bonus: 600.0,
+  });
+
+  await seedRow(pool, 'Facilities', {
+    facilityUID: ids.facilityDoctor,
+    facilityName: 'Hausarztpraxis Dr. Beispiel',
+    distanceKm: 3,
+  });
+  await seedRow(pool, 'Facilities', {
+    facilityUID: ids.facilityRadiology,
+    facilityName: 'Radiologie Musterstadt',
+    distanceKm: 12,
+  });
+
+  await seedRow(pool, 'CollectionAgencies', {
+    agencyUID: ids.agency,
+    agencyName: 'Beispiel Inkasso GmbH',
+    bankAccount: 'DE02120300000000202051',
+  });
+
+  await seedRow(pool, 'Submissions', {
+    submissionUID: ids.submission,
+    contractUID: ids.contractAnna,
+    submittedDate: '2024-03-15',
+  });
+
+  // Open: never submitted.
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceOpen,
+    invoiceNumber: 'R-2024-100',
+    invoiceDate: '2024-02-20',
+    accountUID: ids.accountAnna,
+    facilityUID: ids.facilityDoctor,
+    invoiceAmount: 85.0,
+  });
+  // Submitted, not yet billed: has a submission but no allocation.
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceSubmitted,
+    invoiceNumber: 'R-2024-101',
+    invoiceDate: '2024-03-01',
+    accountUID: ids.accountAnna,
+    facilityUID: ids.facilityRadiology,
+    submissionUID: ids.submission,
+    invoiceAmount: 120.0,
+  });
+  // Billed: submission + allocation, not yet paid out (no transferDate).
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceBilled,
+    invoiceNumber: 'R-2024-102',
+    invoiceDate: '2024-03-02',
+    accountUID: ids.accountAnna,
+    facilityUID: ids.facilityDoctor,
+    submissionUID: ids.submission,
+    invoiceAmount: 200.0,
+  });
+  // Done: billed and paid out (transferDate set).
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceDone,
+    invoiceNumber: 'R-2024-103',
+    invoiceDate: '2024-03-03',
+    accountUID: ids.accountAnna,
+    facilityUID: ids.facilityRadiology,
+    submissionUID: ids.submission,
+    invoiceAmount: 60.0,
+    transferDate: '2024-04-10',
+  });
+  // Ben's single open invoice.
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceBenOpen,
+    invoiceNumber: 'R-2024-200',
+    invoiceDate: '2024-05-05',
+    accountUID: ids.accountBen,
+    facilityUID: ids.facilityDoctor,
+    invoiceAmount: 45.0,
+  });
+
+  await seedRow(pool, 'ServiceBillings', {
+    billingUID: ids.billing,
+    submissionUID: ids.submission,
+    billingDate: '2024-04-01',
+    billingNumber: 'LA-2024-500',
+  });
+
+  await seedRow(pool, 'Allocations', {
+    allocationUID: ids.allocationBilled,
+    invoiceUID: ids.invoiceBilled,
+    billingUID: ids.billing,
+    receiptNumber: 'BELEG-102',
+    reimbursement: 150.0,
+  });
+  await seedRow(pool, 'Allocations', {
+    allocationUID: ids.allocationDone,
+    invoiceUID: ids.invoiceDone,
+    billingUID: ids.billing,
+    receiptNumber: 'BELEG-103',
+    reimbursement: 45.0,
+  });
+}
+
+/** Standalone entry point for `npm run seed`. */
+async function main(): Promise<void> {
+  const config = loadConfig();
+  if (config.isProduction) {
+    throw new Error('Refusing to run the development seed against NODE_ENV=production.');
+  }
+
+  const pool = createPool(config.database);
+  try {
+    await waitForDatabase(pool);
+    await runMigrations(pool);
+    await seedDatabase(pool);
+    console.log('Seed data applied.');
+  } finally {
+    await pool.end();
+  }
+}
+
+if (
+  process.argv[1] &&
+  (import.meta.url === `file://${process.argv[1]}` || import.meta.url.endsWith(process.argv[1]))
+) {
+  main().catch((error: unknown) => {
+    console.error('Seeding failed:', error);
+    process.exitCode = 1;
+  });
+}
