@@ -14,13 +14,15 @@
     "start": "node dist/index.js",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/seed/seed.ts",
-    "test": "tsx --test 'src/**/*.test.ts'",
+    "test": "tsx --test --test-concurrency=1 'src/**/*.test.ts'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "express": "^5.2.1",
+    "jose": "^5.10.0",
     "mariadb": "^3.5.3",
-    "umzug": "^3.8.3"
+    "umzug": "^3.8.3",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

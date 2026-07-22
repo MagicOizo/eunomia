@@ -12,7 +12,7 @@ const pool = createPool(config.database);
 await waitForDatabase(pool);
 await runMigrations(pool);
 
-const app = createApp();
+const app = createApp({ pool, config });
 
 const server = app.listen(config.port, () => {
   console.log(`Eunomia API listening on port ${config.port}`);

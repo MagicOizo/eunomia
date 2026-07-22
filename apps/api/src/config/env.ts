@@ -35,11 +35,34 @@ export interface DatabaseConfig {
   database: string;
 }
 
+export interface AuthConfig {
+  /** HMAC secret for signing access-token JWTs. */
+  jwtSecret: string;
+  /** Access-token lifetime in seconds (short — the refresh token is the long-lived one). */
+  accessTokenTtlSeconds: number;
+  /** Refresh-token lifetime in seconds. */
+  refreshTokenTtlSeconds: number;
+  /**
+   * One-time bootstrap token required by the setup endpoint (see 2.4 / Slice 3).
+   * Setup only works while no user exists AND this token is presented, so an
+   * exposed API port cannot be used to claim the first admin account. Unset
+   * (undefined) disables the setup endpoint entirely.
+   */
+  setupToken: string | undefined;
+}
+
 export interface AppConfig {
   nodeEnv: string;
   port: number;
   isProduction: boolean;
   database: DatabaseConfig;
+  auth: AuthConfig;
+}
+
+/** Reads an optional string variable, returning undefined when unset/empty. */
+function optionalString(name: string): string | undefined {
+  const value = process.env[name];
+  return value === undefined || value.trim() === '' ? undefined : value;
 }
 
 /** Reads and validates the full application config from the environment. */
@@ -55,6 +78,12 @@ export function loadConfig(): AppConfig {
       user: requireString('DB_USER'),
       password: requireString('DB_PASSWORD'),
       database: requireString('DB_NAME'),
+    },
+    auth: {
+      jwtSecret: requireString('JWT_SECRET'),
+      accessTokenTtlSeconds: optionalInt('ACCESS_TOKEN_TTL_SECONDS', 15 * 60),
+      refreshTokenTtlSeconds: optionalInt('REFRESH_TOKEN_TTL_SECONDS', 30 * 24 * 60 * 60),
+      setupToken: optionalString('SETUP_TOKEN'),
     },
   };
 }

@@ -25,6 +25,7 @@ export const ENTITY_PREFIX = {
   invoice: 'i',
   serviceBilling: 's',
   allocation: 'l', // aLLocation (successor to the old Assignment)
+  role: 'r', // Users themselves use a UUID (see 002 migration), roles a NanoID
 } as const;
 
 export type EntityName = keyof typeof ENTITY_PREFIX;
