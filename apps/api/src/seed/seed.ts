@@ -1,6 +1,6 @@
 import type { Pool } from 'mariadb';
 
-import { loadConfig } from '../config/env.js';
+import { loadDatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
 import { createPool, waitForDatabase } from '../db/pool.js';
 import { ENTITY_PREFIX, ID_ALPHABET, type EntityName } from '../lib/ids.js';
@@ -118,11 +118,12 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     submittedDate: '2024-03-15',
   });
 
-  // Open: never submitted.
+  // Open: never submitted. Treated in 2023, so Anna also has a 2023 year tab.
   await seedRow(pool, 'Invoices', {
     invoiceUID: ids.invoiceOpen,
     invoiceNumber: 'R-2024-100',
     invoiceDate: '2024-02-20',
+    treatmentDate: '2023-11-20',
     accountUID: ids.accountAnna,
     facilityUID: ids.facilityDoctor,
     invoiceAmount: 85.0,
@@ -132,6 +133,7 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     invoiceUID: ids.invoiceSubmitted,
     invoiceNumber: 'R-2024-101',
     invoiceDate: '2024-03-01',
+    treatmentDate: '2024-02-10',
     accountUID: ids.accountAnna,
     facilityUID: ids.facilityRadiology,
     submissionUID: ids.submission,
@@ -142,6 +144,7 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     invoiceUID: ids.invoiceBilled,
     invoiceNumber: 'R-2024-102',
     invoiceDate: '2024-03-02',
+    treatmentDate: '2024-02-11',
     accountUID: ids.accountAnna,
     facilityUID: ids.facilityDoctor,
     submissionUID: ids.submission,
@@ -152,6 +155,7 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     invoiceUID: ids.invoiceDone,
     invoiceNumber: 'R-2024-103',
     invoiceDate: '2024-03-03',
+    treatmentDate: '2024-02-12',
     accountUID: ids.accountAnna,
     facilityUID: ids.facilityRadiology,
     submissionUID: ids.submission,
@@ -163,6 +167,7 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     invoiceUID: ids.invoiceBenOpen,
     invoiceNumber: 'R-2024-200',
     invoiceDate: '2024-05-05',
+    treatmentDate: '2024-04-20',
     accountUID: ids.accountBen,
     facilityUID: ids.facilityDoctor,
     invoiceAmount: 45.0,
@@ -225,12 +230,11 @@ async function seedDevAdmin(pool: Pool): Promise<void> {
 
 /** Standalone entry point for `npm run seed`. */
 async function main(): Promise<void> {
-  const config = loadConfig();
-  if (config.isProduction) {
+  if ((process.env.NODE_ENV ?? 'development') === 'production') {
     throw new Error('Refusing to run the development seed against NODE_ENV=production.');
   }
 
-  const pool = createPool(config.database);
+  const pool = createPool(loadDatabaseConfig());
   try {
     await waitForDatabase(pool);
     await runMigrations(pool);

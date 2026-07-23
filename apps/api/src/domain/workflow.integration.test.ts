@@ -146,6 +146,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         await post('/api/v1/invoices', {
           invoiceNumber: number,
           invoiceDate: '2024-05-01',
+          treatmentDate: '2024-05-01',
           accountUID: account,
           invoiceAmount: amount,
         })
@@ -245,6 +246,11 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(res.body.data.alreadyReimbursed, 200);
       assert.equal(res.body.data.analysis.reimbursement, 800); // 1100 - 300 deductible
       assert.equal(res.body.data.analysis.worthSubmitting, true); // 800 > 600 bonus
+
+      // All of account A's invoices were treated in 2024.
+      const years = await request(app).get(`/api/v1/invoices/years?accountUID=${accountA}`).set(admin);
+      assert.equal(years.status, 200);
+      assert.deepEqual(years.body.data, [2024]);
     });
 
     await t.test('account scoping: a scoped user is confined to their account', async () => {
@@ -261,6 +267,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       const own = await post('/api/v1/invoices', {
         invoiceNumber: 'R-own',
         invoiceDate: '2024-09-01',
+        treatmentDate: '2024-09-01',
         accountUID: accountA,
         invoiceAmount: 50,
       }, user);
@@ -269,6 +276,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       const foreign = await post('/api/v1/invoices', {
         invoiceNumber: 'R-foreign',
         invoiceDate: '2024-09-01',
+        treatmentDate: '2024-09-01',
         accountUID: accountB,
         invoiceAmount: 50,
       }, user);

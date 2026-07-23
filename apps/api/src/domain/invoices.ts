@@ -43,7 +43,9 @@ const directPayment = z.boolean().transform((value) => (value ? 1 : 0));
 const base = z.object({
   invoiceNumber: z.string().trim().min(1).max(50),
   invoiceDate: z.string().date(),
-  treatmentDate: z.string().date().nullish(),
+  // Mandatory: the deductible/bonus year is keyed by treatment date, not billing
+  // date (see Notes/eunomia-plan.md, Slice 8).
+  treatmentDate: z.string().date(),
   accountUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.account)),
   facilityUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.facility)).nullish(),
   invoiceAmount: money,
@@ -156,12 +158,47 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
 
     const year = typeof req.query.year === 'string' ? Number(req.query.year) : undefined;
     if (year !== undefined && Number.isInteger(year)) {
-      where.push('YEAR(COALESCE(i.treatmentDate, i.invoiceDate)) = ?');
+      where.push('YEAR(i.treatmentDate) = ?');
       params.push(year);
     }
 
     const rows = await queryInvoices(pool, where.join(' AND '), params);
     sendData(res, rows.map(present));
+  });
+
+  // Distinct treatment years for an account, so the UI can offer year tabs
+  // without loading every invoice. Registered before '/:uid' so it is not
+  // captured as an invoice id.
+  router.get('/years', requireAuth, async (req, res) => {
+    const user = getAuthUser(res);
+    const where: string[] = ['invoiceStatus <> -1'];
+    const params: unknown[] = [];
+
+    const requestedAccount = typeof req.query.accountUID === 'string' ? req.query.accountUID : undefined;
+    if (requestedAccount !== undefined) {
+      if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_INVOICES, requestedAccount))) {
+        throw forbidden();
+      }
+      where.push('accountUID = ?');
+      params.push(requestedAccount);
+    } else {
+      const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_INVOICES);
+      if (!scope.all) {
+        if (scope.accountUIDs.length === 0) {
+          sendData(res, []);
+          return;
+        }
+        where.push(`accountUID IN (${scope.accountUIDs.map(() => '?').join(', ')})`);
+        params.push(...scope.accountUIDs);
+      }
+    }
+
+    const rows = await pool.query<Array<{ year: number }>>(
+      `SELECT DISTINCT YEAR(treatmentDate) AS year FROM Invoices
+        WHERE ${where.join(' AND ')} ORDER BY year DESC`,
+      params,
+    );
+    sendData(res, rows.map((row) => row.year));
   });
 
   router.get('/:uid', requireAuth, async (req, res) => {

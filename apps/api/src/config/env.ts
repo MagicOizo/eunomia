@@ -65,6 +65,21 @@ function optionalString(name: string): string | undefined {
   return value === undefined || value.trim() === '' ? undefined : value;
 }
 
+/**
+ * Reads only the database config. Split out so tools that need the database but
+ * not the app's auth config (e.g. the seed script) don't have to provide
+ * JWT_SECRET etc.
+ */
+export function loadDatabaseConfig(): DatabaseConfig {
+  return {
+    host: requireString('DB_HOST'),
+    port: optionalInt('DB_PORT', 3306),
+    user: requireString('DB_USER'),
+    password: requireString('DB_PASSWORD'),
+    database: requireString('DB_NAME'),
+  };
+}
+
 /** Reads and validates the full application config from the environment. */
 export function loadConfig(): AppConfig {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
@@ -72,13 +87,7 @@ export function loadConfig(): AppConfig {
     nodeEnv,
     port: optionalInt('PORT', 3000),
     isProduction: nodeEnv === 'production',
-    database: {
-      host: requireString('DB_HOST'),
-      port: optionalInt('DB_PORT', 3306),
-      user: requireString('DB_USER'),
-      password: requireString('DB_PASSWORD'),
-      database: requireString('DB_NAME'),
-    },
+    database: loadDatabaseConfig(),
     auth: {
       jwtSecret: requireString('JWT_SECRET'),
       accessTokenTtlSeconds: optionalInt('ACCESS_TOKEN_TTL_SECONDS', 15 * 60),

@@ -1,18 +1,6 @@
+import { euro, germanDate } from '../lib/format';
 import type { ResourceRow } from '../lib/resource';
 import type { ResourceConfig } from './config';
-
-/** Formats an optional money value (numbers arrive from the API as plain numbers). */
-function euro(value: unknown): string {
-  if (value === null || value === undefined) return '–';
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(value));
-}
-
-/** Formats an ISO date string (YYYY-MM-DD) as DD.MM.YYYY. */
-function germanDate(value: unknown): string {
-  if (typeof value !== 'string' || value === '') return '–';
-  const [year, month, day] = value.split('-');
-  return `${day}.${month}.${year}`;
-}
 
 /** A person's display name from an account row. */
 function personName(row: ResourceRow): string {

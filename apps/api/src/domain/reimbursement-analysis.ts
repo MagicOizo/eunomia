@@ -19,10 +19,10 @@ interface ContractFinancials {
 
 /**
  * Router exposing the "is it worth submitting?" analysis for a contract and
- * year. It aggregates that year's active invoices for the contract's account
- * (by treatment date, falling back to invoice date) and runs the pure
- * reimbursement service on the total. Mounted alongside the contracts router;
- * the two-segment path does not collide with the contracts CRUD routes.
+ * year. It aggregates the treatment-year's active invoices for the contract's
+ * account and runs the pure reimbursement service on the total. Mounted
+ * alongside the contracts router; the two-segment path does not collide with
+ * the contracts CRUD routes.
  */
 export function createReimbursementAnalysisRouter(pool: Pool, config: AppConfig): Router {
   const router = Router();
@@ -47,7 +47,7 @@ export function createReimbursementAnalysisRouter(pool: Pool, config: AppConfig)
       `SELECT COALESCE(SUM(invoiceAmount), 0) AS invoiceTotal
          FROM Invoices
         WHERE accountUID = ? AND invoiceStatus <> -1
-          AND YEAR(COALESCE(treatmentDate, invoiceDate)) = ?`,
+          AND YEAR(treatmentDate) = ?`,
       [contract.accountUID, year],
     );
     const [reimbursed] = await pool.query<Array<{ alreadyReimbursed: number }>>(
@@ -55,7 +55,7 @@ export function createReimbursementAnalysisRouter(pool: Pool, config: AppConfig)
          FROM Allocations a
          JOIN Invoices i ON i.invoiceUID = a.invoiceUID
         WHERE i.accountUID = ? AND i.invoiceStatus <> -1 AND a.allocationStatus <> -1
-          AND YEAR(COALESCE(i.treatmentDate, i.invoiceDate)) = ?`,
+          AND YEAR(i.treatmentDate) = ?`,
       [contract.accountUID, year],
     );
 

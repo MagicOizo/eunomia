@@ -263,6 +263,12 @@ Jeder Slice ist für sich lauffähig/überprüfbar (App startet, Tests laufen, s
 
 **DoD:** Der komplette Loop aus 1.1.1 ist im Browser durchführbar, mobil nutzbar (responsiv), in Light und Dark Mode geprüft.
 
+**Backlog (spätere Slice, aus der Slice-8-Durchsicht):**
+- **Zahlungsstatus-Ampel** in der Rechnungstabelle: ein Ampelpunkt, der zeigt, ob der Nutzer noch überweisen muss und wie dringend — vier Zustände: bereits bezahlt (inkl. Direkt-/Barzahlung), Zahlungsziel > 1 Woche in der Zukunft, innerhalb von 7 Tagen, erreicht/überschritten. Klick auf den Punkt öffnet eine kleine Popup-Blase mit den Zahlungsinformationen (Betrag, Kontonummer/IBAN des Inkassos, Verwendungszweck). Der Verwendungszweck (`transferSubject`) lebt dort, nicht als eigene Tabellenspalte.
+- **Sammel-Abrechnung** (eine Leistungsabrechnung, mehrere Rechnungen einer Einreichung auf einmal zuordnen) — in Slice 8 ist die Abrechnung pro Rechnung umgesetzt.
+- **Dialog-Layout überarbeiten**: die Formular-Dialoge sind aktuell schmal und hoch (mit Scroll). Mehr Seitenbreite nutzen und flexibler anordnen (mehrspaltig statt einspaltig), damit weniger gescrollt werden muss.
+- **Näher an den Stil der Referenz-App** herangehen (visuelle Anmutung/Feinschliff über das bisherige Design-System hinaus).
+
 ## Slice 9 — Rechte-Verwaltung UI
 **Ziel:** Admins können Rollen und Rechte ohne SQL vergeben.
 - Nutzerverwaltung, Rollenverwaltung, Zuordnung Nutzer↔Account-Rechte (UI zu Slice 3/2.4)

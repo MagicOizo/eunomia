@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 import ResourceView from '../components/resource/ResourceView.vue';
+import InvoicePickerView from '../invoices/InvoicePickerView.vue';
+import InvoiceWorkspaceView from '../invoices/InvoiceWorkspaceView.vue';
 import { resourceConfigs } from '../resources/definitions';
 import { useAuthStore } from '../stores/auth';
 import DashboardView from '../views/DashboardView.vue';
@@ -22,7 +24,11 @@ declare module 'vue-router' {
  * resource config (Slice 4/7 master data) render the CRUD view; the rest stay
  * placeholders until their slice lands.
  */
-const navRoutes = [...mainNav.filter((item) => item.to !== '/'), ...systemNav].map((item) => {
+// '/invoices' has bespoke routes (picker + workspace) below, so it is excluded here.
+const navRoutes = [
+  ...mainNav.filter((item) => item.to !== '/' && item.to !== '/invoices'),
+  ...systemNav,
+].map((item) => {
   const config = resourceConfigs[item.to];
   return {
     path: item.to,
@@ -42,6 +48,19 @@ export const router = createRouter({
   routes: [
     { path: '/login', name: 'login', component: LoginView, meta: { layout: 'blank', title: 'Anmelden' } },
     { path: '/', name: 'home', component: DashboardView, meta: { title: 'Startseite', requiresAuth: true } },
+    {
+      path: '/invoices',
+      name: '/invoices',
+      component: InvoicePickerView,
+      meta: { title: 'Rechnungen', requiresAuth: true },
+    },
+    {
+      path: '/invoices/:accountUID',
+      name: 'invoices-account',
+      component: InvoiceWorkspaceView,
+      props: true,
+      meta: { title: 'Rechnungen', requiresAuth: true },
+    },
     ...navRoutes,
     {
       path: '/styleguide',
