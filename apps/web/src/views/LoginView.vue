@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { faScaleBalanced } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import logoBlue from '../assets/logo/eunomia-blue.svg';
+import logoWhite from '../assets/logo/eunomia-white.svg';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { HttpError } from '../lib/http';
@@ -39,7 +39,8 @@ async function submit(): Promise<void> {
 <template>
   <div class="eu-login">
     <div class="eu-login__brand">
-      <FontAwesomeIcon :icon="faScaleBalanced" aria-hidden="true" />
+      <img :src="logoBlue" alt="" class="eu-login__logo eu-login__logo--light" />
+      <img :src="logoWhite" alt="" class="eu-login__logo eu-login__logo--dark" />
       <span>Eunomia</span>
     </div>
     <p class="eu-login__subtitle">Verwaltung privater Krankenversicherungs-Abrechnungen</p>
@@ -71,6 +72,25 @@ async function submit(): Promise<void> {
   font-family: var(--eu-font-heading);
   font-size: 1.8rem;
   color: var(--eu-color-accent);
+}
+
+.eu-login__logo {
+  height: 2.75rem;
+  width: auto;
+}
+
+/* Theme-aware emblem: blue on the light card, white on the dark card. */
+.eu-login__logo--dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .eu-login__logo--light {
+    display: none;
+  }
+  .eu-login__logo--dark {
+    display: inline;
+  }
 }
 
 .eu-login__subtitle {

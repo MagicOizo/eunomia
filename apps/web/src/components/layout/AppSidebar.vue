@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { faArrowRightFromBracket, faScaleBalanced, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faArrowRightFromBracket, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { useRouter } from 'vue-router';
 
+import eunomiaLogo from '../../assets/logo/eunomia-white.svg';
 import { mainNav, systemNav } from '../../router/nav';
 import { useAuthStore } from '../../stores/auth';
 
@@ -22,7 +23,7 @@ async function logout(): Promise<void> {
 <template>
   <aside class="eu-sidebar" :class="{ 'eu-sidebar--open': open }">
     <RouterLink class="eu-sidebar__brand" to="/" title="Eunomia Startseite" @click="emit('navigate')">
-      <FontAwesomeIcon :icon="faScaleBalanced" aria-hidden="true" />
+      <img :src="eunomiaLogo" alt="" class="eu-sidebar__logo" />
       <span class="eu-sidebar__wordmark">Eunomia</span>
     </RouterLink>
 
@@ -85,6 +86,11 @@ async function logout(): Promise<void> {
   text-decoration: none;
   font-family: var(--eu-font-heading);
   font-size: 1.6rem;
+}
+
+.eu-sidebar__logo {
+  height: 2.25rem;
+  width: auto;
 }
 
 .eu-sidebar__nav {
