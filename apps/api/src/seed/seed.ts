@@ -4,6 +4,7 @@ import { loadConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
 import { createPool, waitForDatabase } from '../db/pool.js';
 import { ENTITY_PREFIX, ID_ALPHABET, type EntityName } from '../lib/ids.js';
+import { hashPassword } from '../lib/password.js';
 
 /**
  * Anonymized development seed data. Every row uses a DETERMINISTIC public ID
@@ -190,6 +191,38 @@ export async function seedDatabase(pool: Pool): Promise<void> {
   });
 }
 
+/**
+ * Ensures a development admin exists so the app is immediately usable after
+ * `npm run dev:up` — no manual setup call needed. Idempotent: a repeat run
+ * neither duplicates the user nor the role grant. Credentials come from
+ * DEV_ADMIN_EMAIL / DEV_ADMIN_PASSWORD (with obvious dev defaults). Dev only:
+ * `main()` below refuses to run against NODE_ENV=production.
+ */
+async function seedDevAdmin(pool: Pool): Promise<void> {
+  const email = process.env.DEV_ADMIN_EMAIL ?? 'admin@example.com';
+  const password = process.env.DEV_ADMIN_PASSWORD ?? 'eunomia';
+
+  const existing = await pool.query<Array<{ userID: number }>>(
+    'SELECT userID FROM Users WHERE email = ? LIMIT 1',
+    [email],
+  );
+  let userId = existing[0]?.userID;
+  if (userId === undefined) {
+    const result = (await pool.query(
+      'INSERT INTO Users (email, firstname, surname, passwordHash) VALUES (?, ?, ?, ?)',
+      [email, 'Dev', 'Admin', await hashPassword(password)],
+    )) as { insertId: number };
+    userId = result.insertId;
+  }
+
+  await pool.query(
+    `INSERT IGNORE INTO UserRoles (userID, roleID)
+     SELECT ?, roleID FROM Roles WHERE roleName = 'Admin'`,
+    [userId],
+  );
+  console.log(`Dev admin ready: ${email} / ${password}`);
+}
+
 /** Standalone entry point for `npm run seed`. */
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -202,6 +235,7 @@ async function main(): Promise<void> {
     await waitForDatabase(pool);
     await runMigrations(pool);
     await seedDatabase(pool);
+    await seedDevAdmin(pool);
     console.log('Seed data applied.');
   } finally {
     await pool.end();

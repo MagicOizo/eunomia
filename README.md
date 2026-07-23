@@ -22,14 +22,34 @@ Requires Node.js 24+ and Docker with Compose.
 ```bash
 npm install                 # install all workspace dependencies
 
-npm run dev:api              # apps/api with hot reload (tsx watch)
-npm run dev:web               # apps/web with hot reload (Vite)
-
 npm run lint                 # ESLint across the whole repo
 npm run typecheck            # tsc / vue-tsc, no emit
 npm run test                  # backend (node:test) + frontend (vitest)
 npm run build                 # production build of every workspace
 ```
+
+### Run the whole app locally (one command)
+
+```bash
+npm run dev:up               # DB + migrations + seed (incl. dev admin) + API + web
+```
+
+This starts a MariaDB container, seeds demo data and a development admin, and runs both dev
+servers with hot reload. When it's ready, open **http://localhost:5173** and log in with the
+credentials it prints (default `admin@example.com` / `eunomia` — override via `DEV_ADMIN_EMAIL` /
+`DEV_ADMIN_PASSWORD`). In WSL2, `localhost` forwards from Windows automatically, so the same URL
+works in your Windows browser.
+
+`Ctrl-C` stops the API and web servers; the database keeps running. To stop it too:
+
+```bash
+npm run dev:down             # stop the dev database (test data is kept)
+npm run dev:down -- --wipe   # also delete the data volume (fresh start)
+```
+
+Everything here is development-only and self-contained: teardown removes only what `dev:up`
+created (its container, network, and — with `--wipe` — its named volume). To run the individual
+servers by hand instead, use `npm run dev:api` and `npm run dev:web`.
 
 To run the containerized stack (API + MariaDB), copy `.env.example` to `.env`, fill in real
 values, then:

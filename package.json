@@ -21,7 +21,9 @@
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "dev:api": "npm run dev --workspace apps/api",
-    "dev:web": "npm run dev --workspace apps/web"
+    "dev:web": "npm run dev --workspace apps/web",
+    "dev:up": "bash scripts/dev.sh",
+    "dev:down": "bash scripts/dev-down.sh"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

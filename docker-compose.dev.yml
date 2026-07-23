@@ -1,0 +1,30 @@
+# Local development database only. The API and web dev servers run on the host
+# (via scripts/dev.sh) for fast hot reload; this file just provides a MariaDB
+# with a published port and a named volume so data survives restarts.
+#
+# Managed entirely by `npm run dev:up` / `npm run dev:down`. Teardown only ever
+# removes what this file created (container, network, and — with `down -v` —
+# the named volume); nothing else on the machine is touched.
+services:
+  db:
+    image: mariadb:11
+    container_name: eunomia-dev-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: eunomia
+      MARIADB_USER: eunomia
+      MARIADB_PASSWORD: eunomia
+    ports:
+      - '3306:3306'
+    volumes:
+      - eunomia-dev-db:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  eunomia-dev-db:
