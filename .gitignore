@@ -14,3 +14,4 @@ npm-debug.log*
 
 # MariaDB bind-mount data (production)
 db_data/
+backups/

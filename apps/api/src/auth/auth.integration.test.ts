@@ -42,6 +42,8 @@ function testConfig(database: DatabaseConfig): AppConfig {
       refreshTokenTtlSeconds: 3600,
       setupToken: SETUP_TOKEN,
     },
+    trustProxy: 1,
+    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
   };
 }
 
@@ -227,6 +229,20 @@ test('auth flow: setup, login, protected access, scoping, refresh, logout', asyn
         .post('/api/v1/auth/refresh')
         .set('Cookie', `refresh_token=${newCookie}`);
       assert.equal(afterLogout.status, 401);
+    });
+
+    await t.test('the auth endpoints are rate limited', async () => {
+      const strict = createApp({
+        pool,
+        config: { ...config, rateLimit: { ...config.rateLimit, authMax: 3, authWindowMs: 60_000 } },
+      });
+      let lastStatus = 0;
+      for (let i = 0; i < 5; i += 1) {
+        lastStatus = (
+          await request(strict).post('/api/v1/auth/login').send({ email: 'x@example.com', password: 'nope' })
+        ).status;
+      }
+      assert.equal(lastStatus, 429); // over the 3-per-window limit
     });
   } finally {
     await pool.end();

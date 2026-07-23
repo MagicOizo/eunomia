@@ -42,6 +42,8 @@ function testConfig(database: DatabaseConfig): AppConfig {
       refreshTokenTtlSeconds: 3600,
       setupToken: SETUP_TOKEN,
     },
+    trustProxy: 1,
+    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
   };
 }
 

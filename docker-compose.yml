@@ -1,9 +1,10 @@
 services:
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    image: eunomia-api:local
+    # Pre-built, versioned image from GitHub Container Registry — a production
+    # host only needs this file + .env (no source checkout, no build). Pin a
+    # release with EUNOMIA_VERSION in .env; defaults to the latest release.
+    # To build locally instead, add docker-compose.build.yml (see DEV.md).
+    image: ghcr.io/magicoizo/eunomia:${EUNOMIA_VERSION:-latest}
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}

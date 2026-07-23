@@ -7,6 +7,7 @@ import {
   faPen,
   faPlus,
   faTrash,
+  faUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, ref, watch, watchEffect } from 'vue';
@@ -277,6 +278,10 @@ function submitSettle(transferDate: string): void {
   );
 }
 
+function openDocument(invoice: InvoiceDto): void {
+  if (invoice.documentLink) window.open(invoice.documentLink, '_blank', 'noopener');
+}
+
 function confirmDelete(): void {
   const uids = deleteTargets.value;
   if (uids.length === 0) return;
@@ -388,6 +393,15 @@ function confirmDelete(): void {
             <td>{{ euro(invoice.invoiceAmount) }}</td>
             <td>{{ euro(invoice.reimbursedTotal) }}</td>
             <td class="eu-ws__actions">
+              <EuButton
+                v-if="invoice.documentLink"
+                variant="secondary"
+                icon-only
+                :icon="faUpRightFromSquare"
+                aria-label="Dokument öffnen"
+                title="Hinterlegtes Dokument öffnen"
+                @click="openDocument(invoice)"
+              />
               <EuButton
                 v-if="invoice.workflowStatus === 'offen'"
                 variant="secondary"

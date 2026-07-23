@@ -1,4 +1,8 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import express, { type Express } from 'express';
+import rateLimit from 'express-rate-limit';
 import type { Pool } from 'mariadb';
 
 import { createUserAdminRouter } from './auth/admin-routes.js';
@@ -21,28 +25,50 @@ import { versionRouter } from './routes/version.js';
 export interface AppDependencies {
   pool: Pool;
   config: AppConfig;
+  /** Absolute path to the built SPA (apps/web/dist). When present, the API serves it. */
+  webRoot?: string;
+}
+
+/** Builds a rate limiter that responds with our JSON error envelope on 429. */
+function limiter(windowMs: number, max: number) {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: { code: 'RATE_LIMITED', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' } },
+  });
 }
 
 /**
  * Builds the Express app without starting a listener, so tests can exercise
  * it via supertest without binding a real port (see src/index.ts for that).
  *
- * `deps` is optional: the liveness and version routes work without a database,
- * so lightweight tests can call `createApp()`. The auth/rights routes are only
- * mounted when a pool and config are supplied.
+ * `deps` is optional: the version route works without a database, so lightweight
+ * tests can call `createApp()`. The API routers, rate limiting and the SPA are
+ * only mounted when a pool + config are supplied.
  */
 export function createApp(deps?: AppDependencies): Express {
   const app = express();
   app.use(express.json());
 
-  app.get('/', (_req, res) => {
-    res.json({ service: 'eunomia-api', status: 'ok' });
-  });
+  if (deps) {
+    const { config } = deps;
+    // Behind a reverse proxy the real client IP arrives in X-Forwarded-For.
+    app.set('trust proxy', config.trustProxy);
+    // Generous baseline for the whole API, strict on the auth endpoints.
+    app.use('/api', limiter(config.rateLimit.globalWindowMs, config.rateLimit.globalMax));
+    app.use(
+      ['/api/v1/auth/login', '/api/v1/auth/refresh', '/api/v1/setup'],
+      limiter(config.rateLimit.authWindowMs, config.rateLimit.authMax),
+    );
+  }
 
+  // Version endpoint (no DB) doubles as the container health check.
   app.use('/api/v1', versionRouter);
 
   if (deps) {
-    const { pool, config } = deps;
+    const { pool, config, webRoot } = deps;
     app.use('/api/v1', createAuthRouter(pool, config));
     app.use('/api/v1', createUserAdminRouter(pool, config));
     app.use('/api/v1/accounts', createAccountsRouter(pool, config));
@@ -55,6 +81,20 @@ export function createApp(deps?: AppDependencies): Express {
     app.use('/api/v1/submissions', createSubmissionsRouter(pool, config));
     app.use('/api/v1/billings', createServiceBillingsRouter(pool, config));
     app.use('/api/v1/allocations', createAllocationsRouter(pool, config));
+
+    // In production the built SPA is served by this same server (same origin, so
+    // the httpOnly refresh cookie works without proxy tricks). Absent in dev/
+    // tests, where Vite serves the frontend separately.
+    if (webRoot && existsSync(webRoot)) {
+      app.use(express.static(webRoot));
+      app.use((req, res, next) => {
+        if (req.method !== 'GET' || req.path.startsWith('/api/')) {
+          next();
+          return;
+        }
+        res.sendFile(join(webRoot, 'index.html'));
+      });
+    }
   }
 
   app.use(errorHandler);

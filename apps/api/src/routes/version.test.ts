@@ -16,8 +16,10 @@ test('GET /api/v1/version returns the version from package.json', async () => {
   assert.equal(response.body.version, packageJson.version);
 });
 
-test('GET / responds with 200', async () => {
-  const response = await request(createApp()).get('/');
+test('the version endpoint works without a database (health check target)', async () => {
+  // In production '/' serves the SPA; the container health check uses this
+  // JSON endpoint instead, which needs no database.
+  const response = await request(createApp()).get('/api/v1/version');
 
   assert.equal(response.status, 200);
 });

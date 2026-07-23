@@ -51,12 +51,24 @@ export interface AuthConfig {
   setupToken: string | undefined;
 }
 
+export interface RateLimitConfig {
+  /** Requests per window allowed on the auth endpoints (brute-force protection). */
+  authMax: number;
+  authWindowMs: number;
+  /** Requests per window allowed across the whole API (generous baseline). */
+  globalMax: number;
+  globalWindowMs: number;
+}
+
 export interface AppConfig {
   nodeEnv: string;
   port: number;
   isProduction: boolean;
+  /** Number of proxy hops to trust for the client IP (reverse proxy in front). */
+  trustProxy: number;
   database: DatabaseConfig;
   auth: AuthConfig;
+  rateLimit: RateLimitConfig;
 }
 
 /** Reads an optional string variable, returning undefined when unset/empty. */
@@ -87,12 +99,19 @@ export function loadConfig(): AppConfig {
     nodeEnv,
     port: optionalInt('PORT', 3000),
     isProduction: nodeEnv === 'production',
+    trustProxy: optionalInt('TRUST_PROXY', 1),
     database: loadDatabaseConfig(),
     auth: {
       jwtSecret: requireString('JWT_SECRET'),
       accessTokenTtlSeconds: optionalInt('ACCESS_TOKEN_TTL_SECONDS', 15 * 60),
       refreshTokenTtlSeconds: optionalInt('REFRESH_TOKEN_TTL_SECONDS', 30 * 24 * 60 * 60),
       setupToken: optionalString('SETUP_TOKEN'),
+    },
+    rateLimit: {
+      authMax: optionalInt('RATE_LIMIT_AUTH_MAX', 10),
+      authWindowMs: optionalInt('RATE_LIMIT_AUTH_WINDOW_MS', 15 * 60 * 1000),
+      globalMax: optionalInt('RATE_LIMIT_GLOBAL_MAX', 300),
+      globalWindowMs: optionalInt('RATE_LIMIT_GLOBAL_WINDOW_MS', 60 * 1000),
     },
   };
 }

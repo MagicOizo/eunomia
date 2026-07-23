@@ -1,3 +1,6 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { loadConfig } from './config/env.js';
 import { createApp } from './app.js';
 import { runMigrations } from './db/migrate.js';
@@ -12,7 +15,13 @@ const pool = createPool(config.database);
 await waitForDatabase(pool);
 await runMigrations(pool);
 
-const app = createApp({ pool, config });
+// The built SPA sits next to the compiled API in the production image
+// (/app/apps/web/dist). Absent in dev, where Vite serves it — createApp only
+// serves it when the directory exists.
+const here = dirname(fileURLToPath(import.meta.url));
+const webRoot = process.env.WEB_ROOT ?? join(here, '..', '..', 'web', 'dist');
+
+const app = createApp({ pool, config, webRoot });
 
 const server = app.listen(config.port, () => {
   console.log(`Eunomia API listening on port ${config.port}`);

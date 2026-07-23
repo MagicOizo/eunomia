@@ -6,7 +6,6 @@
 .vscode
 .claude
 Notes
-apps/web
 README.md
 *.md
 .env

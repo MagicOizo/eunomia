@@ -1,0 +1,11 @@
+# Development/local override: build the api image from source instead of pulling
+# the published one. Production hosts do NOT use this file — they pull the
+# pre-built image referenced in docker-compose.yml.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
