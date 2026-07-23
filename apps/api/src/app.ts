@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import type { Pool } from 'mariadb';
 
+import { createUserAdminRouter } from './auth/admin-routes.js';
 import { createAuthRouter } from './auth/routes.js';
 import type { AppConfig } from './config/env.js';
 import { createAccountsRouter } from './domain/accounts.js';
@@ -43,6 +44,7 @@ export function createApp(deps?: AppDependencies): Express {
   if (deps) {
     const { pool, config } = deps;
     app.use('/api/v1', createAuthRouter(pool, config));
+    app.use('/api/v1', createUserAdminRouter(pool, config));
     app.use('/api/v1/accounts', createAccountsRouter(pool, config));
     app.use('/api/v1/companies', createInsuranceCompaniesRouter(pool, config));
     app.use('/api/v1/contracts', createContractsRouter(pool, config));

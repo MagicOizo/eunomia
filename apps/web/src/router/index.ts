@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
+import UsersView from '../admin/UsersView.vue';
 import ResourceView from '../components/resource/ResourceView.vue';
 import InvoicePickerView from '../invoices/InvoicePickerView.vue';
 import InvoiceWorkspaceView from '../invoices/InvoiceWorkspaceView.vue';
@@ -27,7 +28,7 @@ declare module 'vue-router' {
 // '/invoices' has bespoke routes (picker + workspace) below, so it is excluded here.
 const navRoutes = [
   ...mainNav.filter((item) => item.to !== '/' && item.to !== '/invoices'),
-  ...systemNav,
+  ...systemNav.filter((item) => item.to !== '/system/users'),
 ].map((item) => {
   const config = resourceConfigs[item.to];
   return {
@@ -60,6 +61,12 @@ export const router = createRouter({
       component: InvoiceWorkspaceView,
       props: true,
       meta: { title: 'Rechnungen', requiresAuth: true },
+    },
+    {
+      path: '/system/users',
+      name: '/system/users',
+      component: UsersView,
+      meta: { title: 'Nutzer & Rechte', requiresAuth: true, requiresAdmin: true },
     },
     ...navRoutes,
     {
