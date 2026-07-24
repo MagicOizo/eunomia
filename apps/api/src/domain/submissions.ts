@@ -18,7 +18,6 @@ import {
 const createSchema = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
   submittedDate: z.string().date(),
-  documentLink: z.string().trim().url().max(255).nullish(),
   // The invoices bundled into this submission — at least one, no duplicates.
   invoiceUIDs: z
     .array(z.string().regex(entityIdPattern(ENTITY_PREFIX.invoice)))
@@ -89,8 +88,8 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
 
       const submissionUID = generateEntityId('submission');
       await conn.query(
-        'INSERT INTO Submissions (submissionUID, contractUID, submittedDate, documentLink) VALUES (?, ?, ?, ?)',
-        [submissionUID, input.contractUID, input.submittedDate, input.documentLink ?? null],
+        'INSERT INTO Submissions (submissionUID, contractUID, submittedDate) VALUES (?, ?, ?)',
+        [submissionUID, input.contractUID, input.submittedDate],
       );
       await conn.query(
         `UPDATE Invoices SET submissionUID = ? WHERE invoiceUID IN (${placeholders})`,
@@ -104,7 +103,6 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
           submissionUID,
           contractUID: input.contractUID,
           submittedDate: input.submittedDate,
-          documentLink: input.documentLink ?? null,
           accountUID: contractAccount,
           invoiceUIDs: input.invoiceUIDs,
         },
@@ -132,7 +130,7 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
       params.push(...scope.accountUIDs);
     }
     const rows = await pool.query(
-      `SELECT s.submissionUID, s.contractUID, s.submittedDate, s.documentLink,
+      `SELECT s.submissionUID, s.contractUID, s.submittedDate,
               s.submissionStatus, c.accountUID
          FROM Submissions s
          JOIN Contracts c ON c.contractUID = s.contractUID
@@ -151,7 +149,7 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
     await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
 
     const [submission] = await pool.query(
-      `SELECT submissionUID, contractUID, submittedDate, documentLink, submissionStatus
+      `SELECT submissionUID, contractUID, submittedDate, submissionStatus
          FROM Submissions WHERE submissionUID = ? LIMIT 1`,
       [uid],
     );

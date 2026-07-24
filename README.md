@@ -30,8 +30,10 @@ then reachable at `http://localhost:${PORT}` (default `3000`) — the SPA at `/`
 for TLS; `TRUST_PROXY` makes rate limiting use the real client IP.
 
 The database container is not published to the host (reachable only from the API on the compose
-network), gets a dedicated non-root application user, and requires an explicit
-`MYSQL_ROOT_PASSWORD` (never a random one — see the comment in `.env.example`).
+network) and is bootstrapped from the same `DB_*` values the API connects with — a dedicated
+non-root application user with full rights on its own schema, defined once in `.env`. Nothing ever
+connects as root (the API, migrations and the backup/restore scripts all use `DB_USER`), so the
+container gets a throwaway random root password (`MARIADB_RANDOM_ROOT_PASSWORD`) that no human needs.
 
 ## First-run setup (creating the first admin)
 
@@ -92,15 +94,16 @@ All variables are read from `.env` (see `.env.example` for the template — neve
 | `DB_HOST` / `DB_PORT`           | Host and port the API uses to reach the database (`db` / `3306` in compose).                                 |
 | `DB_USER` / `DB_PASSWORD`       | Credentials the API connects with — the dedicated application user, never root.                              |
 | `DB_NAME`                       | Database/schema name the API connects to.                                                                    |
-| `JWT_SECRET`                    | Secret signing the access-token JWTs. Long random string; rotating it invalidates all access tokens.         |
+| `JWT_SECRET`                    | Secret signing the access-token JWTs (≥32 chars, enforced in production; 64 recommended — `openssl rand -base64 64`). Rotating it invalidates all sessions. |
 | `ACCESS_TOKEN_TTL_SECONDS`      | Access-token lifetime (default `900` = 15 min).                                                              |
 | `REFRESH_TOKEN_TTL_SECONDS`     | Refresh-token lifetime (default `2592000` = 30 days).                                                        |
 | `SETUP_TOKEN`                   | One-time token enabling `POST /api/v1/setup` for the first admin. Remove after setup to disable it.          |
 | `TRUST_PROXY`                   | Proxy hops in front of the app so rate limiting uses the real client IP (default `1`).                       |
 | `RATE_LIMIT_*`                  | Optional overrides for the auth / global rate limits (defaults in `.env.example`).                           |
-| `MYSQL_ROOT_PASSWORD`           | Root password for the MariaDB container. Must be set explicitly — see the comment in `.env.example` for why. |
-| `MYSQL_DATABASE`                | Database schema created on first MariaDB start (must equal `DB_NAME`).                                       |
-| `MYSQL_USER` / `MYSQL_PASSWORD` | Application database user created on first MariaDB start (must equal `DB_USER` / `DB_PASSWORD`).             |
+
+The MariaDB container is bootstrapped from `DB_NAME` / `DB_USER` / `DB_PASSWORD` (see
+`docker-compose.yml`), so there are no separate `MYSQL_*` variables to set — root gets a random
+password nobody uses.
 
 ## API reference
 

@@ -239,7 +239,7 @@ function submitInvoiceForm(payload: Record<string, unknown>): void {
   }, () => (formOpen.value = false));
 }
 
-function submitSubmission(payload: { contractUID: string; submittedDate: string; documentLink?: string }): void {
+function submitSubmission(payload: { contractUID: string; submittedDate: string }): void {
   void runDialog(
     () => createSubmission({ ...payload, invoiceUIDs: submitTargets.value }).then(() => undefined),
     () => (submitOpen.value = false),

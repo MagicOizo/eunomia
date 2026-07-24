@@ -28,10 +28,15 @@ services:
     image: mariadb:11
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      # Bootstrapped from the same DB_* values the API connects with — defined
+      # once in .env, no duplicate credentials.
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      # Nothing ever connects as root — the API, migrations and the backup/
+      # restore scripts all use DB_USER, which has ALL privileges on its own
+      # database — so root gets a throwaway random password no human needs.
+      MARIADB_RANDOM_ROOT_PASSWORD: 'yes'
     # No 'ports:' mapping on purpose — the database must not be reachable
     # from outside the compose network, only from the api container (see
     # Notes/eunomia-plan.md, 2.1).

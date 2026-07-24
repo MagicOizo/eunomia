@@ -71,7 +71,6 @@ export async function deleteInvoice(uid: string): Promise<void> {
 export async function createSubmission(body: {
   contractUID: string;
   submittedDate: string;
-  documentLink?: string;
   invoiceUIDs: string[];
 }): Promise<{ submissionUID: string }> {
   return unwrap(await apiFetch<{ data: { submissionUID: string } }>('/submissions', { method: 'POST', body }));

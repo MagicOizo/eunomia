@@ -95,14 +95,25 @@ export function loadDatabaseConfig(): DatabaseConfig {
 /** Reads and validates the full application config from the environment. */
 export function loadConfig(): AppConfig {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
+  const isProduction = nodeEnv === 'production';
+
+  const jwtSecret = requireString('JWT_SECRET');
+  // A short secret undermines HS256 token signing. Enforced only in production
+  // so development configs can stay simple.
+  if (isProduction && jwtSecret.length < 32) {
+    throw new Error(
+      'JWT_SECRET must be at least 32 characters in production — generate one with `openssl rand -base64 64`.',
+    );
+  }
+
   return {
     nodeEnv,
     port: optionalInt('PORT', 3000),
-    isProduction: nodeEnv === 'production',
+    isProduction,
     trustProxy: optionalInt('TRUST_PROXY', 1),
     database: loadDatabaseConfig(),
     auth: {
-      jwtSecret: requireString('JWT_SECRET'),
+      jwtSecret,
       accessTokenTtlSeconds: optionalInt('ACCESS_TOKEN_TTL_SECONDS', 15 * 60),
       refreshTokenTtlSeconds: optionalInt('REFRESH_TOKEN_TTL_SECONDS', 30 * 24 * 60 * 60),
       setupToken: optionalString('SETUP_TOKEN'),

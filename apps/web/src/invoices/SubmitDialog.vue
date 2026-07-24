@@ -17,12 +17,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  submit: [payload: { contractUID: string; submittedDate: string; documentLink?: string }];
+  submit: [payload: { contractUID: string; submittedDate: string }];
 }>();
 
 const contractUID = ref('');
 const submittedDate = ref('');
-const documentLink = ref('');
 const localError = ref<string | null>(null);
 
 watch(
@@ -32,7 +31,6 @@ watch(
     localError.value = null;
     contractUID.value = props.contracts.length === 1 ? props.contracts[0].value : '';
     submittedDate.value = new Date().toISOString().slice(0, 10);
-    documentLink.value = '';
   },
   { immediate: true },
 );
@@ -46,7 +44,6 @@ function submit(): void {
   emit('submit', {
     contractUID: contractUID.value,
     submittedDate: submittedDate.value,
-    ...(documentLink.value.trim() ? { documentLink: documentLink.value.trim() } : {}),
   });
 }
 </script>
@@ -57,7 +54,6 @@ function submit(): void {
       <p class="eu-form__note">{{ count }} Rechnung(en) werden als eine Einreichung gebündelt.</p>
       <EuSelectField v-model="contractUID" label="Vertrag" required :options="contracts" />
       <EuTextField v-model="submittedDate" label="Einreichungsdatum" type="date" />
-      <EuTextField v-model="documentLink" label="Dokument-Link" />
       <p v-if="error ?? localError" class="eu-form__error" role="alert">{{ error ?? localError }}</p>
     </form>
 
