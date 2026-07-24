@@ -25,7 +25,6 @@ onMounted(async () => {
 
 <template>
   <section>
-    <h2>Rechnungen</h2>
     <p class="eu-picker__lead">Für welchen Versicherten möchtest du die Rechnungen ansehen?</p>
 
     <p v-if="loading" class="eu-picker__hint">Wird geladen…</p>

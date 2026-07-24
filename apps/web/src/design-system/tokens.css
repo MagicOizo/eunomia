@@ -28,6 +28,11 @@
   --eu-color-text-inverse: #ffffff;
   --eu-color-text-inverse-muted: #b8c4e8;
 
+  /* Brand: the wordmark colour, kept identical to the logo emblem (#030088)
+     so "Eunomia" text and the emblem never drift apart. Flips to white on the
+     dark card, matching the white emblem variant. */
+  --eu-color-brand: #030088;
+
   /* Accent / interaction */
   --eu-color-accent: #0b57c7; /* buttons, links: >=4.5:1 on white */
   --eu-color-accent-soft: #3395f3; /* original brand accent; hover fills, borders, large text only */
@@ -64,6 +69,7 @@
     --eu-color-text: #e8e8f0;
     --eu-color-text-muted: #a6a6b3;
 
+    --eu-color-brand: #ffffff; /* matches the white emblem on the dark card */
     --eu-color-accent: #2d6fd1; /* paired with white text: >=4.5:1 */
     --eu-color-accent-soft: #8fc4ff;
     --eu-color-focus-ring: #4da3ff;

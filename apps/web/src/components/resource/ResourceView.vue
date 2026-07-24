@@ -146,7 +146,6 @@ async function confirmDelete(): Promise<void> {
 <template>
   <section>
     <div class="eu-resource__head">
-      <h2>{{ config.plural }}</h2>
       <EuButton :icon="faPlus" @click="openCreate">Neu</EuButton>
     </div>
 
@@ -219,13 +218,9 @@ async function confirmDelete(): Promise<void> {
 .eu-resource__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   margin-bottom: 1rem;
-}
-
-.eu-resource__head h2 {
-  margin: 0;
 }
 
 .eu-resource__hint {

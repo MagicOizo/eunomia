@@ -36,8 +36,10 @@ import {
 import BillingDialog from './BillingDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
+import PaymentInfoPopover from './PaymentInfoPopover.vue';
 import SettleDialog from './SettleDialog.vue';
 import SubmitDialog from './SubmitDialog.vue';
+import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, calcPaymentState } from './payment';
 import { STATUS_DISPLAY } from './status';
 
 const props = defineProps<{ accountUID: string }>();
@@ -55,6 +57,7 @@ const contracts = ref<ContractRef[]>([]);
 const facilityOptions = ref<SelectOption[]>([]);
 const facilityNameById = ref<Map<string, string>>(new Map());
 const agencyOptions = ref<SelectOption[]>([]);
+const agencyById = ref<Map<string, { name: string; bankAccount: string }>>(new Map());
 const analyses = ref<Array<{ label: string; analysis: ReimbursementAnalysisDto }>>([]);
 const selected = ref<Set<string>>(new Set());
 
@@ -121,8 +124,23 @@ async function loadStatic(): Promise<void> {
   facilityOptions.value = facilities.map((f) => ({ value: f.facilityUID, label: f.facilityName }));
   facilityNameById.value = new Map(facilities.map((f) => [f.facilityUID, f.facilityName]));
 
-  const agencies = await listResource<{ agencyUID: string; agencyName: string }>('/agencies');
+  const agencies = await listResource<{ agencyUID: string; agencyName: string; bankAccount: string }>(
+    '/agencies',
+  );
   agencyOptions.value = agencies.map((a) => ({ value: a.agencyUID, label: a.agencyName }));
+  agencyById.value = new Map(
+    agencies.map((a) => [a.agencyUID, { name: a.agencyName, bankAccount: a.bankAccount }]),
+  );
+}
+
+/** Payment-status traffic light for a row: icon, colour and label in one bundle. */
+function paymentView(invoice: InvoiceDto) {
+  const state = calcPaymentState(invoice);
+  return {
+    icon: PAYMENT_DISPLAY[state].icon,
+    color: `var(${PAYMENT_COLOR_VAR[state]})`,
+    label: PAYMENT_DISPLAY[state].label,
+  };
 }
 
 async function loadYearData(): Promise<void> {
@@ -390,7 +408,29 @@ function confirmDelete(): void {
             <td>{{ germanDate(invoice.treatmentDate) }}</td>
             <td>{{ invoice.invoiceNumber }}</td>
             <td>{{ invoice.facilityUID ? facilityNameById.get(invoice.facilityUID) : '–' }}</td>
-            <td>{{ euro(invoice.invoiceAmount) }}</td>
+            <td>
+              <div class="eu-ws__amount">
+                <span>{{ euro(invoice.invoiceAmount) }}</span>
+                <PaymentInfoPopover
+                  :invoice="invoice"
+                  :facility-name="invoice.facilityUID ? facilityNameById.get(invoice.facilityUID) ?? null : null"
+                  :agency-name="invoice.agencyUID ? agencyById.get(invoice.agencyUID)?.name ?? null : null"
+                  :bank-account="invoice.agencyUID ? agencyById.get(invoice.agencyUID)?.bankAccount ?? null : null"
+                >
+                  <template #trigger>
+                    <button
+                      type="button"
+                      class="eu-ws__ampel"
+                      :style="{ color: paymentView(invoice).color }"
+                      :aria-label="`${paymentView(invoice).label} – Zahlungsinformationen anzeigen`"
+                      :title="`${paymentView(invoice).label} – Zahlungsinformationen anzeigen`"
+                    >
+                      <FontAwesomeIcon :icon="paymentView(invoice).icon" aria-hidden="true" />
+                    </button>
+                  </template>
+                </PaymentInfoPopover>
+              </div>
+            </td>
             <td>{{ euro(invoice.reimbursedTotal) }}</td>
             <td class="eu-ws__actions">
               <EuButton
@@ -606,5 +646,31 @@ function confirmDelete(): void {
   display: flex;
   gap: 0.35rem;
   justify-content: flex-end;
+}
+
+.eu-ws__amount {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Combined payment-status light + info trigger. Colour is bound inline from the
+   payment state; shape (the icon) and the title carry the state without relying
+   on colour alone (WCAG 1.4.1). */
+.eu-ws__ampel {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 0.25rem;
+}
+
+.eu-ws__ampel:focus-visible {
+  outline: 2px solid var(--eu-color-focus-ring);
+  outline-offset: 1px;
 }
 </style>

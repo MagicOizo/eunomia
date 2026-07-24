@@ -125,7 +125,6 @@ async function confirmDelete(): Promise<void> {
 <template>
   <section>
     <div class="eu-users__head">
-      <h2>Nutzer & Rechte</h2>
       <EuButton :icon="faPlus" @click="openCreate">Neuer Nutzer</EuButton>
     </div>
 
@@ -206,14 +205,10 @@ async function confirmDelete(): Promise<void> {
 .eu-users__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   margin-bottom: 1rem;
 }
-.eu-users__head h2 {
-  margin: 0;
-}
-
 .eu-users__hint {
   color: var(--eu-color-text-muted);
   font-family: var(--eu-font-data);

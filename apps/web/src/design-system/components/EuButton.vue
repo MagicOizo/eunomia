@@ -5,7 +5,7 @@ import { computed } from 'vue';
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary';
+    variant?: 'primary' | 'secondary' | 'ghost';
     icon?: IconDefinition;
     iconOnly?: boolean;
     disabled?: boolean;
@@ -73,6 +73,19 @@ const classes = computed(() => [
   background-color: transparent;
   color: var(--eu-color-accent);
   border-color: var(--eu-color-accent);
+}
+
+/* Low-emphasis icon actions (e.g. a popover/dialog close): muted by default,
+   accent on hover/focus — never competes with the content. */
+.eu-button--ghost {
+  background-color: transparent;
+  color: var(--eu-color-text-muted);
+}
+
+.eu-button--ghost:hover:not(:disabled),
+.eu-button--ghost:focus-visible {
+  color: var(--eu-color-accent);
+  background-color: color-mix(in srgb, var(--eu-color-accent) 12%, transparent);
 }
 
 .eu-button--icon-only {

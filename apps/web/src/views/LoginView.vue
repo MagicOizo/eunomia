@@ -71,7 +71,7 @@ async function submit(): Promise<void> {
   gap: 0.6rem;
   font-family: var(--eu-font-heading);
   font-size: 1.8rem;
-  color: var(--eu-color-accent);
+  color: var(--eu-color-brand);
 }
 
 .eu-login__logo {

@@ -39,7 +39,7 @@ watch(
   >
     <header class="eu-dialog__header">
       <h2 :id="titleId" class="eu-dialog__title">{{ title }}</h2>
-      <EuButton icon-only :icon="faXmark" aria-label="Schließen" @click="emit('close')" />
+      <EuButton variant="ghost" icon-only :icon="faXmark" aria-label="Schließen" @click="emit('close')" />
     </header>
     <div class="eu-dialog__body">
       <slot />
