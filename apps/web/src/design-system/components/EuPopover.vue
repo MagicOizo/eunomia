@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
-import { nextTick, onBeforeUnmount, ref, useId, useTemplateRef, watch } from 'vue';
+import { onBeforeUnmount, ref, useId, useTemplateRef, watch } from 'vue';
 
 import EuButton from './EuButton.vue';
 
@@ -16,7 +16,6 @@ const props = defineProps<{ title: string }>();
 
 const referenceRef = useTemplateRef<HTMLElement>('reference');
 const floatingRef = useTemplateRef<HTMLElement>('floating');
-const closeRef = useTemplateRef<InstanceType<typeof EuButton>>('close');
 const isOpen = ref(false);
 const panelId = useId();
 
@@ -53,8 +52,6 @@ watch(isOpen, (nowOpen) => {
   if (nowOpen) {
     document.addEventListener('pointerdown', onDocumentPointerDown);
     document.addEventListener('keydown', onKeydown);
-    // Move focus into the bubble so keyboard users land on the close button.
-    void nextTick(() => closeRef.value?.$el?.focus?.());
   } else {
     document.removeEventListener('pointerdown', onDocumentPointerDown);
     document.removeEventListener('keydown', onKeydown);
@@ -88,7 +85,7 @@ onBeforeUnmount(() => {
   >
     <header class="eu-popover__header">
       <h3 class="eu-popover__title">{{ props.title }}</h3>
-      <EuButton ref="close" variant="ghost" icon-only :icon="faXmark" aria-label="Schließen" @click="close" />
+      <EuButton variant="ghost" icon-only :icon="faXmark" aria-label="Schließen" @click="close" />
     </header>
     <div class="eu-popover__body">
       <slot />

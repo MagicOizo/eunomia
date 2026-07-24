@@ -19,6 +19,8 @@ export interface InvoiceDto {
   reimbursedTotal: number;
   allocationCount: number;
   workflowStatus: WorkflowStatus;
+  /** True while any billing reimbursing this invoice has an unresolved objection. */
+  hasOpenObjection: boolean;
 }
 
 export interface BillingDto {
@@ -27,6 +29,10 @@ export interface BillingDto {
   billingDate: string;
   billingNumber: string;
   documentLink: string | null;
+  /** Objection ("Widerspruch") tracking; objectionDate set + resolved unset = open. */
+  objectionDate: string | null;
+  objectionResolvedDate: string | null;
+  objectionNote: string | null;
 }
 
 export interface ReimbursementAnalysisDto {
@@ -86,6 +92,18 @@ export async function createBilling(body: {
   billingNumber: string;
 }): Promise<BillingDto> {
   return unwrap(await apiFetch<{ data: BillingDto }>('/billings', { method: 'POST', body }));
+}
+
+/** Files or resolves an objection ("Widerspruch") on a billing (or clears fields with null). */
+export async function updateBilling(
+  uid: string,
+  body: {
+    objectionDate?: string | null;
+    objectionResolvedDate?: string | null;
+    objectionNote?: string | null;
+  },
+): Promise<BillingDto> {
+  return unwrap(await apiFetch<{ data: BillingDto }>(`/billings/${uid}`, { method: 'PATCH', body }));
 }
 
 export async function createAllocation(body: {

@@ -284,5 +284,8 @@ Jeder Slice ist für sich lauffähig/überprüfbar (App startet, Tests laufen, s
 
 **DoD:** Checkliste aus 2.1 vollständig erfüllt; ein Backup lässt sich erzeugen und in eine frische Instanz zurückspielen (inkl. Migration auf den aktuellen Schema-Stand).
 
+**Backlog (offene UI-Lücken):**
+- **Leistungsabrechnungen-Seite** (`/billings`) ist noch ein Platzhalter (`PlaceholderView`). Braucht eine echte Übersicht/Verwaltung der ServiceBillings (Liste je Einreichung/Konto, zugeordnete Rechnungen, Dokument-Link, Widerspruch-Status). Bisher entstehen Abrechnungen nur im Rechnungs-Workspace über „Abrechnung zuordnen".
+
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.

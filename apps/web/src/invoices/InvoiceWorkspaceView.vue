@@ -2,11 +2,13 @@
 import {
   faChevronLeft,
   faCircleCheck,
+  faGavel,
   faHandHoldingDollar,
   faPaperPlane,
   faPen,
   faPlus,
   faTrash,
+  faTriangleExclamation,
   faUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
@@ -36,6 +38,7 @@ import {
 import BillingDialog from './BillingDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
+import ObjectionDialog from './ObjectionDialog.vue';
 import PaymentInfoPopover from './PaymentInfoPopover.vue';
 import SettleDialog from './SettleDialog.vue';
 import SubmitDialog from './SubmitDialog.vue';
@@ -69,6 +72,7 @@ const editing = ref<InvoiceDto | null>(null);
 const submitOpen = ref(false);
 const submitTargets = ref<string[]>([]);
 const billingOpen = ref(false);
+const objectionOpen = ref(false);
 const settleOpen = ref(false);
 const dialogInvoice = ref<InvoiceDto | null>(null);
 const dialogBusy = ref(false);
@@ -224,6 +228,10 @@ function openBilling(invoice: InvoiceDto): void {
   dialogInvoice.value = invoice;
   dialogError.value = null;
   billingOpen.value = true;
+}
+function openObjection(invoice: InvoiceDto): void {
+  dialogInvoice.value = invoice;
+  objectionOpen.value = true;
 }
 function openSettle(invoice: InvoiceDto): void {
   dialogInvoice.value = invoice;
@@ -397,12 +405,23 @@ function confirmDelete(): void {
               />
             </td>
             <td>
-              <EuBadge
-                :tone="STATUS_DISPLAY[invoice.workflowStatus].tone"
-                :icon="STATUS_DISPLAY[invoice.workflowStatus].icon"
-              >
-                {{ STATUS_DISPLAY[invoice.workflowStatus].label }}
-              </EuBadge>
+              <div class="eu-ws__badges">
+                <EuBadge
+                  :tone="STATUS_DISPLAY[invoice.workflowStatus].tone"
+                  :icon="STATUS_DISPLAY[invoice.workflowStatus].icon"
+                >
+                  {{ STATUS_DISPLAY[invoice.workflowStatus].label }}
+                </EuBadge>
+                <span
+                  v-if="invoice.hasOpenObjection"
+                  class="eu-ws__objection"
+                  role="img"
+                  aria-label="Im Widerspruch"
+                  title="Im Widerspruch"
+                >
+                  <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
+                </span>
+              </div>
             </td>
             <td>{{ germanDate(invoice.invoiceDate) }}</td>
             <td>{{ germanDate(invoice.treatmentDate) }}</td>
@@ -478,6 +497,15 @@ function confirmDelete(): void {
                 @click="openSettle(invoice)"
               />
               <EuButton
+                v-if="invoice.workflowStatus === 'abgerechnet' || invoice.workflowStatus === 'erledigt'"
+                variant="secondary"
+                icon-only
+                :icon="faGavel"
+                aria-label="Widerspruch"
+                title="Fehlerhafte Leistungsabrechnung als Widerspruch markieren"
+                @click="openObjection(invoice)"
+              />
+              <EuButton
                 variant="secondary"
                 icon-only
                 :icon="faTrash"
@@ -532,6 +560,12 @@ function confirmDelete(): void {
       :error="dialogError"
       @close="settleOpen = false"
       @submit="submitSettle"
+    />
+    <ObjectionDialog
+      :open="objectionOpen"
+      :invoice="dialogInvoice"
+      @close="objectionOpen = false"
+      @changed="afterMutation"
     />
 
     <EuDialog :open="deleteTargets.length > 0" title="Rechnung löschen" @close="deleteTargets = []">
@@ -652,6 +686,21 @@ function confirmDelete(): void {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.eu-ws__badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Objection marker: amber warning symbol; the label lives in its title
+   tooltip (and accessible name), so it stays compact next to the status. */
+.eu-ws__objection {
+  color: var(--eu-color-status-submitted-fg);
+  font-size: 1rem;
+  cursor: help;
 }
 
 /* Combined payment-status light + info trigger. Colour is bound inline from the

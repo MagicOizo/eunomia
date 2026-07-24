@@ -17,7 +17,15 @@ const table: CrudTable = {
   uidColumn: 'billingUID',
   statusColumn: 'billingStatus',
   entity: 'serviceBilling',
-  columns: ['submissionUID', 'billingDate', 'billingNumber', 'documentLink'],
+  columns: [
+    'submissionUID',
+    'billingDate',
+    'billingNumber',
+    'documentLink',
+    'objectionDate',
+    'objectionResolvedDate',
+    'objectionNote',
+  ],
 };
 
 const base = z.object({
@@ -27,8 +35,16 @@ const base = z.object({
   documentLink: z.string().trim().url().max(255).nullish(),
 });
 
-// A billing stays with its submission; only its own fields are editable.
-const updateSchema = base.omit({ submissionUID: true }).partial();
+// Objection ("Widerspruch") fields are only ever set after creation, via PATCH.
+const objection = z.object({
+  objectionDate: z.string().date().nullish(),
+  objectionResolvedDate: z.string().date().nullish(),
+  objectionNote: z.string().trim().max(500).nullish(),
+});
+
+// A billing stays with its submission; its own fields plus the objection state
+// are editable.
+const updateSchema = base.omit({ submissionUID: true }).extend(objection.shape).partial();
 
 /** Router for service billings (Leistungsabrechnungen), attached to a submission. */
 export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Router {
@@ -60,7 +76,8 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     }
 
     const rows = await pool.query(
-      `SELECT b.billingUID, b.submissionUID, b.billingDate, b.billingNumber, b.documentLink, b.billingStatus
+      `SELECT b.billingUID, b.submissionUID, b.billingDate, b.billingNumber, b.documentLink,
+              b.objectionDate, b.objectionResolvedDate, b.objectionNote, b.billingStatus
          FROM ServiceBillings b
          JOIN Submissions s ON s.submissionUID = b.submissionUID
          JOIN Contracts c ON c.contractUID = s.contractUID

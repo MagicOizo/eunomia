@@ -85,6 +85,7 @@ type InvoiceRow = Record<string, unknown> & {
   submissionUID: string | null;
   transferDate: string | null;
   allocationCount: number;
+  hasOpenObjection: number;
 };
 
 /**
@@ -100,7 +101,11 @@ function workflowStatus(row: InvoiceRow): 'offen' | 'eingereicht' | 'abgerechnet
 
 /** Adds the derived status to an enriched invoice row. */
 function present(row: InvoiceRow): Record<string, unknown> {
-  return { ...row, workflowStatus: workflowStatus(row) };
+  return {
+    ...row,
+    workflowStatus: workflowStatus(row),
+    hasOpenObjection: Boolean(Number(row.hasOpenObjection)),
+  };
 }
 
 /** Enriched invoice query: joins allocations for the reimbursed total + count. */
@@ -112,9 +117,14 @@ async function queryInvoices(
   return pool.query<InvoiceRow[]>(
     `SELECT ${INVOICE_COLUMNS},
             COALESCE(SUM(a.reimbursement), 0) AS reimbursedTotal,
-            COUNT(a.allocationID) AS allocationCount
+            COUNT(a.allocationID) AS allocationCount,
+            MAX(
+              CASE WHEN b.objectionDate IS NOT NULL AND b.objectionResolvedDate IS NULL
+                   THEN 1 ELSE 0 END
+            ) AS hasOpenObjection
        FROM Invoices i
        LEFT JOIN Allocations a ON a.invoiceUID = i.invoiceUID AND a.allocationStatus <> -1
+       LEFT JOIN ServiceBillings b ON b.billingUID = a.billingUID AND b.billingStatus <> -1
       WHERE ${where}
       GROUP BY i.invoiceID
       ORDER BY i.invoiceDate DESC, i.invoiceUID`,

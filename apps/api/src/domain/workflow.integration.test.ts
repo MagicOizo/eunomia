@@ -219,6 +219,30 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(Number(inv.body.data.reimbursedTotal), 200);
     });
 
+    await t.test('filing an objection on the billing flags the invoice; resolving clears it', async () => {
+      let inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
+      assert.equal(inv.body.data.hasOpenObjection, false);
+
+      const filed = await request(app)
+        .patch(`/api/v1/billings/${billingUID}`)
+        .set(admin)
+        .send({ objectionDate: '2024-07-15', objectionNote: 'Betrag zu niedrig' });
+      assert.equal(filed.status, 200);
+      assert.ok(filed.body.data.objectionDate);
+
+      inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
+      assert.equal(inv.body.data.hasOpenObjection, true);
+
+      const resolved = await request(app)
+        .patch(`/api/v1/billings/${billingUID}`)
+        .set(admin)
+        .send({ objectionResolvedDate: '2024-09-01' });
+      assert.equal(resolved.status, 200);
+
+      inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
+      assert.equal(inv.body.data.hasOpenObjection, false);
+    });
+
     await t.test('allocation across submissions violates the same-submission invariant', async () => {
       const loose = await makeInvoice(accountA, 100, 'R-loose'); // never submitted
       const res = await post('/api/v1/allocations', {
