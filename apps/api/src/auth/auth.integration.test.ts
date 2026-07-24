@@ -143,6 +143,21 @@ test('auth flow: setup, login, protected access, scoping, refresh, logout', asyn
       assert.equal(me.status, 200);
       assert.ok(me.body.permissions.global.includes('MANAGE_USERS'));
       assert.ok(me.body.permissions.global.includes('VIEW_INVOICES'));
+      // SETUP_TOKEN is set in this config, so the admin is warned it is still open.
+      assert.equal(me.body.setupTokenActive, true);
+    });
+
+    await t.test('/me reports setupTokenActive false when no SETUP_TOKEN is set', async () => {
+      // Same jwtSecret, so the admin's token stays valid on this second app.
+      const noSetup = createApp({
+        pool,
+        config: { ...config, auth: { ...config.auth, setupToken: undefined } },
+      });
+      const me = await request(noSetup)
+        .get('/api/v1/me')
+        .set('Authorization', `Bearer ${adminToken}`);
+      assert.equal(me.status, 200);
+      assert.equal(me.body.setupTokenActive, false);
     });
 
     await t.test('admin passes the global-permission guard', async () => {

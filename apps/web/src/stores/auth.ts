@@ -23,6 +23,8 @@ interface SessionResponse {
 interface MeResponse {
   user: AuthUser;
   permissions: EffectivePermissions;
+  /** Admin-only: the one-time setup endpoint is still open (SETUP_TOKEN set). */
+  setupTokenActive: boolean;
 }
 
 /**
@@ -35,6 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null);
   const user = ref<AuthUser | null>(null);
   const permissions = ref<EffectivePermissions | null>(null);
+  const setupTokenActive = ref(false);
 
   const isAuthenticated = computed(() => accessToken.value !== null);
 
@@ -48,12 +51,14 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = null;
     user.value = null;
     permissions.value = null;
+    setupTokenActive.value = false;
   }
 
   async function loadMe(): Promise<void> {
     const me = await request<MeResponse>('/me', { token: accessToken.value });
     user.value = me.user;
     permissions.value = me.permissions;
+    setupTokenActive.value = me.setupTokenActive;
   }
 
   async function login(email: string, password: string): Promise<void> {
@@ -95,6 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     user,
     permissions,
+    setupTokenActive,
     isAuthenticated,
     isAdmin,
     hasGlobalPermission,

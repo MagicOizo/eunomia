@@ -60,7 +60,12 @@ export function createAuthRouter(pool: Pool, config: AppConfig): Router {
   router.get('/me', requireAuth, async (_req, res) => {
     const user = getAuthUser(res);
     const permissions = await getEffectivePermissions(pool, user.userId);
-    res.json({ user: publicUser(user), permissions });
+    // Admins are told whether the one-time setup endpoint is still open (its
+    // SETUP_TOKEN is set), so they can be nudged to remove it. Gated on
+    // MANAGE_USERS so a non-admin cannot probe whether setup is reachable.
+    const isAdmin = permissions.global.includes(PERMISSIONS.MANAGE_USERS);
+    const setupTokenActive = isAdmin && config.auth.setupToken !== undefined;
+    res.json({ user: publicUser(user), permissions, setupTokenActive });
   });
 
   // Protected demo endpoints proving the guard works (Slice 3 DoD):

@@ -5,9 +5,13 @@ import { useRoute } from 'vue-router';
 import AppFooter from '../components/layout/AppFooter.vue';
 import AppHeader from '../components/layout/AppHeader.vue';
 import AppSidebar from '../components/layout/AppSidebar.vue';
+import SetupTokenBanner from '../components/layout/SetupTokenBanner.vue';
+import { useAuthStore } from '../stores/auth';
 
 const route = useRoute();
 const title = computed(() => route.meta.title ?? 'Eunomia');
+
+const auth = useAuthStore();
 
 const sidebarOpen = ref(false);
 // Close the mobile drawer whenever the route changes.
@@ -24,6 +28,7 @@ watch(() => route.fullPath, () => (sidebarOpen.value = false));
         <main class="eu-main">
           <AppHeader :title="title" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
           <div class="eu-main__content">
+            <SetupTokenBanner v-if="auth.isAdmin && auth.setupTokenActive" />
             <slot />
           </div>
         </main>
