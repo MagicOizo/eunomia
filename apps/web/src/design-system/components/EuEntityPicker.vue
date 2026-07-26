@@ -26,10 +26,12 @@ const props = withDefaults(
     required?: boolean;
     disabled?: boolean;
     allowCreate?: boolean;
+    /** Display-mask mode: no visible label, border only on hover/focus. */
+    bare?: boolean;
     /** Noun used in the "‹query› hinzufügen" row, e.g. "Leistungserbringer". */
     createNoun?: string;
   }>(),
-  { required: false, disabled: false, allowCreate: false, createNoun: 'Eintrag' },
+  { required: false, disabled: false, allowCreate: false, bare: false, createNoun: 'Eintrag' },
 );
 
 const emit = defineEmits<{
@@ -137,8 +139,11 @@ function onKeydown(event: KeyboardEvent): void {
 
 <template>
   <div ref="reference" class="eu-picker">
-    <label :for="inputId" class="eu-picker__label">{{ label }}</label>
-    <div class="eu-picker__control" :class="{ 'is-open': open, 'is-disabled': disabled }">
+    <label v-if="!bare" :for="inputId" class="eu-picker__label">{{ label }}</label>
+    <div
+      class="eu-picker__control"
+      :class="{ 'is-open': open, 'is-disabled': disabled, 'is-bare': bare }"
+    >
       <input
         :id="inputId"
         ref="input"
@@ -146,6 +151,7 @@ function onKeydown(event: KeyboardEvent): void {
         :value="displayValue"
         :placeholder="open && selected ? selected.label : ''"
         :disabled="disabled"
+        :aria-label="bare ? label : undefined"
         autocomplete="off"
         role="combobox"
         aria-autocomplete="list"
@@ -156,7 +162,7 @@ function onKeydown(event: KeyboardEvent): void {
         @keydown="onKeydown"
       />
       <button
-        v-if="modelValue && !required && !disabled"
+        v-if="modelValue && !required && !disabled && !bare"
         type="button"
         class="eu-picker__action"
         aria-label="Auswahl entfernen"
@@ -224,6 +230,21 @@ function onKeydown(event: KeyboardEvent): void {
 
 .eu-picker__control.is-disabled {
   opacity: 0.6;
+}
+
+/* Display-mask mode: no border at rest, revealed on hover/focus. */
+.eu-picker__control.is-bare {
+  border-color: transparent;
+  padding: 0.2em 0.4em;
+}
+
+.eu-picker__control.is-bare:hover {
+  border-color: var(--eu-color-border);
+}
+
+.eu-picker__control.is-bare.is-open,
+.eu-picker__control.is-bare:focus-within {
+  border-color: var(--eu-color-accent);
 }
 
 .eu-picker__input {

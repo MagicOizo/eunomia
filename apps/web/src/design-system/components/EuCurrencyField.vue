@@ -8,8 +8,8 @@ import { computed, ref, useId, watch } from 'vue';
  * caret never jumps.
  */
 const props = withDefaults(
-  defineProps<{ modelValue: number | null; label: string; error?: string }>(),
-  { error: undefined },
+  defineProps<{ modelValue: number | null; label: string; error?: string; bare?: boolean }>(),
+  { error: undefined, bare: false },
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: number | null] }>();
@@ -73,13 +73,14 @@ function onBlur(): void {
 
 <template>
   <div class="eu-currency-field">
-    <label :for="inputId" class="eu-currency-field__label">{{ label }}</label>
-    <div class="eu-currency-field__control" :class="{ 'is-error': hasError }">
+    <label v-if="!bare" :for="inputId" class="eu-currency-field__label">{{ label }}</label>
+    <div class="eu-currency-field__control" :class="{ 'is-error': hasError, 'is-bare': bare }">
       <input
         :id="inputId"
         class="eu-currency-field__input"
         inputmode="decimal"
         :value="text"
+        :aria-label="bare ? label : undefined"
         :aria-invalid="hasError || undefined"
         :aria-describedby="hasError ? errorId : undefined"
         @focus="onFocus"
@@ -121,6 +122,20 @@ function onBlur(): void {
 
 .eu-currency-field__control.is-error {
   border-color: var(--eu-color-error-fg);
+}
+
+/* Display-mask mode: no border at rest, revealed on hover/focus. */
+.eu-currency-field__control.is-bare {
+  border-color: transparent;
+  padding: 0.2em 0.4em;
+}
+
+.eu-currency-field__control.is-bare:hover {
+  border-color: var(--eu-color-border);
+}
+
+.eu-currency-field__control.is-bare:focus-within {
+  border-color: var(--eu-color-accent);
 }
 
 .eu-currency-field__input {

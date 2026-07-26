@@ -38,6 +38,7 @@ import {
   updateInvoice,
 } from './api';
 import BillingDialog from './BillingDialog.vue';
+import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
 import ObjectionDialog from './ObjectionDialog.vue';
@@ -63,6 +64,9 @@ const facilityOptions = ref<SelectOption[]>([]);
 const facilityNameById = ref<Map<string, string>>(new Map());
 const agencyOptions = ref<SelectOption[]>([]);
 const agencyById = ref<Map<string, { name: string; bankAccount: string }>>(new Map());
+const agencyIbanMap = computed(() =>
+  Object.fromEntries([...agencyById.value].map(([uid, a]) => [uid, a.bankAccount])),
+);
 const analyses = ref<Array<{ label: string; analysis: ReimbursementAnalysisDto }>>([]);
 const selected = ref<Set<string>>(new Set());
 
@@ -70,6 +74,7 @@ const loading = ref(false);
 const loadError = ref<string | null>(null);
 
 const formOpen = ref(false);
+const detailOpen = ref(false);
 const editing = ref<InvoiceDto | null>(null);
 const submitOpen = ref(false);
 const submitTargets = ref<string[]>([]);
@@ -238,10 +243,19 @@ function openCreate(): void {
   dialogError.value = null;
   formOpen.value = true;
 }
+// Editing opens the display-mask detail dialog; creating keeps the classic form.
 function openEdit(invoice: InvoiceDto): void {
-  editing.value = invoice;
+  dialogInvoice.value = invoice;
   dialogError.value = null;
-  formOpen.value = true;
+  detailOpen.value = true;
+}
+function submitDetail(payload: Record<string, unknown>): void {
+  const invoice = dialogInvoice.value;
+  if (!invoice) return;
+  void runDialog(
+    () => updateInvoice(invoice.invoiceUID, payload).then(() => undefined),
+    () => (detailOpen.value = false),
+  );
 }
 function openSubmit(uids: string[]): void {
   submitTargets.value = uids;
@@ -549,6 +563,18 @@ function confirmDelete(): void {
       :contract-analyses="analyses"
     />
 
+    <InvoiceDetailDialog
+      :open="detailOpen"
+      :invoice="dialogInvoice"
+      :account-name="accountName"
+      :facilities="facilityOptions"
+      :agencies="agencyOptions"
+      :agency-iban="agencyIbanMap"
+      :submitting="dialogBusy"
+      :error="dialogError"
+      @close="detailOpen = false"
+      @submit="submitDetail"
+    />
     <InvoiceFormDialog
       :open="formOpen"
       :editing="editing"

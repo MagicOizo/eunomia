@@ -11,7 +11,7 @@ import EuButton from './EuButton.vue';
  * hand-rolled `.modal-dialog` markup had to (and didn't fully) replicate —
  * see Notes/eunomia-plan.md, 2.7.
  */
-const props = defineProps<{ open: boolean; title: string }>();
+const props = defineProps<{ open: boolean; title: string; wide?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const dialogRef = useTemplateRef<HTMLDialogElement>('dialog');
@@ -45,6 +45,7 @@ watch(
   <dialog
     ref="dialog"
     class="eu-dialog"
+    :class="{ 'is-wide': wide }"
     :aria-labelledby="titleId"
     @close="emit('close')"
     @cancel="emit('close')"
@@ -80,6 +81,10 @@ watch(
   /* Never taller than the viewport: header and footer stay put, only the body
      scrolls (see __body). Flex column drives that split. */
   max-height: 90vh;
+}
+
+.eu-dialog.is-wide {
+  max-width: min(44rem, calc(100vw - 2rem));
 }
 
 /* Only the OPEN dialog is a flex column. Scoping this to [open] keeps the
