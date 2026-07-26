@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
-import { useId, useTemplateRef, watch } from 'vue';
+import { nextTick, useId, useTemplateRef, watch } from 'vue';
 
 import EuButton from './EuButton.vue';
 
@@ -22,7 +22,19 @@ watch(
   (isOpen) => {
     const dialog = dialogRef.value;
     if (!dialog) return;
-    if (isOpen && !dialog.open) dialog.showModal();
+    if (isOpen && !dialog.open) {
+      dialog.showModal();
+      // showModal() focuses the first focusable element, which is the header
+      // close button. Move focus to the first form control in the body instead
+      // (e.g. the prefilled name field), skipping the close button.
+      void nextTick(() => {
+        dialog
+          .querySelector<HTMLElement>(
+            '.eu-dialog__body input, .eu-dialog__body select, .eu-dialog__body textarea',
+          )
+          ?.focus();
+      });
+    }
     if (!isOpen && dialog.open) dialog.close();
   },
   { immediate: true },
