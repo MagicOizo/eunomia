@@ -71,6 +71,23 @@ export async function listInvoices(accountUID: string, year: number): Promise<In
   return unwrap(await apiFetch<{ data: InvoiceDto[] }>(`/invoices?accountUID=${accountUID}&year=${year}`));
 }
 
+/** All invoices of an account (every year) — used to pick allocation targets. */
+export async function listAccountInvoices(accountUID: string): Promise<InvoiceDto[]> {
+  return unwrap(await apiFetch<{ data: InvoiceDto[] }>(`/invoices?accountUID=${accountUID}`));
+}
+
+export interface SubmissionDto {
+  submissionUID: string;
+  contractUID: string;
+  submittedDate: string;
+  accountUID: string;
+}
+
+/** All submissions the user may view (filter by contract client-side). */
+export async function listSubmissions(): Promise<SubmissionDto[]> {
+  return unwrap(await apiFetch<{ data: SubmissionDto[] }>('/submissions'));
+}
+
 export async function listInvoiceYears(accountUID: string): Promise<number[]> {
   return unwrap(await apiFetch<{ data: number[] }>(`/invoices/years?accountUID=${accountUID}`));
 }
@@ -108,6 +125,7 @@ export async function createBilling(body: {
   submissionUID: string;
   billingDate: string;
   billingNumber: string;
+  documentLink?: string | null;
 }): Promise<BillingDto> {
   return unwrap(await apiFetch<{ data: BillingDto }>('/billings', { method: 'POST', body }));
 }

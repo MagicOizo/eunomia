@@ -3,6 +3,7 @@ import {
   faChevronLeft,
   faGavel,
   faPen,
+  faPlus,
   faTrash,
   faTriangleExclamation,
   faUpRightFromSquare,
@@ -19,11 +20,14 @@ import { euro, germanDate } from '../lib/format';
 import { HttpError } from '../lib/http';
 import { useTableSort } from '../lib/useTableSort';
 import { type BillingListDto, deleteBilling, listContractBillings, updateBilling } from './api';
+import NewBillingDialog from './NewBillingDialog.vue';
 
 const props = defineProps<{ contractUID: string }>();
 
 const billings = ref<BillingListDto[]>([]);
 const heading = ref('');
+const accountUID = ref('');
+const newOpen = ref(false);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
 
@@ -76,6 +80,7 @@ async function load(): Promise<void> {
     );
     const person = [account.data.firstname, account.data.surname].filter(Boolean).join(' ');
     heading.value = `${contract.data.contractNumber} · ${person}`;
+    accountUID.value = contract.data.accountUID;
     billings.value = await listContractBillings(props.contractUID);
   } catch (err) {
     loadError.value = err instanceof HttpError ? err.message : 'Abrechnungen konnten nicht geladen werden.';
@@ -185,15 +190,18 @@ function confirmDelete(): void {
 <template>
   <section>
     <div class="eu-billings__head">
-      <RouterLink
-        to="/billings"
-        class="eu-billings__back"
-        title="Zurück zur Vertragsauswahl"
-        aria-label="Zurück zur Vertragsauswahl"
-      >
-        <FontAwesomeIcon :icon="faChevronLeft" aria-hidden="true" />
-      </RouterLink>
-      <h2 class="eu-billings__title">{{ heading }}</h2>
+      <div class="eu-billings__heading">
+        <RouterLink
+          to="/billings"
+          class="eu-billings__back"
+          title="Zurück zur Vertragsauswahl"
+          aria-label="Zurück zur Vertragsauswahl"
+        >
+          <FontAwesomeIcon :icon="faChevronLeft" aria-hidden="true" />
+        </RouterLink>
+        <h2 class="eu-billings__title">{{ heading }}</h2>
+      </div>
+      <EuButton v-if="!loading && !loadError" :icon="faPlus" @click="newOpen = true">Neu</EuButton>
     </div>
 
     <p v-if="loading" class="eu-billings__hint">Wird geladen…</p>
@@ -328,6 +336,14 @@ function confirmDelete(): void {
       </template>
     </EuDialog>
 
+    <NewBillingDialog
+      :open="newOpen"
+      :contract-u-i-d="contractUID"
+      :account-u-i-d="accountUID"
+      @close="newOpen = false"
+      @created="load"
+    />
+
     <EuDialog :open="deleteOpen" title="Abrechnung löschen" @close="deleteOpen = false">
       <div v-if="selected" class="eu-form">
         <p>
@@ -351,8 +367,15 @@ function confirmDelete(): void {
 .eu-billings__head {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  justify-content: space-between;
+  gap: 1rem;
   margin: 0 0 1rem;
+}
+
+.eu-billings__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .eu-billings__back {
