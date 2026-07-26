@@ -3,8 +3,8 @@ import { computed, reactive, ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import EuSelectField from '../components/resource/EuSelectField.vue';
 import { euro, germanDate } from '../lib/format';
 import { HttpError } from '../lib/http';
 import {
@@ -115,11 +115,12 @@ function save(): void {
       </p>
 
       <template v-else>
-        <EuSelectField
-          v-model="submissionUID"
+        <EuEntityPicker
+          :model-value="submissionUID || null"
           label="Einreichung"
           required
           :options="submissionOptions"
+          @update:model-value="submissionUID = $event ?? ''"
         />
         <EuTextField v-model="billingNumber" label="Abrechnungsnummer" />
         <EuTextField v-model="billingDate" label="Abrechnungsdatum" type="date" />

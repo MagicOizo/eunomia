@@ -3,8 +3,9 @@ import { ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import EuSelectField, { type SelectOption } from '../components/resource/EuSelectField.vue';
+import { type SelectOption } from '../components/resource/EuSelectField.vue';
 
 const props = defineProps<{
   open: boolean;
@@ -52,7 +53,13 @@ function submit(): void {
   <EuDialog :open="open" title="Rechnungen einreichen" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <p class="eu-form__note">{{ count }} Rechnung(en) werden als eine Einreichung gebündelt.</p>
-      <EuSelectField v-model="contractUID" label="Vertrag" required :options="contracts" />
+      <EuEntityPicker
+        :model-value="contractUID || null"
+        label="Vertrag"
+        required
+        :options="contracts"
+        @update:model-value="contractUID = $event ?? ''"
+      />
       <EuTextField v-model="submittedDate" label="Einreichungsdatum" type="date" />
       <p v-if="error ?? localError" class="eu-form__error" role="alert">{{ error ?? localError }}</p>
     </form>

@@ -3,10 +3,11 @@ import { ref, watch } from 'vue';
 
 import EuButton from '../../design-system/components/EuButton.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
+import EuEntityPicker from '../../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
 import type { ResourceRow } from '../../lib/resource';
 import type { FieldConfig } from '../../resources/config';
-import EuSelectField, { type SelectOption } from './EuSelectField.vue';
+import { type SelectOption } from './EuSelectField.vue';
 
 const props = defineProps<{
   open: boolean;
@@ -79,13 +80,14 @@ function submit(): void {
   <EuDialog :open="open" :title="title" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <template v-for="field in fields" :key="field.key">
-        <EuSelectField
+        <EuEntityPicker
           v-if="field.type === 'select'"
-          v-model="values[field.key]"
+          :model-value="values[field.key] || null"
           :label="field.label"
           :required="field.required"
           :disabled="field.immutable && isEditing()"
           :options="field.optionsFrom ? (options[field.optionsFrom] ?? []) : []"
+          @update:model-value="values[field.key] = $event ?? ''"
         />
         <EuTextField
           v-else

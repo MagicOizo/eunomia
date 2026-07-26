@@ -24,11 +24,12 @@ const props = withDefaults(
     label: string;
     options: PickerOption[];
     required?: boolean;
+    disabled?: boolean;
     allowCreate?: boolean;
     /** Noun used in the "‹query› hinzufügen" row, e.g. "Leistungserbringer". */
     createNoun?: string;
   }>(),
-  { required: false, allowCreate: false, createNoun: 'Eintrag' },
+  { required: false, disabled: false, allowCreate: false, createNoun: 'Eintrag' },
 );
 
 const emit = defineEmits<{
@@ -137,13 +138,14 @@ function onKeydown(event: KeyboardEvent): void {
 <template>
   <div ref="reference" class="eu-picker">
     <label :for="inputId" class="eu-picker__label">{{ label }}</label>
-    <div class="eu-picker__control" :class="{ 'is-open': open }">
+    <div class="eu-picker__control" :class="{ 'is-open': open, 'is-disabled': disabled }">
       <input
         :id="inputId"
         ref="input"
         class="eu-picker__input"
         :value="displayValue"
         :placeholder="open && selected ? selected.label : ''"
+        :disabled="disabled"
         autocomplete="off"
         role="combobox"
         aria-autocomplete="list"
@@ -154,7 +156,7 @@ function onKeydown(event: KeyboardEvent): void {
         @keydown="onKeydown"
       />
       <button
-        v-if="modelValue && !required"
+        v-if="modelValue && !required && !disabled"
         type="button"
         class="eu-picker__action"
         aria-label="Auswahl entfernen"
@@ -218,6 +220,10 @@ function onKeydown(event: KeyboardEvent): void {
 .eu-picker__control.is-open,
 .eu-picker__control:focus-within {
   border-color: var(--eu-color-accent);
+}
+
+.eu-picker__control.is-disabled {
+  opacity: 0.6;
 }
 
 .eu-picker__input {

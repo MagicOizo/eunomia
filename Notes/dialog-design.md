@@ -22,7 +22,7 @@ Jetzt zum Design der Dialoge. Nicht alles sind Design-Spezifikationen, sondern d
 - Dialoge fürs Einreichen und auch zur Verknüpfung von Leistungsabrechnungen müssen auch eine Bulk-Verarbeitung erlauben
 - Bei der Auswahl zur Bulk-Verarbeitung muss sichergestellt werden, dass die aufgewählten Items auch kompatibel sind (also z.B. bei Verknüpfung auch entsprechende Einreichungen zu dem entsprechenden Vertrag haben)
 - Icons für Action Items:
-    - Add: '''<i class="fa-solid fa-plus"></i>'''
-    - Search: '''<i class="fa-solid fa-magnifying-glass"></i>'''
-    - Clear: '''<i class="fa-solid fa-xmark"></i>'''
-    - Reset: '''<i class="fa-solid fa-arrow-rotate-left"></i>'''
+    - Add: ```<i class="fa-solid fa-plus"></i>```
+    - Search: ```<i class="fa-solid fa-magnifying-glass"></i>```
+    - Clear: ```<i class="fa-solid fa-xmark"></i>```
+    - Reset: ```<i class="fa-solid fa-arrow-rotate-left"></i>```

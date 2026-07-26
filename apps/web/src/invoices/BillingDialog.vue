@@ -4,8 +4,8 @@ import { computed, ref, watch } from 'vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import EuSelectField from '../components/resource/EuSelectField.vue';
 import { type BillingDto, type InvoiceDto, listBillings } from './api';
 import { euro } from '../lib/format';
 
@@ -104,12 +104,13 @@ function submit(): void {
         <label><input v-model="mode" type="radio" value="new" /> Neue Abrechnung</label>
       </div>
 
-      <EuSelectField
+      <EuEntityPicker
         v-if="mode === 'existing'"
-        v-model="selectedBilling"
+        :model-value="selectedBilling || null"
         label="Leistungsabrechnung"
         required
         :options="billingOptions"
+        @update:model-value="selectedBilling = $event ?? ''"
       />
       <template v-else>
         <EuTextField v-model="billingDate" label="Abrechnungsdatum" type="date" />

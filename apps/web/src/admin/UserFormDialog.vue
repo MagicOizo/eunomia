@@ -6,7 +6,8 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
-import EuSelectField, { type SelectOption } from '../components/resource/EuSelectField.vue';
+import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
+import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import type { AdminUserDto, RoleDto } from './api';
 
 export interface UserFormPayload {
@@ -129,8 +130,20 @@ function submit(): void {
         <legend>Konto-Zugriffe</legend>
         <p v-if="grants.length === 0" class="eu-form__hint">Kein konto-spezifischer Zugriff.</p>
         <div v-for="(grant, index) in grants" :key="index" class="eu-form__grant">
-          <EuSelectField v-model="grant.accountUID" label="Konto" required :options="accounts" />
-          <EuSelectField v-model="grant.roleUID" label="Rolle" required :options="roleOptions" />
+          <EuEntityPicker
+            :model-value="grant.accountUID || null"
+            label="Konto"
+            required
+            :options="accounts"
+            @update:model-value="grant.accountUID = $event ?? ''"
+          />
+          <EuEntityPicker
+            :model-value="grant.roleUID || null"
+            label="Rolle"
+            required
+            :options="roleOptions"
+            @update:model-value="grant.roleUID = $event ?? ''"
+          />
           <EuButton
             variant="secondary"
             icon-only
