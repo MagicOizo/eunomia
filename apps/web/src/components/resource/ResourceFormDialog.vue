@@ -26,11 +26,16 @@ const emit = defineEmits<{ close: []; submit: [payload: Record<string, unknown>]
 const values = ref<Record<string, string>>({});
 const localError = ref<string | null>(null);
 
-/** Rebuilds the form values whenever the dialog opens (create = empty, edit = row). */
+/**
+ * Keeps `values` in sync with the fields and the edited row (create = empty,
+ * edit = row). Runs even while closed so every field always has a string value
+ * (never undefined) — the dialog body is rendered even when hidden, so an
+ * undefined bound to a field component would warn. Depends on `fields` too, so
+ * switching resources (the view is reused) rebuilds for the new keys.
+ */
 watch(
-  () => [props.open, props.editing] as const,
-  ([open]) => {
-    if (!open) return;
+  () => [props.open, props.editing, props.fields] as const,
+  () => {
     localError.value = null;
     const next: Record<string, string> = {};
     for (const field of props.fields) {

@@ -39,7 +39,14 @@ watch(
   >
     <header class="eu-dialog__header">
       <h2 :id="titleId" class="eu-dialog__title">{{ title }}</h2>
-      <EuButton variant="ghost" icon-only :icon="faXmark" aria-label="Schließen" @click="emit('close')" />
+      <EuButton
+        class="eu-dialog__close"
+        variant="ghost"
+        icon-only
+        :icon="faXmark"
+        aria-label="Schließen"
+        @click="emit('close')"
+      />
     </header>
     <div class="eu-dialog__body">
       <slot />
@@ -61,6 +68,13 @@ watch(
   /* Never taller than the viewport: header and footer stay put, only the body
      scrolls (see __body). Flex column drives that split. */
   max-height: 90vh;
+}
+
+/* Only the OPEN dialog is a flex column. Scoping this to [open] keeps the
+   scoped-CSS specificity from overriding the UA `dialog:not([open])
+   { display: none }`, which would otherwise leave closed dialogs rendered in
+   normal flow (below the footer). */
+.eu-dialog[open] {
   display: flex;
   flex-direction: column;
 }
@@ -70,13 +84,21 @@ watch(
 }
 
 .eu-dialog__header {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1em;
-  padding: 1em 1.25em;
+  /* extra right padding reserves the corner for the close button */
+  padding: 1em 3rem 1em 1.25em;
   border-bottom: 1px solid var(--eu-color-border);
+}
+
+/* Close sits in the very top-right corner, like a window close control. */
+.eu-dialog__close {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
 }
 
 .eu-dialog__title {
