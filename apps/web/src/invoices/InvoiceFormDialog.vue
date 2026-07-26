@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
+import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
@@ -26,7 +27,7 @@ const form = ref({
   invoiceDate: '',
   treatmentDate: '',
   facilityUID: '',
-  invoiceAmount: '',
+  invoiceAmount: null as number | null,
   agencyUID: '',
   transferUntilDate: '',
   transferSubject: '',
@@ -48,7 +49,7 @@ watch(
       invoiceDate: e?.invoiceDate ?? '',
       treatmentDate: e?.treatmentDate ?? '',
       facilityUID: e?.facilityUID ?? '',
-      invoiceAmount: e ? String(e.invoiceAmount) : '',
+      invoiceAmount: e ? e.invoiceAmount : null,
       agencyUID: e?.agencyUID ?? '',
       transferUntilDate: e?.transferUntilDate ?? '',
       transferSubject: e?.transferSubject ?? '',
@@ -62,7 +63,7 @@ watch(
 function submit(): void {
   localError.value = null;
   const f = form.value;
-  if (!f.invoiceNumber.trim() || !f.invoiceDate || !f.treatmentDate || f.invoiceAmount.trim() === '') {
+  if (!f.invoiceNumber.trim() || !f.invoiceDate || !f.treatmentDate || f.invoiceAmount === null) {
     localError.value = 'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
     return;
   }
@@ -72,7 +73,7 @@ function submit(): void {
     invoiceNumber: f.invoiceNumber.trim(),
     invoiceDate: f.invoiceDate,
     treatmentDate: f.treatmentDate,
-    invoiceAmount: Number(f.invoiceAmount),
+    invoiceAmount: f.invoiceAmount,
     directPayment: dp,
     facilityUID: f.facilityUID || null,
     documentLink: f.documentLink.trim() || null,
@@ -99,7 +100,7 @@ function submit(): void {
       <EuTextField v-model="form.invoiceDate" label="Rechnungsdatum" type="date" />
       <EuTextField v-model="form.treatmentDate" label="Behandlungsdatum" type="date" />
       <EuSelectField v-model="form.facilityUID" label="Leistungserbringer" :options="facilities" />
-      <EuTextField v-model="form.invoiceAmount" label="Betrag (€)" type="number" />
+      <EuCurrencyField v-model="form.invoiceAmount" label="Betrag" />
 
       <EuToggle v-model="directPayment" label="Direkt-/Barzahlung" />
 

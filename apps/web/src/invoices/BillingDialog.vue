@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
+import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuSelectField from '../components/resource/EuSelectField.vue';
@@ -32,7 +33,7 @@ const mode = ref<'new' | 'existing'>('new');
 const selectedBilling = ref('');
 const billingDate = ref('');
 const billingNumber = ref('');
-const reimbursement = ref('');
+const reimbursement = ref<number | null>(null);
 const receiptNumber = ref('');
 const localError = ref<string | null>(null);
 
@@ -49,7 +50,7 @@ watch(
     selectedBilling.value = '';
     billingDate.value = new Date().toISOString().slice(0, 10);
     billingNumber.value = '';
-    reimbursement.value = '';
+    reimbursement.value = null;
     receiptNumber.value = '';
     existingBillings.value = await listBillings(props.invoice.submissionUID);
     if (existingBillings.value.length > 0) {
@@ -62,12 +63,12 @@ watch(
 
 function submit(): void {
   localError.value = null;
-  if (reimbursement.value.trim() === '') {
+  if (reimbursement.value === null) {
     localError.value = 'Bitte den Erstattungsbetrag angeben.';
     return;
   }
   const common = {
-    reimbursement: Number(reimbursement.value),
+    reimbursement: reimbursement.value,
     ...(receiptNumber.value.trim() ? { receiptNumber: receiptNumber.value.trim() } : {}),
   };
 
@@ -115,7 +116,7 @@ function submit(): void {
         <EuTextField v-model="billingNumber" label="Abrechnungsnummer" />
       </template>
 
-      <EuTextField v-model="reimbursement" label="Erstattungsbetrag (€)" type="number" />
+      <EuCurrencyField v-model="reimbursement" label="Erstattungsbetrag" />
       <EuTextField v-model="receiptNumber" label="Belegnummer" />
       <p v-if="error ?? localError" class="eu-form__error" role="alert">{{ error ?? localError }}</p>
     </form>
