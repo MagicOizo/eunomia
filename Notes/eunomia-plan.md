@@ -284,8 +284,77 @@ Jeder Slice ist für sich lauffähig/überprüfbar (App startet, Tests laufen, s
 
 **DoD:** Checkliste aus 2.1 vollständig erfüllt; ein Backup lässt sich erzeugen und in eine frische Instanz zurückspielen (inkl. Migration auf den aktuellen Schema-Stand).
 
-**Backlog (offene UI-Lücken):**
-- **Leistungsabrechnungen-Seite** (`/billings`) ist noch ein Platzhalter (`PlaceholderView`). Braucht eine echte Übersicht/Verwaltung der ServiceBillings (Liste je Einreichung/Konto, zugeordnete Rechnungen, Dokument-Link, Widerspruch-Status). Bisher entstehen Abrechnungen nur im Rechnungs-Workspace über „Abrechnung zuordnen".
+**Nach Slice 10 zusätzlich umgesetzt (Backlog/ad-hoc, nicht als nummerierte Slices):**
+Zahlungsstatus-Ampel + Zahlungsinfo-Popover; Setup-Token-Warnung für Admins; Widerspruch-Status auf ServiceBillings; Leistungsabrechnungen-Seite (Vertrags-Picker → Liste, Widerspruch, Anlegen/Bearbeiten/Löschen); klick-Sortierung in allen Daten-Tabellen; Logo-/Close-Button-/Überschriften-Politur.
+
+---
+
+# Dialog-Design & Politur (aus Notes/dialog-design.md)
+
+Abgeleitet aus `Notes/dialog-design.md` + Referenz-Screenshots (`Rechnungsdetails.png`,
+`Rechnungen_Verknüpfen.png`, `Leistungsabrechnung auswählen.png`). Reihenfolge nach Abhängigkeit:
+risikoarme, wiederverwendbare Bausteine (11–14) zuerst, dann der View/Edit-Umbau (15), dann die
+Feature-Slices (16–17), die eine kurze Modell-Design-Runde voraussetzen.
+
+## Slice 11 — Tabellen-Politur
+**Ziel:** Tabellen ruhiger und besser lesbar.
+- Aktionen-Spalte nur so breit wie ihr Inhalt (shrink-to-fit); die Datenspalten teilen sich den Rest — der Header steht nicht mehr weit weg von den Icons.
+- Eurobeträge **rechtsbündig und untereinander** (tabellarische Ziffern, `font-variant-numeric: tabular-nums`), Kopf entsprechend rechtsbündig.
+- Gilt für alle Daten-Tabellen (ResourceView, InvoiceWorkspace, BillingsView, UsersView).
+
+**DoD:** Aktionen-Spalte bündig; €-Spalten rechtsbündig, Nachkommastellen fluchten.
+
+## Slice 12 — EuDialog-Struktur (Höhe & Scroll)
+**Ziel:** Dialoge nehmen nie mehr als ~90 % der Bildschirmhöhe ein.
+- EuDialog: `max-height: 90vh`, Layout mit **fixem Header + Footer**, nur der **Body** hat `overflow-y` — kein Scrollen des gesamten Dialogs.
+- Bestehende Dialog-Inhalte bleiben unverändert.
+
+**DoD:** Ein überlanger Dialog scrollt intern; Titelzeile und Buttons bleiben sichtbar.
+
+## Slice 13 — EuCurrencyField
+**Ziel:** Schöne, formatierte Währungseingabe.
+- Neues Feld-Component: Tausender-Trennung, Komma-Dezimal, €-Symbol; liefert intern einen sauberen `number`-Wert.
+- Einsatz zunächst bei Rechnungsbetrag und Erstattung.
+- Offene Entscheidung: externe Lib (`vue-currency-input`) vs. selbst gebaut (Default: schlank selbst).
+
+**DoD:** Beträge werden bei Eingabe/Verlassen korrekt formatiert; der übermittelte Wert ist numerisch korrekt.
+
+## Slice 14 — EuEntityPicker (Typeahead + Ad-hoc-Create)
+**Ziel:** Relationen per Typeahead statt Dropdown (skaliert mit wachsenden Listen).
+- Vorschlagsliste mit den zur Identifikation sinnvollen Spalten; speichert die UID, zeigt eine treffende Bezeichnung.
+- Action-Items am Feld: Clear (`fa-xmark`), optional Search (`fa-magnifying-glass`) + Add (`fa-plus`).
+- **Ad-hoc-Create:** ist kein eindeutiger Treffer vorhanden, oben „'xyz' hinzufügen" → Create-Subdialog (mit der Eingabe vorbefüllt); nach Speichern Wert übernehmen, bei Abbruch Feld leeren/zurücksetzen. **Ausnahme: Versicherte** werden so nie angelegt.
+- Vorerst client-seitige Filterung (Entscheidung: später Backend-Such-Endpunkte, wenn Listen groß werden).
+- Einsatz: Vertrag, Leistungserbringer, Inkasso-Firma, Versicherung; später Leistungsabrechnung.
+
+**DoD:** In mindestens einem Formular ersetzt der Picker das Dropdown inkl. funktionierendem Ad-hoc-Create.
+
+## Slice 15 — View/Edit-Modus als 3-Spalten-Anzeigemaske (Pilot: Rechnung)
+**Ziel:** Ansehen/Bearbeiten klar getrennt vom Anlegen (Referenz `Rechnungsdetails.png`).
+- Struktur: Zeilen **Label | Wert | Action-Items**, kompakt, Input-Rahmen erst bei Hover/Focus, Dialog etwas breiter.
+- Pro Feld **Clear/Reset** mit Regeln: Pflichtfeld → Clear vorhanden aber deaktiviert; Wert geändert → Reset aktiv (setzt auf zuletzt gespeicherten Wert); abgeleitetes/nicht-änderbares Feld (z. B. IBAN aus gewählter Inkasso-Firma) → keine Action-Items.
+- Create-Modus bleibt das klassische Formular; Action-Items dort **im Feld rechts eingebettet**, nicht daneben.
+- Pilot an der Rechnung; Ausrollen auf weitere Entitäten in Folge-Slices.
+
+**DoD:** Eine Rechnung lässt sich in der neuen Maske ansehen und punktuell editieren; Reset/Clear verhalten sich regelkonform.
+
+## Slice 16 — Rechnungs-Detaildialog mit Einreichungs-/Abrechnungs-Block
+**Ziel:** Einreichungen und darauf erfolgte Leistungsabrechnungen direkt am Rechnungs-Detail verwalten.
+- Kartenblock (wie Referenz „Zuordnung") mit Action-Items: einreichen, Leistungsabrechnung verknüpfen, Erstattung erfassen.
+- Reorganisiert die heutigen Workspace-Zeilenaktionen und Einzeldialoge.
+- **Vorab kurze Modell-Design-Runde:** Mapping des Referenz-„Verknüpfens" auf unser Modell (Rechnung→Einreichung→ServiceBilling→**Allocation**).
+
+**DoD:** Von der Rechnung aus einreichen/abrechnen/erstatten, ohne Umweg über getrennte Zeilenaktionen.
+
+## Slice 17 — Verknüpfen-Dialog + Such-Subdialog + Bulk
+**Ziel:** Leistungsabrechnung bequem finden/anlegen/verknüpfen, auch in Masse (Referenz `Rechnungen_Verknüpfen.png`, `Leistungsabrechnung auswählen.png`).
+- Auswahlfeld mit Search (🔍 → Filter-Subdialog: Nummer/Freitext, Zeitraum, „unverknüpft", Erstattungs-Range) und Add (＋ → Create).
+- Backend: Such-/Filter-Endpunkt für ServiceBillings.
+- **Bulk-Verarbeitung** fürs Einreichen und Verknüpfen mit **Kompatibilitätsprüfung** (z. B. nur Rechnungen desselben Vertrags/derselben Einreichung).
+
+**DoD:** Mehrere kompatible Rechnungen in einem Zug verknüpfen; die Suche filtert korrekt.
+
+**Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14); View/Edit-Umstieg nur Rechnung-Pilot vs. alle Entitäten (15); Modell-Design-Runde vor 16/17.
 
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.
