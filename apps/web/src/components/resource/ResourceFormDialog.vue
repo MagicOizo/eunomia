@@ -16,6 +16,8 @@ const props = defineProps<{
   options: Record<string, SelectOption[]>;
   /** The row being edited, or null when creating. */
   editing: ResourceRow | null;
+  /** Seeds field values in create mode (e.g. an ad-hoc name typed elsewhere). */
+  prefill?: Record<string, string>;
   submitting: boolean;
   /** Server-side error message to show above the buttons. */
   error: string | null;
@@ -34,13 +36,14 @@ const localError = ref<string | null>(null);
  * switching resources (the view is reused) rebuilds for the new keys.
  */
 watch(
-  () => [props.open, props.editing, props.fields] as const,
+  () => [props.open, props.editing, props.fields, props.prefill] as const,
   () => {
     localError.value = null;
     const next: Record<string, string> = {};
     for (const field of props.fields) {
       const raw = props.editing?.[field.key];
-      next[field.key] = raw === null || raw === undefined ? '' : String(raw);
+      if (raw !== null && raw !== undefined) next[field.key] = String(raw);
+      else next[field.key] = props.editing ? '' : (props.prefill?.[field.key] ?? '');
     }
     values.value = next;
   },
