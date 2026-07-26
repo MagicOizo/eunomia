@@ -4,7 +4,9 @@ import { computed, ref, watch } from 'vue';
 
 import EuButton from '../../design-system/components/EuButton.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
+import EuSortableTh from '../../design-system/components/EuSortableTh.vue';
 import { HttpError } from '../../lib/http';
+import { useTableSort } from '../../lib/useTableSort';
 import {
   type ResourceRow,
   createResource,
@@ -100,6 +102,17 @@ function cell(row: ResourceRow, column: ColumnConfig): string {
   return raw === null || raw === undefined || raw === '' ? '–' : String(raw);
 }
 
+// Sort lookup columns by their resolved name; everything else by the raw value
+// (ISO dates and numbers then sort correctly, not by their display text).
+function sortValue(row: ResourceRow, key: string): string | number | null | undefined {
+  const column = props.config.columns.find((c) => c.key === key);
+  if (column?.lookup) return cell(row, column);
+  const raw = row[key];
+  return typeof raw === 'number' || typeof raw === 'string' || raw == null ? raw : String(raw);
+}
+
+const sort = useTableSort(rows, sortValue);
+
 function openCreate(): void {
   editing.value = null;
   formError.value = null;
@@ -159,12 +172,18 @@ async function confirmDelete(): Promise<void> {
       <table class="eu-resource__table">
         <thead>
           <tr>
-            <th v-for="column in config.columns" :key="column.key">{{ column.label }}</th>
+            <EuSortableTh
+              v-for="column in config.columns"
+              :key="column.key"
+              :label="column.label"
+              :state="sort.stateOf(column.key)"
+              @sort="sort.toggle(column.key)"
+            />
             <th class="eu-resource__actions-head">Aktionen</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in rows" :key="String(row[config.idKey])">
+          <tr v-for="row in sort.sorted" :key="String(row[config.idKey])">
             <td v-for="column in config.columns" :key="column.key">{{ cell(row, column) }}</td>
             <td class="eu-resource__actions">
               <EuButton

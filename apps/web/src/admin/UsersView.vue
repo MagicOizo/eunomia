@@ -5,9 +5,11 @@ import { onMounted, ref } from 'vue';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { HttpError } from '../lib/http';
 import { listResource } from '../lib/resource';
+import { useTableSort } from '../lib/useTableSort';
 import {
   type AdminUserDto,
   type RoleDto,
@@ -34,6 +36,24 @@ const busy = ref(false);
 const formError = ref<string | null>(null);
 const deleteTarget = ref<AdminUserDto | null>(null);
 const deleteError = ref<string | null>(null);
+
+function userSortValue(u: AdminUserDto, key: string): string | number {
+  switch (key) {
+    case 'email':
+      return u.email;
+    case 'name':
+      return [u.firstname, u.surname].filter(Boolean).join(' ');
+    case 'status':
+      return u.status;
+    case 'roles':
+      return u.globalRoles.join(', ');
+    case 'grants':
+      return u.accountGrants.length;
+    default:
+      return '';
+  }
+}
+const sort = useTableSort(users, userSortValue);
 
 function describeError(error: unknown): string {
   if (error instanceof HttpError) {
@@ -135,16 +155,16 @@ async function confirmDelete(): Promise<void> {
       <table class="eu-users__table">
         <thead>
           <tr>
-            <th>E-Mail</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Globale Rollen</th>
-            <th>Konto-Zugriffe</th>
+            <EuSortableTh label="E-Mail" :state="sort.stateOf('email')" @sort="sort.toggle('email')" />
+            <EuSortableTh label="Name" :state="sort.stateOf('name')" @sort="sort.toggle('name')" />
+            <EuSortableTh label="Status" :state="sort.stateOf('status')" @sort="sort.toggle('status')" />
+            <EuSortableTh label="Globale Rollen" :state="sort.stateOf('roles')" @sort="sort.toggle('roles')" />
+            <EuSortableTh label="Konto-Zugriffe" :state="sort.stateOf('grants')" @sort="sort.toggle('grants')" />
             <th class="eu-users__actions-head">Aktionen</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in users" :key="user.uuid">
+          <tr v-for="user in sort.sorted" :key="user.uuid">
             <td>{{ user.email }}</td>
             <td>{{ [user.firstname, user.surname].filter(Boolean).join(' ') }}</td>
             <td>

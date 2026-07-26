@@ -10,10 +10,12 @@ import { computed, onMounted, ref } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { apiFetch } from '../lib/api';
 import { euro, germanDate } from '../lib/format';
 import { HttpError } from '../lib/http';
+import { useTableSort } from '../lib/useTableSort';
 import { type BillingListDto, listContractBillings, updateBilling } from './api';
 
 const props = defineProps<{ contractUID: string }>();
@@ -22,6 +24,25 @@ const billings = ref<BillingListDto[]>([]);
 const heading = ref('');
 const loading = ref(true);
 const loadError = ref<string | null>(null);
+
+function billingSortValue(b: BillingListDto, key: string): string | number | null {
+  switch (key) {
+    case 'number':
+      return b.billingNumber;
+    case 'date':
+      return b.billingDate;
+    case 'reimbursed':
+      return b.reimbursedTotal;
+    case 'invoices':
+      return b.invoiceNumbers;
+    case 'objection':
+      // Open objections first, then resolved, then none.
+      return b.objectionDate === null ? 2 : b.objectionResolvedDate === null ? 0 : 1;
+    default:
+      return '';
+  }
+}
+const sort = useTableSort(billings, billingSortValue);
 
 const objectionOpen = ref(false);
 const selected = ref<BillingListDto | null>(null);
@@ -134,16 +155,16 @@ function resolveObjection(): void {
       <table class="eu-billings__table">
         <thead>
           <tr>
-            <th>Nummer</th>
-            <th>Datum</th>
-            <th>Erstattung</th>
-            <th>Rechnungen</th>
-            <th>Widerspruch</th>
+            <EuSortableTh label="Nummer" :state="sort.stateOf('number')" @sort="sort.toggle('number')" />
+            <EuSortableTh label="Datum" :state="sort.stateOf('date')" @sort="sort.toggle('date')" />
+            <EuSortableTh label="Erstattung" :state="sort.stateOf('reimbursed')" @sort="sort.toggle('reimbursed')" />
+            <EuSortableTh label="Rechnungen" :state="sort.stateOf('invoices')" @sort="sort.toggle('invoices')" />
+            <EuSortableTh label="Widerspruch" :state="sort.stateOf('objection')" @sort="sort.toggle('objection')" />
             <th class="eu-billings__actions-head">Aktionen</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="b in billings" :key="b.billingUID">
+          <tr v-for="b in sort.sorted" :key="b.billingUID">
             <td>{{ b.billingNumber }}</td>
             <td>{{ germanDate(b.billingDate) }}</td>
             <td>{{ euro(b.reimbursedTotal) }}</td>

@@ -17,11 +17,13 @@ import { computed, ref, watch, watchEffect } from 'vue';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { apiFetch } from '../lib/api';
 import { euro, germanDate } from '../lib/format';
 import { HttpError } from '../lib/http';
 import { listResource } from '../lib/resource';
+import { useTableSort } from '../lib/useTableSort';
 import {
   type InvoiceDto,
   type ReimbursementAnalysisDto,
@@ -43,7 +45,7 @@ import PaymentInfoPopover from './PaymentInfoPopover.vue';
 import SettleDialog from './SettleDialog.vue';
 import SubmitDialog from './SubmitDialog.vue';
 import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, calcPaymentState } from './payment';
-import { STATUS_DISPLAY } from './status';
+import { STATUS_DISPLAY, STATUS_ORDER } from './status';
 
 const props = defineProps<{ accountUID: string }>();
 
@@ -97,6 +99,28 @@ const selectAllEl = ref<HTMLInputElement | null>(null);
 watchEffect(() => {
   if (selectAllEl.value) selectAllEl.value.indeterminate = someSelected.value;
 });
+
+function invoiceSortValue(inv: InvoiceDto, key: string): string | number {
+  switch (key) {
+    case 'status':
+      return STATUS_ORDER.indexOf(inv.workflowStatus); // sort by workflow order, not label
+    case 'invoiceDate':
+      return inv.invoiceDate;
+    case 'treatmentDate':
+      return inv.treatmentDate;
+    case 'number':
+      return inv.invoiceNumber;
+    case 'facility':
+      return inv.facilityUID ? (facilityNameById.value.get(inv.facilityUID) ?? '') : '';
+    case 'amount':
+      return inv.invoiceAmount;
+    case 'reimbursed':
+      return inv.reimbursedTotal;
+    default:
+      return '';
+  }
+}
+const sort = useTableSort(invoices, invoiceSortValue);
 
 function describeError(error: unknown): string {
   if (error instanceof HttpError) {
@@ -384,18 +408,18 @@ function confirmDelete(): void {
                 @change="toggleSelectAll"
               />
             </th>
-            <th>Status</th>
-            <th>Rechnungsdatum</th>
-            <th>Behandlung</th>
-            <th>Nummer</th>
-            <th>Leistungserbringer</th>
-            <th>Betrag</th>
-            <th>Erstattung</th>
+            <EuSortableTh label="Status" :state="sort.stateOf('status')" @sort="sort.toggle('status')" />
+            <EuSortableTh label="Rechnungsdatum" :state="sort.stateOf('invoiceDate')" @sort="sort.toggle('invoiceDate')" />
+            <EuSortableTh label="Behandlung" :state="sort.stateOf('treatmentDate')" @sort="sort.toggle('treatmentDate')" />
+            <EuSortableTh label="Nummer" :state="sort.stateOf('number')" @sort="sort.toggle('number')" />
+            <EuSortableTh label="Leistungserbringer" :state="sort.stateOf('facility')" @sort="sort.toggle('facility')" />
+            <EuSortableTh label="Betrag" :state="sort.stateOf('amount')" @sort="sort.toggle('amount')" />
+            <EuSortableTh label="Erstattung" :state="sort.stateOf('reimbursed')" @sort="sort.toggle('reimbursed')" />
             <th class="eu-ws__actions-head">Aktionen</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="invoice in invoices" :key="invoice.invoiceUID">
+          <tr v-for="invoice in sort.sorted" :key="invoice.invoiceUID">
             <td>
               <input
                 type="checkbox"
