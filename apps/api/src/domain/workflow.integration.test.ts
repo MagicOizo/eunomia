@@ -254,6 +254,27 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(inv.body.data.hasOpenObjection, false);
     });
 
+    await t.test('deleting a billing cascades: its invoice reverts to eingereicht', async () => {
+      const delBilling = (
+        await post('/api/v1/billings', {
+          submissionUID,
+          billingDate: '2024-07-05',
+          billingNumber: 'LA-DEL',
+        })
+      ).body.data.billingUID as string;
+      await post('/api/v1/allocations', { billingUID: delBilling, invoiceUID: inv2, reimbursement: 150 });
+
+      let inv = await request(app).get(`/api/v1/invoices/${inv2}`).set(admin);
+      assert.equal(inv.body.data.workflowStatus, 'abgerechnet');
+
+      const del = await request(app).delete(`/api/v1/billings/${delBilling}`).set(admin);
+      assert.equal(del.status, 204);
+
+      inv = await request(app).get(`/api/v1/invoices/${inv2}`).set(admin);
+      assert.equal(inv.body.data.workflowStatus, 'eingereicht');
+      assert.equal(Number(inv.body.data.reimbursedTotal), 0);
+    });
+
     await t.test('allocation across submissions violates the same-submission invariant', async () => {
       const loose = await makeInvoice(accountA, 100, 'R-loose'); // never submitted
       const res = await post('/api/v1/allocations', {

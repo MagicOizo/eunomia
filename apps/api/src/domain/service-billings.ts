@@ -7,7 +7,7 @@ import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
-import { type CrudTable, getRow, insertRow, softDeleteRow, updateRow } from '../crud/repository.js';
+import { type CrudTable, getRow, insertRow, updateRow } from '../crud/repository.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import {
@@ -143,7 +143,29 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const account = await accountForBilling(pool, uid);
     if (account === null) throw notFound('Service billing');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
-    await softDeleteRow(pool, table, uid);
+
+    // Cascade: detach the reimbursements first, so every invoice billed through
+    // this Leistungsabrechnung falls back to "eingereicht" (the derived status
+    // ignores soft-deleted allocations). Transactional, so a billing is never
+    // left half-deleted with orphaned allocations.
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query(
+        'UPDATE Allocations SET allocationStatus = -1 WHERE billingUID = ? AND allocationStatus <> -1',
+        [uid],
+      );
+      await conn.query(
+        'UPDATE ServiceBillings SET billingStatus = -1 WHERE billingUID = ? AND billingStatus <> -1',
+        [uid],
+      );
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
     res.status(204).end();
   });
 

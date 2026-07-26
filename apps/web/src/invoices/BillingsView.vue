@@ -2,6 +2,8 @@
 import {
   faChevronLeft,
   faGavel,
+  faPen,
+  faTrash,
   faTriangleExclamation,
   faUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
@@ -16,7 +18,7 @@ import { apiFetch } from '../lib/api';
 import { euro, germanDate } from '../lib/format';
 import { HttpError } from '../lib/http';
 import { useTableSort } from '../lib/useTableSort';
-import { type BillingListDto, listContractBillings, updateBilling } from './api';
+import { type BillingListDto, deleteBilling, listContractBillings, updateBilling } from './api';
 
 const props = defineProps<{ contractUID: string }>();
 
@@ -45,11 +47,16 @@ function billingSortValue(b: BillingListDto, key: string): string | number | nul
 const sort = useTableSort(billings, billingSortValue);
 
 const objectionOpen = ref(false);
+const editOpen = ref(false);
+const deleteOpen = ref(false);
 const selected = ref<BillingListDto | null>(null);
 const busy = ref(false);
 const dialogError = ref<string | null>(null);
 const formDate = ref('');
 const formNote = ref('');
+const editNumber = ref('');
+const editDate = ref('');
+const editLink = ref('');
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -93,12 +100,13 @@ function openObjection(b: BillingListDto): void {
 
 const selectedOpen = computed(() => (selected.value ? isOpenObjection(selected.value) : false));
 
-async function run(action: () => Promise<unknown>): Promise<void> {
+/** Runs a mutating action, closing its dialog and reloading the list on success. */
+async function run(action: () => Promise<unknown>, close: () => void): Promise<void> {
   busy.value = true;
   dialogError.value = null;
   try {
     await action();
-    objectionOpen.value = false;
+    close();
     await load();
   } catch (err) {
     dialogError.value = err instanceof HttpError ? err.message : 'Aktion fehlgeschlagen.';
@@ -114,19 +122,63 @@ function fileObjection(): void {
     dialogError.value = 'Bitte ein Datum für den Widerspruch angeben.';
     return;
   }
-  void run(() =>
-    updateBilling(billing.billingUID, {
-      objectionDate: formDate.value,
-      objectionResolvedDate: null,
-      objectionNote: formNote.value.trim() ? formNote.value.trim() : null,
-    }),
+  void run(
+    () =>
+      updateBilling(billing.billingUID, {
+        objectionDate: formDate.value,
+        objectionResolvedDate: null,
+        objectionNote: formNote.value.trim() ? formNote.value.trim() : null,
+      }),
+    () => (objectionOpen.value = false),
   );
 }
 
 function resolveObjection(): void {
   const billing = selected.value;
   if (!billing) return;
-  void run(() => updateBilling(billing.billingUID, { objectionResolvedDate: today() }));
+  void run(
+    () => updateBilling(billing.billingUID, { objectionResolvedDate: today() }),
+    () => (objectionOpen.value = false),
+  );
+}
+
+function openEdit(b: BillingListDto): void {
+  selected.value = b;
+  dialogError.value = null;
+  editNumber.value = b.billingNumber;
+  editDate.value = b.billingDate;
+  editLink.value = b.documentLink ?? '';
+  editOpen.value = true;
+}
+
+function saveEdit(): void {
+  const billing = selected.value;
+  if (!billing) return;
+  if (!editNumber.value.trim() || !editDate.value) {
+    dialogError.value = 'Bitte Abrechnungsnummer und -datum angeben.';
+    return;
+  }
+  void run(
+    () =>
+      updateBilling(billing.billingUID, {
+        billingNumber: editNumber.value.trim(),
+        billingDate: editDate.value,
+        documentLink: editLink.value.trim() ? editLink.value.trim() : null,
+      }),
+    () => (editOpen.value = false),
+  );
+}
+
+function openDelete(b: BillingListDto): void {
+  selected.value = b;
+  dialogError.value = null;
+  deleteOpen.value = true;
+}
+
+function confirmDelete(): void {
+  const billing = selected.value;
+  if (!billing) return;
+  void run(() => deleteBilling(billing.billingUID), () => (deleteOpen.value = false));
 }
 </script>
 
@@ -202,6 +254,22 @@ function resolveObjection(): void {
                 title="Widerspruch einlegen oder auflösen"
                 @click="openObjection(b)"
               />
+              <EuButton
+                variant="secondary"
+                icon-only
+                :icon="faPen"
+                aria-label="Bearbeiten"
+                title="Abrechnung bearbeiten"
+                @click="openEdit(b)"
+              />
+              <EuButton
+                variant="secondary"
+                icon-only
+                :icon="faTrash"
+                aria-label="Löschen"
+                title="Abrechnung löschen"
+                @click="openDelete(b)"
+              />
             </td>
           </tr>
         </tbody>
@@ -246,6 +314,36 @@ function resolveObjection(): void {
         </EuButton>
       </template>
     </EuDialog>
+
+    <EuDialog :open="editOpen" title="Abrechnung bearbeiten" @close="editOpen = false">
+      <form class="eu-form" @submit.prevent="saveEdit">
+        <EuTextField v-model="editNumber" label="Abrechnungsnummer" />
+        <EuTextField v-model="editDate" label="Abrechnungsdatum" type="date" />
+        <EuTextField v-model="editLink" label="Dokument-Link (optional)" />
+        <p v-if="dialogError" class="eu-billings__error" role="alert">{{ dialogError }}</p>
+      </form>
+      <template #footer>
+        <EuButton variant="secondary" @click="editOpen = false">Abbrechen</EuButton>
+        <EuButton :disabled="busy" @click="saveEdit">{{ busy ? 'Speichern…' : 'Speichern' }}</EuButton>
+      </template>
+    </EuDialog>
+
+    <EuDialog :open="deleteOpen" title="Abrechnung löschen" @close="deleteOpen = false">
+      <div v-if="selected" class="eu-form">
+        <p>
+          Leistungsabrechnung <strong>{{ selected.billingNumber }}</strong> wirklich löschen?
+        </p>
+        <p v-if="selected.invoiceCount > 0" class="eu-billings__warn">
+          {{ selected.invoiceCount }} zugeordnete Rechnung(en) verlieren dadurch ihre Erstattung und
+          gehen zurück auf „eingereicht".
+        </p>
+        <p v-if="dialogError" class="eu-billings__error" role="alert">{{ dialogError }}</p>
+      </div>
+      <template #footer>
+        <EuButton variant="secondary" @click="deleteOpen = false">Abbrechen</EuButton>
+        <EuButton :disabled="busy" @click="confirmDelete">{{ busy ? 'Löschen…' : 'Löschen' }}</EuButton>
+      </template>
+    </EuDialog>
   </section>
 </template>
 
@@ -285,6 +383,12 @@ function resolveObjection(): void {
 .eu-billings__error {
   margin: 0;
   color: var(--eu-color-error-fg);
+  font-size: 0.9rem;
+}
+
+.eu-billings__warn {
+  margin: 0;
+  color: var(--eu-color-status-submitted-fg);
   font-size: 0.9rem;
 }
 

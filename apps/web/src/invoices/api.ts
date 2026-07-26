@@ -112,16 +112,24 @@ export async function createBilling(body: {
   return unwrap(await apiFetch<{ data: BillingDto }>('/billings', { method: 'POST', body }));
 }
 
-/** Files or resolves an objection ("Widerspruch") on a billing (or clears fields with null). */
+/** Edits a billing's metadata and/or its objection ("Widerspruch") state. */
 export async function updateBilling(
   uid: string,
   body: {
+    billingNumber?: string;
+    billingDate?: string;
+    documentLink?: string | null;
     objectionDate?: string | null;
     objectionResolvedDate?: string | null;
     objectionNote?: string | null;
   },
 ): Promise<BillingDto> {
   return unwrap(await apiFetch<{ data: BillingDto }>(`/billings/${uid}`, { method: 'PATCH', body }));
+}
+
+/** Deletes a billing, cascading to its allocations (affected invoices revert). */
+export async function deleteBilling(uid: string): Promise<void> {
+  await apiFetch(`/billings/${uid}`, { method: 'DELETE' });
 }
 
 export async function createAllocation(body: {
