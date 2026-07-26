@@ -30,7 +30,7 @@ export const mainNav: NavItem[] = [
   { to: '/contracts', title: 'Policen', icon: faAward },
   { to: '/companies', title: 'Versicherungen', icon: faBuildingShield },
   { to: '/facilities', title: 'Leistungserbringer', icon: faHouseMedical },
-  { to: '/agencies', title: 'Inkasso-Firmen', icon: faSackDollar },
+  { to: '/agencies', title: 'Abrechnungsdienstleister', icon: faSackDollar },
   { to: '/billings', title: 'Leistungsabrechnungen', icon: faReceipt },
 ];
 

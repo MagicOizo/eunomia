@@ -63,7 +63,7 @@ watch(
 type CreateKind = 'facility' | 'agency';
 const kinds: Record<CreateKind, { path: string; config: ResourceConfig; noun: string }> = {
   facility: { path: '/facilities', config: resourceConfigs['/facilities'], noun: 'Leistungserbringer' },
-  agency: { path: '/agencies', config: resourceConfigs['/agencies'], noun: 'Inkasso-Firma' },
+  agency: { path: '/agencies', config: resourceConfigs['/agencies'], noun: 'Abrechnungsdienstleister' },
 };
 const createOpen = ref(false);
 const createKind = ref<CreateKind>('facility');
@@ -182,10 +182,10 @@ function submit(): void {
         <EuTextField v-model="form.transferSubject" label="Verwendungszweck" />
         <EuEntityPicker
           :model-value="form.agencyUID || null"
-          label="Inkasso-Firma"
+          label="Abrechnungsdienstleister"
           :options="localAgencies"
           allow-create
-          create-noun="Inkasso-Firma"
+          create-noun="Abrechnungsdienstleister"
           @update:model-value="form.agencyUID = $event ?? ''"
           @create="openCreate('agency', $event)"
         />

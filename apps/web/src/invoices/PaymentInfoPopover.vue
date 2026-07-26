@@ -62,7 +62,7 @@ const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.
       </template>
 
       <template v-if="agencyName">
-        <dt><FontAwesomeIcon :icon="faSackDollar" fixed-width title="Inkasso / Empfänger" /></dt>
+        <dt><FontAwesomeIcon :icon="faSackDollar" fixed-width title="Abrechnungsdienstleister / Empfänger" /></dt>
         <dd>{{ agencyName }}</dd>
       </template>
 

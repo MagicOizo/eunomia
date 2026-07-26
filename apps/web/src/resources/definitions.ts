@@ -99,8 +99,8 @@ const facilities: ResourceConfig = {
 
 const agencies: ResourceConfig = {
   path: '/agencies',
-  singular: 'Inkasso-Firma',
-  plural: 'Inkasso-Firmen',
+  singular: 'Abrechnungsdienstleister',
+  plural: 'Abrechnungsdienstleister',
   idKey: 'agencyUID',
   columns: [
     { key: 'agencyName', label: 'Name' },
