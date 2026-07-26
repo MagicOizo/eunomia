@@ -58,6 +58,11 @@ watch(
   color: var(--eu-color-text);
   background-color: var(--eu-color-surface-bg);
   max-width: min(32rem, calc(100vw - 2rem));
+  /* Never taller than the viewport: header and footer stay put, only the body
+     scrolls (see __body). Flex column drives that split. */
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .eu-dialog::backdrop {
@@ -65,6 +70,7 @@ watch(
 }
 
 .eu-dialog__header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -79,10 +85,16 @@ watch(
 }
 
 .eu-dialog__body {
+  /* The only scrollable region. min-height:0 lets this flex child shrink below
+     its content so overflow-y actually kicks in. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   padding: 1.25em;
 }
 
 .eu-dialog__footer {
+  flex: 0 0 auto;
   display: flex;
   justify-content: flex-end;
   gap: 0.75em;
