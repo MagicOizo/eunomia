@@ -176,6 +176,7 @@ async function confirmDelete(): Promise<void> {
               v-for="column in config.columns"
               :key="column.key"
               :label="column.label"
+              :align="column.align === 'right' ? 'center' : column.align"
               :state="sort.stateOf(column.key)"
               @sort="sort.toggle(column.key)"
             />
@@ -184,7 +185,13 @@ async function confirmDelete(): Promise<void> {
         </thead>
         <tbody>
           <tr v-for="row in sort.sorted" :key="String(row[config.idKey])">
-            <td v-for="column in config.columns" :key="column.key">{{ cell(row, column) }}</td>
+            <td
+              v-for="column in config.columns"
+              :key="column.key"
+              :class="{ 'eu-resource__num': column.align === 'right' }"
+            >
+              {{ cell(row, column) }}
+            </td>
             <td class="eu-resource__actions">
               <EuButton
                 variant="secondary"
@@ -278,13 +285,21 @@ async function confirmDelete(): Promise<void> {
   letter-spacing: 0.03em;
 }
 
-.eu-resource__actions-head {
+/* Shrink the actions column to its content so the data columns get the rest.
+   Prefixed with the table class to outweigh the base `.eu-resource__table td`. */
+.eu-resource__table .eu-resource__actions-head,
+.eu-resource__table .eu-resource__actions {
+  width: 1%;
+  white-space: nowrap;
   text-align: right;
 }
 
-.eu-resource__actions {
-  display: flex;
-  gap: 0.4rem;
-  justify-content: flex-end;
+.eu-resource__actions button + button {
+  margin-left: 0.4rem;
+}
+
+.eu-resource__table .eu-resource__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 </style>

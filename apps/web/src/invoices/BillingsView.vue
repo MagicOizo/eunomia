@@ -217,7 +217,7 @@ function confirmDelete(): void {
           <tr>
             <EuSortableTh label="Nummer" :state="sort.stateOf('number')" @sort="sort.toggle('number')" />
             <EuSortableTh label="Datum" :state="sort.stateOf('date')" @sort="sort.toggle('date')" />
-            <EuSortableTh label="Erstattung" :state="sort.stateOf('reimbursed')" @sort="sort.toggle('reimbursed')" />
+            <EuSortableTh label="Erstattung" align="center" :state="sort.stateOf('reimbursed')" @sort="sort.toggle('reimbursed')" />
             <EuSortableTh label="Rechnungen" :state="sort.stateOf('invoices')" @sort="sort.toggle('invoices')" />
             <EuSortableTh label="Widerspruch" :state="sort.stateOf('objection')" @sort="sort.toggle('objection')" />
             <th class="eu-billings__actions-head">Aktionen</th>
@@ -227,7 +227,7 @@ function confirmDelete(): void {
           <tr v-for="b in sort.sorted" :key="b.billingUID">
             <td>{{ b.billingNumber }}</td>
             <td>{{ germanDate(b.billingDate) }}</td>
-            <td>{{ euro(b.reimbursedTotal) }}</td>
+            <td class="eu-billings__num">{{ euro(b.reimbursedTotal) }}</td>
             <td>{{ b.invoiceNumbers ?? '–' }}</td>
             <td>
               <span
@@ -432,14 +432,22 @@ function confirmDelete(): void {
   white-space: nowrap;
 }
 
-.eu-billings__actions-head {
+/* Shrink the actions column to its content so the data columns get the rest.
+   Prefixed with the table class to outweigh the base `.eu-billings__table td`. */
+.eu-billings__table .eu-billings__actions-head,
+.eu-billings__table .eu-billings__actions {
+  width: 1%;
+  white-space: nowrap;
   text-align: right;
 }
 
-.eu-billings__actions {
-  display: flex;
-  gap: 0.35rem;
-  justify-content: flex-end;
+.eu-billings__actions button + button {
+  margin-left: 0.35rem;
+}
+
+.eu-billings__table .eu-billings__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .eu-billings__objection {

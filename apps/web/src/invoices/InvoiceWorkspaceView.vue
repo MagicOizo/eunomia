@@ -413,8 +413,8 @@ function confirmDelete(): void {
             <EuSortableTh label="Behandlung" :state="sort.stateOf('treatmentDate')" @sort="sort.toggle('treatmentDate')" />
             <EuSortableTh label="Nummer" :state="sort.stateOf('number')" @sort="sort.toggle('number')" />
             <EuSortableTh label="Leistungserbringer" :state="sort.stateOf('facility')" @sort="sort.toggle('facility')" />
-            <EuSortableTh label="Betrag" :state="sort.stateOf('amount')" @sort="sort.toggle('amount')" />
-            <EuSortableTh label="Erstattung" :state="sort.stateOf('reimbursed')" @sort="sort.toggle('reimbursed')" />
+            <EuSortableTh label="Betrag" align="center" :state="sort.stateOf('amount')" @sort="sort.toggle('amount')" />
+            <EuSortableTh label="Erstattung" align="center" :state="sort.stateOf('reimbursed')" @sort="sort.toggle('reimbursed')" />
             <th class="eu-ws__actions-head">Aktionen</th>
           </tr>
         </thead>
@@ -474,7 +474,7 @@ function confirmDelete(): void {
                 </PaymentInfoPopover>
               </div>
             </td>
-            <td>{{ euro(invoice.reimbursedTotal) }}</td>
+            <td class="eu-ws__num">{{ euro(invoice.reimbursedTotal) }}</td>
             <td class="eu-ws__actions">
               <EuButton
                 v-if="invoice.documentLink"
@@ -493,14 +493,6 @@ function confirmDelete(): void {
                 aria-label="Einreichen"
                 title="Rechnung bei der Versicherung einreichen"
                 @click="openSubmit([invoice.invoiceUID])"
-              />
-              <EuButton
-                variant="secondary"
-                icon-only
-                :icon="faPen"
-                aria-label="Bearbeiten"
-                title="Rechnung bearbeiten"
-                @click="openEdit(invoice)"
               />
               <EuButton
                 v-if="invoice.workflowStatus === 'eingereicht'"
@@ -528,6 +520,14 @@ function confirmDelete(): void {
                 aria-label="Widerspruch"
                 title="Fehlerhafte Leistungsabrechnung als Widerspruch markieren"
                 @click="openObjection(invoice)"
+              />
+              <EuButton
+                variant="secondary"
+                icon-only
+                :icon="faPen"
+                aria-label="Bearbeiten"
+                title="Rechnung bearbeiten"
+                @click="openEdit(invoice)"
               />
               <EuButton
                 variant="secondary"
@@ -696,20 +696,30 @@ function confirmDelete(): void {
   letter-spacing: 0.03em;
 }
 
-.eu-ws__actions-head {
+/* Shrink the actions column to its content so the data columns get the rest.
+   Prefixed with the table class to outweigh the base `.eu-ws__table td` rule. */
+.eu-ws__table .eu-ws__actions-head,
+.eu-ws__table .eu-ws__actions {
+  width: 1%;
+  white-space: nowrap;
   text-align: right;
 }
 
-.eu-ws__actions {
-  display: flex;
-  gap: 0.35rem;
-  justify-content: flex-end;
+.eu-ws__actions button + button {
+  margin-left: 0.35rem;
 }
 
 .eu-ws__amount {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.eu-ws__table .eu-ws__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .eu-ws__badges {

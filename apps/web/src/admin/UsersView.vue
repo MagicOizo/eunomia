@@ -260,12 +260,15 @@ async function confirmDelete(): Promise<void> {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.eu-users__actions-head {
+/* Shrink the actions column to its content so the data columns get the rest.
+   Prefixed with the table class to outweigh the base `.eu-users__table td`. */
+.eu-users__table .eu-users__actions-head,
+.eu-users__table .eu-users__actions {
+  width: 1%;
+  white-space: nowrap;
   text-align: right;
 }
-.eu-users__actions {
-  display: flex;
-  gap: 0.4rem;
-  justify-content: flex-end;
+.eu-users__actions button + button {
+  margin-left: 0.4rem;
 }
 </style>

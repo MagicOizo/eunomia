@@ -22,6 +22,8 @@ export interface ColumnConfig {
   lookup?: string;
   /** Custom cell formatting (money, units, …). */
   format?: (value: unknown, row: ResourceRow) => string;
+  /** Right-align the column (numbers/money), with tabular figures. */
+  align?: 'left' | 'right';
 }
 
 /** A related resource loaded to resolve foreign-key UIDs to labels and select options. */

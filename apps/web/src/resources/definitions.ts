@@ -58,8 +58,8 @@ const contracts: ResourceConfig = {
     { key: 'contractNumber', label: 'Vertragsnummer' },
     { key: 'accountUID', label: 'Versicherter', lookup: 'accounts' },
     { key: 'companyUID', label: 'Versicherung', lookup: 'companies' },
-    { key: 'deductible', label: 'Selbstbeteiligung', format: euro },
-    { key: 'bonus', label: 'Bonus', format: euro },
+    { key: 'deductible', label: 'Selbstbeteiligung', format: euro, align: 'right' },
+    { key: 'bonus', label: 'Bonus', format: euro, align: 'right' },
   ],
   fields: [
     { key: 'contractNumber', label: 'Vertragsnummer', type: 'text', required: true },
