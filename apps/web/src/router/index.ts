@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 import UsersView from '../admin/UsersView.vue';
 import ResourceView from '../components/resource/ResourceView.vue';
+import BillingPickerView from '../invoices/BillingPickerView.vue';
+import BillingsView from '../invoices/BillingsView.vue';
 import InvoicePickerView from '../invoices/InvoicePickerView.vue';
 import InvoiceWorkspaceView from '../invoices/InvoiceWorkspaceView.vue';
 import { resourceConfigs } from '../resources/definitions';
@@ -25,9 +27,10 @@ declare module 'vue-router' {
  * resource config (Slice 4/7 master data) render the CRUD view; the rest stay
  * placeholders until their slice lands.
  */
-// '/invoices' has bespoke routes (picker + workspace) below, so it is excluded here.
+// '/invoices' (picker + workspace) and '/billings' (bespoke view) have their own
+// routes below, so they are excluded from the generated placeholder/CRUD routes.
 const navRoutes = [
-  ...mainNav.filter((item) => item.to !== '/' && item.to !== '/invoices'),
+  ...mainNav.filter((item) => item.to !== '/' && item.to !== '/invoices' && item.to !== '/billings'),
   ...systemNav.filter((item) => item.to !== '/system/users'),
 ].map((item) => {
   const config = resourceConfigs[item.to];
@@ -67,6 +70,19 @@ export const router = createRouter({
       name: '/system/users',
       component: UsersView,
       meta: { title: 'Nutzer & Rechte', requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/billings',
+      name: '/billings',
+      component: BillingPickerView,
+      meta: { title: 'Leistungsabrechnungen', requiresAuth: true },
+    },
+    {
+      path: '/billings/:contractUID',
+      name: 'billings-contract',
+      component: BillingsView,
+      props: true,
+      meta: { title: 'Leistungsabrechnungen', requiresAuth: true },
     },
     ...navRoutes,
     {

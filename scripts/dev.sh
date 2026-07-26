@@ -16,6 +16,10 @@ export DB_HOST=127.0.0.1 DB_PORT=3306 DB_USER=eunomia DB_PASSWORD=eunomia DB_NAM
 export JWT_SECRET=dev-only-not-a-real-secret
 export SETUP_TOKEN=dev-setup
 export PORT=3000
+# Generous auth rate limit in dev — repeated logins from you and from browser
+# tooling share one IP bucket, and the strict prod default (10/15 min) would
+# otherwise lock you out with a 429.
+export RATE_LIMIT_AUTH_MAX=1000
 export DEV_ADMIN_EMAIL="${DEV_ADMIN_EMAIL:-admin@example.com}"
 export DEV_ADMIN_PASSWORD="${DEV_ADMIN_PASSWORD:-eunomia}"
 

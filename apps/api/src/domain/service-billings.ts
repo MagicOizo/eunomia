@@ -10,7 +10,12 @@ import { pathParam } from '../crud/params.js';
 import { type CrudTable, getRow, insertRow, softDeleteRow, updateRow } from '../crud/repository.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
-import { accountForBilling, accountForSubmission, authorizeAccount } from './workflow-access.js';
+import {
+  accountForBilling,
+  accountForContract,
+  accountForSubmission,
+  authorizeAccount,
+} from './workflow-access.js';
 
 const table: CrudTable = {
   table: 'ServiceBillings',
@@ -57,12 +62,19 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const params: unknown[] = [];
 
     const submissionUID = typeof req.query.submissionUID === 'string' ? req.query.submissionUID : undefined;
+    const contractUID = typeof req.query.contractUID === 'string' ? req.query.contractUID : undefined;
     if (submissionUID !== undefined) {
       const account = await accountForSubmission(pool, submissionUID);
       if (account === null) throw notFound('Submission');
       await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
       where.push('b.submissionUID = ?');
       params.push(submissionUID);
+    } else if (contractUID !== undefined) {
+      const account = await accountForContract(pool, contractUID);
+      if (account === null) throw notFound('Contract');
+      await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
+      where.push('c.contractUID = ?');
+      params.push(contractUID);
     } else {
       const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_INVOICES);
       if (!scope.all) {
@@ -77,11 +89,20 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
 
     const rows = await pool.query(
       `SELECT b.billingUID, b.submissionUID, b.billingDate, b.billingNumber, b.documentLink,
-              b.objectionDate, b.objectionResolvedDate, b.objectionNote, b.billingStatus
+              b.objectionDate, b.objectionResolvedDate, b.objectionNote, b.billingStatus,
+              c.accountUID, c.contractUID, c.contractNumber,
+              CONCAT_WS(' ', acc.firstname, acc.surname) AS personName,
+              COALESCE(SUM(al.reimbursement), 0) AS reimbursedTotal,
+              COUNT(al.allocationID) AS invoiceCount,
+              GROUP_CONCAT(inv.invoiceNumber ORDER BY inv.invoiceNumber SEPARATOR ', ') AS invoiceNumbers
          FROM ServiceBillings b
          JOIN Submissions s ON s.submissionUID = b.submissionUID
          JOIN Contracts c ON c.contractUID = s.contractUID
+         JOIN Accounts acc ON acc.accountUID = c.accountUID
+         LEFT JOIN Allocations al ON al.billingUID = b.billingUID AND al.allocationStatus <> -1
+         LEFT JOIN Invoices inv ON inv.invoiceUID = al.invoiceUID AND inv.invoiceStatus <> -1
         WHERE ${where.join(' AND ')}
+        GROUP BY b.billingID
         ORDER BY b.billingDate DESC, b.billingUID`,
       params,
     );

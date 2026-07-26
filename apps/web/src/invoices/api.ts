@@ -35,6 +35,19 @@ export interface BillingDto {
   objectionNote: string | null;
 }
 
+/** A billing enriched for the standalone Leistungsabrechnungen list. */
+export interface BillingListDto extends BillingDto {
+  accountUID: string;
+  contractUID: string;
+  personName: string;
+  contractNumber: string;
+  /** Sum of the allocations booked against this billing. */
+  reimbursedTotal: number;
+  invoiceCount: number;
+  /** Comma-separated invoice numbers reimbursed through it (null if none yet). */
+  invoiceNumbers: string | null;
+}
+
 export interface ReimbursementAnalysisDto {
   contractUID: string;
   year: number;
@@ -84,6 +97,11 @@ export async function createSubmission(body: {
 
 export async function listBillings(submissionUID: string): Promise<BillingDto[]> {
   return unwrap(await apiFetch<{ data: BillingDto[] }>(`/billings?submissionUID=${submissionUID}`));
+}
+
+/** Enriched service billings for one contract (Leistungsabrechnungen list). */
+export async function listContractBillings(contractUID: string): Promise<BillingListDto[]> {
+  return unwrap(await apiFetch<{ data: BillingListDto[] }>(`/billings?contractUID=${contractUID}`));
 }
 
 export async function createBilling(body: {

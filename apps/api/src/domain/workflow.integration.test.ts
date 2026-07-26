@@ -219,6 +219,17 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(Number(inv.body.data.reimbursedTotal), 200);
     });
 
+    await t.test('GET /billings?contractUID lists the contract billings, enriched', async () => {
+      const res = await request(app).get(`/api/v1/billings?contractUID=${contractA}`).set(admin);
+      assert.equal(res.status, 200);
+      const billing = res.body.data.find((b: { billingUID: string }) => b.billingUID === billingUID);
+      assert.ok(billing, 'the created billing is listed for its contract');
+      assert.equal(billing.contractNumber, 'PKV-A');
+      assert.equal(Number(billing.reimbursedTotal), 200);
+      assert.ok(billing.personName.length > 0);
+      assert.ok((billing.invoiceNumbers ?? '').includes('R-1'));
+    });
+
     await t.test('filing an objection on the billing flags the invoice; resolving clears it', async () => {
       let inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
       assert.equal(inv.body.data.hasOpenObjection, false);
