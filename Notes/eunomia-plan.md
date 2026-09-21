@@ -404,6 +404,18 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - Detailansicht als **breiter Dialog** aus der Policen-Liste (`ResourceConfig.detailDialog`); Anlegen bleibt das klassische Formular.
 - Nebenbei behoben: im Dark Mode hatte Akzentblau als **Textfarbe** (Sekundär-Buttons, aktiver Tab, Sortier-Header …) nur 3,45:1 Kontrast — neues Token `--eu-color-accent-text` (siehe `CONTRAST.md`).
 
+## Slice 16a — Code-Formatierung durchsetzen (Zwischen-Slice, vor Slice 17)
+**Anlass:** In Slice 16 hat ein Prettier-Lauf 53 nicht betroffene Dateien umformatiert (30 `apps/web`, 22 `apps/api`, README). Ursache: Die CI prüft die Formatierung nicht — `ci.yml` führt nur lint/typecheck/test/build aus, `format:check` existiert als Skript, läuft aber nirgends. Das Zurückdrehen der Formatierung in Slice 16 war die falsche Lösung. **Festlegung des Autors: Der Code ist immer Prettier-formatiert (`.prettierrc`); Abweichungen werden behoben, nicht umgangen.**
+- **Einmal alles formatieren** (`npm run format`) als eigener Commit ohne Logikänderung; der Commit-Hash kommt in `.git-blame-ignore-revs`.
+- **ESLint-Konflikt im Code lösen:** Prettier bricht in `EuDetailField.vue` einen `||`-Ausdruck so um, dass `vue/no-deprecated-filter` ihn als Vue-2-Filter meldet — Ausdruck z. B. in eine `computed` auslagern, nicht die Regel abschalten und nicht die Datei unformatiert lassen.
+- **CI:** `npm run format:check` als Schritt in `.github/workflows/ci.yml`.
+- **Arbeitsablauf:** `format`/`format:check` gehört ab jetzt in die Verifikation jeder Slice; Formatierungs-Drift wird als eigener Commit behoben.
+- `Notes/` bleibt in `.prettierignore`.
+
+**Offene Entscheidung (im Planmodus klären):** zusätzlich ein Pre-Commit-Hook (z. B. husky + lint-staged), der geänderte Dateien vor jedem Commit formatiert — fängt Drift früher ab, kostet eine Dev-Abhängigkeit.
+
+**DoD:** `npm run format:check` ist grün im ganzen Repo; `npm run lint`/`typecheck`/`test` bleiben grün; die CI schlägt bei unformatiertem Code fehl.
+
 ## Slice 17 — Mehrfach-Einreichung
 **Ziel:** Eine Rechnung kann bei mehreren Policen eingereicht werden, bei derselben Police aber nur einmal.
 - Migration: `SubmissionInvoices` mit `UNIQUE (invoiceUID, contractUID)`, `Invoices.submissionUID` entfällt; `InvoiceExclusions`.
