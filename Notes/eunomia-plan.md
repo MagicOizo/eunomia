@@ -4,15 +4,18 @@ Eunomia ist eine WebApp zur Verwaltung des Abrechnungsprozesses mit privaten Kra
 
 Zu jedem Vertrag kann es Selbstbeteiligungsschwellen geben und auch Bonuszahlungen, wenn in einem Jahr keine Rechnungen eingereicht wurden sind. Die App soll also nachhalten, ob es noch günstiger ist, die Rechnung zurück zu halten, weil die Summe aus möglicher Bonuszahlung und Selbstbeteiligung noch nicht erreicht ist, oder ob es zu einer tatsächlichen Erstattung kommen würde und eine Einreichung sinnvoll ist.
 
+Ein Versicherter kann **mehrere Policen parallel** haben (z. B. eine PKV-Vollversicherung und eine Zusatzversicherung). Eine Rechnung kann bei mehreren davon eingereicht werden — typischerweise erst bei der Vollversicherung und der nicht erstattete Rest (Selbstbeteiligung, Abgelehntes) bei der Zusatzversicherung, oder bewusst nur bei der Zusatzversicherung, um den Bonus der Vollversicherung zu schonen. Die App soll diese Zusammenhänge sichtbar machen, Erstattungsfähigkeit signalisieren und empfehlen, **wo** sich eine Einreichung lohnt (siehe 2.3 "Datenmodell v3" und Slices 16–20).
+
 Dokumente können über einen Link auf eine Dokumentenmanagement-Plattform verlinkt werden (z.B. Paperless NGX oder Nextcloud). Auch sollen später einmal API-Interaktionen möglich sein (Paperless pushed eine neue Rechnung).
 
 Die App ist für den privaten Einsatz geplant. Ein öffentlicher Einsatz (z.B. als SaaS) ist wegen der möglichen Verarbeitung von Gesundheitsdaten und der damit verbundenen Auflagen nicht geplant. Vielmehr soll das Projekt in Home Labs betrieben werden können. Aber durchaus breiter, als nur im Haushalt des Autors. Eine Veröffentlichung als public Repo ist also möglich.
 
 ### 1.1.1 Der Loop
 1. Rechnung erfassen
-1. Rechnung einreichen (einem Versicherungsvertrag zuweisen)
+1. Rechnung einreichen (einer Police zuweisen — laut Empfehlung der Übersicht)
 1. Leistungsabrechnung mit Erstattungsbetrag erfassen
 1. Leistungsabrechnung zu Rechnung zuordnen
+1. Ggf. den nicht erstatteten Rest bei einer weiteren Police (Zusatzversicherung) einreichen → zurück zu Schritt 3
 1. Nachhalten des Status ob die Rechnung bezahlt wurde und ob die Zahlung der Versicherung eingegangen ist
 
 ## 1.2 Projekthistorie
@@ -25,6 +28,13 @@ Das Projekt ist schon begonnen worden (siehe 1.4 Vorlagen). Allerdings wurden ei
 4. Aufbau auf Basis von TypeScript statt plain JavaScript
 5. Mit der Umstellung auf SPA kann der Access Token (JWT) auch klassisch im Bearer geführt werden und nicht als Cookie. Nur den Reauth-Token werden wir an die Route gebunden im Cookie http-only behalten.
 6. Rechtemanagement als Bitmaske ist zu wenigig Differenzierbar. Wir bauen eine eigene Rollen- und Rechte-Tabellenstruktur auf, die einfacher erweiterbar ist und bauen Standardrollen (mind. Admin und Nutzer)
+7. **(Erkenntnis aus der ersten Echtdaten-Erfassung in Prod, 2026-09)** Das Vertragsmodell trägt nicht:
+   - Unterjährige Beitragsanpassungen erzwingen heute einen neuen `Contract` — dieselbe Police erscheint mehrfach (gleiche Vertragsnummer, ohne sichtbaren Gültigkeitszeitraum), die Selbstbeteiligung zerfällt auf mehrere "Verträge", die Auswahl beim Einreichen ist nicht eindeutig.
+   - Die Regel "eine Rechnung kann nur einmal eingereicht werden" (aus Punkt 1) ist fachlich falsch: eine Zusatzversicherung kann z. B. die Selbstbeteiligung einer anderen Versicherung übernehmen.
+   - Die Bonus-Staffel (Beitragsrückerstattung abhängig von der Zahl leistungsfreier Jahre) ist nicht abbildbar, der Bonus ist ein fester Betrag.
+   - Die "lohnt sich Einreichen?"-Analyse betrachtet jeden Vertrag isoliert (und summiert dabei alle Rechnungen des Versicherten je Vertrag, zählt also bei mehreren Policen doppelt) — das Zusammenspiel mehrerer Policen fehlt.
+   
+   Lösung: Datenmodell v3, siehe 2.3 und Slices 16–20.
 
 ## 1.4 Vorlagen
 - Erster Umsetzungsversuch: /home/magicoizo/projects/rechnungs-verwaltung
@@ -85,6 +95,8 @@ Contracts ──1:n──→ Submissions ──1:n──→ Invoices
                         └──1:n──→ ServiceBillings ──1:n──→ Allocations ──n:1──→ Invoices
 ```
 
+> **Revidiert durch Datenmodell v3 (siehe unten):** Die Regel "nur einmal einreichen" gilt jetzt **pro Police**, `Invoices.submissionUID` wird durch die Tabelle `SubmissionInvoices` ersetzt.
+
 - Eine `Invoice` bekommt beim Einreichen eine `submissionUID` (statt bisher `submittedDate` + `contractUID` direkt auf der Rechnung). Einmal gesetzt, ist sie **unveränderlich** — das erzwingt "eine Rechnung kann nicht mehrfach eingereicht werden" strukturell, nicht nur per Anwendungslogik.
 - Eine `Submission` kann mehrere `Invoices` enthalten (Sammeleinreichung) und trägt darüber `contractUID` und `submittedDate`.
 - `ServiceBillings` hängen an der `Submission`, nicht mehr direkt an einer einzelnen `Invoice` — eine Einreichung kann mehrere Leistungsabrechnungen erhalten (z.B. bei Teilabrechnungen).
@@ -100,6 +112,40 @@ Contracts ──1:n──→ Submissions ──1:n──→ Invoices
 **Geklärt: `cap`-Spalte auf `Contracts`.** Im Vorgänger in `database.md` nur in einer Referenz-Query verwendet, aber nie in der `CREATE TABLE Contracts`-DDL definiert (Doku-Lücke, nicht Schema-Lücke — die Spalte existiert in der laufenden DB). Bedeutung anhand der Frontend-Logik verifiziert (`public/scripts/invoices.js`, Summary-Zeile pro Vertrag): `cap` ist eine **Erstattungs-Obergrenze pro Vertrag** — der Höchstbetrag, den die Versicherung insgesamt erstattet, unabhängig von `deductible` (Selbstbeteiligung) und `bonus`. `NULL` bedeutet kein Cap. Übernahme ins neue Schema als eigene, dokumentierte Spalte auf `Contracts` (`DECIMAL`, nullable).
 
 Rechte-/Nutzer-Entitäten — siehe 2.4.
+
+### Datenmodell v3: Policen, Mehrfach-Einreichung, Bonus-Staffel (beschlossen 2026-09-21)
+
+Löst 1.3.7. **Ersetzt** Teile des obigen Entwurfs: die Konditionen-Spalten auf `Contracts` (`monthlyRate`, `deductible`, `bonus`, `reimbursementCap`) und die Regel "eine Rechnung wird genau einmal eingereicht" (`Invoices.submissionUID`). Das Grundprinzip der `Submission` als Bindeglied (1.3.1) bleibt erhalten.
+
+```
+Accounts ─1:n→ Contracts (Police, stabil)
+                 ├─1:n→ ContractPremiums   (Beitragsstände, gültig ab Datum — nur Information)
+                 ├─1:n→ ContractTerms      (Konditionen, gültig ab Kalenderjahr)
+                 │         └─1:n→ ContractBonusTiers (Staffel: leistungsfreie Jahre → absoluter Bonusbetrag)
+                 ├─1:n→ ContractYears      (Jahresstatus: Bonus verwirkt?, tatsächliche Rückerstattung)
+                 └─1:n→ Submissions ─n:m→ Invoices   (über SubmissionInvoices)
+                            └─1:n→ ServiceBillings ─1:n→ Allocations ─n:1→ Invoices
+Invoices ─n:m→ Contracts über InvoiceExclusions ("nicht erstattungsfähig bei dieser Police")
+```
+
+- **`Contracts` = stabile Police.** Tabellenname und `/api/v1/contracts` bleiben (weniger Umbau), die UI spricht von "Police". Felder: Nummer, Versicherung, Versicherter, Beginn/Ende, neu `contractKind` (`FULL` = Vollversicherung / `SUPPLEMENTARY` = Zusatzversicherung), `bonusForfeitRule` (`ON_SUBMISSION` = schon das Einreichen verwirkt den Bonus / `ON_REIMBURSEMENT` = erst eine tatsächliche Erstattung), sowie der Startwert der Leistungsfreiheit `claimFreeYearsAtStart` + `claimFreeCountingFromYear` (Default: 0 bzw. Beginnjahr — für neu abgeschlossene Policen passt der Default, für ältere trägt man die bisherigen leistungsfreien Jahre ein). Eine neue Police entsteht nur noch bei echtem Vertragswechsel.
+- **`ContractPremiums`**: `validFrom` (DATE), Monatsbeitrag, Notiz (z. B. "Beitragsanpassung 01/2026"). `validTo` wird aus dem Folgeeintrag abgeleitet, nicht gespeichert. Rein informativ (Beitragsverlauf, Jahreskosten) — **kein Einfluss auf Selbstbeteiligung oder Bonus**. Bewusst keine Aufteilung in Tarif-Bestandteile.
+- **`ContractTerms`**: gültig ab `validFromYear` bis zum nächsten Eintrag (ein Jahr ohne eigenen Eintrag erbt den vorherigen). Felder: Selbstbeteiligung (jährlich), Jahres-Erstattungsobergrenze (nullable), Erstattungssatz in % (Default 100). Unterjährige Änderungen gibt es hier nicht — die Selbstbeteiligung ist immer eine Jahresgröße der Police.
+- **`ContractBonusTiers`**: gehört zu einem `ContractTerms`-Eintrag, also fest zu einem (ab-)Versicherungsjahr (= Kalenderjahr). Pro Stufe: Mindestzahl leistungsfreier Jahre → **absoluter Bonusbetrag in €** (z. B. 1 → 300 €, 2 → 450 €, 4 → 600 €). Keine Berechnung aus Monatsbeiträgen — ändern sich die Werte, werden sie mit einem neuen `ContractTerms`-Eintrag neu eingegeben (UI bietet "vom Vorjahr übernehmen" an). Ist für ein Jahr keine eigene Staffel erfasst, gilt die geerbte als Prognose und wird in der UI als "nicht aktualisiert" gekennzeichnet.
+- **Leistungsfreiheit wird gezählt, nicht gepflegt:** Ein Jahr ist für eine Police leistungsfrei, wenn der Bonus darin nicht verwirkt ist. Verwirkt ist er — je nach `bonusForfeitRule` — durch eine Einreichung bzw. eine Erstattung > 0 bei dieser Police in dem Behandlungsjahr; übersteuerbar pro Leistungsabrechnung (`ServiceBillings.forfeitsBonus`, nullable = Regel der Police folgen; wird bei Erfassung der Erstattung abgefragt) und pro Jahr (`ContractYears`). Die Serie leistungsfreier Jahre = `claimFreeYearsAtStart` + ununterbrochen leistungsfreie Jahre ab `claimFreeCountingFromYear`; ein verwirktes Jahr setzt sie auf 0.
+- **`ContractYears`** (optional pro Police und Jahr): tatsächlich erhaltene Beitragsrückerstattung laut Schreiben der Versicherung (überschreibt die Prognose) und manueller Override "Bonus verwirkt ja/nein".
+- **`SubmissionInvoices`** (`submissionUID`, `invoiceUID`, `contractUID` denormalisiert) ersetzt `Invoices.submissionUID`. `UNIQUE (invoiceUID, contractUID)`: **eine Rechnung höchstens einmal pro Police** — die Doppel-Einreichung bei derselben Versicherung bleibt strukturell ausgeschlossen, bei verschiedenen Policen ist sie erlaubt.
+- **Bereicherungsverbot:** Summe aller `Allocations` einer Rechnung (über alle Policen) ≤ Rechnungsbetrag — Validierung im Anwendungslayer.
+- **`InvoiceExclusions`** (`invoiceUID`, `contractUID`, Notiz): manuelle Markierung "nicht erstattungsfähig bei dieser Police" (z. B. stationäre Leistung bei einer ambulanten Zusatzversicherung). Eine Einteilung in Leistungsbereiche ist bewusst (noch) nicht vorgesehen.
+- **Abgeleiteter Status:** Der Workflow-Status (`eingereicht`/`abgerechnet`) wird je Einreichung bestimmt; die Rechnung erhält einen Gesamtstatus plus den **nicht erstatteten Restbetrag** als Kandidat für die nächste Police.
+
+**Erstattungs-Optimierer** (ersetzt `evaluateReimbursement` / den Analyse-Endpoint je Vertrag): reine, unit-getestete Funktion **pro Versichertem und Behandlungsjahr über alle Policen**. Für jede Kombination "Police mit Bonus in Anspruch nehmen / schonen" (2ⁿ, n = Zahl der Bonus-Policen, in der Praxis 1–3) wird gerechnet: in Anspruch genommene Vollversicherungen erstatten zuerst (Satz × (Summe − Selbstbeteiligung), gedeckelt), Zusatzversicherungen erstatten auf den Rest bis zu ihrer Obergrenze, `InvoiceExclusions` werden je Police herausgenommen, bereits verwirkte Boni gelten als verloren. Ziel: maximale Summe aus Erstattungen + Boni. Ausgabe: empfohlene Strategie je Police, Schwelle "ab weiteren N € lohnt sich Police x", Empfehlung je Rechnung ("bei y einreichen", "zurückhalten", "bei x, Rest bei y"). Die Beispieljahre des Autors sind Pflicht-Testfälle (PKV x: SB 200 €, Staffel 300/450/…; Zusatz y: 200 €/Jahr):
+
+| Jahr | Kosten | x schonen, nur y | x + Rest bei y | Empfehlung |
+|---|---|---|---|---|
+| 1 | 150 € | 150 + 300 = 450 € | 0 + 150 = 150 € | nur y |
+| 2 | 640 € | 200 + 450 = 650 € | 440 + 200 = 640 € | nur y |
+| 3 | 1000 € | 200 + Bonus (≈ 450–600 €) | 800 + 200 = 1000 € | x, Rest bei y |
 
 ## 2.4 Rechte- und Rollenmodell (Entwurf)
 
@@ -293,8 +339,8 @@ Zahlungsstatus-Ampel + Zahlungsinfo-Popover; Setup-Token-Warnung für Admins; Wi
 
 Abgeleitet aus `Notes/dialog-design.md` + Referenz-Screenshots (`Rechnungsdetails.png`,
 `Rechnungen_Verknüpfen.png`, `Leistungsabrechnung auswählen.png`). Reihenfolge nach Abhängigkeit:
-risikoarme, wiederverwendbare Bausteine (11–14) zuerst, dann der View/Edit-Umbau (15), dann die
-Feature-Slices (16–17), die eine kurze Modell-Design-Runde voraussetzen.
+risikoarme, wiederverwendbare Bausteine (11–14) zuerst, dann der View/Edit-Umbau (15). Die
+Feature-Slices zum Einreichen/Verknüpfen (jetzt 21–22) setzen das Datenmodell v3 (Slices 16–20) voraus.
 
 ## Slice 11 — Tabellen-Politur
 **Ziel:** Tabellen ruhiger und besser lesbar.
@@ -338,23 +384,71 @@ Feature-Slices (16–17), die eine kurze Modell-Design-Runde voraussetzen.
 
 **DoD:** Eine Rechnung lässt sich in der neuen Maske ansehen und punktuell editieren; Reset/Clear verhalten sich regelkonform.
 
-## Slice 16 — Rechnungs-Detaildialog mit Einreichungs-/Abrechnungs-Block
+# Datenmodell v3: Policen, Mehrfach-Einreichung, Erstattungs-Optimierung
+
+Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständige Scheibe (Migration + API + UI). Slice 16 hat Vorrang, weil er die Erfassung der Echtdaten blockiert.
+
+## Slice 16 — Police & Beitragsstände (inkl. Altdaten-Export)
+**Ziel:** Eine Police erscheint genau einmal; Beitragsanpassungen und Konditionen sind Einträge unter ihr.
+- Migration: `Contracts` → stabile Police (`contractKind`, `bonusForfeitRule`, `claimFreeYearsAtStart`, `claimFreeCountingFromYear`), neue Tabellen `ContractPremiums`, `ContractTerms` (SB, Obergrenze, Satz; ab Jahr) — die Staffel folgt in Slice 18.
+- **Altdaten:** Keine automatische Zusammenführung — der Autor ordnet neu zu. Stammdaten (Versicherte, Versicherungen, Leistungserbringer, Abrechnungsdienstleister) und Rechnungen bleiben erhalten; die Migration entfernt die bisherigen `Contracts`, `Submissions`, `ServiceBillings` und `Allocations`, Rechnungen gelten danach wieder als nicht eingereicht und werden neu zugeordnet. **Kein Legacy-Code in der App:** Stattdessen ein einmaliges Export-Skript (`scripts/export-legacy-contracts.sh`), das **vor dem Update** über `docker compose exec db mariadb --batch` direkt gegen die laufende (alte) DB zwei lesbare CSVs erzeugt — Policen (Nummer, Versicherung, Versicherter, Zeitraum, SB, Beitrag, Bonus) und Einreichungen (mit Rechnungen, Leistungsabrechnungen, Erstattungen) — als Vorlage für die Neuerfassung. Unabhängig von der App-Version, da es nur den DB-Container nutzt. Update-Anleitung: 1. Backup (Slice-10-Skript) als Rückfallebene, 2. Export-Skript, 3. neue Version starten.
+- API: CRUD für Beitragsstände und Konditionen unter der Police; Police-Response enthält aktuellen Beitrag und aktuelle Konditionen.
+- UI: Policen-Liste mit einer Zeile pro Police (Nummer, Versicherter, Versicherung, Art, aktueller Beitrag, SB, Laufzeit); Detailansicht (Anzeigemaske aus Slice 15) mit Beitragsverlauf (gültig von–bis) und Konditionen je Jahr, Aktionen "Beitragsanpassung erfassen" / "Konditionen ab Jahr erfassen". Einreichen/Picker wählen nur noch die Police.
+
+**DoD:** Eine Police mit drei unterjährigen Beitragsständen erscheint einmal in Liste und Picker, der Verlauf zeigt die Gültigkeitszeiträume; die SB ist über das Jahr eine Größe; das Export-Skript erzeugt auf einer Kopie der Prod-Daten vollständige CSVs; die Migration läuft auf dieser Kopie durch, Rechnungen und Stammdaten bleiben erhalten.
+
+## Slice 17 — Mehrfach-Einreichung
+**Ziel:** Eine Rechnung kann bei mehreren Policen eingereicht werden, bei derselben Police aber nur einmal.
+- Migration: `SubmissionInvoices` mit `UNIQUE (invoiceUID, contractUID)`, `Invoices.submissionUID` entfällt; `InvoiceExclusions`.
+- Validierung: Summe der Allocations je Rechnung ≤ Rechnungsbetrag; keine Einreichung bei Policen mit Ausschluss-Markierung.
+- Abgeleiteter Status je Einreichung + Gesamtstatus und Restbetrag je Rechnung; Workspace-Tabelle zeigt, bei welchen Policen eine Rechnung liegt.
+- UI: Einreichen-Dialog bietet nur Policen an, bei denen die Rechnung noch nicht liegt; Aktion "Rest bei weiterer Police einreichen"; Markierung "nicht erstattungsfähig bei …" am Rechnungs-Detail.
+
+**DoD:** Rechnung bei x einreichen → abrechnen (Teilerstattung) → Rest bei y einreichen → abrechnen; zweite Einreichung bei x wird abgelehnt; Überschreitung des Rechnungsbetrags wird abgelehnt.
+
+## Slice 18 — Bonus-Staffel & Leistungsfreiheit
+**Ziel:** Der erwartete Bonus ergibt sich aus Staffel und gezählten leistungsfreien Jahren.
+- `ContractBonusTiers` (absolute Beträge je Stufe, an `ContractTerms` = Versicherungsjahr gebunden), "vom Vorjahr übernehmen", Kennzeichnung geerbter Staffeln als "nicht aktualisiert".
+- `ServiceBillings.forfeitsBonus` (Abfrage bei Erfassung der Erstattung, Default aus `bonusForfeitRule`), `ContractYears` (tatsächliche Rückerstattung, Override "verwirkt").
+- Service: leistungsfreie Serie je Police und Jahr, erwarteter Bonus; Unit-Tests für Serienbruch, Startwert, Override, beide Verwirk-Regeln.
+- UI: Staffel und Jahresverlauf (leistungsfrei ja/nein, erwartet vs. tatsächlich erhalten) in der Policen-Detailansicht.
+
+**DoD:** Für eine Police mit Startwert und mehreren Jahren stimmt die gezählte Serie; ein Jahr mit Erstattung setzt sie zurück; eine erfasste tatsächliche Rückerstattung überschreibt die Prognose.
+
+## Slice 19 — Erstattungs-Optimierer
+**Ziel:** Berechnung "wo lohnt sich Einreichen?" über alle Policen eines Versicherten.
+- Reiner Service nach 2.3 (Strategie-Enumeration, Vollversicherung vor Zusatz, Rest-Logik, Ausschlüsse, verwirkte Boni), ausführlich dokumentiert (2.8).
+- Endpoint `GET /api/v1/accounts/:accountUID/reimbursement-plan?year=` ersetzt `GET /contracts/:uid/reimbursement-analysis`.
+- Tests: die drei Beispieljahre aus 2.3 wörtlich, dazu Grenzfälle (keine Zusatzversicherung, Obergrenze < Bonus, Bonus bereits verwirkt, alle Rechnungen ausgeschlossen, Erstattungssatz < 100 %).
+
+**DoD:** Alle Beispieljahre liefern die erwartete Empfehlung; der Endpoint liefert Strategie, Schwellen und Empfehlung je Rechnung.
+
+## Slice 20 — Übersicht & Empfehlungen
+**Ziel:** In der Rechnungsübersicht ist auf einen Blick klar, wo welche Rechnung eingereicht werden sollte.
+- Zusammenfassung pro Versichertem/Jahr neu: je Police SB-Fortschritt, Bonus (sicher / in Gefahr / verwirkt, erwartete Höhe), Ausschöpfung der Zusatz-Obergrenze; empfohlene Strategie mit Vergleich der Alternativen (Ersparnis in €).
+- Empfehlungs-Badge je Rechnung in der Tabelle (Text + Icon, nicht nur Farbe — 2.7).
+
+**DoD:** Für die Beispieljahre zeigt die Übersicht die richtige Empfehlung inkl. Betragsvergleich; responsiv, Light/Dark, axe ohne kritische Findings.
+
+---
+
+## Slice 21 — Rechnungs-Detaildialog mit Einreichungs-/Abrechnungs-Block (bisher Slice 16)
 **Ziel:** Einreichungen und darauf erfolgte Leistungsabrechnungen direkt am Rechnungs-Detail verwalten.
-- Kartenblock (wie Referenz „Zuordnung") mit Action-Items: einreichen, Leistungsabrechnung verknüpfen, Erstattung erfassen.
+- Kartenblock (wie Referenz „Zuordnung") mit Action-Items: einreichen, Leistungsabrechnung verknüpfen, Erstattung erfassen — **Karten nach Police gruppiert**, mit Restbetrag und Empfehlung aus Slice 19/20.
 - Reorganisiert die heutigen Workspace-Zeilenaktionen und Einzeldialoge.
-- **Vorab kurze Modell-Design-Runde:** Mapping des Referenz-„Verknüpfens" auf unser Modell (Rechnung→Einreichung→ServiceBilling→**Allocation**).
+- Das Mapping Rechnung→Einreichung→ServiceBilling→Allocation ist durch das Datenmodell v3 geklärt; die vorherige Modell-Design-Runde entfällt.
 
-**DoD:** Von der Rechnung aus einreichen/abrechnen/erstatten, ohne Umweg über getrennte Zeilenaktionen.
+**DoD:** Von der Rechnung aus einreichen/abrechnen/erstatten — auch bei einer zweiten Police — ohne Umweg über getrennte Zeilenaktionen.
 
-## Slice 17 — Verknüpfen-Dialog + Such-Subdialog + Bulk
+## Slice 22 — Verknüpfen-Dialog + Such-Subdialog + Bulk (bisher Slice 17)
 **Ziel:** Leistungsabrechnung bequem finden/anlegen/verknüpfen, auch in Masse (Referenz `Rechnungen_Verknüpfen.png`, `Leistungsabrechnung auswählen.png`).
 - Auswahlfeld mit Search (🔍 → Filter-Subdialog: Nummer/Freitext, Zeitraum, „unverknüpft", Erstattungs-Range) und Add (＋ → Create).
 - Backend: Such-/Filter-Endpunkt für ServiceBillings.
-- **Bulk-Verarbeitung** fürs Einreichen und Verknüpfen mit **Kompatibilitätsprüfung** (z. B. nur Rechnungen desselben Vertrags/derselben Einreichung).
+- **Bulk-Verarbeitung** fürs Einreichen und Verknüpfen mit **Kompatibilitätsprüfung** (Einreichen: Rechnungen noch nicht bei dieser Police und nicht ausgeschlossen; Verknüpfen: Rechnungen derselben Einreichung).
 
 **DoD:** Mehrere kompatible Rechnungen in einem Zug verknüpfen; die Suche filtert korrekt.
 
-**Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14); View/Edit-Umstieg nur Rechnung-Pilot vs. alle Entitäten (15); Modell-Design-Runde vor 16/17.
+**Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14); View/Edit-Umstieg nur Rechnung-Pilot vs. alle Entitäten (15).
 
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.
