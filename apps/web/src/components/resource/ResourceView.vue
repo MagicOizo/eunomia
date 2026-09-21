@@ -5,7 +5,7 @@ import { computed, ref, watch } from 'vue';
 import EuButton from '../../design-system/components/EuButton.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuSortableTh from '../../design-system/components/EuSortableTh.vue';
-import { HttpError } from '../../lib/http';
+import { describeError } from '../../lib/errors';
 import { useTableSort } from '../../lib/useTableSort';
 import {
   type ResourceRow,
@@ -35,6 +35,9 @@ const editing = ref<ResourceRow | null>(null);
 const submitting = ref(false);
 const formError = ref<string | null>(null);
 
+/** UID of the row open in the resource's own detail dialog (see ResourceConfig.detailDialog). */
+const detailUid = ref<string | null>(null);
+
 const confirmTarget = ref<ResourceRow | null>(null);
 const deleteError = ref<string | null>(null);
 
@@ -46,21 +49,6 @@ const dialogTitle = computed(
 const optionsForForm = computed<Record<string, SelectOption[]>>(() =>
   Object.fromEntries(Object.entries(lookups.value).map(([name, data]) => [name, data.options])),
 );
-
-/** Turns any thrown error into a readable German message. */
-function describeError(error: unknown): string {
-  if (error instanceof HttpError) {
-    if (error.code === 'VALIDATION_ERROR' && Array.isArray(error.details)) {
-      const messages = (error.details as Array<{ message?: string }>)
-        .map((issue) => issue.message)
-        .filter(Boolean);
-      if (messages.length > 0) return messages.join('; ');
-    }
-    if (error.status === 403) return 'Dazu fehlt dir die Berechtigung.';
-    return error.message;
-  }
-  return 'Unerwarteter Fehler.';
-}
 
 async function loadLookups(): Promise<void> {
   const entries = Object.entries(props.config.lookups ?? {});
@@ -120,6 +108,10 @@ function openCreate(): void {
 }
 
 function openEdit(row: ResourceRow): void {
+  if (props.config.detailDialog) {
+    detailUid.value = String(row[props.config.idKey]);
+    return;
+  }
   editing.value = row;
   formError.value = null;
   dialogOpen.value = true;
@@ -188,7 +180,7 @@ async function confirmDelete(): Promise<void> {
             <td
               v-for="column in config.columns"
               :key="column.key"
-              :class="{ 'eu-resource__num': column.align === 'right' }"
+              :class="{ 'eu-resource__num': column.align === 'right', 'eu-resource__wrap': column.wrap }"
             >
               {{ cell(row, column) }}
             </td>
@@ -223,6 +215,16 @@ async function confirmDelete(): Promise<void> {
       :error="formError"
       @close="dialogOpen = false"
       @submit="onSubmit"
+    />
+
+    <component
+      :is="config.detailDialog"
+      v-if="config.detailDialog"
+      :open="detailUid !== null"
+      :uid="detailUid"
+      :options="optionsForForm"
+      @close="detailUid = null"
+      @changed="reload"
     />
 
     <EuDialog
@@ -296,6 +298,10 @@ async function confirmDelete(): Promise<void> {
 
 .eu-resource__actions button + button {
   margin-left: 0.4rem;
+}
+
+.eu-resource__table .eu-resource__wrap {
+  white-space: normal;
 }
 
 .eu-resource__table .eu-resource__num {

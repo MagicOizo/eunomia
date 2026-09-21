@@ -7,7 +7,7 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
-import { HttpError } from '../lib/http';
+import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/useTableSort';
 import {
@@ -55,19 +55,6 @@ function userSortValue(u: AdminUserDto, key: string): string | number {
 }
 const sort = useTableSort(users, userSortValue);
 
-function describeError(error: unknown): string {
-  if (error instanceof HttpError) {
-    if (error.code === 'VALIDATION_ERROR' && Array.isArray(error.details)) {
-      const messages = (error.details as Array<{ message?: string }>).map((i) => i.message).filter(Boolean);
-      if (messages.length > 0) return messages.join('; ');
-    }
-    if (error.code === 'CONFLICT') return 'Diese E-Mail-Adresse wird bereits verwendet.';
-    if (error.status === 403) return 'Dazu fehlt dir die Berechtigung.';
-    return error.message;
-  }
-  return 'Unerwarteter Fehler.';
-}
-
 async function reload(): Promise<void> {
   loading.value = true;
   loadError.value = null;
@@ -82,7 +69,7 @@ async function reload(): Promise<void> {
       label: [a.firstname, a.surname].filter(Boolean).join(' '),
     }));
   } catch (error) {
-    loadError.value = describeError(error);
+    loadError.value = describeError(error, 'Diese E-Mail-Adresse wird bereits verwendet.');
   } finally {
     loading.value = false;
   }
@@ -123,7 +110,7 @@ async function onSubmit(payload: UserFormPayload): Promise<void> {
     dialogOpen.value = false;
     await reload();
   } catch (error) {
-    formError.value = describeError(error);
+    formError.value = describeError(error, 'Diese E-Mail-Adresse wird bereits verwendet.');
   } finally {
     busy.value = false;
   }
@@ -137,7 +124,7 @@ async function confirmDelete(): Promise<void> {
     deleteTarget.value = null;
     await reload();
   } catch (error) {
-    deleteError.value = describeError(error);
+    deleteError.value = describeError(error, 'Diese E-Mail-Adresse wird bereits verwendet.');
   }
 }
 </script>

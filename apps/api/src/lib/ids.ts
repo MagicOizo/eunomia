@@ -19,6 +19,8 @@ export const ENTITY_PREFIX = {
   account: 'a',
   company: 'v', // Versicherung
   contract: 'p', // Police
+  premium: 'b', // Beitragsstand of a contract
+  contractTerms: 'k', // Konditionen (deductible/cap/rate) of a contract
   facility: 'f',
   agency: 'c', // Collection agency
   submission: 'e', // Einreichung (new in the rebuild)

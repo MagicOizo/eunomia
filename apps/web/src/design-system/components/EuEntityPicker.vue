@@ -272,7 +272,7 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 .eu-picker__action:hover {
-  color: var(--eu-color-accent);
+  color: var(--eu-color-accent-text);
 }
 
 .eu-picker__list {
@@ -304,7 +304,7 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 .eu-picker__option--create {
-  color: var(--eu-color-accent);
+  color: var(--eu-color-accent-text);
   gap: 0.5rem;
   justify-content: flex-start;
 }

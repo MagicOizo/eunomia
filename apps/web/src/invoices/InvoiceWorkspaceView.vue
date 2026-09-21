@@ -21,7 +21,7 @@ import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { apiFetch } from '../lib/api';
 import { euro, germanDate } from '../lib/format';
-import { HttpError } from '../lib/http';
+import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/useTableSort';
 import {
@@ -53,7 +53,11 @@ const props = defineProps<{ accountUID: string }>();
 interface ContractRef {
   contractUID: string;
   contractNumber: string;
+  companyName: string;
 }
+
+/** "Nummer · Versicherung" — tells a person's full and supplementary policy apart. */
+const contractLabel = (c: ContractRef): string => `${c.contractNumber} · ${c.companyName}`;
 
 const accountName = ref('');
 const years = ref<number[]>([]);
@@ -87,7 +91,7 @@ const dialogError = ref<string | null>(null);
 const deleteTargets = ref<string[]>([]);
 
 const contractOptions = computed<SelectOption[]>(() =>
-  contracts.value.map((c) => ({ value: c.contractUID, label: c.contractNumber })),
+  contracts.value.map((c) => ({ value: c.contractUID, label: contractLabel(c) })),
 );
 
 // Selection derived state. Every row is selectable; the global buttons enable
@@ -127,20 +131,6 @@ function invoiceSortValue(inv: InvoiceDto, key: string): string | number {
 }
 const sort = useTableSort(invoices, invoiceSortValue);
 
-function describeError(error: unknown): string {
-  if (error instanceof HttpError) {
-    if (error.code === 'VALIDATION_ERROR' && Array.isArray(error.details)) {
-      const messages = (error.details as Array<{ message?: string }>)
-        .map((i) => i.message)
-        .filter(Boolean);
-      if (messages.length > 0) return messages.join('; ');
-    }
-    if (error.status === 403) return 'Dazu fehlt dir die Berechtigung.';
-    return error.message;
-  }
-  return 'Unerwarteter Fehler.';
-}
-
 /** Loads the account-level data that does not depend on the selected year. */
 async function loadStatic(): Promise<void> {
   const account = await apiFetch<{ data: { firstname: string; surname: string | null } }>(
@@ -151,7 +141,11 @@ async function loadStatic(): Promise<void> {
   const allContracts = await listResource<ContractRef & { accountUID: string }>('/contracts');
   contracts.value = allContracts
     .filter((c) => c.accountUID === props.accountUID)
-    .map((c) => ({ contractUID: c.contractUID, contractNumber: c.contractNumber }));
+    .map((c) => ({
+      contractUID: c.contractUID,
+      contractNumber: c.contractNumber,
+      companyName: c.companyName,
+    }));
 
   const facilities = await listResource<{ facilityUID: string; facilityName: string }>('/facilities');
   facilityOptions.value = facilities.map((f) => ({ value: f.facilityUID, label: f.facilityName }));
@@ -181,7 +175,7 @@ async function loadYearData(): Promise<void> {
   invoices.value = await listInvoices(props.accountUID, activeYear.value);
   analyses.value = await Promise.all(
     contracts.value.map(async (c) => ({
-      label: c.contractNumber,
+      label: contractLabel(c),
       analysis: await reimbursementAnalysis(c.contractUID, activeYear.value),
     })),
   );
@@ -682,7 +676,7 @@ function confirmDelete(): void {
 }
 
 .eu-ws__year.is-active {
-  color: var(--eu-color-accent);
+  color: var(--eu-color-accent-text);
   border-bottom-color: var(--eu-color-accent);
   font-weight: 600;
 }

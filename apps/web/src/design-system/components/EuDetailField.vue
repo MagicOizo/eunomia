@@ -199,7 +199,7 @@ function reset(): void {
 }
 
 .eu-detail__action:hover:not(:disabled) {
-  color: var(--eu-color-accent);
+  color: var(--eu-color-accent-text);
   background-color: color-mix(in srgb, var(--eu-color-accent) 12%, transparent);
 }
 

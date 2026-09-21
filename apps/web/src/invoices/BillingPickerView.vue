@@ -6,6 +6,7 @@ import { listResource } from '../lib/resource';
 interface ContractRow {
   contractUID: string;
   contractNumber: string;
+  companyName: string;
   accountUID: string;
 }
 interface AccountRow {
@@ -22,6 +23,7 @@ const tiles = computed(() =>
   contracts.value.map((c) => ({
     contractUID: c.contractUID,
     contractNumber: c.contractNumber,
+    companyName: c.companyName,
     person: personByAccount.value.get(c.accountUID) ?? '',
   })),
 );
@@ -53,7 +55,7 @@ onMounted(async () => {
       <li v-for="tile in tiles" :key="tile.contractUID">
         <RouterLink class="eu-picker__tile" :to="`/billings/${tile.contractUID}`">
           <span class="eu-picker__name">{{ tile.contractNumber }}</span>
-          <span class="eu-picker__person">{{ tile.person }}</span>
+          <span class="eu-picker__person">{{ tile.companyName }} · {{ tile.person }}</span>
         </RouterLink>
       </li>
     </ul>

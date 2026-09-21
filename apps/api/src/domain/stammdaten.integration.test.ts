@@ -47,6 +47,8 @@ function testConfig(database: DatabaseConfig): AppConfig {
 }
 
 async function resetData(pool: Pool): Promise<void> {
+  await pool.query('DELETE FROM ContractPremiums');
+  await pool.query('DELETE FROM ContractTerms');
   await pool.query('DELETE FROM Contracts');
   await pool.query('DELETE FROM CollectionAgencies');
   await pool.query('DELETE FROM InsuranceCompanies');
@@ -215,19 +217,19 @@ test('master-data CRUD and account scoping', async (t) => {
         .send({ companyName: 'Vertrag Kranken AG' });
       const companyUID = company.body.data.companyUID as string;
 
-      const contractA = await request(app)
-        .post('/api/v1/contracts')
-        .set(admin)
-        .send({
-          contractNumber: 'PKV-A',
-          companyUID,
-          accountUID: accountA,
-          contractBegin: '2020-01-01',
-          deductible: 300,
-        });
+      const contractA = await request(app).post('/api/v1/contracts').set(admin).send({
+        contractNumber: 'PKV-A',
+        companyUID,
+        accountUID: accountA,
+        contractBegin: '2020-01-01',
+        initialMonthlyPremium: 380,
+        initialDeductible: 300,
+        initialReimbursementCap: 5000,
+      });
       assert.equal(contractA.status, 201);
       const contractAUID = contractA.body.data.contractUID as string;
-      assert.equal(contractA.body.data.deductible, 300);
+      assert.equal(contractA.body.data.contractKind, 'FULL');
+      assert.equal(contractA.body.data.bonusForfeitRule, 'ON_REIMBURSEMENT');
 
       const contractB = await request(app).post('/api/v1/contracts').set(admin).send({
         contractNumber: 'PKV-B',
@@ -261,15 +263,165 @@ test('master-data CRUD and account scoping', async (t) => {
       const userPatch = await request(app)
         .patch(`/api/v1/contracts/${contractAUID}`)
         .set(user)
-        .send({ bonus: 500 });
+        .send({ contractKind: 'SUPPLEMENTARY' });
       assert.equal(userPatch.status, 403);
 
       const adminPatch = await request(app)
         .patch(`/api/v1/contracts/${contractAUID}`)
         .set(admin)
-        .send({ bonus: 500 });
+        .send({ claimFreeYearsAtStart: 3 });
       assert.equal(adminPatch.status, 200);
-      assert.equal(adminPatch.body.data.bonus, 500);
+      assert.equal(adminPatch.body.data.claimFreeYearsAtStart, 3);
+
+      // The history sub-routes follow the same account scoping.
+      const userPremium = await request(app)
+        .post(`/api/v1/contracts/${contractAUID}/premiums`)
+        .set(user)
+        .send({ validFrom: '2024-01-01', monthlyPremium: 400 });
+      assert.equal(userPremium.status, 403);
+      const otherAccountTerms = await request(app)
+        .post(`/api/v1/contracts/${contractBUID}/terms`)
+        .set(user)
+        .send({ validFromYear: 2024, deductible: 0 });
+      assert.equal(otherAccountTerms.status, 403);
+    });
+
+    await t.test('contracts: premiums and terms as a dated history', async () => {
+      const companyUID = (
+        await request(app).post('/api/v1/companies').set(admin).send({ companyName: 'Historie AG' })
+      ).body.data.companyUID as string;
+      const created = await request(app).post('/api/v1/contracts').set(admin).send({
+        contractNumber: 'PKV-H',
+        companyUID,
+        accountUID: accountA,
+        contractBegin: '2022-01-01',
+        initialMonthlyPremium: 300,
+        initialDeductible: 200,
+      });
+      assert.equal(created.status, 201);
+      const uid = created.body.data.contractUID as string;
+      const premiums = `/api/v1/contracts/${uid}/premiums`;
+      const terms = `/api/v1/contracts/${uid}/terms`;
+
+      // Two intra-year adjustments — still one policy.
+      assert.equal(
+        (
+          await request(app)
+            .post(premiums)
+            .set(admin)
+            .send({ validFrom: '2024-01-01', monthlyPremium: 320 })
+        ).status,
+        201,
+      );
+      const july = await request(app)
+        .post(premiums)
+        .set(admin)
+        .send({ validFrom: '2024-07-01', monthlyPremium: 335, note: 'Zahntarif' });
+      assert.equal(july.status, 201);
+      const julyUID = july.body.data.premiumUID as string;
+
+      // Same start twice, or a start before the contract begins, is rejected.
+      assert.equal(
+        (
+          await request(app)
+            .post(premiums)
+            .set(admin)
+            .send({ validFrom: '2024-07-01', monthlyPremium: 1 })
+        ).status,
+        409,
+      );
+      assert.equal(
+        (
+          await request(app)
+            .post(premiums)
+            .set(admin)
+            .send({ validFrom: '2021-12-31', monthlyPremium: 1 })
+        ).status,
+        400,
+      );
+
+      assert.equal(
+        (
+          await request(app)
+            .post(terms)
+            .set(admin)
+            .send({ validFromYear: 2025, deductible: 400, reimbursementRate: 80 })
+        ).status,
+        201,
+      );
+      assert.equal(
+        (await request(app).post(terms).set(admin).send({ validFromYear: 2025, deductible: 1 }))
+          .status,
+        409,
+      );
+      assert.equal(
+        (await request(app).post(terms).set(admin).send({ validFromYear: 2021, deductible: 1 }))
+          .status,
+        400,
+      );
+
+      const detail = await request(app).get(`/api/v1/contracts/${uid}`).set(admin);
+      assert.equal(detail.status, 200);
+      assert.deepEqual(
+        detail.body.data.premiums.map((p: { validFrom: string; validTo: string | null }) => [
+          p.validFrom,
+          p.validTo,
+        ]),
+        [
+          ['2022-01-01', '2023-12-31'],
+          ['2024-01-01', '2024-06-30'],
+          ['2024-07-01', null],
+        ],
+      );
+      assert.deepEqual(
+        detail.body.data.terms.map(
+          (t: { validFromYear: number; validToYear: number | null; deductible: number }) => [
+            t.validFromYear,
+            t.validToYear,
+            t.deductible,
+          ],
+        ),
+        [
+          [2022, 2024, 200],
+          [2025, null, 400],
+        ],
+      );
+
+      // The list shows exactly one row for the policy, with its current values.
+      const list = await request(app).get('/api/v1/contracts').set(admin);
+      const rows = list.body.data.filter(
+        (c: { contractNumber: string }) => c.contractNumber === 'PKV-H',
+      );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].currentMonthlyPremium, 335);
+
+      // Editing and deleting an entry; an entry is only reachable via its own contract.
+      const patched = await request(app)
+        .patch(`${premiums}/${julyUID}`)
+        .set(admin)
+        .send({ monthlyPremium: 336 });
+      assert.equal(patched.status, 200);
+      assert.equal(patched.body.data.monthlyPremium, 336);
+      const foreignContract = (
+        await request(app).post('/api/v1/contracts').set(admin).send({
+          contractNumber: 'PKV-F',
+          companyUID,
+          accountUID: accountA,
+          contractBegin: '2022-01-01',
+        })
+      ).body.data.contractUID as string;
+      assert.equal(
+        (
+          await request(app)
+            .delete(`/api/v1/contracts/${foreignContract}/premiums/${julyUID}`)
+            .set(admin)
+        ).status,
+        404,
+      );
+      assert.equal((await request(app).delete(`${premiums}/${julyUID}`).set(admin)).status, 204);
+      const afterDelete = await request(app).get(`/api/v1/contracts/${uid}`).set(admin);
+      assert.equal(afterDelete.body.data.premiums.length, 2);
+      assert.equal(afterDelete.body.data.premiums[1].validTo, null);
     });
   } finally {
     await pool.end();

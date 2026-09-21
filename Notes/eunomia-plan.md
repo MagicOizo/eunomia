@@ -397,6 +397,13 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 
 **DoD:** Eine Police mit drei unterjährigen Beitragsständen erscheint einmal in Liste und Picker, der Verlauf zeigt die Gültigkeitszeiträume; die SB ist über das Jahr eine Größe; das Export-Skript erzeugt auf einer Kopie der Prod-Daten vollständige CSVs; die Migration läuft auf dieser Kopie durch, Rechnungen und Stammdaten bleiben erhalten.
 
+**Umgesetzt (2026-09-21).** Entscheidungen beim Bau:
+- Das Export-Skript läuft auf dem Prod-Host über `docker compose exec -T api … mariadb` (Zugangsdaten wie `backup.sh`); per `EXPORT_SQL_RUNNER` auch gegen andere DBs (z. B. Dev) nutzbar. Update-Anleitung im README ("Updating to the policy model").
+- Migration `006-contract-policy-model`; Beiträge und Konditionen teilen sich einen generischen History-Router (`domain/contract-history.ts`), `validTo`/`validToYear` werden abgeleitet, nicht gespeichert. Anlegen einer Police nimmt optionale Startwerte (erster Beitrag, erste Konditionen) in einer Transaktion.
+- Bis Slice 18 ist der Bonus in der Analyse **0** und als `bonusPending` gekennzeichnet; die Zusammenfassung zeigt "noch nicht erfasst" und gibt keine Einreichungs-Empfehlung.
+- Detailansicht als **breiter Dialog** aus der Policen-Liste (`ResourceConfig.detailDialog`); Anlegen bleibt das klassische Formular.
+- Nebenbei behoben: im Dark Mode hatte Akzentblau als **Textfarbe** (Sekundär-Buttons, aktiver Tab, Sortier-Header …) nur 3,45:1 Kontrast — neues Token `--eu-color-accent-text` (siehe `CONTRAST.md`).
+
 ## Slice 17 — Mehrfach-Einreichung
 **Ziel:** Eine Rechnung kann bei mehreren Policen eingereicht werden, bei derselben Police aber nur einmal.
 - Migration: `SubmissionInvoices` mit `UNIQUE (invoiceUID, contractUID)`, `Invoices.submissionUID` entfällt; `InvoiceExclusions`.

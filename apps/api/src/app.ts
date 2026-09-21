@@ -11,6 +11,10 @@ import type { AppConfig } from './config/env.js';
 import { createAccountsRouter } from './domain/accounts.js';
 import { createAllocationsRouter } from './domain/allocations.js';
 import { createCollectionAgenciesRouter } from './domain/collection-agencies.js';
+import {
+  createContractPremiumsRouter,
+  createContractTermsRouter,
+} from './domain/contract-history.js';
 import { createContractsRouter } from './domain/contracts.js';
 import { createFacilitiesRouter } from './domain/facilities.js';
 import { createInsuranceCompaniesRouter } from './domain/insurance-companies.js';
@@ -74,6 +78,8 @@ export function createApp(deps?: AppDependencies): Express {
     app.use('/api/v1/accounts', createAccountsRouter(pool, config));
     app.use('/api/v1/companies', createInsuranceCompaniesRouter(pool, config));
     app.use('/api/v1/contracts', createContractsRouter(pool, config));
+    app.use('/api/v1/contracts', createContractPremiumsRouter(pool, config));
+    app.use('/api/v1/contracts', createContractTermsRouter(pool, config));
     app.use('/api/v1/contracts', createReimbursementAnalysisRouter(pool, config));
     app.use('/api/v1/facilities', createFacilitiesRouter(pool, config));
     app.use('/api/v1/agencies', createCollectionAgenciesRouter(pool, config));

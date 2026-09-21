@@ -43,13 +43,20 @@ const distribution = computed(() =>
       <h4>{{ item.label }}</h4>
       <dl class="eu-summary__grid">
         <div><dt>Selbstbeteiligung</dt><dd>{{ euro(item.analysis.deductible) }}</dd></div>
-        <div><dt>Bonus</dt><dd>{{ euro(item.analysis.bonus) }}</dd></div>
+        <div>
+          <dt>Bonus</dt>
+          <dd>{{ item.analysis.bonusPending ? 'noch nicht erfasst' : euro(item.analysis.bonus) }}</dd>
+        </div>
         <div><dt>Obergrenze</dt><dd>{{ euro(item.analysis.reimbursementCap) }}</dd></div>
         <div><dt>Rechnungssumme (Jahr)</dt><dd>{{ euro(item.analysis.invoiceTotal) }}</dd></div>
         <div><dt>Bereits erstattet</dt><dd>{{ euro(item.analysis.alreadyReimbursed) }}</dd></div>
         <div><dt>Mögliche Erstattung</dt><dd>{{ euro(item.analysis.analysis.reimbursement) }}</dd></div>
       </dl>
-      <p class="eu-summary__verdict" :class="item.analysis.analysis.worthSubmitting ? 'is-worth' : 'not-worth'">
+      <p v-if="item.analysis.bonusPending" class="eu-summary__verdict not-worth">
+        Mögliche Erstattung nach Selbstbeteiligung und Obergrenze: {{ euro(item.analysis.analysis.reimbursement) }}.
+        Der Bonus ist noch nicht berücksichtigt – ob sich das Einreichen lohnt, lässt sich noch nicht bewerten.
+      </p>
+      <p v-else class="eu-summary__verdict" :class="item.analysis.analysis.worthSubmitting ? 'is-worth' : 'not-worth'">
         <template v-if="item.analysis.analysis.worthSubmitting">
           ✓ Einreichen lohnt sich – die Erstattung übersteigt den Bonus.
         </template>

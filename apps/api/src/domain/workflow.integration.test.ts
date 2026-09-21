@@ -53,6 +53,8 @@ async function resetData(pool: Pool): Promise<void> {
     'DELETE FROM ServiceBillings',
     'DELETE FROM Invoices',
     'DELETE FROM Submissions',
+    'DELETE FROM ContractPremiums',
+    'DELETE FROM ContractTerms',
     'DELETE FROM Contracts',
     'DELETE FROM InsuranceCompanies',
     'DELETE FROM RefreshTokens',
@@ -137,8 +139,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         companyUID,
         accountUID: accountA,
         contractBegin: '2020-01-01',
-        deductible: 300,
-        bonus: 600,
+        initialDeductible: 300,
       })
     ).body.data.contractUID as string;
 
@@ -302,8 +303,13 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       // account A's active 2024 invoices: 500 + 500 + the 100 "loose" one = 1100.
       assert.equal(res.body.data.invoiceTotal, 1100);
       assert.equal(res.body.data.alreadyReimbursed, 200);
+      // Deductible comes from the contract terms in force for 2024.
+      assert.equal(res.body.data.deductible, 300);
       assert.equal(res.body.data.analysis.reimbursement, 800); // 1100 - 300 deductible
-      assert.equal(res.body.data.analysis.worthSubmitting, true); // 800 > 600 bonus
+      // No bonus scale yet (Slice 18): the bonus is 0 and flagged as pending.
+      assert.equal(res.body.data.bonus, 0);
+      assert.equal(res.body.data.bonusPending, true);
+      assert.equal(res.body.data.analysis.worthSubmitting, true);
 
       // All of account A's invoices were treated in 2024.
       const years = await request(app).get(`/api/v1/invoices/years?accountUID=${accountA}`).set(admin);

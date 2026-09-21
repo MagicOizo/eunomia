@@ -53,6 +53,8 @@ export interface ReimbursementAnalysisDto {
   year: number;
   deductible: number;
   bonus: number;
+  /** True while the bonus scale is not modelled yet (Slice 18): `bonus` is then 0. */
+  bonusPending: boolean;
   reimbursementCap: number | null;
   invoiceTotal: number;
   alreadyReimbursed: number;

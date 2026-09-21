@@ -82,6 +82,20 @@ docker compose pull && docker compose up -d
 Migrations run automatically on start, so the schema is brought up to date as part of the restart.
 Take a backup first (see above).
 
+### Updating to the policy model (migration 006)
+
+Migration 006 turns contracts into stable policies with a premium history and yearly terms. It
+**deletes** all existing contracts, submissions, service billings and allocations (master data and
+invoices are kept; invoices become un-submitted and are re-assigned by hand). Export the old data
+as CSV **before** updating — the running old image does not contain the script yet, so copy
+`scripts/export-legacy-contracts.sh` from the repository onto the host first:
+
+```bash
+docker compose exec -T api /app/scripts/backup.sh > eunomia-$(date +%F).sql.gz
+sh export-legacy-contracts.sh ./altdaten     # writes altdaten/policen.csv + altdaten/einreichungen.csv
+docker compose pull && docker compose up -d
+```
+
 ## Environment Variables
 
 All variables are read from `.env` (see `.env.example` for the template — never commit the real

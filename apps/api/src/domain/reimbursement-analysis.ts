@@ -7,20 +7,19 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { notFound } from '../lib/api-error.js';
+import { termsForYear } from './contract-history.js';
 import { evaluateReimbursement } from './reimbursement.js';
 import { authorizeAccount } from './workflow-access.js';
-
-interface ContractFinancials {
-  accountUID: string;
-  deductible: number;
-  reimbursementCap: number | null;
-  bonus: number;
-}
 
 /**
  * Router exposing the "is it worth submitting?" analysis for a contract and
  * year. It aggregates the treatment-year's active invoices for the contract's
- * account and runs the pure reimbursement service on the total. Mounted
+ * account and runs the pure reimbursement service on the total, using the
+ * contract terms in force for that year.
+ *
+ * Transitional (Slice 16 → 18/19): the bonus scale does not exist yet, so the
+ * bonus is 0 and the response flags `bonusPending`; the cross-policy optimizer
+ * of Slice 19 replaces this endpoint. Mounted
  * alongside the contracts router; the two-segment path does not collide with
  * the contracts CRUD routes.
  */
@@ -32,9 +31,8 @@ export function createReimbursementAnalysisRouter(pool: Pool, config: AppConfig)
     const user = getAuthUser(res);
     const contractUID = pathParam(req, 'contractUID');
 
-    const [contract] = await pool.query<ContractFinancials[]>(
-      `SELECT accountUID, deductible, reimbursementCap, bonus
-         FROM Contracts WHERE contractUID = ? AND contractStatus <> -1 LIMIT 1`,
+    const [contract] = await pool.query<Array<{ accountUID: string }>>(
+      'SELECT accountUID FROM Contracts WHERE contractUID = ? AND contractStatus <> -1 LIMIT 1',
       [contractUID],
     );
     if (!contract) throw notFound('Contract');
@@ -42,6 +40,10 @@ export function createReimbursementAnalysisRouter(pool: Pool, config: AppConfig)
 
     const yearParam = typeof req.query.year === 'string' ? Number(req.query.year) : NaN;
     const year = Number.isInteger(yearParam) ? yearParam : new Date().getFullYear();
+    const terms = await termsForYear(pool, contractUID, year);
+    const deductible = terms?.deductible ?? 0;
+    const reimbursementCap = terms?.reimbursementCap ?? null;
+    const bonus = 0;
 
     const [totals] = await pool.query<Array<{ invoiceTotal: number }>>(
       `SELECT COALESCE(SUM(invoiceAmount), 0) AS invoiceTotal
@@ -61,9 +63,9 @@ export function createReimbursementAnalysisRouter(pool: Pool, config: AppConfig)
 
     const invoiceTotal = totals?.invoiceTotal ?? 0;
     const analysis = evaluateReimbursement({
-      deductible: contract.deductible,
-      bonus: contract.bonus,
-      cap: contract.reimbursementCap,
+      deductible,
+      bonus,
+      cap: reimbursementCap,
       invoiceTotal,
     });
 
@@ -71,9 +73,10 @@ export function createReimbursementAnalysisRouter(pool: Pool, config: AppConfig)
       contractUID,
       accountUID: contract.accountUID,
       year,
-      deductible: contract.deductible,
-      bonus: contract.bonus,
-      reimbursementCap: contract.reimbursementCap,
+      deductible,
+      bonus,
+      bonusPending: true,
+      reimbursementCap,
       invoiceTotal,
       alreadyReimbursed: reimbursed?.alreadyReimbursed ?? 0,
       analysis,

@@ -1,4 +1,4 @@
-import type { Pool } from 'mariadb';
+import type { Pool, PoolConnection } from 'mariadb';
 
 import { type EntityName, generateEntityId } from '../lib/ids.js';
 
@@ -18,6 +18,9 @@ export interface CrudTable {
 }
 
 export type Row = Record<string, unknown>;
+
+/** A pool or a single (transaction-bound) connection — both expose `query`. */
+export type Queryable = Pool | PoolConnection;
 
 /** Optional extra WHERE fragment (ANDed in) used for account-scoped listing. */
 export interface Filter {
@@ -50,7 +53,7 @@ function pickColumns(t: CrudTable, data: Record<string, unknown>): [columns: str
 }
 
 /** Lists non-deleted rows, optionally narrowed by an account-scope filter. */
-export async function listRows(pool: Pool, t: CrudTable, filter?: Filter): Promise<Row[]> {
+export async function listRows(pool: Queryable, t: CrudTable, filter?: Filter): Promise<Row[]> {
   const where = [`${t.statusColumn} <> ?`];
   const params: unknown[] = [STATUS_DELETED];
   if (filter) {
@@ -64,7 +67,7 @@ export async function listRows(pool: Pool, t: CrudTable, filter?: Filter): Promi
 }
 
 /** Fetches a single non-deleted row by its UID, or null. */
-export async function getRow(pool: Pool, t: CrudTable, uid: string): Promise<Row | null> {
+export async function getRow(pool: Queryable, t: CrudTable, uid: string): Promise<Row | null> {
   const rows = await pool.query<Row[]>(
     `SELECT ${outputColumns(t)} FROM ${t.table} WHERE ${t.uidColumn} = ? AND ${t.statusColumn} <> ? LIMIT 1`,
     [uid, STATUS_DELETED],
@@ -73,7 +76,7 @@ export async function getRow(pool: Pool, t: CrudTable, uid: string): Promise<Row
 }
 
 /** Inserts a row (generating its UID) and returns the created row. */
-export async function insertRow(pool: Pool, t: CrudTable, data: Record<string, unknown>): Promise<Row> {
+export async function insertRow(pool: Queryable, t: CrudTable, data: Record<string, unknown>): Promise<Row> {
   const uid = generateEntityId(t.entity);
   const [columns, values] = pickColumns(t, data);
   const allColumns = [t.uidColumn, ...columns];
@@ -92,7 +95,7 @@ export async function insertRow(pool: Pool, t: CrudTable, data: Record<string, u
  * null if no such row exists (so the caller can answer 404).
  */
 export async function updateRow(
-  pool: Pool,
+  pool: Queryable,
   t: CrudTable,
   uid: string,
   data: Record<string, unknown>,
@@ -109,7 +112,7 @@ export async function updateRow(
 }
 
 /** Soft-deletes a row (status = -1). Returns false if it did not exist / was already deleted. */
-export async function softDeleteRow(pool: Pool, t: CrudTable, uid: string): Promise<boolean> {
+export async function softDeleteRow(pool: Queryable, t: CrudTable, uid: string): Promise<boolean> {
   const result = (await pool.query(
     `UPDATE ${t.table} SET ${t.statusColumn} = ? WHERE ${t.uidColumn} = ? AND ${t.statusColumn} <> ?`,
     [STATUS_DELETED, uid, STATUS_DELETED],

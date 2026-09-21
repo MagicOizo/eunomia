@@ -71,6 +71,6 @@ const cards = mainNav.filter((item) => item.to !== '/');
 
 .eu-dashboard__icon {
   font-size: 1.6rem;
-  color: var(--eu-color-accent);
+  color: var(--eu-color-accent-text);
 }
 </style>

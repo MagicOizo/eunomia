@@ -43,6 +43,7 @@ works, and replaced with `#1d6fd6` for general use).
 | `--eu-color-text-muted` `#a6a6b3` on `#12121b`                                                                                                                      | 7.74:1           | 4.5:1 (text) ✅   |
 | white text on `--eu-color-accent` `#2d6fd1` (button)                                                                                                                | 4.88:1           | 4.5:1 (text) ✅   |
 | `--eu-color-accent-soft` `#8fc4ff` on `#12121b` / `#1c1c28`                                                                                                         | 10.20:1 / 9.24:1 | 4.5:1 (text) ✅   |
+| `--eu-color-accent-text` `#8fc4ff` (secondary button, links, active tab) on `#12121b` / `#1c1c28` — the fill accent `#2d6fd1` as text would only reach 3.45:1      | 10.20:1 / 9.24:1 | 4.5:1 (text) ✅   |
 | `--eu-color-focus-ring` `#4da3ff` on `#12121b`                                                                                                                      | 7.09:1           | 3:1 (non-text) ✅ |
 | Sidebar stays brand blue `#030088` with white text/`#80bdff` focus ring in both modes — see light-mode rows above; those ratios are unaffected by the color scheme. |
 

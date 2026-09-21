@@ -71,7 +71,7 @@ const classes = computed(() => [
 
 .eu-button--secondary {
   background-color: transparent;
-  color: var(--eu-color-accent);
+  color: var(--eu-color-accent-text);
   border-color: var(--eu-color-accent);
 }
 
@@ -84,7 +84,7 @@ const classes = computed(() => [
 
 .eu-button--ghost:hover:not(:disabled),
 .eu-button--ghost:focus-visible {
-  color: var(--eu-color-accent);
+  color: var(--eu-color-accent-text);
   background-color: color-mix(in srgb, var(--eu-color-accent) 12%, transparent);
 }
 

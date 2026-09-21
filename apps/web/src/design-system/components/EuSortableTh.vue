@@ -50,7 +50,7 @@ const ariaSort = computed(() =>
 }
 
 .eu-sort__icon {
-  color: var(--eu-color-accent);
+  color: var(--eu-color-accent-text);
   font-size: 0.85em;
 }
 

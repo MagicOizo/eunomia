@@ -46,7 +46,9 @@ const ids = {
   accountAnna: seedId('account', 0),
   accountBen: seedId('account', 1),
   company: seedId('company', 0),
+  companySupplementary: seedId('company', 1),
   contractAnna: seedId('contract', 0),
+  contractAnnaSupplementary: seedId('contract', 1),
   facilityDoctor: seedId('facility', 0),
   facilityRadiology: seedId('facility', 1),
   agency: seedId('agency', 0),
@@ -83,16 +85,79 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     addressCity: 'Musterstadt',
   });
 
+  await seedRow(pool, 'InsuranceCompanies', {
+    companyUID: ids.companySupplementary,
+    companyName: 'Beispiel Zusatzversicherung AG',
+    addressCity: 'Musterstadt',
+  });
+
+  // Anna's full PKV: one stable policy with an intra-year premium adjustment
+  // (2024-07) and a deductible change from 2025 — the case that used to force
+  // duplicate contracts (see Notes/eunomia-plan.md, 1.3.7).
   await seedRow(pool, 'Contracts', {
     contractUID: ids.contractAnna,
     contractNumber: 'PKV-2020-0001',
     companyUID: ids.company,
     accountUID: ids.accountAnna,
+    contractKind: 'FULL',
     contractBegin: '2020-01-01',
+    bonusForfeitRule: 'ON_REIMBURSEMENT',
+    claimFreeYearsAtStart: 2,
+    claimFreeCountingFromYear: 2020,
+  });
+  const premiums: Array<
+    [index: number, validFrom: string, monthlyPremium: number, note: string | null]
+  > = [
+    [0, '2020-01-01', 380.0, null],
+    [1, '2024-01-01', 405.0, 'Beitragsanpassung 2024'],
+    [2, '2024-07-01', 420.0, 'Unterjährige Anpassung Zahntarif'],
+  ];
+  for (const [index, validFrom, monthlyPremium, note] of premiums) {
+    await seedRow(pool, 'ContractPremiums', {
+      premiumUID: seedId('premium', index),
+      contractUID: ids.contractAnna,
+      validFrom,
+      monthlyPremium,
+      note,
+    });
+  }
+  await seedRow(pool, 'ContractTerms', {
+    termsUID: seedId('contractTerms', 0),
+    contractUID: ids.contractAnna,
+    validFromYear: 2020,
     deductible: 300.0,
     reimbursementCap: 5000.0,
-    monthlyRate: 420.0,
-    bonus: 600.0,
+  });
+  await seedRow(pool, 'ContractTerms', {
+    termsUID: seedId('contractTerms', 1),
+    contractUID: ids.contractAnna,
+    validFromYear: 2025,
+    deductible: 400.0,
+    reimbursementCap: 5000.0,
+  });
+
+  // Anna's supplementary policy: no deductible, reimburses up to 200 € a year.
+  await seedRow(pool, 'Contracts', {
+    contractUID: ids.contractAnnaSupplementary,
+    contractNumber: 'ZV-2022-0042',
+    companyUID: ids.companySupplementary,
+    accountUID: ids.accountAnna,
+    contractKind: 'SUPPLEMENTARY',
+    contractBegin: '2022-01-01',
+  });
+  await seedRow(pool, 'ContractPremiums', {
+    premiumUID: seedId('premium', 3),
+    contractUID: ids.contractAnnaSupplementary,
+    validFrom: '2022-01-01',
+    monthlyPremium: 24.9,
+    note: null,
+  });
+  await seedRow(pool, 'ContractTerms', {
+    termsUID: seedId('contractTerms', 2),
+    contractUID: ids.contractAnnaSupplementary,
+    validFromYear: 2022,
+    deductible: 0,
+    reimbursementCap: 200.0,
   });
 
   await seedRow(pool, 'Facilities', {

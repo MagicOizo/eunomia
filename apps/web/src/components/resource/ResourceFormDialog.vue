@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 
 import EuButton from '../../design-system/components/EuButton.vue';
+import EuCurrencyField from '../../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
@@ -44,7 +45,8 @@ watch(
     for (const field of props.fields) {
       const raw = props.editing?.[field.key];
       if (raw !== null && raw !== undefined) next[field.key] = String(raw);
-      else next[field.key] = props.editing ? '' : (props.prefill?.[field.key] ?? '');
+      else if (props.editing) next[field.key] = '';
+      else next[field.key] = props.prefill?.[field.key] ?? field.defaultValue ?? '';
     }
     values.value = next;
   },
@@ -69,7 +71,8 @@ function submit(): void {
       }
       continue; // omit empty optionals so the server keeps its default / null
     }
-    payload[field.key] = field.type === 'number' ? Number(value) : value;
+    const numeric = field.type === 'number' || field.type === 'currency';
+    payload[field.key] = numeric ? Number(value) : value;
   }
 
   emit('submit', payload);
@@ -86,8 +89,14 @@ function submit(): void {
           :label="field.label"
           :required="field.required"
           :disabled="field.immutable && isEditing()"
-          :options="field.optionsFrom ? (options[field.optionsFrom] ?? []) : []"
+          :options="field.options ?? (field.optionsFrom ? (options[field.optionsFrom] ?? []) : [])"
           @update:model-value="values[field.key] = $event ?? ''"
+        />
+        <EuCurrencyField
+          v-else-if="field.type === 'currency'"
+          :model-value="values[field.key] ? Number(values[field.key]) : null"
+          :label="field.label"
+          @update:model-value="values[field.key] = $event === null ? '' : String($event)"
         />
         <EuTextField
           v-else
