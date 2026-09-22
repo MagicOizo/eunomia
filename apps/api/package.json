@@ -14,6 +14,7 @@
     "start": "node dist/index.js",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/seed/seed.ts",
+    "seed:reset": "tsx src/seed/seed.ts --reset",
     "test": "tsx --test --test-concurrency=1 'src/**/*.test.ts'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

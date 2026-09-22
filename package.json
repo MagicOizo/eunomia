@@ -24,6 +24,8 @@
     "dev:web": "npm run dev --workspace apps/web",
     "dev:up": "bash scripts/dev.sh",
     "dev:down": "bash scripts/dev-down.sh",
+    "dev:seed": "bash scripts/dev-seed.sh",
+    "dev:reset": "bash scripts/dev-seed.sh --reset",
     "prepare": "node -e \"import('husky').then((m) => console.log(m.default()), () => {})\""
   },
   "lint-staged": {

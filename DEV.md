@@ -65,17 +65,39 @@ files only. `git commit --no-verify` skips it in an emergency. Formatting drift 
 commit, whose hash goes into `.git-blame-ignore-revs`. To have local `git blame` skip those commits:
 `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
-## Migrations & seed data (by hand)
+## Seed data & resetting the dev database
+
+The seed fills the database with a dataset built for clicking through the app: every workflow
+status, both payment traffic lights, an invoice at two policies, an open objection, a correction
+booked from a second billing, a policy whose bonus scale was not updated, an insured person
+without a policy — and, as `Clara Beispiel`, the author's three example years from
+`Notes/eunomia-plan.md` (2.3), so the reimbursement optimizer can be checked against its
+reference table in the running app. Treatment years are relative to today, so the current year
+always carries data.
+
+```bash
+npm run dev:seed    # add the seed rows to the dev database
+npm run dev:reset   # delete every application row first, then seed
+```
+
+`dev:reset` is the way to get rid of whatever piled up while testing. Both scripts target the dev
+container only and refuse to run with `NODE_ENV=production`; the seed is idempotent, so repeating
+it without `--reset` changes nothing.
+
+## Migrations (by hand)
 
 Migrations run automatically on API start; to drive them manually against a running MariaDB:
 
 ```bash
-npm run migrate --workspace apps/api   # apply all pending migrations
-npm run seed    --workspace apps/api   # demo data + dev admin (refuses NODE_ENV=production)
+npm run migrate    --workspace apps/api   # apply all pending migrations
+npm run seed       --workspace apps/api   # seed against the DB_* env vars
+npm run seed:reset --workspace apps/api   # the same, wiping the data first
 ```
 
-Both read the `DB_*` variables from the environment. The seed is idempotent — running it twice
-does not duplicate rows.
+These read the `DB_*` variables from the environment.
+
+> **The API integration tests delete all data.** Point them at their own database, never at the
+> dev one: `DB_NAME=eunomia_test npm run test --workspace apps/api` (CI does the same).
 
 ## Production image (build locally / release)
 

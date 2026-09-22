@@ -531,6 +531,14 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - Erstattungen werden über `DELETE /allocations/:uid` entfernt (die Leistungsabrechnung bleibt); `policyActionBadge()` in `recommendation.ts` übersetzt die Plan-Aktion je Police in ein Badge.
 - **Achtung für Tests:** Die API-Integrationstests löschen alle Daten. Sie laufen nur gegen eine separate Datenbank (`eunomia_test`), nie gegen die Dev-DB `eunomia`.
 
+## Slice 21a — Dev-Datenbestand & Reset (Zwischen-Slice, umgesetzt 2026-09-22)
+**Anlass:** Die API-Integrationstests löschen alle Daten; einmal versehentlich gegen die Dev-DB gelaufen, war der Dev-Bestand weg. Daraus die Konsequenz: ein Seed, der den Dev-Bestand jederzeit reproduzierbar neu aufbaut, und eine klare Trennung der Testdatenbank.
+- `npm run dev:seed` / `npm run dev:reset` (`scripts/dev-seed.sh`, `--reset` löscht vorher alles); im API-Workspace `seed`/`seed:reset`. Beide verweigern `NODE_ENV=production`.
+- Seed-Datensatz deckt bewusst Edge Cases ab: jeder Workflow-Status, beide Zahlungs-Ampeln (überfällig / bald fällig), Barzahlung, Rechnung bei zwei Policen, offener Widerspruch, Nachkorrektur über eine zweite Leistungsabrechnung, nicht aktualisierte Bonus-Staffel, Ausschluss-Markierung, Versicherter ohne Police.
+- `seed/example-years.ts` bildet die drei Beispieljahre des Autors (§2.3) als echte Daten ab (Clara, X-1/Y-1). Im laufenden System liefert der Optimierer: 450 € (nur Y), 650 € gegen 640 € (nur Y), 1000 € (X + Rest bei Y) — also genau die Referenztabelle.
+- Behandlungsjahre sind relativ zu heute, damit das aktuelle Jahr immer Daten hat.
+- **Regel:** API-Integrationstests nur mit `DB_NAME=eunomia_test`, nie gegen `eunomia`. In DEV.md dokumentiert.
+
 ## Slice 22 — Verknüpfen-Dialog + Such-Subdialog + Bulk (bisher Slice 17)
 **Ziel:** Leistungsabrechnung bequem finden/anlegen/verknüpfen, auch in Masse (Referenz `Rechnungen_Verknüpfen.png`, `Leistungsabrechnung auswählen.png`).
 - Auswahlfeld mit Search (🔍 → Filter-Subdialog: Nummer/Freitext, Zeitraum, „unverknüpft", Erstattungs-Range) und Add (＋ → Create).
