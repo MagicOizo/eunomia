@@ -232,6 +232,14 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(Number(inv.body.data.reimbursedTotal), 200);
       assert.equal(inv.body.data.remainingAmount, 300);
       assert.equal(inv.body.data.submissions[0].status, 'abgerechnet');
+
+      // The invoice detail's cards need the billing behind the reimbursement.
+      const [allocation] = inv.body.data.submissions[0].allocations;
+      assert.equal(allocation.billingUID, billingUID);
+      assert.equal(allocation.billingNumber, 'LA-1');
+      assert.equal(allocation.billingDate, '2024-07-01');
+      assert.equal(Number(allocation.reimbursement), 200);
+      assert.equal(allocation.objectionOpen, false);
     });
 
     await t.test('GET /billings?contractUID lists the contract billings, enriched', async () => {
@@ -554,6 +562,40 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         .set(admin)
         .send({ transferDate: '2024-09-02' });
       assert.equal(paid.body.data.workflowStatus, 'erledigt');
+    });
+
+    await t.test('removing an allocation frees the invoice again', async () => {
+      const inv5 = await makeInvoice(accountA, 120, 'R-5');
+      const submission = (
+        await post('/api/v1/submissions', {
+          contractUID: contractY,
+          submittedDate: '2024-08-06',
+          invoiceUIDs: [inv5],
+        })
+      ).body.data.submissionUID as string;
+      const billing = (
+        await post('/api/v1/billings', {
+          submissionUID: submission,
+          billingDate: '2024-08-25',
+          billingNumber: 'ZV-LA-2',
+        })
+      ).body.data.billingUID as string;
+      const allocationUID = (
+        await post('/api/v1/allocations', {
+          billingUID: billing,
+          invoiceUID: inv5,
+          reimbursement: 50,
+        })
+      ).body.data.allocationUID as string;
+
+      const res = await request(app).delete(`/api/v1/allocations/${allocationUID}`).set(admin);
+      assert.equal(res.status, 204);
+
+      const inv = await invoice(inv5);
+      assert.deepEqual(inv.submissions[0].allocations, []);
+      assert.equal(inv.submissions[0].status, 'eingereicht');
+      assert.equal(inv.workflowStatus, 'eingereicht');
+      assert.equal(inv.remainingAmount, 120);
     });
 
     await t.test('account scoping: a scoped user is confined to their account', async () => {

@@ -13,7 +13,13 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import { euro } from '../lib/format';
-import type { PlanInvoiceDto, PlanPolicyDto, PlanStrategyDto, ReimbursementPlanDto } from './api';
+import type {
+  PlanInvoiceDto,
+  PlanInvoicePolicyAction,
+  PlanPolicyDto,
+  PlanStrategyDto,
+  ReimbursementPlanDto,
+} from './api';
 
 /**
  * Display texts for the reimbursement optimizer's plan (see the API's
@@ -123,6 +129,24 @@ export function invoiceBadge(
         label: 'Nicht erstattbar',
         tooltip: 'Bei keiner Police erstattungsfähig.',
       };
+    default:
+      return null;
+  }
+}
+
+/**
+ * The optimizer's advice for this invoice at one policy, for the cards of the
+ * invoice detail. `answered`, `submitted` and `excluded` describe what already
+ * happened and carry no advice, so they have no badge.
+ */
+export function policyActionBadge(action: PlanInvoicePolicyAction): BadgeView | null {
+  switch (action) {
+    case 'submit':
+      return { tone: 'billed', icon: faPaperPlane, label: 'Einreichen' };
+    case 'wait':
+      return { tone: 'partial', icon: faHourglassHalf, label: 'Abwarten' };
+    case 'withdraw':
+      return { tone: 'open', icon: faRotateLeft, label: 'Zurückziehen' };
     default:
       return null;
   }

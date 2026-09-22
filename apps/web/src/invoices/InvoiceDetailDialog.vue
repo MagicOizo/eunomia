@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { faArrowRotateLeft, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faBan, faPaperPlane, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, reactive, ref, watch } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
@@ -9,17 +9,27 @@ import EuDetailField from '../design-system/components/EuDetailField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { describeError } from '../lib/errors';
-import { euro, germanDate } from '../lib/format';
+import { euro } from '../lib/format';
 import {
+  type InvoiceAllocationDto,
   type InvoiceDto,
   type InvoiceExclusionDto,
   type InvoiceSubmissionDto,
+  type PlanInvoiceDto,
   addExclusion,
+  createSubmission,
+  deleteAllocation,
   removeExclusion,
   withdrawSubmission,
 } from './api';
+import { type BillingAllocationPayload, saveBillingAllocation } from './billing-actions';
+import BillingDialog from './BillingDialog.vue';
+import { submittableContracts } from './eligibility';
 import ExclusionDialog from './ExclusionDialog.vue';
-import { STATUS_DISPLAY, SUBMISSION_STATUS_DISPLAY } from './status';
+import ObjectionDialog from './ObjectionDialog.vue';
+import SubmissionCard from './SubmissionCard.vue';
+import SubmitDialog from './SubmitDialog.vue';
+import { STATUS_DISPLAY } from './status';
 
 /**
  * View/edit an invoice as a compact display mask (see dialog-design.md): three
@@ -28,10 +38,11 @@ import { STATUS_DISPLAY, SUBMISSION_STATUS_DISPLAY } from './status';
  * values (status, insured person, IBAN of the selected agency, reimbursement)
  * are read-only rows. Saving sends the full field set as a PATCH.
  *
- * Below the mask: the invoice's submissions, one per policy with its own
- * status (withdrawable until the policy has billed), and its "not
- * reimbursable under" marks. These act immediately through their own API
- * calls and report back with `changed`, independent of the mask's Save.
+ * Below the mask, the "Zuordnung" block: one card per policy the invoice was
+ * submitted to (with its billings and the optimizer's advice) and one per "not
+ * reimbursable under" mark. Their actions — submit, bill, object, withdraw,
+ * remove — act immediately through their own API calls and report back with
+ * `changed`, independent of the mask's Save.
  */
 const props = defineProps<{
   open: boolean;
@@ -41,8 +52,10 @@ const props = defineProps<{
   agencies: SelectOption[];
   /** agencyUID → IBAN, to show the read-only IBAN of the picked agency. */
   agencyIban: Record<string, string>;
-  /** All policies of the insured person, for the exclusion picker. */
+  /** All policies of the insured person, for the submit and exclusion pickers. */
   contracts: SelectOption[];
+  /** The optimizer's advice for this invoice, shown per policy card. */
+  planInvoice: PlanInvoiceDto | null;
   submitting: boolean;
   error: string | null;
 }>();
@@ -108,13 +121,20 @@ const ibanForSelected = computed(() => {
 const str = (value: DetailValue): string => (typeof value === 'string' ? value.trim() : '');
 const isSubmitted = computed(() => (props.invoice?.submissions.length ?? 0) > 0);
 
-// --- submissions & exclusions blocks ---
+// --- "Zuordnung" block: submissions, their billings and the exclusions ---
 const blockBusy = ref(false);
 const blockError = ref<string | null>(null);
 const exclusionOpen = ref(false);
 const exclusionError = ref<string | null>(null);
+const submitOpen = ref(false);
+const submitError = ref<string | null>(null);
+const billingOpen = ref(false);
+const billingError = ref<string | null>(null);
+const billingSubmission = ref<InvoiceSubmissionDto | null>(null);
+const objectionOpen = ref(false);
 const pendingWithdraw = ref<InvoiceSubmissionDto | null>(null);
 const pendingRemove = ref<InvoiceExclusionDto | null>(null);
+const pendingAllocation = ref<InvoiceAllocationDto | null>(null);
 
 watch(
   () => [props.open, props.invoice?.invoiceUID] as const,
@@ -134,6 +154,16 @@ const markableContracts = computed(() => {
   ]);
   return props.contracts.filter((c) => !taken.has(c.value));
 });
+
+/** Policies the invoice can still go to (mirrors the API's checks). */
+const openContracts = computed(() =>
+  props.invoice ? submittableContracts(props.invoice, props.contracts) : [],
+);
+
+/** contractUID → what the optimizer advises for this invoice at that policy. */
+const planActions = computed(
+  () => new Map((props.planInvoice?.policies ?? []).map((p) => [p.contractUID, p.action])),
+);
 
 async function runBlock(
   action: () => Promise<unknown>,
@@ -164,6 +194,50 @@ async function confirmWithdraw(): Promise<void> {
     'Zu dieser Einreichung gibt es bereits eine Leistungsabrechnung, sie kann nicht mehr zurückgezogen werden.',
   );
   pendingWithdraw.value = null;
+}
+
+async function saveSubmission(payload: {
+  contractUID: string;
+  submittedDate: string;
+}): Promise<void> {
+  const inv = props.invoice;
+  if (!inv) return;
+  submitError.value = null;
+  const ok = await runBlock(
+    () => createSubmission({ ...payload, invoiceUIDs: [inv.invoiceUID] }),
+    (m) => (submitError.value = m),
+    'Die Rechnung liegt bei dieser Police bereits, ist dort als nicht erstattungsfähig markiert oder schon abgerechnet.',
+  );
+  if (ok) submitOpen.value = false;
+}
+
+function openBilling(submission: InvoiceSubmissionDto): void {
+  billingSubmission.value = submission;
+  billingError.value = null;
+  billingOpen.value = true;
+}
+
+async function saveBilling(payload: BillingAllocationPayload): Promise<void> {
+  const inv = props.invoice;
+  if (!inv) return;
+  billingError.value = null;
+  const ok = await runBlock(
+    () => saveBillingAllocation(inv.invoiceUID, payload),
+    (m) => (billingError.value = m),
+    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${euro(inv.remainingAmount)}).`,
+  );
+  if (ok) billingOpen.value = false;
+}
+
+async function confirmRemoveAllocation(): Promise<void> {
+  const allocation = pendingAllocation.value;
+  if (!allocation) return;
+  blockError.value = null;
+  await runBlock(
+    () => deleteAllocation(allocation.allocationUID),
+    (m) => (blockError.value = m),
+  );
+  pendingAllocation.value = null;
 }
 
 async function saveExclusion(payload: { contractUID: string; note: string | null }): Promise<void> {
@@ -345,98 +419,73 @@ function submit(): void {
     </p>
 
     <template v-if="invoice">
-      <section class="eu-detail-block" aria-labelledby="eu-invoice-submissions">
+      <section class="eu-detail-block" aria-labelledby="eu-invoice-assignment">
         <div class="eu-detail-block__head">
-          <h3 id="eu-invoice-submissions">Einreichungen</h3>
+          <h3 id="eu-invoice-assignment">Zuordnung</h3>
+          <div class="eu-detail-block__head-actions">
+            <EuButton
+              variant="secondary"
+              :icon="faPaperPlane"
+              :disabled="openContracts.length === 0 || blockBusy"
+              @click="
+                submitError = null;
+                submitOpen = true;
+              "
+              >Einreichen</EuButton
+            >
+            <EuButton
+              variant="secondary"
+              :icon="faBan"
+              :disabled="markableContracts.length === 0 || blockBusy"
+              @click="
+                exclusionError = null;
+                exclusionOpen = true;
+              "
+              >Nicht erstattungsfähig</EuButton
+            >
+          </div>
         </div>
-        <p v-if="invoice.submissions.length === 0" class="eu-detail-block__hint">
-          Noch bei keiner Police eingereicht.
-        </p>
-        <table v-else class="eu-detail-block__table">
-          <thead>
-            <tr>
-              <th scope="col">Police</th>
-              <th scope="col">Eingereicht am</th>
-              <th scope="col">Status</th>
-              <th scope="col" class="eu-detail-block__num">Erstattung</th>
-              <th scope="col" class="eu-detail-block__actions">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="submission in invoice.submissions" :key="submission.submissionUID">
-              <td>{{ policyLabel(submission) }}</td>
-              <td>{{ germanDate(submission.submittedDate) }}</td>
-              <td>
-                <EuBadge
-                  :tone="SUBMISSION_STATUS_DISPLAY[submission.status].tone"
-                  :icon="SUBMISSION_STATUS_DISPLAY[submission.status].icon"
-                >
-                  {{ SUBMISSION_STATUS_DISPLAY[submission.status].label }}
-                </EuBadge>
-              </td>
-              <td class="eu-detail-block__num">
-                {{ submission.status === 'abgerechnet' ? euro(submission.reimbursed) : '–' }}
-              </td>
-              <td class="eu-detail-block__actions">
-                <EuButton
-                  v-if="submission.billingCount === 0"
-                  variant="secondary"
-                  icon-only
-                  :icon="faArrowRotateLeft"
-                  :aria-label="`Einreichung bei ${submission.contractNumber} zurückziehen`"
-                  :title="`Einreichung bei ${submission.contractNumber} zurückziehen`"
-                  :disabled="blockBusy"
-                  @click="pendingWithdraw = submission"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
 
-      <section class="eu-detail-block" aria-labelledby="eu-invoice-exclusions">
-        <div class="eu-detail-block__head">
-          <h3 id="eu-invoice-exclusions">Nicht erstattungsfähig bei</h3>
-          <EuButton
-            variant="secondary"
-            :icon="faPlus"
-            :disabled="markableContracts.length === 0 || blockBusy"
-            @click="
-              exclusionError = null;
-              exclusionOpen = true;
-            "
-            >Markierung hinzufügen</EuButton
-          >
-        </div>
-        <p v-if="invoice.exclusions.length === 0" class="eu-detail-block__hint">
-          Keine Markierung: Die Rechnung kommt für jede Police in Frage.
+        <p
+          v-if="invoice.submissions.length === 0 && invoice.exclusions.length === 0"
+          class="eu-detail-block__hint"
+        >
+          Noch bei keiner Police eingereicht oder markiert.
         </p>
-        <table v-else class="eu-detail-block__table">
-          <thead>
-            <tr>
-              <th scope="col">Police</th>
-              <th scope="col">Notiz</th>
-              <th scope="col" class="eu-detail-block__actions">Aktionen</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="exclusion in invoice.exclusions" :key="exclusion.contractUID">
-              <td>{{ policyLabel(exclusion) }}</td>
-              <td>{{ exclusion.note ?? '–' }}</td>
-              <td class="eu-detail-block__actions">
-                <EuButton
-                  variant="secondary"
-                  icon-only
-                  :icon="faTrash"
-                  :aria-label="`Markierung für ${exclusion.contractNumber} entfernen`"
-                  :title="`Markierung für ${exclusion.contractNumber} entfernen`"
-                  :disabled="blockBusy"
-                  @click="pendingRemove = exclusion"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-else class="eu-detail-block__cards">
+          <SubmissionCard
+            v-for="submission in invoice.submissions"
+            :key="submission.submissionUID"
+            :submission="submission"
+            :plan-action="planActions.get(submission.contractUID) ?? null"
+            :closed="invoice.reimbursementClosed"
+            :busy="blockBusy"
+            @bill="openBilling"
+            @objection="objectionOpen = true"
+            @withdraw="pendingWithdraw = $event"
+            @remove-allocation="pendingAllocation = $event"
+          />
+          <article
+            v-for="exclusion in invoice.exclusions"
+            :key="exclusion.contractUID"
+            class="eu-detail-block__excl"
+          >
+            <div>
+              <h4>{{ policyLabel(exclusion) }}</h4>
+              <p>{{ exclusion.note ?? 'Nicht erstattungsfähig bei dieser Police.' }}</p>
+            </div>
+            <EuBadge tone="neutral" :icon="faBan">Nicht erstattungsfähig</EuBadge>
+            <EuButton
+              variant="secondary"
+              icon-only
+              :icon="faTrash"
+              :aria-label="`Markierung für ${exclusion.contractNumber} entfernen`"
+              :title="`Markierung für ${exclusion.contractNumber} entfernen`"
+              :disabled="blockBusy"
+              @click="pendingRemove = exclusion"
+            />
+          </article>
+        </div>
       </section>
       <p v-if="blockError" class="eu-detail-grid__error" role="alert">{{ blockError }}</p>
     </template>
@@ -449,6 +498,30 @@ function submit(): void {
     </template>
   </EuDialog>
 
+  <SubmitDialog
+    :open="submitOpen"
+    :count="1"
+    :contracts="openContracts"
+    :submitting="blockBusy"
+    :error="submitError"
+    @close="submitOpen = false"
+    @submit="saveSubmission"
+  />
+  <BillingDialog
+    :open="billingOpen"
+    :invoice="invoice"
+    :preset-submission="billingSubmission?.submissionUID ?? null"
+    :submitting="blockBusy"
+    :error="billingError"
+    @close="billingOpen = false"
+    @submit="saveBilling"
+  />
+  <ObjectionDialog
+    :open="objectionOpen"
+    :invoice="invoice"
+    @close="objectionOpen = false"
+    @changed="emit('changed')"
+  />
   <ExclusionDialog
     :open="exclusionOpen"
     :contracts="markableContracts"
@@ -469,6 +542,21 @@ function submit(): void {
     <template #footer>
       <EuButton variant="secondary" @click="pendingWithdraw = null">Abbrechen</EuButton>
       <EuButton :disabled="blockBusy" @click="confirmWithdraw">Zurückziehen</EuButton>
+    </template>
+  </EuDialog>
+  <EuDialog
+    :open="pendingAllocation !== null"
+    title="Erstattung entfernen"
+    @close="pendingAllocation = null"
+  >
+    <p v-if="pendingAllocation">
+      Die Erstattung von {{ euro(pendingAllocation.reimbursement) }} aus Abrechnung
+      {{ pendingAllocation.billingNumber }} wirklich entfernen? Die Leistungsabrechnung selbst
+      bleibt bestehen.
+    </p>
+    <template #footer>
+      <EuButton variant="secondary" @click="pendingAllocation = null">Abbrechen</EuButton>
+      <EuButton :disabled="blockBusy" @click="confirmRemoveAllocation">Entfernen</EuButton>
     </template>
   </EuDialog>
   <EuDialog
@@ -530,36 +618,44 @@ function submit(): void {
   font-family: var(--eu-font-data);
 }
 
-.eu-detail-block__table {
-  width: 100%;
-  border-collapse: collapse;
+.eu-detail-block__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.eu-detail-block__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 0.75rem;
+}
+
+/* A mark is not a submission: flatter and muted, so the cards that carry
+   money stay the ones that stand out. */
+.eu-detail-block__excl {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px dashed var(--eu-color-border);
+  border-radius: 0.6rem;
   font-family: var(--eu-font-data);
 }
 
-.eu-detail-block__table th,
-.eu-detail-block__table td {
-  padding: 0.4rem 0.6rem;
-  text-align: left;
-  border-bottom: 1px solid var(--eu-color-border);
-}
-
-.eu-detail-block__table th {
+.eu-detail-block__excl h4 {
+  margin: 0;
   font-family: var(--eu-font-heading);
+  font-size: 1rem;
+}
+
+.eu-detail-block__excl p {
+  margin: 0;
   color: var(--eu-color-text-muted);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-size: 0.85rem;
 }
 
-.eu-detail-block__table .eu-detail-block__num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.eu-detail-block__table .eu-detail-block__actions {
-  width: 1%;
-  white-space: nowrap;
-  text-align: right;
+.eu-detail-block__excl > div {
+  flex: 1;
+  min-width: 0;
 }
 </style>

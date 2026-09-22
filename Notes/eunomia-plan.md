@@ -520,6 +520,17 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 
 **DoD:** Von der Rechnung aus einreichen/abrechnen/erstatten — auch bei einer zweiten Police — ohne Umweg über getrennte Zeilenaktionen.
 
+**Entscheidungen (Planmodus):**
+- Karten nur für **genutzte** Policen (bestehende Einreichungen und Markierungen), dazu ＋-Aktionen im Blockkopf — wie in der Referenz-App. Kein Kartenraster über alle Policen der Person.
+- Zeilenaktionen im Workspace bleiben schlank: Dokument öffnen, Einreichen (nur bei Status `offen`), Bezahlt markieren, Details, Löschen. Weg: bei weiterer Police einreichen, Abrechnung zuordnen, Als abgerechnet markieren, Widerspruch — alles davon steckt jetzt im Detaildialog. Bulk-Einreichen/-Löschen in der Toolbar bleiben.
+
+**Umgesetzt (2026-09-22).** Entscheidungen beim Bau:
+- Die Rechnungs-API liefert je Einreichung zusätzlich `allocations` (Abrechnungsnummer, -datum, Belegnummer, Betrag, offener Widerspruch). Eine gebatchte Abfrage in `invoices.ts`, gruppiert nach Rechnung **und** Einreichung — eine Einreichung bündelt mehrere Rechnungen, die Einreichung allein wäre kein eindeutiger Schlüssel.
+- Block „Zuordnung" mit `SubmissionCard.vue` je Einreichung (Status, Empfehlungs-Badge aus dem Plan, Abrechnungsliste mit Widerspruchs-Marker, Aktionen: Abrechnung erfassen / Widerspruch / Zurückziehen / einzelne Erstattung entfernen) und gedämpften Karten für die „nicht erstattungsfähig"-Markierungen.
+- `SubmitDialog`, `BillingDialog` und `ObjectionDialog` hängen jetzt am Detaildialog und rufen die API selbst auf; die zusammengesetzte Speicherlogik (Abrechnung anlegen → Erstattung buchen → Bonus-Flag) liegt in `billing-actions.ts`. `BillingDialog` bekam `presetSubmission` für die Vorbelegung aus der Karte.
+- Erstattungen werden über `DELETE /allocations/:uid` entfernt (die Leistungsabrechnung bleibt); `policyActionBadge()` in `recommendation.ts` übersetzt die Plan-Aktion je Police in ein Badge.
+- **Achtung für Tests:** Die API-Integrationstests löschen alle Daten. Sie laufen nur gegen eine separate Datenbank (`eunomia_test`), nie gegen die Dev-DB `eunomia`.
+
 ## Slice 22 — Verknüpfen-Dialog + Such-Subdialog + Bulk (bisher Slice 17)
 **Ziel:** Leistungsabrechnung bequem finden/anlegen/verknüpfen, auch in Masse (Referenz `Rechnungen_Verknüpfen.png`, `Leistungsabrechnung auswählen.png`).
 - Auswahlfeld mit Search (🔍 → Filter-Subdialog: Nummer/Freitext, Zeitraum, „unverknüpft", Erstattungs-Range) und Add (＋ → Create).

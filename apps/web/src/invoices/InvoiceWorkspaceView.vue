@@ -2,9 +2,6 @@
 import {
   faChevronLeft,
   faCircleCheck,
-  faFileCircleCheck,
-  faGavel,
-  faHandHoldingDollar,
   faPaperPlane,
   faPen,
   faPlus,
@@ -28,27 +25,18 @@ import { useTableSort } from '../lib/useTableSort';
 import {
   type InvoiceDto,
   type ReimbursementPlanDto,
-  createAllocation,
-  createBilling,
   createInvoice,
   createSubmission,
   deleteInvoice,
   listInvoiceYears,
   listInvoices,
   reimbursementPlan,
-  updateBilling,
   updateInvoice,
 } from './api';
-import BillingDialog from './BillingDialog.vue';
-import {
-  commonSubmittableContracts,
-  submittableContracts,
-  unbilledSubmissions,
-} from './eligibility';
+import { commonSubmittableContracts, submittableContracts } from './eligibility';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
-import ObjectionDialog from './ObjectionDialog.vue';
 import PaymentInfoPopover from './PaymentInfoPopover.vue';
 import RecommendationBadge from './RecommendationBadge.vue';
 import { type InvoiceBadgeView, invoiceBadge } from './recommendation';
@@ -101,9 +89,6 @@ const detailOpen = ref(false);
 const editing = ref<InvoiceDto | null>(null);
 const submitOpen = ref(false);
 const submitTargets = ref<InvoiceDto[]>([]);
-const closeTarget = ref<InvoiceDto | null>(null);
-const billingOpen = ref(false);
-const objectionOpen = ref(false);
 const settleOpen = ref(false);
 const dialogInvoice = ref<InvoiceDto | null>(null);
 const dialogBusy = ref(false);
@@ -281,24 +266,16 @@ function openSubmit(targets: InvoiceDto[]): void {
   dialogError.value = null;
   submitOpen.value = true;
 }
-function openBilling(invoice: InvoiceDto): void {
-  dialogInvoice.value = invoice;
-  dialogError.value = null;
-  billingOpen.value = true;
-}
-function openObjection(invoice: InvoiceDto): void {
-  dialogInvoice.value = invoice;
-  objectionOpen.value = true;
-}
 function openSettle(invoice: InvoiceDto): void {
   dialogInvoice.value = invoice;
   dialogError.value = null;
   settleOpen.value = true;
 }
-function openClose(invoice: InvoiceDto): void {
-  closeTarget.value = invoice;
-  dialogError.value = null;
-}
+/** The optimizer's advice for the invoice the detail dialog shows. */
+const detailPlan = computed(
+  () => plan.value?.invoices.find((i) => i.invoiceUID === dialogInvoice.value?.invoiceUID) ?? null,
+);
+
 /** Detail dialog blocks changed something: reload and hand it the fresh invoice. */
 async function detailChanged(): Promise<void> {
   const uid = dialogInvoice.value?.invoiceUID;
@@ -348,52 +325,6 @@ function submitSubmission(payload: { contractUID: string; submittedDate: string 
     () => createSubmission({ ...payload, invoiceUIDs }).then(() => undefined),
     () => (submitOpen.value = false),
     'Mindestens eine Rechnung liegt bereits bei dieser Police, ist dort als nicht erstattungsfähig markiert oder schon abgerechnet.',
-  );
-}
-
-function submitBilling(payload: {
-  submissionUID: string;
-  billingUID?: string;
-  newBilling?: { billingDate: string; billingNumber: string };
-  reimbursement: number;
-  receiptNumber?: string;
-  forfeitsBonus?: boolean;
-}): void {
-  const invoice = dialogInvoice.value;
-  if (!invoice) return;
-  void runDialog(
-    async () => {
-      let billingUID = payload.billingUID;
-      if (payload.newBilling) {
-        const billing = await createBilling({
-          submissionUID: payload.submissionUID,
-          ...payload.newBilling,
-          ...(payload.forfeitsBonus !== undefined ? { forfeitsBonus: payload.forfeitsBonus } : {}),
-        });
-        billingUID = billing.billingUID;
-      }
-      await createAllocation({
-        billingUID: billingUID!,
-        invoiceUID: invoice.invoiceUID,
-        reimbursement: payload.reimbursement,
-        ...(payload.receiptNumber ? { receiptNumber: payload.receiptNumber } : {}),
-      });
-      // Only once the reimbursement is booked, so a rejected one changes nothing.
-      if (payload.billingUID && payload.forfeitsBonus !== undefined) {
-        await updateBilling(payload.billingUID, { forfeitsBonus: payload.forfeitsBonus });
-      }
-    },
-    () => (billingOpen.value = false),
-    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${euro(invoice.remainingAmount)}).`,
-  );
-}
-
-function confirmClose(): void {
-  const invoice = closeTarget.value;
-  if (!invoice) return;
-  void runDialog(
-    () => updateInvoice(invoice.invoiceUID, { reimbursementClosed: true }).then(() => undefined),
-    () => (closeTarget.value = null),
   );
 }
 
@@ -617,36 +548,6 @@ function confirmDelete(): void {
                 @click="openSubmit([invoice])"
               />
               <EuButton
-                v-else-if="canSubmit(invoice)"
-                variant="secondary"
-                icon-only
-                :icon="faPaperPlane"
-                aria-label="Bei weiterer Police einreichen"
-                title="Rechnung (bzw. den Rest) bei einer weiteren Police einreichen"
-                @click="openSubmit([invoice])"
-              />
-              <EuButton
-                v-if="!invoice.reimbursementClosed && unbilledSubmissions(invoice).length > 0"
-                variant="secondary"
-                icon-only
-                :icon="faHandHoldingDollar"
-                aria-label="Abrechnung zuordnen"
-                title="Leistungsabrechnung erfassen und Erstattung zuordnen"
-                @click="openBilling(invoice)"
-              />
-              <EuButton
-                v-if="
-                  invoice.workflowStatus === 'eingereicht' ||
-                  invoice.workflowStatus === 'teilabgerechnet'
-                "
-                variant="secondary"
-                icon-only
-                :icon="faFileCircleCheck"
-                aria-label="Als abgerechnet markieren"
-                title="Abrechnung abschließen – der Rest wird nicht weiter eingereicht"
-                @click="openClose(invoice)"
-              />
-              <EuButton
                 v-if="invoice.workflowStatus !== 'offen' && invoice.transferDate === null"
                 variant="secondary"
                 icon-only
@@ -656,20 +557,11 @@ function confirmDelete(): void {
                 @click="openSettle(invoice)"
               />
               <EuButton
-                v-if="invoice.submissions.some((s) => s.billingCount > 0)"
-                variant="secondary"
-                icon-only
-                :icon="faGavel"
-                aria-label="Widerspruch"
-                title="Fehlerhafte Leistungsabrechnung als Widerspruch markieren"
-                @click="openObjection(invoice)"
-              />
-              <EuButton
                 variant="secondary"
                 icon-only
                 :icon="faPen"
-                aria-label="Bearbeiten"
-                title="Rechnung bearbeiten"
+                aria-label="Details"
+                title="Rechnungsdetails öffnen – bearbeiten, einreichen, abrechnen"
                 @click="openEdit(invoice)"
               />
               <EuButton
@@ -700,6 +592,7 @@ function confirmDelete(): void {
       :agencies="agencyOptions"
       :agency-iban="agencyIbanMap"
       :contracts="contractOptions"
+      :plan-invoice="detailPlan"
       :submitting="dialogBusy"
       :error="dialogError"
       @close="detailOpen = false"
@@ -726,14 +619,6 @@ function confirmDelete(): void {
       @close="submitOpen = false"
       @submit="submitSubmission"
     />
-    <BillingDialog
-      :open="billingOpen"
-      :invoice="dialogInvoice"
-      :submitting="dialogBusy"
-      :error="dialogError"
-      @close="billingOpen = false"
-      @submit="submitBilling"
-    />
     <SettleDialog
       :open="settleOpen"
       :invoice="dialogInvoice"
@@ -742,30 +627,6 @@ function confirmDelete(): void {
       @close="settleOpen = false"
       @submit="submitSettle"
     />
-    <ObjectionDialog
-      :open="objectionOpen"
-      :invoice="dialogInvoice"
-      @close="objectionOpen = false"
-      @changed="afterMutation"
-    />
-
-    <EuDialog
-      :open="closeTarget !== null"
-      title="Als abgerechnet markieren"
-      @close="closeTarget = null"
-    >
-      <p v-if="closeTarget">
-        Abrechnung von Rechnung {{ closeTarget.invoiceNumber }} abschließen? Der nicht erstattete
-        Rest von {{ euro(closeTarget.remainingAmount) }} wird dann bei keiner weiteren Police
-        eingereicht. Die Markierung lässt sich in den Rechnungsdetails wieder aufheben.
-      </p>
-      <p v-if="dialogError" class="eu-ws__error" role="alert">{{ dialogError }}</p>
-      <template #footer>
-        <EuButton variant="secondary" @click="closeTarget = null">Abbrechen</EuButton>
-        <EuButton :disabled="dialogBusy" @click="confirmClose">Als abgerechnet markieren</EuButton>
-      </template>
-    </EuDialog>
-
     <EuDialog :open="deleteTargets.length > 0" title="Rechnung löschen" @close="deleteTargets = []">
       <p>{{ deleteTargets.length }} Rechnung(en) wirklich löschen?</p>
       <p v-if="dialogError" class="eu-ws__error" role="alert">{{ dialogError }}</p>

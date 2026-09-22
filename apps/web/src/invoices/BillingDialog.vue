@@ -16,6 +16,8 @@ import { euro, germanDate } from '../lib/format';
 const props = defineProps<{
   open: boolean;
   invoice: InvoiceDto | null;
+  /** Preselected submission (policy) when opened from one card. */
+  presetSubmission?: string | null;
   submitting: boolean;
   error: string | null;
 }>();
@@ -110,10 +112,14 @@ watch(
     billingNumber.value = '';
     reimbursement.value = null;
     receiptNumber.value = '';
-    // Default to the policy still waiting for its answer.
+    // The card the dialog was opened from wins; otherwise default to the
+    // policy still waiting for its answer.
     const waiting = unbilledSubmissions(props.invoice);
     submissionUID.value =
-      waiting[0]?.submissionUID ?? props.invoice.submissions[0]?.submissionUID ?? '';
+      props.presetSubmission ??
+      waiting[0]?.submissionUID ??
+      props.invoice.submissions[0]?.submissionUID ??
+      '';
     await loadBillings();
     forfeit.reset();
   },

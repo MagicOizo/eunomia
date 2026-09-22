@@ -5,6 +5,7 @@ import {
   bonusView,
   invoiceBadge,
   percentOf,
+  policyActionBadge,
   policyVerdict,
   recommendationText,
   strategyLabel,
@@ -165,6 +166,23 @@ describe('bonusView', () => {
       '450,00 € laut Versicherung',
     );
     expect(bonusView(zusatz()).label).toBe('Kein Bonus');
+  });
+});
+
+describe('policyActionBadge', () => {
+  it('names the action for the policy card', () => {
+    expect(policyActionBadge('submit')?.label).toBe('Einreichen');
+    expect(policyActionBadge('wait')?.label).toBe('Abwarten');
+    expect(policyActionBadge('withdraw')?.label).toBe('Zurückziehen');
+  });
+
+  it('stays silent where nothing is to be done', () => {
+    // Already answered, already submitted, excluded or simply not involved:
+    // the card's own status badge says it, an advice badge would only repeat.
+    expect(policyActionBadge('answered')).toBeNull();
+    expect(policyActionBadge('submitted')).toBeNull();
+    expect(policyActionBadge('excluded')).toBeNull();
+    expect(policyActionBadge('none')).toBeNull();
   });
 });
 

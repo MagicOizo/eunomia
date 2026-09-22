@@ -27,6 +27,7 @@ function submission(
     billingCount: status === 'abgerechnet' ? 1 : 0,
     reimbursed: 0,
     status,
+    allocations: [],
   };
 }
 

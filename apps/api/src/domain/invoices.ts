@@ -130,6 +130,18 @@ interface InvoiceExclusionRow {
   note: string | null;
 }
 
+interface InvoiceAllocationRow {
+  invoiceUID: string;
+  submissionUID: string;
+  allocationUID: string;
+  billingUID: string;
+  billingNumber: string;
+  billingDate: string;
+  receiptNumber: string | null;
+  reimbursement: number;
+  objectionOpen: number;
+}
+
 /**
  * Enriched invoice query: the reimbursed total and allocation count over all
  * policies, plus whether any billing behind it has an open objection.
@@ -169,9 +181,24 @@ function byInvoice<T extends { invoiceUID: string }>(rows: T[]): Map<string, T[]
 }
 
 /**
- * Adds the per-policy submissions, the exclusions and the derived status to
- * enriched invoice rows. Two batched queries instead of widening the
- * aggregated main query, which would multiply its joins.
+ * Groups allocation rows per invoice *and* submission: a submission can bundle
+ * several invoices, so the submission alone is not a unique bucket here.
+ */
+function byInvoiceSubmission(rows: InvoiceAllocationRow[]): Map<string, InvoiceAllocationRow[]> {
+  const map = new Map<string, InvoiceAllocationRow[]>();
+  for (const row of rows) {
+    const key = `${row.invoiceUID}\u0000${row.submissionUID}`;
+    const list = map.get(key) ?? [];
+    list.push(row);
+    map.set(key, list);
+  }
+  return map;
+}
+
+/**
+ * Adds the per-policy submissions with their booked reimbursements, the
+ * exclusions and the derived status to enriched invoice rows. Batched queries
+ * instead of widening the aggregated main query, which would multiply its joins.
  */
 async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string, unknown>[]> {
   if (rows.length === 0) return [];
@@ -196,6 +223,21 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
         WHERE si.invoiceUID IN (${placeholders})
         GROUP BY si.invoiceUID, s.submissionUID
         ORDER BY s.submittedDate, s.submissionUID`,
+      uids,
+    ),
+  );
+  // The invoice's share of each service billing, for the cards of the detail
+  // dialog: which billing paid what, and whether it is under objection.
+  const allocations = byInvoiceSubmission(
+    await db.query<InvoiceAllocationRow[]>(
+      `SELECT a.invoiceUID, b.submissionUID, a.allocationUID, a.billingUID,
+              b.billingNumber, b.billingDate, a.receiptNumber, a.reimbursement,
+              CASE WHEN b.objectionDate IS NOT NULL AND b.objectionResolvedDate IS NULL
+                   THEN 1 ELSE 0 END AS objectionOpen
+         FROM Allocations a
+         JOIN ServiceBillings b ON b.billingUID = a.billingUID AND b.billingStatus <> -1
+        WHERE a.invoiceUID IN (${placeholders}) AND a.allocationStatus <> -1
+        ORDER BY b.billingDate, b.billingUID`,
       uids,
     ),
   );
@@ -236,6 +278,17 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
         billingCount: s.billingCount,
         reimbursed: s.reimbursed,
         status: deriveSubmissionStatus(s.allocationCount),
+        allocations: (allocations.get(`${row.invoiceUID}\u0000${s.submissionUID}`) ?? []).map(
+          (a) => ({
+            allocationUID: a.allocationUID,
+            billingUID: a.billingUID,
+            billingNumber: a.billingNumber,
+            billingDate: a.billingDate,
+            receiptNumber: a.receiptNumber,
+            reimbursement: a.reimbursement,
+            objectionOpen: Boolean(Number(a.objectionOpen)),
+          }),
+        ),
       })),
       exclusions: (exclusions.get(row.invoiceUID) ?? []).map((x) => ({
         contractUID: x.contractUID,

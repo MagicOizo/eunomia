@@ -2,6 +2,18 @@ import type { BonusForfeitRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
 import type { SubmissionStatus, WorkflowStatus } from './status';
 
+/** What one service billing reimbursed for this invoice. */
+export interface InvoiceAllocationDto {
+  allocationUID: string;
+  billingUID: string;
+  billingNumber: string;
+  billingDate: string;
+  receiptNumber: string | null;
+  reimbursement: number;
+  /** The billing is under an unresolved objection ("Widerspruch"). */
+  objectionOpen: boolean;
+}
+
 /** One submission of an invoice, i.e. the invoice at one policy. */
 export interface InvoiceSubmissionDto {
   submissionUID: string;
@@ -16,6 +28,8 @@ export interface InvoiceSubmissionDto {
   /** What this policy reimbursed for the invoice. */
   reimbursed: number;
   status: SubmissionStatus;
+  /** The billings of this submission that reimbursed the invoice, oldest first. */
+  allocations: InvoiceAllocationDto[];
 }
 
 /** A "not reimbursable under this policy" mark. */
@@ -282,6 +296,11 @@ export async function createAllocation(body: {
   receiptNumber?: string;
 }): Promise<void> {
   await apiFetch('/allocations', { method: 'POST', body });
+}
+
+/** Removes a booked reimbursement; the billing itself stays. */
+export async function deleteAllocation(uid: string): Promise<void> {
+  await apiFetch(`/allocations/${uid}`, { method: 'DELETE' });
 }
 
 export async function reimbursementPlan(
