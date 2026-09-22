@@ -33,6 +33,16 @@
  * Only the bonus of the year itself is compared: that a forfeited year also
  * resets the streak for later years is left to the caller to point out.
  *
+ * On top of the strategy, each policy gets a status for what to do now:
+ *  - spare: its bonus is worth more than using it (so far).
+ *  - submit: submit now — to a full policy in any case, to a supplementary
+ *    one what the policies before it leave over.
+ *  - wait: a supplementary policy while the year is still running and a
+ *    spared policy before it may still tip into being used; what it would
+ *    pay now would then partly be the other policy's share.
+ *  - exhausted: a supplementary policy whose cap is reached, with nothing
+ *    left to submit there.
+ *
  * All arithmetic runs in whole cents; inputs and outputs are euros.
  */
 
@@ -80,6 +90,8 @@ export interface OptimizerInvoice {
 export interface OptimizerInput {
   policies: OptimizerPolicy[];
   invoices: OptimizerInvoice[];
+  /** True while further costs can still come for the year (running or future year). */
+  yearInProgress: boolean;
 }
 
 export interface StrategyResult {
@@ -95,14 +107,18 @@ export interface StrategyResult {
 /**
  * Per invoice and policy: `answered` = reimbursement recorded; `submitted` =
  * recommended and already there; `submit` = recommended, not yet submitted;
+ * `wait` = would be submitted, but the policy is to wait (see `PolicyStatus`);
  * `withdraw` = lies at a spared policy without an answer; `none` = not
  * recommended.
  */
 export type InvoicePolicyAction =
-  'excluded' | 'answered' | 'submitted' | 'submit' | 'withdraw' | 'none';
+  'excluded' | 'answered' | 'submitted' | 'submit' | 'wait' | 'withdraw' | 'none';
 
 /** The overall advice for one invoice, derived from its per-policy actions. */
-export type InvoiceAction = 'submit' | 'withdraw' | 'hold' | 'done' | 'not-reimbursable';
+export type InvoiceAction = 'submit' | 'withdraw' | 'wait' | 'hold' | 'done' | 'not-reimbursable';
+
+/** What to do with a policy now; see the module comment. */
+export type PolicyStatus = 'spare' | 'submit' | 'wait' | 'exhausted';
 
 export interface InvoicePlan {
   invoiceUID: string;
@@ -121,6 +137,7 @@ export interface PolicyPlan {
   bonusMode: BonusMode;
   bonusAmount: number;
   recommendation: 'use' | 'spare';
+  status: PolicyStatus;
   /** Sum of the reimbursements already recorded. */
   actualReimbursement: number;
   /** Actual plus modelled reimbursement in the recommended strategy. */
@@ -325,6 +342,7 @@ function worthUsingAbove(
 function invoiceAction(actions: InvoicePolicyAction[]): InvoiceAction {
   if (actions.includes('withdraw')) return 'withdraw';
   if (actions.includes('submit')) return 'submit';
+  if (actions.includes('wait')) return 'wait';
   if (actions.length > 0 && actions.every((action) => action === 'excluded')) {
     return 'not-reimbursable';
   }
@@ -357,8 +375,40 @@ export function optimizeReimbursement(input: OptimizerInput): OptimizerResult {
     total: toEuros(scenario.totalCents),
   }));
 
+  const thresholds = new Map<string, number | null>();
+  for (const policy of policies) {
+    if (!best.used.has(policy.contractUID) && policy.bonusMode === 'choice') {
+      thresholds.set(policy.contractUID, worthUsingAbove(policies, invoices, policy));
+    }
+  }
+
+  /** Whether a spared policy processed before `index` may still tip into being used. */
+  const earlierMayTip = (index: number): boolean =>
+    policies
+      .slice(0, index)
+      .some((earlier) => (thresholds.get(earlier.contractUID) ?? null) !== null);
+
+  const statuses = new Map<string, PolicyStatus>();
+  policies.forEach((policy, index) => {
+    let status: PolicyStatus = 'submit';
+    if (!best.used.has(policy.contractUID)) {
+      status = 'spare';
+    } else if (policy.kind === 'SUPPLEMENTARY') {
+      const modelled = best.scenario.modelled.get(policy.contractUID) ?? new Map();
+      const leftToSubmit = invoices.some(
+        (invoice) =>
+          modelled.has(invoice.invoiceUID) && !invoice.policies[policy.contractUID]?.submitted,
+      );
+      const capReached =
+        policy.reimbursementCap !== null &&
+        (best.scenario.reimbursed.get(policy.contractUID) ?? 0) >= toCents(policy.reimbursementCap);
+      if (capReached && !leftToSubmit) status = 'exhausted';
+      else if (input.yearInProgress && earlierMayTip(index)) status = 'wait';
+    }
+    statuses.set(policy.contractUID, status);
+  });
+
   const policyPlans: PolicyPlan[] = policies.map((policy) => {
-    const used = best.used.has(policy.contractUID);
     let actualCents = 0;
     for (const invoice of invoices) {
       const actual = invoice.policies[policy.contractUID]?.actualReimbursement;
@@ -368,12 +418,13 @@ export function optimizeReimbursement(input: OptimizerInput): OptimizerResult {
       contractUID: policy.contractUID,
       bonusMode: policy.bonusMode,
       bonusAmount: policy.bonusMode === 'forfeited' ? 0 : policy.bonusAmount,
-      recommendation: used ? 'use' : 'spare',
+      recommendation: best.used.has(policy.contractUID) ? 'use' : 'spare',
+      status: statuses.get(policy.contractUID) ?? 'submit',
       actualReimbursement: toEuros(actualCents),
       expectedReimbursement: toEuros(best.scenario.reimbursed.get(policy.contractUID) ?? 0),
     };
-    if (!used && policy.bonusMode === 'choice') {
-      plan.worthUsingAbove = worthUsingAbove(policies, invoices, policy);
+    if (thresholds.has(policy.contractUID)) {
+      plan.worthUsingAbove = thresholds.get(policy.contractUID) ?? null;
     }
     return plan;
   });
@@ -390,7 +441,8 @@ export function optimizeReimbursement(input: OptimizerInput): OptimizerResult {
       } else if (state?.excluded) {
         action = 'excluded';
       } else if (modelled !== undefined) {
-        action = state?.submitted ? 'submitted' : 'submit';
+        if (state?.submitted) action = 'submitted';
+        else action = statuses.get(policy.contractUID) === 'wait' ? 'wait' : 'submit';
         reimbursement = toEuros(modelled);
       } else if (state?.submitted) {
         action = best.used.has(policy.contractUID) ? 'submitted' : 'withdraw';

@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { faPaperPlane, faPiggyBank } from '@fortawesome/free-solid-svg-icons';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import {
+  faBan,
+  faHourglassHalf,
+  faPaperPlane,
+  faPiggyBank,
+} from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
@@ -45,42 +51,77 @@ function bonusText(policy: PlanPolicyDto): string {
   }
 }
 
+const STATUS_BADGE: Record<
+  PlanPolicyDto['status'],
+  { label: string; icon: IconDefinition; tone: 'done' | 'billed' | 'partial' | 'neutral' }
+> = {
+  spare: { label: 'Schonen', icon: faPiggyBank, tone: 'done' },
+  submit: { label: 'Einreichen', icon: faPaperPlane, tone: 'billed' },
+  wait: { label: 'Abwarten', icon: faHourglassHalf, tone: 'partial' },
+  exhausted: { label: 'Erschöpft', icon: faBan, tone: 'neutral' },
+};
+
+/** Contract numbers of the spared policies that may still tip into being used. */
+const mayTip = computed(() =>
+  (props.plan?.policies ?? [])
+    .filter((p) => p.status === 'spare' && p.worthUsingAbove !== null)
+    .map((p) => p.contractNumber)
+    .join(', '),
+);
+
 function verdict(policy: PlanPolicyDto): string {
-  if (policy.recommendation === 'spare') {
-    if (policy.bonusStatus === 'paid')
-      return 'Bonus bereits erhalten – hier nicht mehr einreichen.';
-    const above =
-      policy.worthUsingAbove === null
-        ? 'Das bleibt auch bei höheren Kosten so, weil die Obergrenze unter dem Bonus liegt.'
-        : `Einreichen lohnt sich erst, wenn mehr als ${euro(policy.worthUsingAbove)} weitere Kosten dazukommen.`;
-    return `Schonen: der Bonus ist mehr wert als die mögliche Erstattung. ${above}`;
+  switch (policy.status) {
+    case 'spare': {
+      if (policy.bonusStatus === 'paid')
+        return 'Bonus bereits erhalten – hier nicht mehr einreichen.';
+      const above =
+        policy.worthUsingAbove === null
+          ? 'Das bleibt auch bei höheren Kosten so, weil die Obergrenze unter dem Bonus liegt.'
+          : `Einreichen lohnt sich erst, wenn mehr als ${euro(policy.worthUsingAbove)} weitere Kosten dazukommen.`;
+      return `Der Bonus ist mehr wert als die mögliche Erstattung. ${above}`;
+    }
+    case 'wait':
+      return `Hier ließen sich ${euro(policy.expectedReimbursement)} erstatten. Kommen aber noch Kosten dazu, lohnt sich ${mayTip.value} – dann erstattet diese Police nur den Rest. Deshalb erst einreichen, wenn das Jahr absehbar ist.`;
+    case 'exhausted':
+      return `Die Obergrenze von ${euro(policy.reimbursementCap)} ist erreicht – keine weiteren Rechnungen hier einreichen.`;
+    default:
+      break;
+  }
+  if (policy.contractKind === 'SUPPLEMENTARY') {
+    return 'Rechnungen hier einreichen, soweit die Vollversicherung sie nicht erstattet.';
   }
   if (policy.bonusStatus === 'at-stake') {
     const streak =
       policy.claimFreeStreak === null
         ? ''
         : ` Dafür endet die Serie von ${policy.claimFreeStreak} leistungsfreien Jahren.`;
-    return `Einreichen: die Erstattung übersteigt den Bonus.${streak}`;
+    return `Die Erstattung übersteigt den Bonus – alle Rechnungen hier einreichen.${streak}`;
   }
   if (policy.bonusStatus === 'forfeited') {
-    return 'Einreichen: der Bonus ist in diesem Jahr bereits verwirkt.';
+    return 'Der Bonus ist in diesem Jahr bereits verwirkt – alle Rechnungen hier einreichen.';
   }
-  return 'Einreichen: hier ist kein Bonus im Spiel.';
+  return 'Hier ist kein Bonus im Spiel – alle Rechnungen hier einreichen.';
 }
 
 const recommendation = computed(() => {
   const plan = props.plan;
   const best = plan?.strategies[0];
   if (!plan || !best || plan.policies.length === 0) return null;
-  const numbers = (uids: string[]) =>
-    uids
-      .map((uid) => plan.policies.find((p) => p.contractUID === uid)?.contractNumber)
-      .filter(Boolean)
-      .join(', ');
-  const used = numbers(best.usedContractUIDs);
-  const spared = numbers(best.sparedContractUIDs);
-  const parts = [used ? `bei ${used} einreichen` : 'nirgends einreichen'];
-  if (spared) parts.push(`${spared} schonen`);
+  const phrases: Array<[PlanPolicyDto['status'], string]> = [
+    ['submit', 'einreichen'],
+    ['wait', 'abwarten'],
+    ['spare', 'schonen'],
+    ['exhausted', 'ist erschöpft'],
+  ];
+  const parts = phrases
+    .map(([status, verb]) => {
+      const numbers = plan.policies
+        .filter((p) => p.status === status)
+        .map((p) => p.contractNumber)
+        .join(', ');
+      return numbers ? `${numbers} ${verb}` : '';
+    })
+    .filter(Boolean);
   return {
     text: parts.join(', '),
     total: best.total,
@@ -120,11 +161,8 @@ const recommendation = computed(() => {
     >
       <h4>
         {{ label(policy) }}
-        <EuBadge
-          :tone="policy.recommendation === 'use' ? 'submitted' : 'done'"
-          :icon="policy.recommendation === 'use' ? faPaperPlane : faPiggyBank"
-        >
-          {{ policy.recommendation === 'use' ? 'Einreichen' : 'Schonen' }}
+        <EuBadge :tone="STATUS_BADGE[policy.status].tone" :icon="STATUS_BADGE[policy.status].icon">
+          {{ STATUS_BADGE[policy.status].label }}
         </EuBadge>
       </h4>
       <dl class="eu-summary__grid">
@@ -149,10 +187,7 @@ const recommendation = computed(() => {
           <dd>{{ euro(policy.expectedReimbursement) }}</dd>
         </div>
       </dl>
-      <p
-        class="eu-summary__verdict"
-        :class="policy.recommendation === 'use' ? 'is-worth' : 'not-worth'"
-      >
+      <p class="eu-summary__verdict" :class="`tone-${STATUS_BADGE[policy.status].tone}`">
         {{ verdict(policy) }}
       </p>
     </div>
@@ -227,13 +262,23 @@ const recommendation = computed(() => {
   border-radius: 0.5rem;
 }
 
-.eu-summary__verdict.is-worth {
+.eu-summary__verdict.tone-done {
   background-color: var(--eu-color-status-done-bg);
   color: var(--eu-color-status-done-fg);
 }
 
-.eu-summary__verdict.not-worth {
-  background-color: var(--eu-color-status-submitted-bg);
-  color: var(--eu-color-status-submitted-fg);
+.eu-summary__verdict.tone-billed {
+  background-color: var(--eu-color-status-billed-bg);
+  color: var(--eu-color-status-billed-fg);
+}
+
+.eu-summary__verdict.tone-partial {
+  background-color: var(--eu-color-status-partial-bg);
+  color: var(--eu-color-status-partial-fg);
+}
+
+.eu-summary__verdict.tone-neutral {
+  border: 1px solid var(--eu-color-border);
+  color: var(--eu-color-text-muted);
 }
 </style>

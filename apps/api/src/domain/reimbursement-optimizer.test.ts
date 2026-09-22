@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   type InvoicePolicyState,
+  type OptimizerInput,
   type OptimizerInvoice,
   type OptimizerPolicy,
   type OptimizerResult,
@@ -67,6 +68,10 @@ const answered = (amount: number): InvoicePolicyState => ({
   actualReimbursement: amount,
 });
 
+// The example years are judged after the fact unless a test says otherwise.
+const run = (input: Omit<OptimizerInput, 'yearInProgress'> & { yearInProgress?: boolean }) =>
+  optimizeReimbursement({ yearInProgress: false, ...input });
+
 const best = (result: OptimizerResult) => {
   const [first] = result.strategies;
   assert.ok(first);
@@ -86,7 +91,7 @@ const totalFor = (result: OptimizerResult, used: string[]) => {
 };
 
 test('example year 1: 150 € → spare x, submit to y only (450 € vs 150 €)', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(300), zusatzY()],
     invoices: [invoice(150)],
   });
@@ -109,7 +114,7 @@ test('example year 1: 150 € → spare x, submit to y only (450 € vs 150 €)
 });
 
 test('example year 2: 640 € → spare x, submit to y only (650 € vs 640 €)', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(450), zusatzY()],
     invoices: [invoice(400), invoice(240)],
   });
@@ -127,7 +132,7 @@ test('example year 2: 640 € → spare x, submit to y only (650 € vs 640 €)
 });
 
 test('example year 3: 1000 € → submit to x, the rest to y (1000 € vs 800 €)', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [zusatzY(), pkvX(600)],
     invoices: [invoice(150), invoice(850)],
   });
@@ -153,18 +158,18 @@ test('example year 3: 1000 € → submit to x, the rest to y (1000 € vs 800 �
 });
 
 test('without a supplementary policy only the bonus is weighed against the reimbursement', () => {
-  const spare = optimizeReimbursement({ policies: [pkvX(300)], invoices: [invoice(450)] });
+  const spare = run({ policies: [pkvX(300)], invoices: [invoice(450)] });
   assert.deepEqual(best(spare).usedContractUIDs, []);
   assert.equal(best(spare).total, 300);
   assert.equal(policy(spare, 'x').worthUsingAbove, 50);
 
-  const use = optimizeReimbursement({ policies: [pkvX(300)], invoices: [invoice(900)] });
+  const use = run({ policies: [pkvX(300)], invoices: [invoice(900)] });
   assert.deepEqual(best(use).usedContractUIDs, ['x']);
   assert.equal(best(use).total, 700);
 });
 
 test('a cap below the bonus never makes using the policy worthwhile', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(300, { reimbursementCap: 250 })],
     invoices: [invoice(5000)],
   });
@@ -173,7 +178,7 @@ test('a cap below the bonus never makes using the policy worthwhile', () => {
 });
 
 test('an already forfeited bonus leaves no choice: the policy is used', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(0, { bonusMode: 'forfeited' }), zusatzY()],
     invoices: [invoice(150)],
   });
@@ -188,7 +193,7 @@ test('an already forfeited bonus leaves no choice: the policy is used', () => {
 });
 
 test('invoices excluded everywhere are not reimbursable and change nothing', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(300), zusatzY()],
     invoices: [invoice(800, { x: excluded, y: excluded })],
   });
@@ -198,7 +203,7 @@ test('invoices excluded everywhere are not reimbursable and change nothing', () 
 });
 
 test('an exclusion at x leaves the invoice fully to y', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(0, { bonusMode: 'forfeited' }), zusatzY()],
     invoices: [invoice(180, { x: excluded })],
   });
@@ -212,7 +217,7 @@ test('an exclusion at x leaves the invoice fully to y', () => {
 });
 
 test('a rate below 100 % scales the reimbursement above the deductible', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(0, { bonusMode: 'forfeited', reimbursementRate: 80 })],
     invoices: [invoice(1200)],
   });
@@ -220,7 +225,7 @@ test('a rate below 100 % scales the reimbursement above the deductible', () => {
 });
 
 test('recorded reimbursements are reality: they use up deductible and cap', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [
       pkvX(0, { bonusMode: 'forfeited', reimbursementCap: 1000 }),
       zusatzY({ reimbursementCap: 500 }),
@@ -252,7 +257,7 @@ test('recorded reimbursements are reality: they use up deductible and cap', () =
 });
 
 test('a pending submission at a policy that should be spared is to be withdrawn', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(300), zusatzY()],
     invoices: [invoice(150, { x: submitted })],
   });
@@ -265,7 +270,7 @@ test('a pending submission at a policy that should be spared is to be withdrawn'
 });
 
 test('a submission already at the right policy is done', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(300), zusatzY()],
     invoices: [invoice(150, { y: submitted })],
   });
@@ -277,7 +282,7 @@ test('a submission already at the right policy is done', () => {
 });
 
 test('a bonus already paid out fixes the policy as spared', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(450, { bonusMode: 'paid' }), zusatzY()],
     invoices: [invoice(5000)],
   });
@@ -288,7 +293,7 @@ test('a bonus already paid out fixes the policy as spared', () => {
 });
 
 test('invoices closed by hand get no further recommendation', () => {
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(0, { bonusMode: 'forfeited' }), zusatzY()],
     invoices: [invoice(300, { x: answered(100) }, { reimbursementClosed: true })],
   });
@@ -297,7 +302,7 @@ test('invoices closed by hand get no further recommendation', () => {
 });
 
 test('a tie spares the policy', () => {
-  const result = optimizeReimbursement({ policies: [pkvX(300)], invoices: [invoice(500)] });
+  const result = run({ policies: [pkvX(300)], invoices: [invoice(500)] });
   assert.equal(result.advantage, 0);
   assert.equal(policy(result, 'x').recommendation, 'spare');
   assert.equal(policy(result, 'x').worthUsingAbove, 0);
@@ -305,7 +310,7 @@ test('a tie spares the policy', () => {
 
 test('several choices are enumerated together', () => {
   const second = pkvX(100, { contractUID: 'z', contractNumber: 'Z-1' });
-  const result = optimizeReimbursement({
+  const result = run({
     policies: [pkvX(300), second],
     invoices: [invoice(450)],
   });
@@ -313,4 +318,68 @@ test('several choices are enumerated together', () => {
   // z (bonus 100) takes 250 € above its deductible; x keeps its 300 €.
   assert.deepEqual(best(result).usedContractUIDs, ['z']);
   assert.equal(best(result).total, 550);
+});
+
+test('status: during the year y waits while x may still tip, afterwards it is submitted', () => {
+  const during = run({
+    policies: [pkvX(300), zusatzY()],
+    invoices: [invoice(150)],
+    yearInProgress: true,
+  });
+  assert.equal(policy(during, 'x').status, 'spare');
+  assert.equal(policy(during, 'y').status, 'wait');
+  assert.equal(during.invoices[0]?.action, 'wait');
+  assert.deepEqual(
+    during.invoices[0]?.policies.map((p) => [p.action, p.reimbursement]),
+    [
+      ['none', 0],
+      ['wait', 150],
+    ],
+  );
+
+  const after = run({ policies: [pkvX(300), zusatzY()], invoices: [invoice(150)] });
+  assert.equal(policy(after, 'y').status, 'submit');
+  assert.equal(after.invoices[0]?.action, 'submit');
+});
+
+test('status: once x is used, both are submitted even during the year', () => {
+  const result = run({
+    policies: [pkvX(600), zusatzY()],
+    invoices: [invoice(1000)],
+    yearInProgress: true,
+  });
+  assert.equal(policy(result, 'x').status, 'submit');
+  assert.equal(policy(result, 'y').status, 'submit');
+});
+
+test('status: y does not wait when x can never tip (cap below the bonus)', () => {
+  const result = run({
+    policies: [pkvX(300, { reimbursementCap: 250 }), zusatzY()],
+    invoices: [invoice(150)],
+    yearInProgress: true,
+  });
+  assert.equal(policy(result, 'x').worthUsingAbove, null);
+  assert.equal(policy(result, 'y').status, 'submit');
+});
+
+test('status: y is exhausted once its cap is reached with nothing left to submit', () => {
+  const result = run({
+    policies: [pkvX(0, { bonusMode: 'forfeited' }), zusatzY()],
+    invoices: [invoice(400, { x: answered(200), y: answered(200) }), invoice(300)],
+    yearInProgress: true,
+  });
+  assert.equal(policy(result, 'y').status, 'exhausted');
+  assert.deepEqual(
+    result.invoices[1]?.policies.map((p) => [p.contractUID, p.action]),
+    [
+      ['x', 'submit'],
+      ['y', 'none'],
+    ],
+  );
+});
+
+test('status: a cap filled only by the model still asks to submit', () => {
+  const result = run({ policies: [pkvX(450), zusatzY()], invoices: [invoice(640)] });
+  assert.equal(policy(result, 'y').expectedReimbursement, 200);
+  assert.equal(policy(result, 'y').status, 'submit');
 });

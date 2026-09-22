@@ -102,6 +102,11 @@ export interface PlanPolicyDto {
   pendingClaims: number;
   tiersInherited: boolean;
   recommendation: 'use' | 'spare';
+  /**
+   * What to do now: spare it, submit, wait (a supplementary policy while a
+   * spared one before it may still tip) or exhausted (cap reached).
+   */
+  status: 'spare' | 'submit' | 'wait' | 'exhausted';
   actualReimbursement: number;
   expectedReimbursement: number;
   /** For a spared policy with a bonus at stake: further costs above which using it pays off. */
@@ -109,12 +114,12 @@ export interface PlanPolicyDto {
 }
 
 export type PlanInvoicePolicyAction =
-  'excluded' | 'answered' | 'submitted' | 'submit' | 'withdraw' | 'none';
+  'excluded' | 'answered' | 'submitted' | 'submit' | 'wait' | 'withdraw' | 'none';
 
 export interface PlanInvoiceDto {
   invoiceUID: string;
   invoiceNumber: string | null;
-  action: 'submit' | 'withdraw' | 'hold' | 'done' | 'not-reimbursable';
+  action: 'submit' | 'withdraw' | 'wait' | 'hold' | 'done' | 'not-reimbursable';
   policies: Array<{ contractUID: string; action: PlanInvoicePolicyAction; reimbursement: number }>;
 }
 

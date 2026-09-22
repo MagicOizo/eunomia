@@ -189,7 +189,11 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
     }));
     const invoiceNumbers = new Map(invoiceRows.map((row) => [row.invoiceUID, row.invoiceNumber]));
 
-    const result = optimizeReimbursement({ policies, invoices });
+    const result = optimizeReimbursement({
+      policies,
+      invoices,
+      yearInProgress: year >= currentYear,
+    });
     sendData(res, {
       accountUID,
       year,

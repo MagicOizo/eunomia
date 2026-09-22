@@ -484,6 +484,12 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - Bei Gleichstand gewinnt die Strategie, die mehr Policen schont.
 - Schwelle `worthUsingAbove` nur für geschonte Policen mit Bonus im Spiel: weitere Kosten (hypothetische, überall erstattungsfähige Rechnung), ab denen das Nutzen mit dem Schonen gleichzieht; `null`, wenn das nie passiert (z. B. Obergrenze < Bonus). Gesucht in 10-€-Schritten, dann per Bisektion auf den Cent.
 - Empfehlung je Rechnung und Police: `answered`, `submitted`, `submit`, `withdraw` (liegt ohne Abrechnung bei einer geschonten Police), `excluded`, `none`; daraus die Gesamtaktion `submit`/`withdraw`/`hold`/`done`/`not-reimbursable`. Eine genutzte Police wird auch unterhalb der SB empfohlen, weil die Rechnung dort auf die SB zählt; eine Zusatzversicherung mit ausgeschöpfter Obergrenze nicht mehr.
+- **Nachgeschärft nach Review des Autors:** Je Police ein Handlungs-Status statt nur „nutzen/schonen“:
+  - **Schonen**: Der Bonus ist (noch) mehr wert als das Einreichen.
+  - **Einreichen**: jetzt einreichen — bei der Vollversicherung alles, bei der Zusatzversicherung, was die Vollversicherung nicht erstattet.
+  - **Abwarten**: Zusatzversicherung im laufenden Jahr (oder später), solange eine vorgelagerte, geschonte Police durch weitere Kosten noch kippen kann (Schwelle ≠ `null`). Sonst würde sie jetzt Anteile zahlen, die später die Vollversicherung trägt.
+  - **Erschöpft**: Die Obergrenze der Zusatzversicherung ist erreicht und dort ist nichts mehr einzureichen. Wird die Obergrenze nur im Modell durch noch nicht eingereichte Rechnungen erreicht, bleibt es bei „Einreichen“.
+  - Je Rechnung gibt es dazu die Aktion `wait`. Abgeschlossene Jahre kennen kein „Abwarten“.
 
 ## Slice 20 — Übersicht & Empfehlungen
 **Ziel:** In der Rechnungsübersicht ist auf einen Blick klar, wo welche Rechnung eingereicht werden sollte.
