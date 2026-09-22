@@ -2,8 +2,7 @@
 import {
   faCalendarCheck,
   faCalendarDay,
-  faCircleCheck,
-  faCircleXmark,
+  faCoins,
   faEuroSign,
   faHashtag,
   faHouseMedical,
@@ -77,17 +76,7 @@ const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.
         <dd>{{ invoice.transferSubject }}</dd>
       </template>
 
-      <dt>
-        <EuIconLabel
-          :icon="invoice.directPayment === 1 ? faCircleCheck : faCircleXmark"
-          label="Barzahlung"
-          :color="
-            invoice.directPayment === 1
-              ? 'var(--eu-color-status-done-fg)'
-              : 'var(--eu-color-status-open-fg)'
-          "
-        />
-      </dt>
+      <dt><EuIconLabel :icon="faCoins" label="Barzahlung" /></dt>
       <dd>{{ invoice.directPayment === 1 ? 'Ja' : 'Nein' }}</dd>
     </dl>
   </EuPopover>
