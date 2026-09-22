@@ -76,6 +76,13 @@ async function logout(): Promise<void> {
   flex-direction: column;
   width: 15rem;
   flex-shrink: 0;
+  /* Pinned to the viewport height, so the logout stays in view however long
+     the main content gets; a menu taller than the window scrolls on its own. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
   padding: 1.5rem 1rem;
   color: var(--eu-color-text-inverse);
   background-color: var(--eu-color-sidebar-bg);
