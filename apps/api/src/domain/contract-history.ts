@@ -16,6 +16,7 @@ import {
   softDeleteRow,
   updateRow,
 } from '../crud/repository.js';
+import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { type ContractRow, loadAuthorizedContract } from './contract-access.js';
 
@@ -50,12 +51,28 @@ export const premiumSchema = z.object({
   note: z.string().trim().max(255).nullish(),
 });
 
+const bonusTier = z.object({
+  claimFreeYears: z.number().int().min(1).max(99),
+  bonusAmount: money,
+});
+
 export const termsSchema = z.object({
   validFromYear: z.number().int().min(1900).max(2999),
   deductible: money,
   reimbursementCap: money.nullish(),
   reimbursementRate: z.number().min(0).max(100).optional(),
+  /** The bonus scale of these terms; when given, it replaces the stored set. */
+  bonusTiers: z
+    .array(bonusTier)
+    .max(20)
+    .refine(
+      (tiers) => new Set(tiers.map((tier) => tier.claimFreeYears)).size === tiers.length,
+      'Each number of claim-free years may appear only once in the bonus scale',
+    )
+    .optional(),
 });
+
+export type BonusTierInput = z.infer<typeof bonusTier>;
 
 interface HistorySpec {
   /** URL segment under /contracts/:uid. */
@@ -68,6 +85,8 @@ interface HistorySpec {
   validityColumn: 'validFrom' | 'validFromYear';
   /** Rejects an entry whose validity key lies outside the contract's term. */
   assertWithinContract: (contract: ContractRow, validity: string | number) => void;
+  /** Stores data kept outside the entry's own row, in the same transaction. */
+  saveChildren?: (db: Queryable, entryUID: string, data: Record<string, unknown>) => Promise<void>;
 }
 
 const yearOf = (isoDate: string): number => Number(isoDate.slice(0, 4));
@@ -104,7 +123,26 @@ const termsSpec: HistorySpec = {
       throw badRequest('Terms cannot start after the year the contract ends');
     }
   },
+  saveChildren: async (db, termsUID, data) => {
+    const tiers = data.bonusTiers as BonusTierInput[] | undefined;
+    if (tiers !== undefined) await replaceBonusTiers(db, termsUID, tiers);
+  },
 };
+
+/** Replaces the bonus scale of a terms entry with the given tiers. */
+async function replaceBonusTiers(
+  db: Queryable,
+  termsUID: string,
+  tiers: BonusTierInput[],
+): Promise<void> {
+  await db.query('DELETE FROM ContractBonusTiers WHERE termsUID = ?', [termsUID]);
+  for (const tier of tiers) {
+    await db.query(
+      'INSERT INTO ContractBonusTiers (termsUID, claimFreeYears, bonusAmount) VALUES (?, ?, ?)',
+      [termsUID, tier.claimFreeYears, tier.bonusAmount],
+    );
+  }
+}
 
 /** Throws 409 when another active entry of the contract already uses this validity key. */
 async function assertValidityFree(
@@ -136,7 +174,9 @@ export async function insertHistoryEntry(
   const validity = data[spec.validityColumn] as string | number;
   spec.assertWithinContract(contract, validity);
   await assertValidityFree(db, spec, contract.contractUID, validity, null);
-  return insertRow(db, spec.table, { ...data, contractUID: contract.contractUID });
+  const entry = await insertRow(db, spec.table, { ...data, contractUID: contract.contractUID });
+  await spec.saveChildren?.(db, String(entry[spec.table.uidColumn]), data);
+  return entry;
 }
 
 function createHistoryRouter(pool: Pool, config: AppConfig, spec: HistorySpec): Router {
@@ -160,7 +200,10 @@ function createHistoryRouter(pool: Pool, config: AppConfig, spec: HistorySpec): 
       PERMISSIONS.MANAGE_CONTRACTS,
     );
     const data = spec.schema.parse(req.body);
-    sendData(res, await insertHistoryEntry(pool, spec.segment, contract, data), 201);
+    const entry = await withTransaction(pool, (conn) =>
+      insertHistoryEntry(conn, spec.segment, contract, data),
+    );
+    sendData(res, entry, 201);
   });
 
   router.patch(`${base}/:entryUID`, requireAuth, async (req, res) => {
@@ -178,8 +221,12 @@ function createHistoryRouter(pool: Pool, config: AppConfig, spec: HistorySpec): 
     spec.assertWithinContract(contract, validity);
     await assertValidityFree(pool, spec, contract.contractUID, validity, entryUID);
     // The schema has no contractUID, so an entry can never move between contracts.
-    const updated = await updateRow(pool, spec.table, entryUID, data);
-    if (!updated) throw notFound(spec.label);
+    const updated = await withTransaction(pool, async (conn) => {
+      const row = await updateRow(conn, spec.table, entryUID, data);
+      if (!row) throw notFound(spec.label);
+      await spec.saveChildren?.(conn, entryUID, data);
+      return row;
+    });
     sendData(res, updated);
   });
 
@@ -237,17 +284,34 @@ export async function listPremiumsWithValidity(
   });
 }
 
-/** Lists a contract's active terms, oldest first, each with a derived `validToYear`. */
+/**
+ * Lists a contract's active terms, oldest first, each with a derived
+ * `validToYear` and its bonus scale (tiers ordered by claim-free years).
+ */
 export async function listTermsWithValidity(db: Queryable, contract: ContractRow): Promise<Row[]> {
   const rows = await db.query<Row[]>(
     `SELECT termsUID, validFromYear, deductible, reimbursementCap, reimbursementRate FROM ContractTerms
       WHERE contractUID = ? AND termsStatus <> -1 ORDER BY validFromYear`,
     [contract.contractUID],
   );
+  const tiers = await db.query<Array<BonusTierInput & { termsUID: string }>>(
+    `SELECT b.termsUID, b.claimFreeYears, b.bonusAmount
+       FROM ContractBonusTiers b
+       JOIN ContractTerms t ON t.termsUID = b.termsUID
+      WHERE t.contractUID = ? AND t.termsStatus <> -1
+      ORDER BY b.claimFreeYears`,
+    [contract.contractUID],
+  );
   const endYear = contract.contractEnd === null ? null : yearOf(contract.contractEnd);
   return rows.map((row, index) => {
     const next = rows[index + 1];
-    return { ...row, validToYear: next ? Number(next.validFromYear) - 1 : endYear };
+    return {
+      ...row,
+      validToYear: next ? Number(next.validFromYear) - 1 : endYear,
+      bonusTiers: tiers
+        .filter((tier) => tier.termsUID === row.termsUID)
+        .map(({ claimFreeYears, bonusAmount }) => ({ claimFreeYears, bonusAmount })),
+    };
   });
 }
 

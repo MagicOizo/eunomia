@@ -161,6 +161,13 @@ of the same submission, and all refunds of an invoice together never exceed its 
 `GET /api/v1/contracts/:uid/reimbursement-analysis?year=YYYY` runs the deductible/bonus/cap
 calculation and reports whether submitting is worthwhile.
 
+**Bonus & claim-free years** (per policy, `VIEW_CONTRACTS` / `MANAGE_CONTRACTS`): a policy's
+yearly terms (`POST/PATCH /api/v1/contracts/:uid/terms`) carry its bonus scale (`bonusTiers`:
+claim-free years → absolute amount). `GET /api/v1/contracts/:uid` returns the computed `years`:
+claim-free streak and expected bonus per year, counted from the policy's start value, its forfeit
+rule and each billing's `forfeitsBonus`. `PUT /api/v1/contracts/:uid/years/:year` records the
+bonus actually paid and an optional "forfeited" override.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

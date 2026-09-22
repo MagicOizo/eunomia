@@ -115,6 +115,7 @@ interface InvoiceSubmissionRow {
   contractUID: string;
   contractNumber: string;
   companyName: string;
+  bonusForfeitRule: string;
   submittedDate: string;
   billingCount: number;
   allocationCount: number;
@@ -180,7 +181,7 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
   const submissions = byInvoice(
     await db.query<InvoiceSubmissionRow[]>(
       `SELECT si.invoiceUID, s.submissionUID, s.contractUID, c.contractNumber, v.companyName,
-              s.submittedDate,
+              c.bonusForfeitRule, s.submittedDate,
               COUNT(DISTINCT b.billingID) AS billingCount,
               COUNT(a.allocationID) AS allocationCount,
               COALESCE(SUM(a.reimbursement), 0) AS reimbursed
@@ -230,6 +231,7 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
         contractUID: s.contractUID,
         contractNumber: s.contractNumber,
         companyName: s.companyName,
+        bonusForfeitRule: s.bonusForfeitRule,
         submittedDate: s.submittedDate,
         billingCount: s.billingCount,
         reimbursed: s.reimbursed,

@@ -12,6 +12,8 @@ const EXPECTED_TABLES = [
   'Contracts',
   'ContractPremiums',
   'ContractTerms',
+  'ContractBonusTiers',
+  'ContractYears',
   'Facilities',
   'CollectionAgencies',
   'Submissions',
@@ -261,6 +263,60 @@ test('migration 007 moves submissions into SubmissionInvoices and back', async (
     assert.equal((await links()).length, 1);
   } finally {
     await cleanup().catch(() => undefined);
+    await pool.end();
+  }
+});
+
+test('migration 008 adds the bonus scale, the year records and the billing flag, and back', async (t) => {
+  const config = databaseConfigFromEnv();
+  if (!config) {
+    t.skip('no database configured (DB_* env vars unset)');
+    return;
+  }
+  const pool = createPool(config);
+  try {
+    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
+  } catch {
+    await pool.end();
+    t.skip('database not reachable');
+    return;
+  }
+
+  const schema = async (): Promise<{ tables: string[]; hasFlag: boolean }> => {
+    const tables = await pool.query<Array<{ name: string }>>(
+      `SELECT table_name AS name FROM information_schema.tables
+        WHERE table_schema = DATABASE() AND table_name IN ('ContractBonusTiers', 'ContractYears')
+        ORDER BY table_name`,
+    );
+    const flag = await pool.query<Array<{ n: number }>>(
+      `SELECT COUNT(*) AS n FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'ServiceBillings'
+          AND column_name = 'forfeitsBonus'`,
+    );
+    return { tables: tables.map((row) => row.name), hasFlag: Number(flag[0]?.n) === 1 };
+  };
+
+  try {
+    await runMigrations(pool);
+    const migrator = createMigrator(pool);
+    const name008 = (await migrator.executed())
+      .map((m) => m.name)
+      .find((n) => n.startsWith('008-'));
+    assert.ok(name008, 'migration 008 should be recorded');
+    assert.deepEqual(await schema(), {
+      tables: ['ContractBonusTiers', 'ContractYears'],
+      hasFlag: true,
+    });
+
+    await migrator.down({ to: name008 });
+    assert.deepEqual(await schema(), { tables: [], hasFlag: false });
+
+    await migrator.up();
+    assert.deepEqual(await schema(), {
+      tables: ['ContractBonusTiers', 'ContractYears'],
+      hasFlag: true,
+    });
+  } finally {
     await pool.end();
   }
 });

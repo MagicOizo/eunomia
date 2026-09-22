@@ -7,7 +7,7 @@ import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
-import { type CrudTable, getRow, insertRow, updateRow } from '../crud/repository.js';
+import { type CrudTable, type Row, getRow, insertRow, updateRow } from '../crud/repository.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import {
@@ -27,6 +27,7 @@ const table: CrudTable = {
     'billingDate',
     'billingNumber',
     'documentLink',
+    'forfeitsBonus',
     'objectionDate',
     'objectionResolvedDate',
     'objectionNote',
@@ -38,6 +39,13 @@ const base = z.object({
   billingDate: z.string().date(),
   billingNumber: z.string().trim().min(1).max(50),
   documentLink: z.string().trim().url().max(255).nullish(),
+  // Whether this billing forfeits the policy's bonus for the treatment year
+  // (see bonus-timeline.ts); null follows the policy's bonusForfeitRule.
+  forfeitsBonus: z
+    .boolean()
+    .nullable()
+    .transform((value) => (value === null ? null : Number(value)))
+    .optional(),
 });
 
 // Objection ("Widerspruch") fields are only ever set after creation, via PATCH.
@@ -50,6 +58,12 @@ const objection = z.object({
 // A billing stays with its submission; its own fields plus the objection state
 // are editable.
 const updateSchema = base.omit({ submissionUID: true }).extend(objection.shape).partial();
+
+/** Exposes the TINYINT(1) forfeit flag as boolean | null. */
+function toBillingDto(row: Row | null): Row | null {
+  if (row === null) return null;
+  return { ...row, forfeitsBonus: row.forfeitsBonus === null ? null : Boolean(row.forfeitsBonus) };
+}
 
 /** Router for service billings (Leistungsabrechnungen), attached to a submission. */
 export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Router {
@@ -89,10 +103,10 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
       }
     }
 
-    const rows = await pool.query(
+    const rows = await pool.query<Row[]>(
       `SELECT b.billingUID, b.submissionUID, b.billingDate, b.billingNumber, b.documentLink,
-              b.objectionDate, b.objectionResolvedDate, b.objectionNote, b.billingStatus,
-              c.accountUID, c.contractUID, c.contractNumber,
+              b.forfeitsBonus, b.objectionDate, b.objectionResolvedDate, b.objectionNote, b.billingStatus,
+              c.accountUID, c.contractUID, c.contractNumber, c.bonusForfeitRule,
               CONCAT_WS(' ', acc.firstname, acc.surname) AS personName,
               COALESCE(SUM(al.reimbursement), 0) AS reimbursedTotal,
               COUNT(al.allocationID) AS invoiceCount,
@@ -108,7 +122,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
         ORDER BY b.billingDate DESC, b.billingUID`,
       params,
     );
-    sendData(res, rows);
+    sendData(res, rows.map(toBillingDto));
   });
 
   router.get('/:uid', requireAuth, async (req, res) => {
@@ -117,7 +131,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const account = await accountForBilling(pool, uid);
     if (account === null) throw notFound('Service billing');
     await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
-    sendData(res, await getRow(pool, table, uid));
+    sendData(res, toBillingDto(await getRow(pool, table, uid)));
   });
 
   router.post('/', requireAuth, async (req, res) => {
@@ -126,7 +140,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const account = await accountForSubmission(pool, data.submissionUID);
     if (account === null) throw notFound('Submission');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
-    sendData(res, await insertRow(pool, table, data), 201);
+    sendData(res, toBillingDto(await insertRow(pool, table, data)), 201);
   });
 
   router.patch('/:uid', requireAuth, async (req, res) => {
@@ -136,7 +150,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     if (account === null) throw notFound('Service billing');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
     const updated = await updateRow(pool, table, uid, updateSchema.parse(req.body));
-    sendData(res, updated);
+    sendData(res, toBillingDto(updated));
   });
 
   router.delete('/:uid', requireAuth, async (req, res) => {

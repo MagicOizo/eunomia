@@ -452,6 +452,18 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 
 **DoD:** Für eine Police mit Startwert und mehreren Jahren stimmt die gezählte Serie; ein Jahr mit Erstattung setzt sie zurück; eine erfasste tatsächliche Rückerstattung überschreibt die Prognose.
 
+**Entscheidungen (Planmodus):**
+- Beim Erfassen der Erstattung ein **Schalter „Diese Abrechnung verwirkt den Bonus“**, vorbelegt aus der Regel der Police (und bei „erst durch Erstattung“ aus dem Betrag > 0). Gespeichert wird immer ein fester Wert; `NULL` bleibt nur für Abrechnungen ohne diese Abfrage und folgt der Regel.
+- Die Jahres-Zusammenfassung der Rechnungsübersicht bleibt bis Slice 19 unverändert (`bonusPending`).
+
+**Umgesetzt (2026-09-22).** Entscheidungen beim Bau:
+- Migration `008-bonus-scale`: `ContractBonusTiers` (PK `termsUID` + Jahre, als Menge ersetzt, ohne UID/Status), `ContractYears` (PK Police + Jahr, hart gelöscht, sobald alle Felder leer sind), `ServiceBillings.forfeitsBonus` (nullable).
+- Reine Funktion `domain/bonus-timeline.ts`. Regeln: Jede Erstattung einer Rechnung wird einzeln bewertet (`forfeitsBonus` der Abrechnung, sonst die Regel; bei „erst durch Erstattung“ verwirkt eine 0-€-Erstattung nicht). Eine eingereichte Rechnung ohne Erstattung verwirkt bei „schon durch Einreichen“ sofort, sonst zählt sie als „in Gefahr“. Der Override je Jahr schlägt alles. Die Serie **schließt das Jahr selbst ein** (erstes leistungsfreies Jahr → Stufe „1 Jahr“), über der obersten Stufe gilt deren Betrag. Gezählt wird ab dem Zählbeginn bis zum laufenden Jahr bzw. Vertragsende; ein angebrochenes erstes Jahr lässt man über den Zählbeginn aus.
+- Die Staffel hängt an den Konditionen (`bonusTiers` in POST/PATCH `…/terms`, in einer Transaktion). „Vom Vorjahr übernehmen“: Neue Konditionen starten als Kopie der geltenden (inkl. Staffel). Aus dem Jahresverlauf lassen sie sich für ein Jahr mit geerbter Staffel direkt anlegen.
+- „Nicht aktualisiert“ erscheint nur, solange die Prognose zählt: nicht bei verwirkten Jahren und nicht, wenn die tatsächliche Rückerstattung erfasst ist.
+- Der Jahresverlauf ist Teil von `GET /contracts/:uid` (`years`); `PUT/DELETE /contracts/:uid/years/:year` speichert tatsächliche Rückerstattung, Override und Notiz.
+- Schalter in „Abrechnung zuordnen“ (bei einer bestehenden Abrechnung zählt deren bisherige Erstattung mit, und ein gespeichertes „nein“ wird bei „erst durch Erstattung“ und Betrag > 0 als „ja“ vorgeschlagen), „Neue Leistungsabrechnung“ und „Abrechnung bearbeiten“.
+
 ## Slice 19 — Erstattungs-Optimierer
 **Ziel:** Berechnung "wo lohnt sich Einreichen?" über alle Policen eines Versicherten.
 - Reiner Service nach 2.3 (Strategie-Enumeration, Vollversicherung vor Zusatz, Rest-Logik, Ausschlüsse, verwirkte Boni), ausführlich dokumentiert (2.8).

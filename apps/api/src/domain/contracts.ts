@@ -17,6 +17,7 @@ import {
   listPremiumsWithValidity,
   listTermsWithValidity,
 } from './contract-history.js';
+import { loadBonusTimeline } from './contract-years.js';
 
 const money = z.number().min(0).max(999999.99);
 
@@ -74,8 +75,9 @@ const LIST_SELECT = `
  * CRUD router for policies (Policen). A contract is scoped to its owning
  * account, so every check resolves the permission against that account's UID:
  * on create it comes from the request body, on the single-resource routes it
- * comes from the stored contract. Premiums and terms have their own routes
- * (see contract-history.ts); the detail route embeds both.
+ * comes from the stored contract. Premiums, terms and year records have their
+ * own routes (see contract-history.ts, contract-years.ts); the detail route
+ * embeds the premiums, the terms and the computed bonus timeline.
  */
 export function createContractsRouter(pool: Pool, config: AppConfig): Router {
   const router = Router();
@@ -114,6 +116,7 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
       ...contract,
       premiums: await listPremiumsWithValidity(pool, contract),
       terms: await listTermsWithValidity(pool, contract),
+      years: await loadBonusTimeline(pool, contract),
     });
   });
 

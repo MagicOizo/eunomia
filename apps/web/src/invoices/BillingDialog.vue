@@ -6,8 +6,11 @@ import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import { type BillingDto, type InvoiceDto, listBillings } from './api';
+import EuToggle from '../design-system/components/EuToggle.vue';
+import { BONUS_FORFEIT_RULE_LABEL, forfeitsByRule } from '../contracts/api';
+import { type BillingListDto, type InvoiceDto, listBillings } from './api';
 import { unbilledSubmissions } from './eligibility';
+import { usePresetToggle } from './forfeit-toggle';
 import { euro, germanDate } from '../lib/format';
 
 const props = defineProps<{
@@ -26,12 +29,14 @@ const emit = defineEmits<{
       newBilling?: { billingDate: string; billingNumber: string };
       reimbursement: number;
       receiptNumber?: string;
+      /** For a new billing always set; for an existing one only when it changes. */
+      forfeitsBonus?: boolean;
     },
   ];
 }>();
 
 const submissionUID = ref('');
-const existingBillings = ref<BillingDto[]>([]);
+const existingBillings = ref<BillingListDto[]>([]);
 const mode = ref<'new' | 'existing'>('new');
 const selectedBilling = ref('');
 const billingDate = ref('');
@@ -58,6 +63,34 @@ const submissionOptions = computed(() =>
   })),
 );
 
+const selectedSubmission = computed(() =>
+  props.invoice?.submissions.find((s) => s.submissionUID === submissionUID.value),
+);
+const chosenBilling = computed(() =>
+  mode.value === 'existing'
+    ? existingBillings.value.find((b) => b.billingUID === selectedBilling.value)
+    : undefined,
+);
+const storedForfeit = computed(() => chosenBilling.value?.forfeitsBonus ?? null);
+
+/**
+ * Preset of the toggle. An existing billing keeps its stored choice, except
+ * that under "erst durch Erstattung" a reimbursement > 0 turns a stored "no"
+ * into a suggested "yes" — that "no" usually just came from a 0 € first entry.
+ */
+const forfeit = usePresetToggle(() => {
+  const rule = selectedSubmission.value?.bonusForfeitRule ?? 'ON_REIMBURSEMENT';
+  // What the billing already reimbursed counts as much as the new amount.
+  const total = (chosenBilling.value?.reimbursedTotal ?? 0) + (reimbursement.value ?? 0);
+  const byRule = forfeitsByRule(rule, total);
+  const stored = storedForfeit.value;
+  if (stored === null) return byRule;
+  return stored || (rule === 'ON_REIMBURSEMENT' && byRule);
+});
+
+// Another billing or policy means another stored choice: drop the user's flip.
+watch([mode, selectedBilling, submissionUID], () => forfeit.reset());
+
 async function loadBillings(): Promise<void> {
   mode.value = 'new';
   selectedBilling.value = '';
@@ -82,6 +115,7 @@ watch(
     submissionUID.value =
       waiting[0]?.submissionUID ?? props.invoice.submissions[0]?.submissionUID ?? '';
     await loadBillings();
+    forfeit.reset();
   },
   { immediate: true },
 );
@@ -121,7 +155,12 @@ function submit(): void {
       localError.value = 'Bitte eine Abrechnung wählen.';
       return;
     }
-    emit('submit', { billingUID: selectedBilling.value, ...common });
+    const changed = forfeit.value.value !== storedForfeit.value;
+    emit('submit', {
+      billingUID: selectedBilling.value,
+      ...common,
+      ...(changed ? { forfeitsBonus: forfeit.value.value } : {}),
+    });
     return;
   }
 
@@ -132,6 +171,7 @@ function submit(): void {
   emit('submit', {
     newBilling: { billingDate: billingDate.value, billingNumber: billingNumber.value.trim() },
     ...common,
+    forfeitsBonus: forfeit.value.value,
   });
 }
 </script>
@@ -180,6 +220,17 @@ function submit(): void {
 
       <EuCurrencyField v-model="reimbursement" label="Erstattungsbetrag" />
       <EuTextField v-model="receiptNumber" label="Belegnummer" />
+      <div>
+        <EuToggle
+          :model-value="forfeit.value.value"
+          label="Diese Abrechnung verwirkt den Bonus"
+          @update:model-value="forfeit.set"
+        />
+        <p v-if="selectedSubmission" class="eu-form__hint">
+          Regel der Police: Bonus verfällt
+          {{ BONUS_FORFEIT_RULE_LABEL[selectedSubmission.bonusForfeitRule] }}.
+        </p>
+      </div>
       <p v-if="error ?? localError" class="eu-form__error" role="alert">
         {{ error ?? localError }}
       </p>
@@ -205,6 +256,13 @@ function submit(): void {
   margin: 0;
   color: var(--eu-color-text-muted);
   font-family: var(--eu-font-data);
+}
+
+.eu-form__hint {
+  margin: 0.35rem 0 0;
+  color: var(--eu-color-text-muted);
+  font-family: var(--eu-font-data);
+  font-size: 0.85rem;
 }
 
 .eu-form__modes {

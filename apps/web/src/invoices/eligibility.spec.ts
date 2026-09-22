@@ -22,6 +22,7 @@ function submission(
     contractUID,
     contractNumber: contractUID,
     companyName: 'AG',
+    bonusForfeitRule: 'ON_REIMBURSEMENT',
     submittedDate: '2024-06-01',
     billingCount: status === 'abgerechnet' ? 1 : 0,
     reimbursed: 0,

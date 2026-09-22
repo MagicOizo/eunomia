@@ -48,6 +48,8 @@ function testConfig(database: DatabaseConfig): AppConfig {
 
 async function resetData(pool: Pool): Promise<void> {
   await pool.query('DELETE FROM ContractPremiums');
+  await pool.query('DELETE FROM ContractBonusTiers');
+  await pool.query('DELETE FROM ContractYears');
   await pool.query('DELETE FROM ContractTerms');
   await pool.query('DELETE FROM Contracts');
   await pool.query('DELETE FROM CollectionAgencies');

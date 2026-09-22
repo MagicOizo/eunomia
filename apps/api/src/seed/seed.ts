@@ -141,6 +141,39 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     reimbursementCap: 5000.0,
   });
 
+  // Bonus scale per insurance year: the 2020 terms carry the original scale,
+  // the 2025 terms a raised one; 2026 inherits it ("nicht aktualisiert").
+  const tiers: Array<[termsIndex: number, claimFreeYears: number, bonusAmount: number]> = [
+    [0, 1, 300],
+    [0, 2, 450],
+    [0, 4, 600],
+    [1, 1, 320],
+    [1, 2, 480],
+    [1, 4, 640],
+  ];
+  for (const [termsIndex, claimFreeYears, bonusAmount] of tiers) {
+    await seedRow(pool, 'ContractBonusTiers', {
+      termsUID: seedId('contractTerms', termsIndex),
+      claimFreeYears,
+      bonusAmount,
+    });
+  }
+  // The insurer's letters: what was actually paid back for 2022 and 2023.
+  await seedRow(pool, 'ContractYears', {
+    contractUID: ids.contractAnna,
+    year: 2022,
+    actualBonus: 600,
+    bonusForfeited: null,
+    note: null,
+  });
+  await seedRow(pool, 'ContractYears', {
+    contractUID: ids.contractAnna,
+    year: 2023,
+    actualBonus: 585.5,
+    bonusForfeited: null,
+    note: 'Schreiben vom 12.06.2024',
+  });
+
   // Anna's supplementary policy: no deductible, reimburses up to 200 € a year.
   await seedRow(pool, 'Contracts', {
     contractUID: ids.contractAnnaSupplementary,
@@ -284,6 +317,7 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     submissionUID: ids.submission,
     billingDate: '2024-04-01',
     billingNumber: 'LA-2024-500',
+    forfeitsBonus: 1,
   });
 
   await seedRow(pool, 'Allocations', {

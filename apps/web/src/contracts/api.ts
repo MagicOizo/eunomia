@@ -28,6 +28,12 @@ export interface PremiumDto {
   note: string | null;
 }
 
+/** One step of a bonus scale: from this many claim-free years on, this bonus in €. */
+export interface BonusTierDto {
+  claimFreeYears: number;
+  bonusAmount: number;
+}
+
 /** Terms (Konditionen) valid from a year; `validToYear` is derived by the API. */
 export interface TermsDto {
   termsUID: string;
@@ -36,6 +42,34 @@ export interface TermsDto {
   deductible: number;
   reimbursementCap: number | null;
   reimbursementRate: number;
+  bonusTiers: BonusTierDto[];
+}
+
+/** One year of the computed bonus timeline (see api domain/bonus-timeline.ts). */
+export interface BonusYearDto {
+  year: number;
+  forfeited: boolean;
+  forfeitSource: 'override' | 'claims' | null;
+  /** Claims without a reimbursement yet that would forfeit the bonus once one arrives. */
+  pendingClaims: number;
+  claimFreeStreak: number;
+  /** 0 if forfeited, null while no terms exist for the year. */
+  expectedBonus: number | null;
+  hasBonusScale: boolean;
+  termsFromYear: number | null;
+  /** The scale was taken over from an earlier year ("nicht aktualisiert"). */
+  tiersInherited: boolean;
+  actualBonus: number | null;
+  bonusForfeitedOverride: boolean | null;
+  note: string | null;
+  inProgress: boolean;
+}
+
+/** What the author records for a year: the paid bonus, a forfeit override, a note. */
+export interface ContractYearInput {
+  actualBonus: number | null;
+  bonusForfeited: boolean | null;
+  note: string | null;
 }
 
 export interface ContractDetailDto {
@@ -51,12 +85,13 @@ export interface ContractDetailDto {
   claimFreeCountingFromYear: number | null;
   premiums: PremiumDto[];
   terms: TermsDto[];
+  years: BonusYearDto[];
 }
 
 export type PremiumInput = Pick<PremiumDto, 'validFrom' | 'monthlyPremium' | 'note'>;
 export type TermsInput = Pick<
   TermsDto,
-  'validFromYear' | 'deductible' | 'reimbursementCap' | 'reimbursementRate'
+  'validFromYear' | 'deductible' | 'reimbursementCap' | 'reimbursementRate' | 'bonusTiers'
 >;
 
 const unwrap = <T>(res: { data: T }): T => res.data;
@@ -89,4 +124,21 @@ export async function deleteHistoryEntry(
   entryUID: string,
 ): Promise<void> {
   await apiFetch(`/contracts/${contractUID}/${segment}/${entryUID}`, { method: 'DELETE' });
+}
+
+/** Stores the year record; an all-empty record removes it again. */
+export async function saveContractYear(
+  contractUID: string,
+  year: number,
+  body: ContractYearInput,
+): Promise<void> {
+  await apiFetch(`/contracts/${contractUID}/years/${year}`, { method: 'PUT', body });
+}
+
+/**
+ * Whether a billing forfeits the bonus by the policy's rule alone — the preset
+ * of the "Verwirkt den Bonus" toggle when a reimbursement is recorded.
+ */
+export function forfeitsByRule(rule: BonusForfeitRule, reimbursement: number): boolean {
+  return rule === 'ON_SUBMISSION' || Math.round(reimbursement * 100) > 0;
 }

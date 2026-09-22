@@ -1,3 +1,4 @@
+import type { BonusForfeitRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
 import type { SubmissionStatus, WorkflowStatus } from './status';
 
@@ -7,6 +8,8 @@ export interface InvoiceSubmissionDto {
   contractUID: string;
   contractNumber: string;
   companyName: string;
+  /** The policy's rule; presets the "Verwirkt den Bonus" toggle when billing. */
+  bonusForfeitRule: BonusForfeitRule;
   submittedDate: string;
   /** Active service billings of the submission; withdrawing is only possible at 0. */
   billingCount: number;
@@ -56,6 +59,8 @@ export interface BillingDto {
   billingDate: string;
   billingNumber: string;
   documentLink: string | null;
+  /** Whether the billing forfeits the policy's bonus; null follows the policy's rule. */
+  forfeitsBonus: boolean | null;
   /** Objection ("Widerspruch") tracking; objectionDate set + resolved unset = open. */
   objectionDate: string | null;
   objectionResolvedDate: string | null;
@@ -68,6 +73,7 @@ export interface BillingListDto extends BillingDto {
   contractUID: string;
   personName: string;
   contractNumber: string;
+  bonusForfeitRule: BonusForfeitRule;
   /** Sum of the allocations booked against this billing. */
   reimbursedTotal: number;
   invoiceCount: number;
@@ -173,8 +179,10 @@ export async function removeExclusion(invoiceUID: string, contractUID: string): 
   await apiFetch(`/invoices/${invoiceUID}/exclusions/${contractUID}`, { method: 'DELETE' });
 }
 
-export async function listBillings(submissionUID: string): Promise<BillingDto[]> {
-  return unwrap(await apiFetch<{ data: BillingDto[] }>(`/billings?submissionUID=${submissionUID}`));
+export async function listBillings(submissionUID: string): Promise<BillingListDto[]> {
+  return unwrap(
+    await apiFetch<{ data: BillingListDto[] }>(`/billings?submissionUID=${submissionUID}`),
+  );
 }
 
 /** Enriched service billings for one contract (Leistungsabrechnungen list). */
@@ -187,6 +195,7 @@ export async function createBilling(body: {
   billingDate: string;
   billingNumber: string;
   documentLink?: string | null;
+  forfeitsBonus?: boolean;
 }): Promise<BillingDto> {
   return unwrap(await apiFetch<{ data: BillingDto }>('/billings', { method: 'POST', body }));
 }
@@ -198,6 +207,7 @@ export async function updateBilling(
     billingNumber?: string;
     billingDate?: string;
     documentLink?: string | null;
+    forfeitsBonus?: boolean;
     objectionDate?: string | null;
     objectionResolvedDate?: string | null;
     objectionNote?: string | null;

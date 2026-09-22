@@ -5,6 +5,8 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import EuToggle from '../design-system/components/EuToggle.vue';
+import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from '../contracts/api';
 import { euro, germanDate } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
@@ -16,8 +18,14 @@ import {
   listAccountInvoices,
   listSubmissions,
 } from './api';
+import { usePresetToggle } from './forfeit-toggle';
 
-const props = defineProps<{ open: boolean; contractUID: string; accountUID: string }>();
+const props = defineProps<{
+  open: boolean;
+  contractUID: string;
+  accountUID: string;
+  bonusForfeitRule: BonusForfeitRule;
+}>();
 const emit = defineEmits<{ close: []; created: [] }>();
 
 const submissions = ref<SubmissionDto[]>([]);
@@ -45,6 +53,14 @@ const submissionInvoices = computed(() => {
   return invoices.value.filter((i) => members.has(i.invoiceUID));
 });
 
+const reimbursedSum = computed(() =>
+  submissionInvoices.value.reduce((sum, inv) => {
+    const amount = Number(reimbursements[inv.invoiceUID]);
+    return Number.isFinite(amount) && amount > 0 ? sum + amount : sum;
+  }, 0),
+);
+const forfeit = usePresetToggle(() => forfeitsByRule(props.bonusForfeitRule, reimbursedSum.value));
+
 watch(
   () => props.open,
   async (open) => {
@@ -54,6 +70,7 @@ watch(
     billingNumber.value = '';
     billingDate.value = new Date().toISOString().slice(0, 10);
     documentLink.value = '';
+    forfeit.reset();
     loading.value = true;
     try {
       const [subs, invs] = await Promise.all([
@@ -100,6 +117,7 @@ function save(): void {
         billingDate: billingDate.value,
         billingNumber: billingNumber.value.trim(),
         documentLink: documentLink.value.trim() ? documentLink.value.trim() : null,
+        forfeitsBonus: forfeit.value.value,
       });
       for (const a of allocations) {
         await createAllocation({
@@ -164,6 +182,16 @@ function save(): void {
             />
           </div>
         </fieldset>
+        <div>
+          <EuToggle
+            :model-value="forfeit.value.value"
+            label="Diese Abrechnung verwirkt den Bonus"
+            @update:model-value="forfeit.set"
+          />
+          <p class="eu-form__hint">
+            Regel der Police: Bonus verfällt {{ BONUS_FORFEIT_RULE_LABEL[bonusForfeitRule] }}.
+          </p>
+        </div>
       </template>
 
       <p v-if="error" class="eu-form__error" role="alert">{{ error }}</p>
@@ -189,6 +217,13 @@ function save(): void {
   margin: 0;
   color: var(--eu-color-text-muted);
   font-family: var(--eu-font-data);
+}
+
+.eu-form__hint {
+  margin: 0.35rem 0 0;
+  color: var(--eu-color-text-muted);
+  font-family: var(--eu-font-data);
+  font-size: 0.85rem;
 }
 
 .eu-form__error {

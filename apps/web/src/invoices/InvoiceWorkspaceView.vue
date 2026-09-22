@@ -36,6 +36,7 @@ import {
   listInvoiceYears,
   listInvoices,
   reimbursementAnalysis,
+  updateBilling,
   updateInvoice,
 } from './api';
 import BillingDialog from './BillingDialog.vue';
@@ -349,6 +350,7 @@ function submitBilling(payload: {
   newBilling?: { billingDate: string; billingNumber: string };
   reimbursement: number;
   receiptNumber?: string;
+  forfeitsBonus?: boolean;
 }): void {
   const invoice = dialogInvoice.value;
   if (!invoice) return;
@@ -359,6 +361,7 @@ function submitBilling(payload: {
         const billing = await createBilling({
           submissionUID: payload.submissionUID,
           ...payload.newBilling,
+          ...(payload.forfeitsBonus !== undefined ? { forfeitsBonus: payload.forfeitsBonus } : {}),
         });
         billingUID = billing.billingUID;
       }
@@ -368,6 +371,10 @@ function submitBilling(payload: {
         reimbursement: payload.reimbursement,
         ...(payload.receiptNumber ? { receiptNumber: payload.receiptNumber } : {}),
       });
+      // Only once the reimbursement is booked, so a rejected one changes nothing.
+      if (payload.billingUID && payload.forfeitsBonus !== undefined) {
+        await updateBilling(payload.billingUID, { forfeitsBonus: payload.forfeitsBonus });
+      }
     },
     () => (billingOpen.value = false),
     `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${euro(invoice.remainingAmount)}).`,

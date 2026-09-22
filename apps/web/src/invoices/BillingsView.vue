@@ -15,6 +15,8 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import EuToggle from '../design-system/components/EuToggle.vue';
+import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
 import { euro, germanDate } from '../lib/format';
 import { HttpError } from '../lib/http';
@@ -27,6 +29,7 @@ const props = defineProps<{ contractUID: string }>();
 const billings = ref<BillingListDto[]>([]);
 const heading = ref('');
 const accountUID = ref('');
+const forfeitRule = ref<BonusForfeitRule>('ON_REIMBURSEMENT');
 const newOpen = ref(false);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
@@ -61,6 +64,7 @@ const formNote = ref('');
 const editNumber = ref('');
 const editDate = ref('');
 const editLink = ref('');
+const editForfeits = ref(false);
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -72,15 +76,16 @@ async function load(): Promise<void> {
   loading.value = true;
   loadError.value = null;
   try {
-    const contract = await apiFetch<{ data: { contractNumber: string; accountUID: string } }>(
-      `/contracts/${props.contractUID}`,
-    );
+    const contract = await apiFetch<{
+      data: { contractNumber: string; accountUID: string; bonusForfeitRule: BonusForfeitRule };
+    }>(`/contracts/${props.contractUID}`);
     const account = await apiFetch<{ data: { firstname: string; surname: string | null } }>(
       `/accounts/${contract.data.accountUID}`,
     );
     const person = [account.data.firstname, account.data.surname].filter(Boolean).join(' ');
     heading.value = `${contract.data.contractNumber} · ${person}`;
     accountUID.value = contract.data.accountUID;
+    forfeitRule.value = contract.data.bonusForfeitRule;
     billings.value = await listContractBillings(props.contractUID);
   } catch (err) {
     loadError.value =
@@ -154,6 +159,7 @@ function openEdit(b: BillingListDto): void {
   editNumber.value = b.billingNumber;
   editDate.value = b.billingDate;
   editLink.value = b.documentLink ?? '';
+  editForfeits.value = b.forfeitsBonus ?? forfeitsByRule(forfeitRule.value, b.reimbursedTotal);
   editOpen.value = true;
 }
 
@@ -170,6 +176,7 @@ function saveEdit(): void {
         billingNumber: editNumber.value.trim(),
         billingDate: editDate.value,
         documentLink: editLink.value.trim() ? editLink.value.trim() : null,
+        forfeitsBonus: editForfeits.value,
       }),
     () => (editOpen.value = false),
   );
@@ -353,6 +360,12 @@ function confirmDelete(): void {
         <EuTextField v-model="editNumber" label="Abrechnungsnummer" />
         <EuTextField v-model="editDate" label="Abrechnungsdatum" type="date" />
         <EuTextField v-model="editLink" label="Dokument-Link (optional)" />
+        <div>
+          <EuToggle v-model="editForfeits" label="Diese Abrechnung verwirkt den Bonus" />
+          <p class="eu-billings__hint">
+            Regel der Police: Bonus verfällt {{ BONUS_FORFEIT_RULE_LABEL[forfeitRule] }}.
+          </p>
+        </div>
         <p v-if="dialogError" class="eu-billings__error" role="alert">{{ dialogError }}</p>
       </form>
       <template #footer>
@@ -367,6 +380,7 @@ function confirmDelete(): void {
       :open="newOpen"
       :contract-u-i-d="contractUID"
       :account-u-i-d="accountUID"
+      :bonus-forfeit-rule="forfeitRule"
       @close="newOpen = false"
       @created="load"
     />
@@ -393,6 +407,13 @@ function confirmDelete(): void {
 </template>
 
 <style scoped>
+.eu-billings__hint {
+  margin: 0.35rem 0 0;
+  color: var(--eu-color-text-muted);
+  font-family: var(--eu-font-data);
+  font-size: 0.85rem;
+}
+
 .eu-billings__head {
   display: flex;
   align-items: center;
