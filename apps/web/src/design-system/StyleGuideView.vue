@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   faCircleCheck,
+  faCircleHalfStroke,
   faFileInvoiceDollar,
   faHourglassHalf,
   faPaperPlane,
@@ -43,6 +44,7 @@ const invalidValue = ref('12,50');
       <div class="row">
         <EuBadge tone="open" :icon="faHourglassHalf">offen</EuBadge>
         <EuBadge tone="submitted" :icon="faPaperPlane">eingereicht</EuBadge>
+        <EuBadge tone="partial" :icon="faCircleHalfStroke">teilabgerechnet</EuBadge>
         <EuBadge tone="billed" :icon="faFileInvoiceDollar">abgerechnet</EuBadge>
         <EuBadge tone="done" :icon="faCircleCheck">erledigt</EuBadge>
       </div>

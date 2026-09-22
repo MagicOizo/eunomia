@@ -142,18 +142,22 @@ Each supports `GET /`, `GET /:uid`, `POST /`, `PATCH /:uid`, `DELETE /:uid`.
 
 **Invoice workflow** (account-scoped via `VIEW_INVOICES` / `MANAGE_INVOICES`)
 
-| Step              | Endpoint                                           |
-| ----------------- | -------------------------------------------------- |
-| Record an invoice | `POST /api/v1/invoices`                            |
-| Submit invoices   | `POST /api/v1/submissions` (batch, transactional)  |
-| Record a billing  | `POST /api/v1/billings`                            |
-| Allocate a refund | `POST /api/v1/allocations`                         |
-| Settle an invoice | `PATCH /api/v1/invoices/:uid` (set `transferDate`) |
+| Step                          | Endpoint                                                              |
+| ----------------------------- | --------------------------------------------------------------------- |
+| Record an invoice             | `POST /api/v1/invoices`                                               |
+| Submit invoices to a policy   | `POST /api/v1/submissions` (batch, transactional)                     |
+| Withdraw (no billing yet)     | `DELETE /api/v1/submissions/:uid/invoices/:invoiceUID`                |
+| Record a billing              | `POST /api/v1/billings`                                               |
+| Allocate a refund             | `POST /api/v1/allocations`                                            |
+| Mark "not reimbursable under" | `POST /api/v1/invoices/:uid/exclusions` (and `DELETE …/:contractUID`) |
+| Close / settle an invoice     | `PATCH /api/v1/invoices/:uid` (`reimbursementClosed`, `transferDate`) |
 
-An invoice's status (`offen`, `eingereicht`, `abgerechnet`, `erledigt`) is **derived**, never
-stored: from whether it was submitted, whether a billing was allocated, and whether it was
-settled. A `submission` immutably binds invoices to one contract (so none is submitted twice); an
-`allocation` may only link an invoice and a billing of the same submission.
+An invoice's status (`offen`, `eingereicht`, `teilabgerechnet`, `abgerechnet`, `erledigt`) is
+**derived**, never stored: from its submissions, the refunds allocated to it over all policies,
+the manual "billed" mark and whether it was paid. An invoice can be submitted to several policies
+(e.g. the remainder to a supplementary insurance), but to each policy at most once and never to
+one it is marked as not reimbursable under; an `allocation` may only link an invoice and a billing
+of the same submission, and all refunds of an invoice together never exceed its amount.
 `GET /api/v1/contracts/:uid/reimbursement-analysis?year=YYYY` runs the deductible/bonus/cap
 calculation and reports whether submitting is worthwhile.
 

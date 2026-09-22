@@ -11,6 +11,7 @@ const props = defineProps<{
   open: boolean;
   /** How many invoices will be submitted. */
   count: number;
+  /** Only the policies every selected invoice can still go to (see eligibility.ts). */
   contracts: SelectOption[];
   submitting: boolean;
   error: string | null;
@@ -39,7 +40,7 @@ watch(
 function submit(): void {
   localError.value = null;
   if (!contractUID.value || !submittedDate.value) {
-    localError.value = 'Bitte Vertrag und Einreichungsdatum wählen.';
+    localError.value = 'Bitte Police und Einreichungsdatum wählen.';
     return;
   }
   emit('submit', {
@@ -53,14 +54,20 @@ function submit(): void {
   <EuDialog :open="open" title="Rechnungen einreichen" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <p class="eu-form__note">{{ count }} Rechnung(en) werden als eine Einreichung gebündelt.</p>
-      <EuEntityPicker
-        :model-value="contractUID || null"
-        label="Vertrag"
-        required
-        :options="contracts"
-        @update:model-value="contractUID = $event ?? ''"
-      />
-      <EuTextField v-model="submittedDate" label="Einreichungsdatum" type="date" />
+      <p v-if="contracts.length === 0" class="eu-form__note" role="status">
+        Keine Police verfügbar: Die Rechnung(en) liegen bereits bei allen Policen oder sind dort als
+        nicht erstattungsfähig markiert.
+      </p>
+      <template v-else>
+        <EuEntityPicker
+          :model-value="contractUID || null"
+          label="Police"
+          required
+          :options="contracts"
+          @update:model-value="contractUID = $event ?? ''"
+        />
+        <EuTextField v-model="submittedDate" label="Einreichungsdatum" type="date" />
+      </template>
       <p v-if="error ?? localError" class="eu-form__error" role="alert">
         {{ error ?? localError }}
       </p>
@@ -68,7 +75,7 @@ function submit(): void {
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
-      <EuButton :disabled="submitting" @click="submit">
+      <EuButton :disabled="submitting || contracts.length === 0" @click="submit">
         {{ submitting ? 'Einreichen…' : 'Einreichen' }}
       </EuButton>
     </template>

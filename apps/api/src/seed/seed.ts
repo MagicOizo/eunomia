@@ -53,14 +53,19 @@ const ids = {
   facilityRadiology: seedId('facility', 1),
   agency: seedId('agency', 0),
   submission: seedId('submission', 0),
+  submissionSupplementary: seedId('submission', 1),
   invoiceOpen: seedId('invoice', 0),
   invoiceSubmitted: seedId('invoice', 1),
   invoiceBilled: seedId('invoice', 2),
   invoiceDone: seedId('invoice', 3),
   invoiceBenOpen: seedId('invoice', 4),
+  invoiceClosed: seedId('invoice', 5),
   billing: seedId('serviceBilling', 0),
+  billingSupplementary: seedId('serviceBilling', 1),
   allocationBilled: seedId('allocation', 0),
   allocationDone: seedId('allocation', 1),
+  allocationDoneSupplementary: seedId('allocation', 2),
+  allocationClosed: seedId('allocation', 3),
 };
 
 /** Inserts the full seed dataset (invoices spanning every lifecycle state). */
@@ -182,6 +187,11 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     contractUID: ids.contractAnna,
     submittedDate: '2024-03-15',
   });
+  await seedRow(pool, 'Submissions', {
+    submissionUID: ids.submissionSupplementary,
+    contractUID: ids.contractAnnaSupplementary,
+    submittedDate: '2024-04-20',
+  });
 
   // Open: never submitted. Treated in 2023, so Anna also has a 2023 year tab.
   await seedRow(pool, 'Invoices', {
@@ -201,10 +211,10 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     treatmentDate: '2024-02-10',
     accountUID: ids.accountAnna,
     facilityUID: ids.facilityRadiology,
-    submissionUID: ids.submission,
     invoiceAmount: 120.0,
   });
-  // Billed: submission + allocation, not yet paid out (no transferDate).
+  // Partially billed: 150 of 200 € from the full policy, the remainder is
+  // submitted to the supplementary policy and not billed there yet.
   await seedRow(pool, 'Invoices', {
     invoiceUID: ids.invoiceBilled,
     invoiceNumber: 'R-2024-102',
@@ -212,10 +222,9 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     treatmentDate: '2024-02-11',
     accountUID: ids.accountAnna,
     facilityUID: ids.facilityDoctor,
-    submissionUID: ids.submission,
     invoiceAmount: 200.0,
   });
-  // Done: billed and paid out (transferDate set).
+  // Done: fully reimbursed over both policies (45 + 15 €) and paid.
   await seedRow(pool, 'Invoices', {
     invoiceUID: ids.invoiceDone,
     invoiceNumber: 'R-2024-103',
@@ -223,7 +232,6 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     treatmentDate: '2024-02-12',
     accountUID: ids.accountAnna,
     facilityUID: ids.facilityRadiology,
-    submissionUID: ids.submission,
     invoiceAmount: 60.0,
     transferDate: '2024-04-10',
   });
@@ -236,6 +244,39 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     accountUID: ids.accountBen,
     facilityUID: ids.facilityDoctor,
     invoiceAmount: 45.0,
+  });
+
+  // Billed by hand: the full policy reimbursed nothing (deductible), and the
+  // author closed it as billed; not paid yet.
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceClosed,
+    invoiceNumber: 'R-2024-104',
+    invoiceDate: '2024-03-04',
+    treatmentDate: '2024-02-13',
+    accountUID: ids.accountAnna,
+    facilityUID: ids.facilityDoctor,
+    invoiceAmount: 90.0,
+    reimbursementClosed: 1,
+  });
+
+  const links: Array<[submissionUID: string, invoiceUID: string, contractUID: string]> = [
+    [ids.submission, ids.invoiceSubmitted, ids.contractAnna],
+    [ids.submission, ids.invoiceBilled, ids.contractAnna],
+    [ids.submission, ids.invoiceDone, ids.contractAnna],
+    [ids.submission, ids.invoiceClosed, ids.contractAnna],
+    [ids.submissionSupplementary, ids.invoiceBilled, ids.contractAnnaSupplementary],
+    [ids.submissionSupplementary, ids.invoiceDone, ids.contractAnnaSupplementary],
+  ];
+  for (const [submissionUID, invoiceUID, contractUID] of links) {
+    await seedRow(pool, 'SubmissionInvoices', { submissionUID, invoiceUID, contractUID });
+  }
+
+  // The open invoice is a hospital stay the outpatient supplementary policy
+  // does not cover.
+  await seedRow(pool, 'InvoiceExclusions', {
+    invoiceUID: ids.invoiceOpen,
+    contractUID: ids.contractAnnaSupplementary,
+    note: 'Stationäre Leistung',
   });
 
   await seedRow(pool, 'ServiceBillings', {
@@ -258,6 +299,26 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     billingUID: ids.billing,
     receiptNumber: 'BELEG-103',
     reimbursement: 45.0,
+  });
+  await seedRow(pool, 'Allocations', {
+    allocationUID: ids.allocationClosed,
+    invoiceUID: ids.invoiceClosed,
+    billingUID: ids.billing,
+    receiptNumber: 'BELEG-104',
+    reimbursement: 0,
+  });
+
+  await seedRow(pool, 'ServiceBillings', {
+    billingUID: ids.billingSupplementary,
+    submissionUID: ids.submissionSupplementary,
+    billingDate: '2024-05-10',
+    billingNumber: 'ZV-LA-2024-17',
+  });
+  await seedRow(pool, 'Allocations', {
+    allocationUID: ids.allocationDoneSupplementary,
+    invoiceUID: ids.invoiceDone,
+    billingUID: ids.billingSupplementary,
+    reimbursement: 15.0,
   });
 }
 

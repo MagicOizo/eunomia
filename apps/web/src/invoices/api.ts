@@ -1,5 +1,27 @@
 import { apiFetch } from '../lib/api';
-import type { WorkflowStatus } from './status';
+import type { SubmissionStatus, WorkflowStatus } from './status';
+
+/** One submission of an invoice, i.e. the invoice at one policy. */
+export interface InvoiceSubmissionDto {
+  submissionUID: string;
+  contractUID: string;
+  contractNumber: string;
+  companyName: string;
+  submittedDate: string;
+  /** Active service billings of the submission; withdrawing is only possible at 0. */
+  billingCount: number;
+  /** What this policy reimbursed for the invoice. */
+  reimbursed: number;
+  status: SubmissionStatus;
+}
+
+/** A "not reimbursable under this policy" mark. */
+export interface InvoiceExclusionDto {
+  contractUID: string;
+  contractNumber: string;
+  companyName: string;
+  note: string | null;
+}
 
 export interface InvoiceDto {
   invoiceUID: string;
@@ -8,7 +30,6 @@ export interface InvoiceDto {
   treatmentDate: string;
   accountUID: string;
   facilityUID: string | null;
-  submissionUID: string | null;
   invoiceAmount: number;
   transferUntilDate: string | null;
   transferDate: string | null;
@@ -16,9 +37,15 @@ export interface InvoiceDto {
   documentLink: string | null;
   agencyUID: string | null;
   directPayment: number;
+  /** Marked as billed by hand although the reimbursements do not cover the amount. */
+  reimbursementClosed: boolean;
   reimbursedTotal: number;
   allocationCount: number;
+  /** Not yet reimbursed amount over all policies. */
+  remainingAmount: number;
   workflowStatus: WorkflowStatus;
+  submissions: InvoiceSubmissionDto[];
+  exclusions: InvoiceExclusionDto[];
   /** True while any billing reimbursing this invoice has an unresolved objection. */
   hasOpenObjection: boolean;
 }
@@ -85,6 +112,7 @@ export interface SubmissionDto {
   contractUID: string;
   submittedDate: string;
   accountUID: string;
+  invoiceUIDs: string[];
 }
 
 /** All submissions the user may view (filter by contract client-side). */
@@ -121,6 +149,28 @@ export async function createSubmission(body: {
   return unwrap(
     await apiFetch<{ data: { submissionUID: string } }>('/submissions', { method: 'POST', body }),
   );
+}
+
+/** Withdraws an invoice from a submission that has no service billing yet. */
+export async function withdrawSubmission(submissionUID: string, invoiceUID: string): Promise<void> {
+  await apiFetch(`/submissions/${submissionUID}/invoices/${invoiceUID}`, { method: 'DELETE' });
+}
+
+/** Marks the invoice as not reimbursable under a policy. */
+export async function addExclusion(
+  invoiceUID: string,
+  body: { contractUID: string; note?: string | null },
+): Promise<InvoiceDto> {
+  return unwrap(
+    await apiFetch<{ data: InvoiceDto }>(`/invoices/${invoiceUID}/exclusions`, {
+      method: 'POST',
+      body,
+    }),
+  );
+}
+
+export async function removeExclusion(invoiceUID: string, contractUID: string): Promise<void> {
+  await apiFetch(`/invoices/${invoiceUID}/exclusions/${contractUID}`, { method: 'DELETE' });
 }
 
 export async function listBillings(submissionUID: string): Promise<BillingDto[]> {

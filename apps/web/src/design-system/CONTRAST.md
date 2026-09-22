@@ -31,6 +31,7 @@ works, and replaced with `#1d6fd6` for general use).
 | --------- | ---------------------- | --------- |
 | open      | `#8f2317` on `#fbe0df` | 6.95:1 ✅ |
 | submitted | `#6b4e00` on `#fff1b8` | 6.82:1 ✅ |
+| partial   | `#5b2a9e` on `#ece3fb` | 7.47:1 ✅ |
 | billed    | `#0b4a8f` on `#dbeeff` | 7.40:1 ✅ |
 | done      | `#146328` on `#ddf3df` | 6.31:1 ✅ |
 
@@ -53,6 +54,7 @@ works, and replaced with `#1d6fd6` for general use).
 | --------- | ---------------------- | --------- |
 | open      | `#ffb3a8` on `#4a1f1a` | 8.17:1 ✅ |
 | submitted | `#ffd873` on `#4a3900` | 8.17:1 ✅ |
+| partial   | `#d7bcff` on `#33204f` | 8.58:1 ✅ |
 | billed    | `#a8d4ff` on `#123a5c` | 7.58:1 ✅ |
 | done      | `#9ee8ac` on `#163d1d` | 8.49:1 ✅ |
 

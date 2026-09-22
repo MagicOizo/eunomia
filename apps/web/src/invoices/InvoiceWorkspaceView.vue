@@ -2,6 +2,7 @@
 import {
   faChevronLeft,
   faCircleCheck,
+  faFileCircleCheck,
   faGavel,
   faHandHoldingDollar,
   faPaperPlane,
@@ -38,6 +39,11 @@ import {
   updateInvoice,
 } from './api';
 import BillingDialog from './BillingDialog.vue';
+import {
+  commonSubmittableContracts,
+  submittableContracts,
+  unbilledSubmissions,
+} from './eligibility';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
@@ -81,7 +87,8 @@ const formOpen = ref(false);
 const detailOpen = ref(false);
 const editing = ref<InvoiceDto | null>(null);
 const submitOpen = ref(false);
-const submitTargets = ref<string[]>([]);
+const submitTargets = ref<InvoiceDto[]>([]);
+const closeTarget = ref<InvoiceDto | null>(null);
 const billingOpen = ref(false);
 const objectionOpen = ref(false);
 const settleOpen = ref(false);
@@ -93,13 +100,18 @@ const deleteTargets = ref<string[]>([]);
 const contractOptions = computed<SelectOption[]>(() =>
   contracts.value.map((c) => ({ value: c.contractUID, label: contractLabel(c) })),
 );
+/** Policies all invoices of the submit dialog can still go to. */
+const submitContractOptions = computed(() =>
+  commonSubmittableContracts(submitTargets.value, contractOptions.value),
+);
+const canSubmit = (invoice: InvoiceDto): boolean =>
+  submittableContracts(invoice, contractOptions.value).length > 0;
 
 // Selection derived state. Every row is selectable; the global buttons enable
-// based on what is selected (submit only acts on the open ones).
-const selectedOffen = computed(() =>
-  invoices.value
-    .filter((i) => i.workflowStatus === 'offen' && selected.value.has(i.invoiceUID))
-    .map((i) => i.invoiceUID),
+// based on what is selected (submit only acts on invoices that can still go
+// to some policy; the dialog offers the policies they have in common).
+const selectedSubmittable = computed(() =>
+  invoices.value.filter((i) => selected.value.has(i.invoiceUID) && canSubmit(i)),
 );
 const allSelected = computed(
   () => invoices.value.length > 0 && selected.value.size === invoices.value.length,
@@ -253,10 +265,11 @@ function submitDetail(payload: Record<string, unknown>): void {
   void runDialog(
     () => updateInvoice(invoice.invoiceUID, payload).then(() => undefined),
     () => (detailOpen.value = false),
+    'Der Rechnungsbetrag kann nicht unter die bereits erstatteten Beträge sinken.',
   );
 }
-function openSubmit(uids: string[]): void {
-  submitTargets.value = uids;
+function openSubmit(targets: InvoiceDto[]): void {
+  submitTargets.value = targets;
   dialogError.value = null;
   submitOpen.value = true;
 }
@@ -274,13 +287,30 @@ function openSettle(invoice: InvoiceDto): void {
   dialogError.value = null;
   settleOpen.value = true;
 }
+function openClose(invoice: InvoiceDto): void {
+  closeTarget.value = invoice;
+  dialogError.value = null;
+}
+/** Detail dialog blocks changed something: reload and hand it the fresh invoice. */
+async function detailChanged(): Promise<void> {
+  const uid = dialogInvoice.value?.invoiceUID;
+  await afterMutation();
+  dialogInvoice.value = invoices.value.find((i) => i.invoiceUID === uid) ?? dialogInvoice.value;
+}
 function openDelete(uids: string[]): void {
   deleteTargets.value = uids;
   dialogError.value = null;
 }
 
-/** Wraps a dialog action with busy/error handling and a reload on success. */
-async function runDialog(action: () => Promise<void>, close: () => void): Promise<void> {
+/**
+ * Wraps a dialog action with busy/error handling and a reload on success.
+ * `conflictMessage` explains a 409 in the dialog's own terms.
+ */
+async function runDialog(
+  action: () => Promise<void>,
+  close: () => void,
+  conflictMessage?: string,
+): Promise<void> {
   dialogBusy.value = true;
   dialogError.value = null;
   try {
@@ -288,7 +318,7 @@ async function runDialog(action: () => Promise<void>, close: () => void): Promis
     close();
     await afterMutation();
   } catch (error) {
-    dialogError.value = describeError(error);
+    dialogError.value = describeError(error, conflictMessage);
   } finally {
     dialogBusy.value = false;
   }
@@ -305,26 +335,29 @@ function submitInvoiceForm(payload: Record<string, unknown>): void {
 }
 
 function submitSubmission(payload: { contractUID: string; submittedDate: string }): void {
+  const invoiceUIDs = submitTargets.value.map((i) => i.invoiceUID);
   void runDialog(
-    () => createSubmission({ ...payload, invoiceUIDs: submitTargets.value }).then(() => undefined),
+    () => createSubmission({ ...payload, invoiceUIDs }).then(() => undefined),
     () => (submitOpen.value = false),
+    'Mindestens eine Rechnung liegt bereits bei dieser Police, ist dort als nicht erstattungsfähig markiert oder schon abgerechnet.',
   );
 }
 
 function submitBilling(payload: {
+  submissionUID: string;
   billingUID?: string;
   newBilling?: { billingDate: string; billingNumber: string };
   reimbursement: number;
   receiptNumber?: string;
 }): void {
   const invoice = dialogInvoice.value;
-  if (!invoice?.submissionUID) return;
+  if (!invoice) return;
   void runDialog(
     async () => {
       let billingUID = payload.billingUID;
       if (payload.newBilling) {
         const billing = await createBilling({
-          submissionUID: invoice.submissionUID!,
+          submissionUID: payload.submissionUID,
           ...payload.newBilling,
         });
         billingUID = billing.billingUID;
@@ -337,6 +370,16 @@ function submitBilling(payload: {
       });
     },
     () => (billingOpen.value = false),
+    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${euro(invoice.remainingAmount)}).`,
+  );
+}
+
+function confirmClose(): void {
+  const invoice = closeTarget.value;
+  if (!invoice) return;
+  void runDialog(
+    () => updateInvoice(invoice.invoiceUID, { reimbursementClosed: true }).then(() => undefined),
+    () => (closeTarget.value = null),
   );
 }
 
@@ -382,10 +425,10 @@ function confirmDelete(): void {
       <EuButton
         :icon="faPaperPlane"
         variant="secondary"
-        :disabled="selectedOffen.length === 0"
-        @click="openSubmit(selectedOffen)"
+        :disabled="selectedSubmittable.length === 0"
+        @click="openSubmit(selectedSubmittable)"
       >
-        Einreichen ({{ selectedOffen.length }})
+        Einreichen ({{ selectedSubmittable.length }})
       </EuButton>
       <EuButton
         :icon="faTrash"
@@ -547,16 +590,25 @@ function confirmDelete(): void {
                 @click="openDocument(invoice)"
               />
               <EuButton
-                v-if="invoice.workflowStatus === 'offen'"
+                v-if="canSubmit(invoice) && invoice.workflowStatus === 'offen'"
                 variant="secondary"
                 icon-only
                 :icon="faPaperPlane"
                 aria-label="Einreichen"
                 title="Rechnung bei der Versicherung einreichen"
-                @click="openSubmit([invoice.invoiceUID])"
+                @click="openSubmit([invoice])"
               />
               <EuButton
-                v-if="invoice.workflowStatus === 'eingereicht'"
+                v-else-if="canSubmit(invoice)"
+                variant="secondary"
+                icon-only
+                :icon="faPaperPlane"
+                aria-label="Bei weiterer Police einreichen"
+                title="Rechnung (bzw. den Rest) bei einer weiteren Police einreichen"
+                @click="openSubmit([invoice])"
+              />
+              <EuButton
+                v-if="!invoice.reimbursementClosed && unbilledSubmissions(invoice).length > 0"
                 variant="secondary"
                 icon-only
                 :icon="faHandHoldingDollar"
@@ -565,18 +617,28 @@ function confirmDelete(): void {
                 @click="openBilling(invoice)"
               />
               <EuButton
-                v-if="invoice.workflowStatus === 'abgerechnet'"
+                v-if="
+                  invoice.workflowStatus === 'eingereicht' ||
+                  invoice.workflowStatus === 'teilabgerechnet'
+                "
+                variant="secondary"
+                icon-only
+                :icon="faFileCircleCheck"
+                aria-label="Als abgerechnet markieren"
+                title="Abrechnung abschließen – der Rest wird nicht weiter eingereicht"
+                @click="openClose(invoice)"
+              />
+              <EuButton
+                v-if="invoice.workflowStatus !== 'offen' && invoice.transferDate === null"
                 variant="secondary"
                 icon-only
                 :icon="faCircleCheck"
                 aria-label="Als bezahlt markieren"
-                title="Erstattung als eingegangen / bezahlt markieren"
+                title="Rechnung als bezahlt markieren"
                 @click="openSettle(invoice)"
               />
               <EuButton
-                v-if="
-                  invoice.workflowStatus === 'abgerechnet' || invoice.workflowStatus === 'erledigt'
-                "
+                v-if="invoice.submissions.some((s) => s.billingCount > 0)"
                 variant="secondary"
                 icon-only
                 :icon="faGavel"
@@ -619,10 +681,12 @@ function confirmDelete(): void {
       :facilities="facilityOptions"
       :agencies="agencyOptions"
       :agency-iban="agencyIbanMap"
+      :contracts="contractOptions"
       :submitting="dialogBusy"
       :error="dialogError"
       @close="detailOpen = false"
       @submit="submitDetail"
+      @changed="detailChanged"
     />
     <InvoiceFormDialog
       :open="formOpen"
@@ -638,7 +702,7 @@ function confirmDelete(): void {
     <SubmitDialog
       :open="submitOpen"
       :count="submitTargets.length"
-      :contracts="contractOptions"
+      :contracts="submitContractOptions"
       :submitting="dialogBusy"
       :error="dialogError"
       @close="submitOpen = false"
@@ -666,6 +730,23 @@ function confirmDelete(): void {
       @close="objectionOpen = false"
       @changed="afterMutation"
     />
+
+    <EuDialog
+      :open="closeTarget !== null"
+      title="Als abgerechnet markieren"
+      @close="closeTarget = null"
+    >
+      <p v-if="closeTarget">
+        Abrechnung von Rechnung {{ closeTarget.invoiceNumber }} abschließen? Der nicht erstattete
+        Rest von {{ euro(closeTarget.remainingAmount) }} wird dann bei keiner weiteren Police
+        eingereicht. Die Markierung lässt sich in den Rechnungsdetails wieder aufheben.
+      </p>
+      <p v-if="dialogError" class="eu-ws__error" role="alert">{{ dialogError }}</p>
+      <template #footer>
+        <EuButton variant="secondary" @click="closeTarget = null">Abbrechen</EuButton>
+        <EuButton :disabled="dialogBusy" @click="confirmClose">Als abgerechnet markieren</EuButton>
+      </template>
+    </EuDialog>
 
     <EuDialog :open="deleteTargets.length > 0" title="Rechnung löschen" @close="deleteTargets = []">
       <p>{{ deleteTargets.length }} Rechnung(en) wirklich löschen?</p>

@@ -11,7 +11,7 @@ import { computed } from 'vue';
  * here, since this component has no knowledge of the domain yet.
  */
 const props = defineProps<{
-  tone: 'open' | 'submitted' | 'billed' | 'done' | 'neutral';
+  tone: 'open' | 'submitted' | 'partial' | 'billed' | 'done' | 'neutral';
   icon?: IconDefinition;
 }>();
 
@@ -45,6 +45,11 @@ const classes = computed(() => ['eu-badge', `eu-badge--${props.tone}`]);
 .eu-badge--submitted {
   background-color: var(--eu-color-status-submitted-bg);
   color: var(--eu-color-status-submitted-fg);
+}
+
+.eu-badge--partial {
+  background-color: var(--eu-color-status-partial-bg);
+  color: var(--eu-color-status-partial-fg);
 }
 
 .eu-badge--billed {

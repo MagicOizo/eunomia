@@ -137,7 +137,7 @@ Invoices ─n:m→ Contracts über InvoiceExclusions ("nicht erstattungsfähig b
 - **`SubmissionInvoices`** (`submissionUID`, `invoiceUID`, `contractUID` denormalisiert) ersetzt `Invoices.submissionUID`. `UNIQUE (invoiceUID, contractUID)`: **eine Rechnung höchstens einmal pro Police** — die Doppel-Einreichung bei derselben Versicherung bleibt strukturell ausgeschlossen, bei verschiedenen Policen ist sie erlaubt.
 - **Bereicherungsverbot:** Summe aller `Allocations` einer Rechnung (über alle Policen) ≤ Rechnungsbetrag — Validierung im Anwendungslayer.
 - **`InvoiceExclusions`** (`invoiceUID`, `contractUID`, Notiz): manuelle Markierung "nicht erstattungsfähig bei dieser Police" (z. B. stationäre Leistung bei einer ambulanten Zusatzversicherung). Eine Einteilung in Leistungsbereiche ist bewusst (noch) nicht vorgesehen.
-- **Abgeleiteter Status:** Der Workflow-Status (`eingereicht`/`abgerechnet`) wird je Einreichung bestimmt; die Rechnung erhält einen Gesamtstatus plus den **nicht erstatteten Restbetrag** als Kandidat für die nächste Police.
+- **Abgeleiteter Status:** Der Workflow-Status (`eingereicht`/`abgerechnet`) wird je Einreichung bestimmt; die Rechnung erhält einen Gesamtstatus plus den **nicht erstatteten Restbetrag** als Kandidat für die nächste Police. Gesamtstatus (festgelegt in Slice 17): `offen` = nirgends eingereicht; `eingereicht` = bei ≥ 1 Police eingereicht, noch keine Erstattung zugeordnet; `teilabgerechnet` = Erstattungen < Rechnungsbetrag (Zahlung egal); `abgerechnet` = Erstattungen decken den Betrag **oder** die Rechnung ist von Hand „als abgerechnet markiert“ (`Invoices.reimbursementClosed`, z. B. der Rest ist Selbstbeteiligung), noch nicht bezahlt; `erledigt` = wie `abgerechnet` und bezahlt.
 
 **Erstattungs-Optimierer** (ersetzt `evaluateReimbursement` / den Analyse-Endpoint je Vertrag): reine, unit-getestete Funktion **pro Versichertem und Behandlungsjahr über alle Policen**. Für jede Kombination "Police mit Bonus in Anspruch nehmen / schonen" (2ⁿ, n = Zahl der Bonus-Policen, in der Praxis 1–3) wird gerechnet: in Anspruch genommene Vollversicherungen erstatten zuerst (Satz × (Summe − Selbstbeteiligung), gedeckelt), Zusatzversicherungen erstatten auf den Rest bis zu ihrer Obergrenze, `InvoiceExclusions` werden je Police herausgenommen, bereits verwirkte Boni gelten als verloren. Ziel: maximale Summe aus Erstattungen + Boni. Ausgabe: empfohlene Strategie je Police, Schwelle "ab weiteren N € lohnt sich Police x", Empfehlung je Rechnung ("bei y einreichen", "zurückhalten", "bei x, Rest bei y"). Die Beispieljahre des Autors sind Pflicht-Testfälle (PKV x: SB 200 €, Staffel 300/450/…; Zusatz y: 200 €/Jahr):
 
@@ -429,6 +429,19 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - UI: Einreichen-Dialog bietet nur Policen an, bei denen die Rechnung noch nicht liegt; Aktion "Rest bei weiterer Police einreichen"; Markierung "nicht erstattungsfähig bei …" am Rechnungs-Detail.
 
 **DoD:** Rechnung bei x einreichen → abrechnen (Teilerstattung) → Rest bei y einreichen → abrechnen; zweite Einreichung bei x wird abgelehnt; Überschreitung des Rechnungsbetrags wird abgelehnt.
+
+**Entscheidungen (Planmodus):**
+- Gesamtstatus in fünf Stufen mit neuem `teilabgerechnet` und der Markierung „als abgerechnet“ (`Invoices.reimbursementClosed`), siehe 2.3 „Abgeleiteter Status“.
+- **Abweichung vom Slice-Text:** Die Workspace-Tabelle zeigt nur den Gesamtstatus, **keine Policen-Spalte**. Den Status je Einreichung zeigt der Rechnungs-Detaildialog.
+- Eine Einreichung kann **zurückgezogen** werden, solange sie keine Leistungsabrechnung hat (z. B. versehentlich bei der falschen Police eingereicht).
+
+**Umgesetzt (2026-09-22).** Entscheidungen beim Bau:
+- Migration `007-multi-submission`: In `SubmissionInvoices` sichert ein zusammengesetzter Fremdschlüssel `(submissionUID, contractUID)` auf `Submissions`, dass die denormalisierte Police nie von der Einreichung abweicht; `UNIQUE (invoiceUID, contractUID)` erzwingt „einmal je Police“. Verknüpfungstabellen (auch `InvoiceExclusions`) haben keine eigene UID und keinen Status, sie werden hart gelöscht. `down` ist verlustbehaftet (behält je Rechnung die Einreichung mit der kleinsten UID).
+- Status-Ableitung als reine Funktion `domain/invoice-status.ts` (Beträge in Cent verglichen). Eine Erstattung von 0 € zählt als Antwort der Versicherung, die Rechnung ist dann `teilabgerechnet`.
+- Bereicherungsverbot beim Zuordnen einer Erstattung und beim Senken des Rechnungsbetrags, jeweils in einer Transaktion mit Sperre auf die Rechnung (`db/transaction.ts`); der Abrechnen-Dialog prüft zusätzlich vorab, damit keine leere Leistungsabrechnung zurückbleibt.
+- Einreichen ist gesperrt bei ausgeschlossener, schon belieferter oder „als abgerechnet“ markierter Rechnung. Das Zurückziehen der letzten Einreichung hebt die Markierung wieder auf, und eine leere Einreichung wird gelöscht.
+- Die Analyse je Police (bis Slice 19) zählt nur noch die eigenen Erstattungen der Police und lässt dort ausgeschlossene Rechnungen weg.
+- UI: Zeilenaktionen „Bei weiterer Police einreichen“ und „Als abgerechnet markieren“; der Einreichen-Dialog bietet nur Policen an, die für alle gewählten Rechnungen noch in Frage kommen (`invoices/eligibility.ts`); im Abrechnen-Dialog wird die Police gewählt; der Widerspruch-Dialog sammelt die Abrechnungen aller Policen. Neuer Badge-Ton `partial` (Violett) für „Teilabgerechnet“.
 
 ## Slice 18 — Bonus-Staffel & Leistungsfreiheit
 **Ziel:** Der erwartete Bonus ergibt sich aus Staffel und gezählten leistungsfreien Jahren.

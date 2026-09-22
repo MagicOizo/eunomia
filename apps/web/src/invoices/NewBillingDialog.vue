@@ -6,6 +6,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { euro, germanDate } from '../lib/format';
+import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import {
   type InvoiceDto,
@@ -37,9 +38,12 @@ const submissionOptions = computed(() =>
   })),
 );
 /** The invoices of the currently selected submission — the allocation targets. */
-const submissionInvoices = computed(() =>
-  invoices.value.filter((i) => i.submissionUID === submissionUID.value),
-);
+const submissionInvoices = computed(() => {
+  const members = new Set(
+    submissions.value.find((s) => s.submissionUID === submissionUID.value)?.invoiceUIDs ?? [],
+  );
+  return invoices.value.filter((i) => members.has(i.invoiceUID));
+});
 
 watch(
   () => props.open,
@@ -107,7 +111,10 @@ function save(): void {
       emit('created');
       emit('close');
     } catch (err) {
-      error.value = err instanceof HttpError ? err.message : 'Speichern fehlgeschlagen.';
+      error.value = describeError(
+        err,
+        'Die Erstattungen einer Rechnung dürfen zusammen den Rechnungsbetrag nicht übersteigen.',
+      );
     } finally {
       busy.value = false;
     }

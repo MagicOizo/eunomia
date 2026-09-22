@@ -15,6 +15,8 @@ const EXPECTED_TABLES = [
   'Facilities',
   'CollectionAgencies',
   'Submissions',
+  'SubmissionInvoices',
+  'InvoiceExclusions',
   'Invoices',
   'ServiceBillings',
   'Allocations',
@@ -142,11 +144,11 @@ test('migration 006 drops contract workflow data but keeps invoices and master d
     for (const table of ['Allocations', 'ServiceBillings', 'Submissions', 'Contracts']) {
       assert.equal(await count(table), 0, `${table} should be emptied`);
     }
-    const [invoice] = await pool.query<Array<{ submissionUID: string | null }>>(
-      "SELECT submissionUID FROM Invoices WHERE invoiceUID = 'iMIGRATION06'",
+    const [invoice] = await pool.query<unknown[]>(
+      "SELECT 1 FROM Invoices WHERE invoiceUID = 'iMIGRATION06'",
     );
     assert.ok(invoice, 'the invoice is kept');
-    assert.equal(invoice.submissionUID, null);
+    assert.equal(await count('SubmissionInvoices'), 0, 'the invoice is no longer submitted');
     const kept = async (sql: string): Promise<boolean> =>
       (await pool.query<unknown[]>(sql)).length === 1;
     assert.ok(
@@ -162,6 +164,103 @@ test('migration 006 drops contract workflow data but keeps invoices and master d
     await pool.query("DELETE FROM InsuranceCompanies WHERE companyUID = 'vMIGRATION06'");
     await pool.query("DELETE FROM Accounts WHERE accountUID = 'aMIGRATION06'");
   } finally {
+    await pool.end();
+  }
+});
+
+test('migration 007 moves submissions into SubmissionInvoices and back', async (t) => {
+  const config = databaseConfigFromEnv();
+  if (!config) {
+    t.skip('no database configured (DB_* env vars unset)');
+    return;
+  }
+  const pool = createPool(config);
+  try {
+    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
+  } catch {
+    await pool.end();
+    t.skip('database not reachable');
+    return;
+  }
+
+  const cleanup = async (): Promise<void> => {
+    for (const sql of [
+      "DELETE FROM SubmissionInvoices WHERE invoiceUID = 'iMIGRATION07'",
+      "DELETE FROM Invoices WHERE invoiceUID = 'iMIGRATION07'",
+      "DELETE FROM Submissions WHERE submissionUID IN ('eMIGRATIO07A', 'eMIGRATIO07B')",
+      "DELETE FROM Contracts WHERE contractUID IN ('pMIGRATIO07A', 'pMIGRATIO07B')",
+      "DELETE FROM InsuranceCompanies WHERE companyUID = 'vMIGRATION07'",
+      "DELETE FROM Accounts WHERE accountUID = 'aMIGRATION07'",
+    ]) {
+      await pool.query(sql);
+    }
+  };
+
+  try {
+    await runMigrations(pool);
+    const migrator = createMigrator(pool);
+    const name007 = (await migrator.executed())
+      .map((m) => m.name)
+      .find((n) => n.startsWith('007-'));
+    assert.ok(name007, 'migration 007 should be recorded');
+
+    await cleanup();
+    await migrator.down({ to: name007 });
+    await pool.query(
+      "INSERT INTO Accounts (accountUID, firstname, birthDate) VALUES ('aMIGRATION07', 'Mig', '1990-01-01')",
+    );
+    await pool.query(
+      "INSERT INTO InsuranceCompanies (companyUID, companyName) VALUES ('vMIGRATION07', 'Mig AG')",
+    );
+    for (const contract of ['pMIGRATIO07A', 'pMIGRATIO07B']) {
+      await pool.query(
+        `INSERT INTO Contracts (contractUID, contractNumber, companyUID, accountUID, contractBegin)
+         VALUES (?, ?, 'vMIGRATION07', 'aMIGRATION07', '2020-01-01')`,
+        [contract, contract],
+      );
+    }
+    await pool.query(
+      `INSERT INTO Submissions (submissionUID, contractUID, submittedDate)
+       VALUES ('eMIGRATIO07A', 'pMIGRATIO07A', '2024-03-01'),
+              ('eMIGRATIO07B', 'pMIGRATIO07B', '2024-04-01')`,
+    );
+    await pool.query(
+      `INSERT INTO Invoices (invoiceUID, invoiceNumber, invoiceDate, treatmentDate, accountUID, submissionUID, invoiceAmount)
+       VALUES ('iMIGRATION07', 'R-7', '2024-02-01', '2024-02-01', 'aMIGRATION07', 'eMIGRATIO07A', 100)`,
+    );
+
+    await migrator.up();
+    const links = async (): Promise<Array<{ submissionUID: string; contractUID: string }>> =>
+      pool.query(
+        `SELECT submissionUID, contractUID FROM SubmissionInvoices
+          WHERE invoiceUID = 'iMIGRATION07' ORDER BY submissionUID`,
+      );
+    assert.deepEqual(await links(), [
+      { submissionUID: 'eMIGRATIO07A', contractUID: 'pMIGRATIO07A' },
+    ]);
+
+    // Once per policy is enforced by the schema itself.
+    await assert.rejects(
+      pool.query(
+        "INSERT INTO SubmissionInvoices VALUES ('eMIGRATIO07B', 'iMIGRATION07', 'pMIGRATIO07A')",
+      ),
+      'the contract copy must match the submission',
+    );
+    await pool.query(
+      "INSERT INTO SubmissionInvoices VALUES ('eMIGRATIO07B', 'iMIGRATION07', 'pMIGRATIO07B')",
+    );
+
+    // down keeps one submission per invoice (the smallest UID).
+    await migrator.down({ to: name007 });
+    const [invoice] = await pool.query<Array<{ submissionUID: string | null }>>(
+      "SELECT submissionUID FROM Invoices WHERE invoiceUID = 'iMIGRATION07'",
+    );
+    assert.equal(invoice?.submissionUID, 'eMIGRATIO07A');
+
+    await migrator.up();
+    assert.equal((await links()).length, 1);
+  } finally {
+    await cleanup().catch(() => undefined);
     await pool.end();
   }
 });

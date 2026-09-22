@@ -50,6 +50,8 @@ async function resetData(pool: Pool): Promise<void> {
   for (const stmt of [
     'DELETE FROM Allocations',
     'DELETE FROM ServiceBillings',
+    'DELETE FROM SubmissionInvoices',
+    'DELETE FROM InvoiceExclusions',
     'DELETE FROM Invoices',
     'DELETE FROM Submissions',
     'DELETE FROM ContractPremiums',

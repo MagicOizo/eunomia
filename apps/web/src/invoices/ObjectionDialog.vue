@@ -32,12 +32,28 @@ function isOpen(billing: BillingDto): boolean {
   return billing.objectionDate !== null && billing.objectionResolvedDate === null;
 }
 
+/** "Policy · company" of the submission a billing belongs to. */
+function policyOf(billing: BillingDto): string {
+  const submission = props.invoice?.submissions.find(
+    (s) => s.submissionUID === billing.submissionUID,
+  );
+  return submission ? `${submission.contractNumber} · ${submission.companyName}` : '';
+}
+
 async function load(): Promise<void> {
-  if (!props.invoice?.submissionUID) return;
+  const invoice = props.invoice;
+  if (!invoice) return;
   loading.value = true;
   error.value = null;
   try {
-    billings.value = await listBillings(props.invoice.submissionUID);
+    // An invoice can be billed by several policies: gather the billings of
+    // every submission that has any.
+    const lists = await Promise.all(
+      invoice.submissions
+        .filter((s) => s.billingCount > 0)
+        .map((s) => listBillings(s.submissionUID)),
+    );
+    billings.value = lists.flat();
     for (const b of billings.value) {
       forms[b.billingUID] ??= { date: today(), note: '' };
     }
@@ -111,6 +127,7 @@ function resolve(billing: BillingDto): void {
           <strong>{{ billing.billingNumber }}</strong>
           <span class="eu-obj__date">{{ germanDate(billing.billingDate) }}</span>
         </div>
+        <span class="eu-obj__date">{{ policyOf(billing) }}</span>
 
         <!-- Open objection: show it and offer to resolve. -->
         <template v-if="isOpen(billing)">

@@ -8,7 +8,8 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { type CrudTable, getRow, insertRow, softDeleteRow } from '../crud/repository.js';
-import { badRequest, notFound } from '../lib/api-error.js';
+import { withTransaction } from '../db/transaction.js';
+import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { authorizeAccount } from './workflow-access.js';
 
@@ -47,20 +48,45 @@ export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
     );
     if (!billing) throw notFound('Service billing');
 
-    const [invoice] = await pool.query<Array<{ submissionUID: string | null }>>(
-      'SELECT submissionUID FROM Invoices WHERE invoiceUID = ? AND invoiceStatus <> -1 LIMIT 1',
-      [data.invoiceUID],
-    );
-    if (!invoice) throw notFound('Invoice');
-
-    // The core cross-entity invariant: an invoice can only be allocated a
-    // reimbursement from a billing of the very submission it was submitted in.
-    if (invoice.submissionUID === null || invoice.submissionUID !== billing.submissionUID) {
-      throw badRequest('Invoice and service billing must belong to the same submission');
-    }
-
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, billing.accountUID);
-    sendData(res, await insertRow(pool, table, data), 201);
+
+    const created = await withTransaction(pool, async (conn) => {
+      // Locks the invoice so concurrent allocations (and amount edits) are
+      // checked against the same total.
+      const [invoice] = await conn.query<Array<{ invoiceAmount: number }>>(
+        `SELECT invoiceAmount FROM Invoices
+          WHERE invoiceUID = ? AND invoiceStatus <> -1
+          LIMIT 1 FOR UPDATE`,
+        [data.invoiceUID],
+      );
+      if (!invoice) throw notFound('Invoice');
+
+      // The core cross-entity invariant: an invoice can only be allocated a
+      // reimbursement from a billing of a submission it is part of.
+      const [membership] = await conn.query<Array<{ n: number }>>(
+        'SELECT COUNT(*) AS n FROM SubmissionInvoices WHERE submissionUID = ? AND invoiceUID = ?',
+        [billing.submissionUID, data.invoiceUID],
+      );
+      if (Number(membership?.n ?? 0) === 0) {
+        throw badRequest('Invoice and service billing must belong to the same submission');
+      }
+
+      // No enrichment ("Bereicherungsverbot"): all reimbursements of an
+      // invoice, over every policy, together never exceed its amount.
+      const [allocated] = await conn.query<Array<{ total: number }>>(
+        `SELECT COALESCE(SUM(reimbursement), 0) AS total
+           FROM Allocations WHERE invoiceUID = ? AND allocationStatus <> -1`,
+        [data.invoiceUID],
+      );
+      const totalCents =
+        Math.round((allocated?.total ?? 0) * 100) + Math.round(data.reimbursement * 100);
+      if (totalCents > Math.round(invoice.invoiceAmount * 100)) {
+        throw conflict('The reimbursements would exceed the invoice amount');
+      }
+
+      return insertRow(conn, table, data);
+    });
+    sendData(res, created, 201);
   });
 
   router.get('/', requireAuth, async (req, res) => {

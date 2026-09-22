@@ -14,8 +14,10 @@ import { authorizeAccount } from './workflow-access.js';
 /**
  * Router exposing the "is it worth submitting?" analysis for a contract and
  * year. It aggregates the treatment-year's active invoices for the contract's
- * account and runs the pure reimbursement service on the total, using the
- * contract terms in force for that year.
+ * account (minus those marked as not reimbursable under this contract) and
+ * runs the pure reimbursement service on the total, using the contract terms
+ * in force for that year. "Already reimbursed" counts only this contract's
+ * own reimbursements, not those of the account's other policies.
  *
  * Transitional (Slice 16 → 18/19): the bonus scale does not exist yet, so the
  * bonus is 0 and the response flags `bonusPending`; the cross-policy optimizer
@@ -46,19 +48,25 @@ export function createReimbursementAnalysisRouter(pool: Pool, config: AppConfig)
     const bonus = 0;
 
     const [totals] = await pool.query<Array<{ invoiceTotal: number }>>(
-      `SELECT COALESCE(SUM(invoiceAmount), 0) AS invoiceTotal
-         FROM Invoices
-        WHERE accountUID = ? AND invoiceStatus <> -1
-          AND YEAR(treatmentDate) = ?`,
-      [contract.accountUID, year],
+      `SELECT COALESCE(SUM(i.invoiceAmount), 0) AS invoiceTotal
+         FROM Invoices i
+        WHERE i.accountUID = ? AND i.invoiceStatus <> -1
+          AND YEAR(i.treatmentDate) = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM InvoiceExclusions x
+             WHERE x.invoiceUID = i.invoiceUID AND x.contractUID = ?
+          )`,
+      [contract.accountUID, year, contractUID],
     );
     const [reimbursed] = await pool.query<Array<{ alreadyReimbursed: number }>>(
       `SELECT COALESCE(SUM(a.reimbursement), 0) AS alreadyReimbursed
          FROM Allocations a
          JOIN Invoices i ON i.invoiceUID = a.invoiceUID
-        WHERE i.accountUID = ? AND i.invoiceStatus <> -1 AND a.allocationStatus <> -1
+         JOIN ServiceBillings b ON b.billingUID = a.billingUID AND b.billingStatus <> -1
+         JOIN Submissions s ON s.submissionUID = b.submissionUID
+        WHERE s.contractUID = ? AND i.invoiceStatus <> -1 AND a.allocationStatus <> -1
           AND YEAR(i.treatmentDate) = ?`,
-      [contract.accountUID, year],
+      [contractUID, year],
     );
 
     const invoiceTotal = totals?.invoiceTotal ?? 0;

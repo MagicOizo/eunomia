@@ -50,6 +50,8 @@
   --eu-color-status-open-fg: #8f2317;
   --eu-color-status-submitted-bg: #fff1b8;
   --eu-color-status-submitted-fg: #6b4e00;
+  --eu-color-status-partial-bg: #ece3fb;
+  --eu-color-status-partial-fg: #5b2a9e;
   --eu-color-status-billed-bg: #dbeeff;
   --eu-color-status-billed-fg: #0b4a8f;
   --eu-color-status-done-bg: #ddf3df;
@@ -85,6 +87,8 @@
     --eu-color-status-open-fg: #ffb3a8;
     --eu-color-status-submitted-bg: #4a3900;
     --eu-color-status-submitted-fg: #ffd873;
+    --eu-color-status-partial-bg: #33204f;
+    --eu-color-status-partial-fg: #d7bcff;
     --eu-color-status-billed-bg: #123a5c;
     --eu-color-status-billed-fg: #a8d4ff;
     --eu-color-status-done-bg: #163d1d;
