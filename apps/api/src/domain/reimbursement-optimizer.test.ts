@@ -102,6 +102,10 @@ test('example year 1: 150 € → spare x, submit to y only (450 € vs 150 €)
   assert.equal(policy(result, 'x').recommendation, 'spare');
   // Using x catches up once further costs reach 350 €: 300 + 200 = 200 + 300.
   assert.equal(policy(result, 'x').worthUsingAbove, 350);
+  // x is spared, yet its progress shows how far the costs fill its deductible.
+  assert.equal(policy(result, 'x').deductibleUsed, 150);
+  assert.equal(policy(result, 'x').eligibleCosts, 150);
+  assert.equal(policy(result, 'y').deductibleUsed, 0);
   const [plan] = result.invoices;
   assert.equal(plan?.action, 'submit');
   assert.deepEqual(
@@ -124,6 +128,7 @@ test('example year 2: 640 € → spare x, submit to y only (650 € vs 640 €)
   assert.equal(result.advantage, 10);
   assert.equal(policy(result, 'x').worthUsingAbove, 10);
   assert.equal(policy(result, 'y').expectedReimbursement, 200);
+  assert.equal(policy(result, 'x').deductibleUsed, 200);
   // y's cap is used up by the first invoice; the second one is held back.
   assert.deepEqual(
     result.invoices.map((p) => p.action),
@@ -141,6 +146,8 @@ test('example year 3: 1000 € → submit to x, the rest to y (1000 € vs 800 �
   assert.equal(totalFor(result, ['y']), 800);
   assert.equal(policy(result, 'x').expectedReimbursement, 800);
   assert.equal(policy(result, 'x').worthUsingAbove, undefined);
+  assert.equal(policy(result, 'x').deductibleUsed, 200);
+  assert.equal(policy(result, 'x').eligibleCosts, 1000);
   // The deductible is taken by the earlier invoice; y covers exactly that rest.
   assert.deepEqual(
     result.invoices.map((p) => p.policies.map((e) => [e.contractUID, e.action, e.reimbursement])),
@@ -254,6 +261,7 @@ test('recorded reimbursements are reality: they use up deductible and cap', () =
   );
   assert.equal(policy(result, 'x').actualReimbursement, 300);
   assert.equal(policy(result, 'x').expectedReimbursement, 1000);
+  assert.equal(policy(result, 'x').deductibleUsed, 200);
 });
 
 test('a pending submission at a policy that should be spared is to be withdrawn', () => {
@@ -382,4 +390,13 @@ test('status: a cap filled only by the model still asks to submit', () => {
   const result = run({ policies: [pkvX(450), zusatzY()], invoices: [invoice(640)] });
   assert.equal(policy(result, 'y').expectedReimbursement, 200);
   assert.equal(policy(result, 'y').status, 'submit');
+});
+
+test('the deductible progress counts answered invoices and skips exclusions', () => {
+  const result = run({
+    policies: [pkvX(0, { bonusMode: 'forfeited', deductible: 500 })],
+    invoices: [invoice(150, { x: answered(0) }), invoice(100), invoice(400, { x: excluded })],
+  });
+  assert.equal(policy(result, 'x').deductibleUsed, 250);
+  assert.equal(policy(result, 'x').eligibleCosts, 250);
 });

@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import {
-  faBan,
-  faHourglassHalf,
-  faPaperPlane,
-  faPiggyBank,
-} from '@fortawesome/free-solid-svg-icons';
+import { faStar } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import { euro } from '../lib/format';
 import type { InvoiceDto, PlanPolicyDto, ReimbursementPlanDto } from './api';
+import {
+  POLICY_STATUS_BADGE,
+  bonusView,
+  percentOf,
+  policyVerdict,
+  recommendationText,
+  strategyLabel,
+} from './recommendation';
 import { STATUS_DISPLAY, STATUS_ORDER } from './status';
 
 const props = defineProps<{
@@ -31,108 +33,43 @@ const distribution = computed(() =>
   })),
 );
 
-const label = (policy: PlanPolicyDto): string =>
-  `${policy.contractNumber} · ${policy.companyName} (${
-    policy.contractKind === 'FULL' ? 'Vollversicherung' : 'Zusatzversicherung'
-  })`;
-
-function bonusText(policy: PlanPolicyDto): string {
-  switch (policy.bonusStatus) {
-    case 'at-stake':
-      return policy.tiersInherited
-        ? `${euro(policy.bonusAmount)} erwartet (Staffel nicht aktualisiert)`
-        : `${euro(policy.bonusAmount)} erwartet`;
-    case 'paid':
-      return `${euro(policy.bonusAmount)} erhalten`;
-    case 'forfeited':
-      return 'verwirkt';
-    default:
-      return 'kein Bonus';
-  }
-}
-
-const STATUS_BADGE: Record<
-  PlanPolicyDto['status'],
-  { label: string; icon: IconDefinition; tone: 'done' | 'billed' | 'partial' | 'neutral' }
-> = {
-  spare: { label: 'Schonen', icon: faPiggyBank, tone: 'done' },
-  submit: { label: 'Einreichen', icon: faPaperPlane, tone: 'billed' },
-  wait: { label: 'Abwarten', icon: faHourglassHalf, tone: 'partial' },
-  exhausted: { label: 'Erschöpft', icon: faBan, tone: 'neutral' },
-};
-
-/** Contract numbers of the spared policies that may still tip into being used. */
-const mayTip = computed(() =>
-  (props.plan?.policies ?? [])
-    .filter((p) => p.status === 'spare' && p.worthUsingAbove !== null)
-    .map((p) => p.contractNumber)
-    .join(', '),
-);
-
-function verdict(policy: PlanPolicyDto): string {
-  switch (policy.status) {
-    case 'spare': {
-      if (policy.bonusStatus === 'paid')
-        return 'Bonus bereits erhalten – hier nicht mehr einreichen.';
-      const above =
-        policy.worthUsingAbove === null
-          ? 'Das bleibt auch bei höheren Kosten so, weil die Obergrenze unter dem Bonus liegt.'
-          : `Einreichen lohnt sich erst, wenn mehr als ${euro(policy.worthUsingAbove)} weitere Kosten dazukommen.`;
-      return `Der Bonus ist mehr wert als die mögliche Erstattung. ${above}`;
-    }
-    case 'wait':
-      return `Hier ließen sich ${euro(policy.expectedReimbursement)} erstatten. Kommen aber noch Kosten dazu, lohnt sich ${mayTip.value} – dann erstattet diese Police nur den Rest. Deshalb erst einreichen, wenn das Jahr absehbar ist.`;
-    case 'exhausted':
-      return `Die Obergrenze von ${euro(policy.reimbursementCap)} ist erreicht – keine weiteren Rechnungen hier einreichen.`;
-    default:
-      break;
-  }
-  if (policy.contractKind === 'SUPPLEMENTARY') {
-    return 'Rechnungen hier einreichen, soweit die Vollversicherung sie nicht erstattet.';
-  }
-  if (policy.bonusStatus === 'at-stake') {
-    const streak =
-      policy.claimFreeStreak === null
-        ? ''
-        : ` Dafür endet die Serie von ${policy.claimFreeStreak} leistungsfreien Jahren.`;
-    return `Die Erstattung übersteigt den Bonus – alle Rechnungen hier einreichen.${streak}`;
-  }
-  if (policy.bonusStatus === 'forfeited') {
-    return 'Der Bonus ist in diesem Jahr bereits verwirkt – alle Rechnungen hier einreichen.';
-  }
-  return 'Hier ist kein Bonus im Spiel – alle Rechnungen hier einreichen.';
-}
+const kindLabel = (policy: PlanPolicyDto): string =>
+  policy.contractKind === 'FULL' ? 'Vollversicherung' : 'Zusatzversicherung';
 
 const recommendation = computed(() => {
   const plan = props.plan;
   const best = plan?.strategies[0];
   if (!plan || !best || plan.policies.length === 0) return null;
-  const phrases: Array<[PlanPolicyDto['status'], string]> = [
-    ['submit', 'einreichen'],
-    ['wait', 'abwarten'],
-    ['spare', 'schonen'],
-    ['exhausted', 'ist erschöpft'],
-  ];
-  const parts = phrases
-    .map(([status, verb]) => {
-      const numbers = plan.policies
-        .filter((p) => p.status === status)
-        .map((p) => p.contractNumber)
-        .join(', ');
-      return numbers ? `${numbers} ${verb}` : '';
-    })
-    .filter(Boolean);
-  return {
-    text: parts.join(', '),
-    total: best.total,
-    advantage: plan.advantage,
-  };
+  return { text: recommendationText(plan), total: best.total, advantage: plan.advantage };
 });
+
+/** Every evaluated strategy, best first, with its gap to the recommended one. */
+const comparison = computed(() => {
+  const plan = props.plan;
+  const best = plan?.strategies[0];
+  if (!plan || !best || plan.strategies.length < 2) return [];
+  return plan.strategies.map((strategy, index) => ({
+    key: strategy.usedContractUIDs.join() || '-',
+    recommended: index === 0,
+    label: strategyLabel(strategy, plan.policies),
+    reimbursements: Object.values(strategy.reimbursements).reduce((sum, v) => sum + v, 0),
+    bonuses: strategy.bonusTotal,
+    total: strategy.total,
+    gap: strategy.total - best.total,
+  }));
+});
+
+/** Cap bar: the part already reimbursed and the part the plan still expects. */
+function capShares(policy: PlanPolicyDto): { actual: number; expected: number } {
+  const cap = policy.reimbursementCap ?? 0;
+  const actual = percentOf(policy.actualReimbursement, cap);
+  return { actual, expected: percentOf(policy.expectedReimbursement, cap) - actual };
+}
 </script>
 
 <template>
-  <section class="eu-summary" aria-label="Zusammenfassung">
-    <h3>Zusammenfassung</h3>
+  <section class="eu-summary" aria-labelledby="eu-summary-title">
+    <h3 id="eu-summary-title">Zusammenfassung</h3>
 
     <div class="eu-summary__row">
       <EuBadge
@@ -154,43 +91,127 @@ const recommendation = computed(() => {
       >.
     </p>
 
-    <div
-      v-for="policy in plan?.policies ?? []"
-      :key="policy.contractUID"
-      class="eu-summary__contract"
-    >
-      <h4>
-        {{ label(policy) }}
-        <EuBadge :tone="STATUS_BADGE[policy.status].tone" :icon="STATUS_BADGE[policy.status].icon">
-          {{ STATUS_BADGE[policy.status].label }}
-        </EuBadge>
-      </h4>
-      <dl class="eu-summary__grid">
-        <div>
-          <dt>Selbstbeteiligung</dt>
-          <dd>{{ policy.hasTerms ? euro(policy.deductible) : 'keine Konditionen' }}</dd>
+    <div v-if="plan && plan.policies.length > 0" class="eu-summary__cards">
+      <article
+        v-for="policy in plan.policies"
+        :key="policy.contractUID"
+        class="eu-summary__card"
+        :aria-labelledby="`eu-policy-${policy.contractUID}`"
+      >
+        <header class="eu-summary__card-head">
+          <h4 :id="`eu-policy-${policy.contractUID}`">
+            {{ policy.contractNumber }}
+            <span class="eu-summary__sub">{{ policy.companyName }} · {{ kindLabel(policy) }}</span>
+          </h4>
+          <EuBadge
+            :tone="POLICY_STATUS_BADGE[policy.status].tone"
+            :icon="POLICY_STATUS_BADGE[policy.status].icon"
+          >
+            {{ POLICY_STATUS_BADGE[policy.status].label }}
+          </EuBadge>
+        </header>
+
+        <div class="eu-summary__metric">
+          <div class="eu-summary__metric-head">
+            <span class="eu-summary__label">Selbstbeteiligung</span>
+            <span v-if="!policy.hasTerms">keine Konditionen</span>
+            <span v-else-if="policy.deductible === 0">keine</span>
+            <span v-else>{{ euro(policy.deductibleUsed) }} von {{ euro(policy.deductible) }}</span>
+          </div>
+          <div v-if="policy.hasTerms && policy.deductible > 0" class="eu-bar" aria-hidden="true">
+            <span
+              class="eu-bar__fill"
+              :style="{ width: `${percentOf(policy.deductibleUsed, policy.deductible)}%` }"
+            />
+          </div>
         </div>
-        <div>
-          <dt>Obergrenze</dt>
-          <dd>{{ policy.reimbursementCap === null ? 'keine' : euro(policy.reimbursementCap) }}</dd>
+
+        <div v-if="policy.reimbursementCap !== null" class="eu-summary__metric">
+          <div class="eu-summary__metric-head">
+            <span class="eu-summary__label">Obergrenze</span>
+            <span>
+              {{ euro(policy.expectedReimbursement) }} von {{ euro(policy.reimbursementCap) }}
+            </span>
+          </div>
+          <div class="eu-bar" aria-hidden="true">
+            <span class="eu-bar__fill" :style="{ width: `${capShares(policy).actual}%` }" />
+            <span
+              class="eu-bar__fill eu-bar__fill--expected"
+              :style="{ width: `${capShares(policy).expected}%` }"
+            />
+          </div>
         </div>
-        <div>
-          <dt>Bonus</dt>
-          <dd>{{ bonusText(policy) }}</dd>
+
+        <div class="eu-summary__metric">
+          <div class="eu-summary__metric-head">
+            <span class="eu-summary__label">Bonus</span>
+            <EuBadge compact :tone="bonusView(policy).tone" :icon="bonusView(policy).icon">
+              {{ bonusView(policy).label }}
+            </EuBadge>
+          </div>
+          <p class="eu-summary__detail">
+            {{ bonusView(policy).detail
+            }}<template v-if="policy.claimFreeStreak !== null"
+              >; Serie: {{ policy.claimFreeStreak }} leistungsfreie(s) Jahr(e)</template
+            >
+          </p>
         </div>
-        <div>
-          <dt>Bereits erstattet</dt>
-          <dd>{{ euro(policy.actualReimbursement) }}</dd>
-        </div>
-        <div>
-          <dt>Erstattung laut Empfehlung</dt>
-          <dd>{{ euro(policy.expectedReimbursement) }}</dd>
-        </div>
-      </dl>
-      <p class="eu-summary__verdict" :class="`tone-${STATUS_BADGE[policy.status].tone}`">
-        {{ verdict(policy) }}
-      </p>
+
+        <dl class="eu-summary__grid">
+          <div>
+            <dt>Bereits erstattet</dt>
+            <dd>{{ euro(policy.actualReimbursement) }}</dd>
+          </div>
+          <div>
+            <dt>Erstattung laut Empfehlung</dt>
+            <dd>{{ euro(policy.expectedReimbursement) }}</dd>
+          </div>
+          <div v-if="policy.reimbursementRate !== 100">
+            <dt>Erstattungssatz</dt>
+            <dd>{{ policy.reimbursementRate }} %</dd>
+          </div>
+        </dl>
+
+        <p class="eu-summary__verdict" :class="`tone-${POLICY_STATUS_BADGE[policy.status].tone}`">
+          {{ policyVerdict(policy, plan) }}
+        </p>
+      </article>
     </div>
+
+    <details v-if="comparison.length > 0" class="eu-summary__compare" open>
+      <summary>Vergleich der Alternativen</summary>
+      <div class="eu-summary__table-wrap">
+        <table class="eu-summary__table">
+          <thead>
+            <tr>
+              <th scope="col">Variante</th>
+              <th scope="col" class="num">Erstattungen</th>
+              <th scope="col" class="num">Boni</th>
+              <th scope="col" class="num">Gesamt</th>
+              <th scope="col" class="num">Differenz</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in comparison"
+              :key="row.key"
+              :class="{ 'is-recommended': row.recommended }"
+            >
+              <th scope="row">
+                {{ row.label }}
+                <EuBadge v-if="row.recommended" compact tone="done" :icon="faStar">
+                  Empfohlen
+                </EuBadge>
+              </th>
+              <td class="num">{{ euro(row.reimbursements) }}</td>
+              <td class="num">{{ euro(row.bonuses) }}</td>
+              <td class="num">{{ euro(row.total) }}</td>
+              <td class="num">{{ row.recommended ? '–' : euro(row.gap) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
   </section>
 </template>
 
@@ -224,31 +245,92 @@ const recommendation = computed(() => {
   margin: 1rem 0 0;
 }
 
-.eu-summary__contract {
+.eu-summary__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 1rem;
   margin-top: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--eu-color-border);
 }
 
-.eu-summary__contract h4 {
+.eu-summary__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--eu-color-border);
+  border-radius: 0.6rem;
+}
+
+.eu-summary__card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.eu-summary__card-head h4 {
+  margin: 0;
+  font-family: var(--eu-font-heading);
+}
+
+.eu-summary__sub {
+  display: block;
+  font-family: var(--eu-font-data);
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: var(--eu-color-text-muted);
+}
+
+.eu-summary__metric-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
-  margin: 0 0 0.6rem;
-  font-family: var(--eu-font-heading);
+  justify-content: space-between;
+  gap: 0.4rem 1rem;
+  font-weight: 600;
+}
+
+.eu-summary__label,
+.eu-summary__grid dt {
+  color: var(--eu-color-text-muted);
+  font-size: 0.8rem;
+  font-weight: normal;
+}
+
+.eu-summary__detail {
+  margin: 0.3rem 0 0;
+  font-size: 0.875rem;
+}
+
+/* Progress bar; purely visual — the values are always spelled out next to it. */
+.eu-bar {
+  display: flex;
+  height: 0.5rem;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background-color: var(--eu-color-border);
+}
+
+.eu-bar__fill {
+  background-color: var(--eu-color-accent);
+}
+
+.eu-bar__fill--expected {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--eu-color-accent) 0 0.25rem,
+    transparent 0.25rem 0.5rem
+  );
+  background-color: transparent;
 }
 
 .eu-summary__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   gap: 0.5rem 1.5rem;
   margin: 0;
-}
-
-.eu-summary__grid dt {
-  color: var(--eu-color-text-muted);
-  font-size: 0.8rem;
 }
 
 .eu-summary__grid dd {
@@ -257,7 +339,7 @@ const recommendation = computed(() => {
 }
 
 .eu-summary__verdict {
-  margin: 0.75rem 0 0;
+  margin: auto 0 0;
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
 }
@@ -280,5 +362,53 @@ const recommendation = computed(() => {
 .eu-summary__verdict.tone-neutral {
   border: 1px solid var(--eu-color-border);
   color: var(--eu-color-text-muted);
+}
+
+.eu-summary__compare {
+  margin-top: 1.25rem;
+}
+
+.eu-summary__compare summary {
+  cursor: pointer;
+  font-family: var(--eu-font-heading);
+}
+
+.eu-summary__table-wrap {
+  overflow-x: auto;
+  margin-top: 0.6rem;
+}
+
+.eu-summary__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.eu-summary__table th,
+.eu-summary__table td {
+  padding: 0.45rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--eu-color-border);
+  white-space: nowrap;
+}
+
+.eu-summary__table thead th {
+  font-family: var(--eu-font-heading);
+  color: var(--eu-color-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.eu-summary__table tbody th {
+  font-weight: normal;
+}
+
+.eu-summary__table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.eu-summary__table tr.is-recommended {
+  font-weight: 600;
 }
 </style>

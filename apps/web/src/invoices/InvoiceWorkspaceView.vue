@@ -50,6 +50,8 @@ import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
 import ObjectionDialog from './ObjectionDialog.vue';
 import PaymentInfoPopover from './PaymentInfoPopover.vue';
+import RecommendationBadge from './RecommendationBadge.vue';
+import { type InvoiceBadgeView, invoiceBadge } from './recommendation';
 import SettleDialog from './SettleDialog.vue';
 import SubmitDialog from './SubmitDialog.vue';
 import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, calcPaymentState } from './payment';
@@ -79,6 +81,16 @@ const agencyIbanMap = computed(() =>
   Object.fromEntries([...agencyById.value].map(([uid, a]) => [uid, a.bankAccount])),
 );
 const plan = ref<ReimbursementPlanDto | null>(null);
+/** The optimizer's advice per invoice; invoices with nothing to do have no entry. */
+const recommendationBadges = computed(() => {
+  const policies = new Map((plan.value?.policies ?? []).map((p) => [p.contractUID, p]));
+  const badges = new Map<string, InvoiceBadgeView>();
+  for (const invoicePlan of plan.value?.invoices ?? []) {
+    const badge = invoiceBadge(invoicePlan, policies);
+    if (badge) badges.set(invoicePlan.invoiceUID, badge);
+  }
+  return badges;
+});
 const selected = ref<Set<string>>(new Set());
 
 const loading = ref(false);
@@ -543,6 +555,10 @@ function confirmDelete(): void {
                 >
                   <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
                 </span>
+                <RecommendationBadge
+                  v-if="recommendationBadges.has(invoice.invoiceUID)"
+                  :badge="recommendationBadges.get(invoice.invoiceUID)!"
+                />
               </div>
             </td>
             <td>{{ germanDate(invoice.invoiceDate) }}</td>

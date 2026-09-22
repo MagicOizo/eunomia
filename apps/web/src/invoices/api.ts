@@ -109,6 +109,10 @@ export interface PlanPolicyDto {
   status: 'spare' | 'submit' | 'wait' | 'exhausted';
   actualReimbursement: number;
   expectedReimbursement: number;
+  /** Deductible the year's costs fill (for a spared policy: as if it were used). */
+  deductibleUsed: number;
+  /** Invoice amounts not excluded at this policy. */
+  eligibleCosts: number;
   /** For a spared policy with a bonus at stake: further costs above which using it pays off. */
   worthUsingAbove: number | null;
 }
@@ -116,10 +120,14 @@ export interface PlanPolicyDto {
 export type PlanInvoicePolicyAction =
   'excluded' | 'answered' | 'submitted' | 'submit' | 'wait' | 'withdraw' | 'none';
 
+export type PlanInvoiceAction =
+  'submit' | 'withdraw' | 'wait' | 'hold' | 'done' | 'not-reimbursable';
+
 export interface PlanInvoiceDto {
   invoiceUID: string;
   invoiceNumber: string | null;
-  action: 'submit' | 'withdraw' | 'wait' | 'hold' | 'done' | 'not-reimbursable';
+  action: PlanInvoiceAction;
+  /** In processing order: full policies before supplementary ones. */
   policies: Array<{ contractUID: string; action: PlanInvoicePolicyAction; reimbursement: number }>;
 }
 

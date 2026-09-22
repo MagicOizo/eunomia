@@ -498,6 +498,18 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 
 **DoD:** Für die Beispieljahre zeigt die Übersicht die richtige Empfehlung inkl. Betragsvergleich; responsiv, Light/Dark, axe ohne kritische Findings.
 
+**Entscheidungen (Planmodus):**
+- Das Badge je Rechnung ist **möglichst schmal** (kompaktes Badge: Farbe + Icon + ein Wort), die Details stehen im Tooltip. Es gibt **keine neue Spalte**, das Badge sitzt in der Status-Zelle.
+- Rechnungen ohne Handlungsbedarf (`done`) bekommen kein Badge.
+- Die Zusammenfassung bleibt unter der Tabelle.
+
+**Umgesetzt (2026-09-22).** Entscheidungen beim Bau:
+- Der Optimizer liefert je Police zusätzlich `deductibleUsed` (von beantworteten und modellierten Rechnungen gefüllte SB) und `eligibleCosts`. Bei einer geschonten Police wird die SB so gezählt, als würde sie zusätzlich genutzt, damit der Fortschritt zeigt, wie nah die Kosten schon an der SB sind.
+- Reine Anzeigelogik in `invoices/recommendation.ts` (Badge je Rechnung, Bonuslage, Strategie-Beschriftung, Hinweistexte), unit-getestet mit den Beispieljahren. Badges: Einreichen / Rest (erste Police hat schon geantwortet) / Zurückziehen / Abwarten / Zurückhalten / Nicht erstattbar.
+- Bonuslage: **Sicher** (im Spiel, geschont, nichts offen), **In Gefahr** (die Empfehlung nutzt die Police, oder eine Einreichung dort ist noch unbeantwortet), **Verwirkt**, **Erhalten**, **Kein Bonus**.
+- Karte je Police mit Balken für SB und Obergrenze (bei der Obergrenze: tatsächlich erstattet voll, erwartet schraffiert). Die Balken sind rein visuell, die Werte stehen immer als Text daneben. Der Vergleich der Alternativen ist eine aufklappbare Tabelle (Erstattungen, Boni, Gesamt, Differenz), die empfohlene Zeile ist mit „Empfohlen“ + Icon markiert.
+- `EuBadge` hat ein `compact`-Prop, `EuTooltip` ein `plain`-Prop (ohne Unterstreichung) und positioniert jetzt `fixed` mit Umbruch, damit Tabellen-Wrapper mit `overflow` den Tooltip nicht abschneiden.
+
 ---
 
 ## Slice 21 — Rechnungs-Detaildialog mit Einreichungs-/Abrechnungs-Block (bisher Slice 16)

@@ -8,7 +8,11 @@ import { ref, useId, useTemplateRef } from 'vue';
  * Chromium-only — see Notes/eunomia-plan.md, 2.7. Shown on hover *and*
  * keyboard focus so keyboard-only users can reach the same information.
  */
-const props = defineProps<{ text: string }>();
+const props = defineProps<{
+  text: string;
+  /** Drops the dotted underline, for triggers that already look interactive (e.g. a badge). */
+  plain?: boolean;
+}>();
 
 const referenceRef = useTemplateRef<HTMLElement>('reference');
 const floatingRef = useTemplateRef<HTMLElement>('floating');
@@ -17,6 +21,8 @@ const tooltipId = useId();
 
 const { floatingStyles } = useFloating(referenceRef, floatingRef, {
   placement: 'top',
+  // Fixed, so a scrolling ancestor (e.g. a table wrapper) does not clip it.
+  strategy: 'fixed',
   middleware: [offset(8), flip(), shift({ padding: 8 })],
   whileElementsMounted: autoUpdate,
 });
@@ -33,6 +39,7 @@ function hide(): void {
   <span
     ref="reference"
     class="eu-tooltip-trigger"
+    :class="{ 'eu-tooltip-trigger--plain': props.plain }"
     tabindex="0"
     :aria-describedby="isOpen ? tooltipId : undefined"
     @mouseenter="show"
@@ -60,7 +67,14 @@ function hide(): void {
   cursor: help;
 }
 
+.eu-tooltip-trigger--plain {
+  border-bottom: none;
+}
+
 .eu-tooltip {
+  z-index: 30;
+  /* Triggers often sit in nowrap table cells; the bubble itself must wrap. */
+  white-space: normal;
   background-color: var(--eu-color-text);
   color: var(--eu-color-surface-bg);
   padding: 0.35em 0.6em;

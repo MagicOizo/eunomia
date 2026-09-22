@@ -143,6 +143,14 @@ export interface PolicyPlan {
   /** Actual plus modelled reimbursement in the recommended strategy. */
   expectedReimbursement: number;
   /**
+   * Deductible the year's costs fill at this policy: in the recommended
+   * strategy if it is used there, else as if it were used on top of it — so a
+   * spared policy shows how close its costs already come.
+   */
+  deductibleUsed: number;
+  /** Invoice amounts not excluded at this policy. */
+  eligibleCosts: number;
+  /**
    * Only for a spared `choice` policy: further invoice costs above which
    * using it beats sparing it, or null when it never does (e.g. its cap
    * stays below the bonus). Undefined for every other policy.
@@ -166,6 +174,8 @@ const toEuros = (cents: number): number => cents / 100;
 interface Scenario {
   /** Cents per policy, actual plus modelled. */
   reimbursed: Map<string, number>;
+  /** Deductible cents consumed per policy, by answered and modelled invoices. */
+  deductibleUsed: Map<string, number>;
   /** Modelled cents per invoice and policy, for the used policies it contributes to. */
   modelled: Map<string, Map<string, number>>;
   bonusCents: number;
@@ -204,6 +214,7 @@ function runScenario(
   }
 
   const reimbursed = new Map<string, number>();
+  const deductibleUsed = new Map<string, number>();
   const modelled = new Map<string, Map<string, number>>();
   let bonusCents = 0;
 
@@ -248,11 +259,12 @@ function runScenario(
       bonusCents += toCents(policy.bonusAmount);
     }
     reimbursed.set(policy.contractUID, policyCents);
+    deductibleUsed.set(policy.contractUID, toCents(policy.deductible) - deductibleLeft);
   }
 
   let totalCents = bonusCents;
   for (const cents of reimbursed.values()) totalCents += cents;
-  return { reimbursed, modelled, bonusCents, totalCents };
+  return { reimbursed, deductibleUsed, modelled, bonusCents, totalCents };
 }
 
 /** Every allowed set of used policies: forfeited ones always, choices in all combinations. */
@@ -410,10 +422,15 @@ export function optimizeReimbursement(input: OptimizerInput): OptimizerResult {
 
   const policyPlans: PolicyPlan[] = policies.map((policy) => {
     let actualCents = 0;
+    let eligibleCents = 0;
     for (const invoice of invoices) {
-      const actual = invoice.policies[policy.contractUID]?.actualReimbursement;
-      if (actual != null) actualCents += toCents(actual);
+      const state = invoice.policies[policy.contractUID];
+      if (state?.actualReimbursement != null) actualCents += toCents(state.actualReimbursement);
+      if (!state?.excluded) eligibleCents += toCents(invoice.amount);
     }
+    const deductibleScenario = best.used.has(policy.contractUID)
+      ? best.scenario
+      : runScenario(policies, invoices, new Set([...best.used, policy.contractUID]));
     const plan: PolicyPlan = {
       contractUID: policy.contractUID,
       bonusMode: policy.bonusMode,
@@ -422,6 +439,8 @@ export function optimizeReimbursement(input: OptimizerInput): OptimizerResult {
       status: statuses.get(policy.contractUID) ?? 'submit',
       actualReimbursement: toEuros(actualCents),
       expectedReimbursement: toEuros(best.scenario.reimbursed.get(policy.contractUID) ?? 0),
+      deductibleUsed: toEuros(deductibleScenario.deductibleUsed.get(policy.contractUID) ?? 0),
+      eligibleCosts: toEuros(eligibleCents),
     };
     if (thresholds.has(policy.contractUID)) {
       plan.worthUsingAbove = thresholds.get(policy.contractUID) ?? null;

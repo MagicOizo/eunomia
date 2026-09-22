@@ -13,9 +13,15 @@ import { computed } from 'vue';
 const props = defineProps<{
   tone: 'open' | 'submitted' | 'partial' | 'billed' | 'done' | 'neutral';
   icon?: IconDefinition;
+  /** Smaller variant for dense table cells. */
+  compact?: boolean;
 }>();
 
-const classes = computed(() => ['eu-badge', `eu-badge--${props.tone}`]);
+const classes = computed(() => [
+  'eu-badge',
+  `eu-badge--${props.tone}`,
+  { 'eu-badge--compact': props.compact },
+]);
 </script>
 
 <template>
@@ -35,6 +41,12 @@ const classes = computed(() => ['eu-badge', `eu-badge--${props.tone}`]);
   font-family: var(--eu-font-data);
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+.eu-badge--compact {
+  gap: 0.3em;
+  padding: 0.1em 0.5em;
+  font-size: 0.75rem;
 }
 
 .eu-badge--open {
