@@ -57,6 +57,16 @@ const classes = computed(() => [
   border-radius: 0.375em;
   border: 2px solid transparent;
   cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eu-button {
+    transition: none;
+  }
 }
 
 .eu-button:disabled {
@@ -69,10 +79,21 @@ const classes = computed(() => [
   color: var(--eu-color-text-inverse);
 }
 
+/* Darkening keeps the white label above AA contrast. */
+.eu-button--primary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--eu-color-accent) 85%, black);
+}
+
 .eu-button--secondary {
   background-color: transparent;
   color: var(--eu-color-accent-text);
   border-color: var(--eu-color-accent);
+}
+
+/* A light tint: subtle, keeps the label contrast. Based on the soft accent,
+   which stays visible on the dark surface (the fill accent nearly vanishes). */
+.eu-button--secondary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--eu-color-accent-soft) 16%, transparent);
 }
 
 /* Low-emphasis icon actions (e.g. a popover/dialog close): muted by default,
