@@ -43,10 +43,24 @@ const emit = defineEmits<{ 'update:modelValue': [value: DetailValue] }>();
 const isEmpty = computed(
   () => props.modelValue === null || props.modelValue === undefined || props.modelValue === '',
 );
-const clearable = computed(() => props.type === 'text' || props.type === 'date' || props.type === 'currency' || props.type === 'select');
-const canReset = computed(
-  () => props.type !== 'readonly' && props.savedValue !== undefined && props.modelValue !== props.savedValue,
+const clearable = computed(
+  () =>
+    props.type === 'text' ||
+    props.type === 'date' ||
+    props.type === 'currency' ||
+    props.type === 'select',
 );
+const canReset = computed(
+  () =>
+    props.type !== 'readonly' &&
+    props.savedValue !== undefined &&
+    props.modelValue !== props.savedValue,
+);
+// Narrowed per editor type. The casts live here because in a template binding
+// the `|` of a union type is flagged as a Vue 2 filter.
+const numberValue = computed(() => props.modelValue as number | null);
+const stringValue = computed(() => props.modelValue as string | null);
+const booleanValue = computed(() => props.modelValue as boolean);
 
 function onText(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
@@ -82,7 +96,7 @@ function reset(): void {
           v-else-if="type === 'currency'"
           bare
           :label="label"
-          :model-value="(modelValue as number | null)"
+          :model-value="numberValue"
           @update:model-value="emit('update:modelValue', $event)"
         />
         <EuEntityPicker
@@ -92,13 +106,13 @@ function reset(): void {
           :required="required"
           :disabled="disabled"
           :options="options"
-          :model-value="(modelValue as string | null)"
+          :model-value="stringValue"
           @update:model-value="emit('update:modelValue', $event)"
         />
         <EuToggle
           v-else-if="type === 'toggle'"
           label=""
-          :model-value="(modelValue as boolean)"
+          :model-value="booleanValue"
           @update:model-value="emit('update:modelValue', $event)"
         />
       </slot>
