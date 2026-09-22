@@ -1,15 +1,16 @@
 <script setup lang="ts">
+import { faPaperPlane, faPiggyBank } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import { euro } from '../lib/format';
-import type { InvoiceDto, ReimbursementAnalysisDto } from './api';
+import type { InvoiceDto, PlanPolicyDto, ReimbursementPlanDto } from './api';
 import { STATUS_DISPLAY, STATUS_ORDER } from './status';
 
 const props = defineProps<{
   invoices: InvoiceDto[];
-  /** One entry per contract of the account, for the active year. */
-  contractAnalyses: Array<{ label: string; analysis: ReimbursementAnalysisDto }>;
+  /** The reimbursement optimizer's plan for the account and the active year. */
+  plan: ReimbursementPlanDto | null;
 }>();
 
 const totalSpend = computed(() =>
@@ -23,6 +24,69 @@ const distribution = computed(() =>
     count: props.invoices.filter((inv) => inv.workflowStatus === status).length,
   })),
 );
+
+const label = (policy: PlanPolicyDto): string =>
+  `${policy.contractNumber} · ${policy.companyName} (${
+    policy.contractKind === 'FULL' ? 'Vollversicherung' : 'Zusatzversicherung'
+  })`;
+
+function bonusText(policy: PlanPolicyDto): string {
+  switch (policy.bonusStatus) {
+    case 'at-stake':
+      return policy.tiersInherited
+        ? `${euro(policy.bonusAmount)} erwartet (Staffel nicht aktualisiert)`
+        : `${euro(policy.bonusAmount)} erwartet`;
+    case 'paid':
+      return `${euro(policy.bonusAmount)} erhalten`;
+    case 'forfeited':
+      return 'verwirkt';
+    default:
+      return 'kein Bonus';
+  }
+}
+
+function verdict(policy: PlanPolicyDto): string {
+  if (policy.recommendation === 'spare') {
+    if (policy.bonusStatus === 'paid')
+      return 'Bonus bereits erhalten – hier nicht mehr einreichen.';
+    const above =
+      policy.worthUsingAbove === null
+        ? 'Das bleibt auch bei höheren Kosten so, weil die Obergrenze unter dem Bonus liegt.'
+        : `Einreichen lohnt sich erst, wenn mehr als ${euro(policy.worthUsingAbove)} weitere Kosten dazukommen.`;
+    return `Schonen: der Bonus ist mehr wert als die mögliche Erstattung. ${above}`;
+  }
+  if (policy.bonusStatus === 'at-stake') {
+    const streak =
+      policy.claimFreeStreak === null
+        ? ''
+        : ` Dafür endet die Serie von ${policy.claimFreeStreak} leistungsfreien Jahren.`;
+    return `Einreichen: die Erstattung übersteigt den Bonus.${streak}`;
+  }
+  if (policy.bonusStatus === 'forfeited') {
+    return 'Einreichen: der Bonus ist in diesem Jahr bereits verwirkt.';
+  }
+  return 'Einreichen: hier ist kein Bonus im Spiel.';
+}
+
+const recommendation = computed(() => {
+  const plan = props.plan;
+  const best = plan?.strategies[0];
+  if (!plan || !best || plan.policies.length === 0) return null;
+  const numbers = (uids: string[]) =>
+    uids
+      .map((uid) => plan.policies.find((p) => p.contractUID === uid)?.contractNumber)
+      .filter(Boolean)
+      .join(', ');
+  const used = numbers(best.usedContractUIDs);
+  const spared = numbers(best.sparedContractUIDs);
+  const parts = [used ? `bei ${used} einreichen` : 'nirgends einreichen'];
+  if (spared) parts.push(`${spared} schonen`);
+  return {
+    text: parts.join(', '),
+    total: best.total,
+    advantage: plan.advantage,
+  };
+});
 </script>
 
 <template>
@@ -41,60 +105,55 @@ const distribution = computed(() =>
       <span class="eu-summary__spend">Gesamtausgaben: {{ euro(totalSpend) }}</span>
     </div>
 
+    <p v-if="recommendation" class="eu-summary__recommendation">
+      <strong>Empfehlung:</strong> {{ recommendation.text }} – Erstattungen und Boni zusammen
+      {{ euro(recommendation.total)
+      }}<template v-if="recommendation.advantage !== null && recommendation.advantage > 0"
+        >, {{ euro(recommendation.advantage) }} mehr als die nächstbeste Variante</template
+      >.
+    </p>
+
     <div
-      v-for="item in contractAnalyses"
-      :key="item.analysis.contractUID"
+      v-for="policy in plan?.policies ?? []"
+      :key="policy.contractUID"
       class="eu-summary__contract"
     >
-      <h4>{{ item.label }}</h4>
+      <h4>
+        {{ label(policy) }}
+        <EuBadge
+          :tone="policy.recommendation === 'use' ? 'submitted' : 'done'"
+          :icon="policy.recommendation === 'use' ? faPaperPlane : faPiggyBank"
+        >
+          {{ policy.recommendation === 'use' ? 'Einreichen' : 'Schonen' }}
+        </EuBadge>
+      </h4>
       <dl class="eu-summary__grid">
         <div>
           <dt>Selbstbeteiligung</dt>
-          <dd>{{ euro(item.analysis.deductible) }}</dd>
-        </div>
-        <div>
-          <dt>Bonus</dt>
-          <dd>
-            {{ item.analysis.bonusPending ? 'noch nicht erfasst' : euro(item.analysis.bonus) }}
-          </dd>
+          <dd>{{ policy.hasTerms ? euro(policy.deductible) : 'keine Konditionen' }}</dd>
         </div>
         <div>
           <dt>Obergrenze</dt>
-          <dd>{{ euro(item.analysis.reimbursementCap) }}</dd>
+          <dd>{{ policy.reimbursementCap === null ? 'keine' : euro(policy.reimbursementCap) }}</dd>
         </div>
         <div>
-          <dt>Rechnungssumme (Jahr)</dt>
-          <dd>{{ euro(item.analysis.invoiceTotal) }}</dd>
+          <dt>Bonus</dt>
+          <dd>{{ bonusText(policy) }}</dd>
         </div>
         <div>
           <dt>Bereits erstattet</dt>
-          <dd>{{ euro(item.analysis.alreadyReimbursed) }}</dd>
+          <dd>{{ euro(policy.actualReimbursement) }}</dd>
         </div>
         <div>
-          <dt>Mögliche Erstattung</dt>
-          <dd>{{ euro(item.analysis.analysis.reimbursement) }}</dd>
+          <dt>Erstattung laut Empfehlung</dt>
+          <dd>{{ euro(policy.expectedReimbursement) }}</dd>
         </div>
       </dl>
-      <p v-if="item.analysis.bonusPending" class="eu-summary__verdict not-worth">
-        Mögliche Erstattung nach Selbstbeteiligung und Obergrenze:
-        {{ euro(item.analysis.analysis.reimbursement) }}. Der Bonus ist noch nicht berücksichtigt –
-        ob sich das Einreichen lohnt, lässt sich noch nicht bewerten.
-      </p>
       <p
-        v-else
         class="eu-summary__verdict"
-        :class="item.analysis.analysis.worthSubmitting ? 'is-worth' : 'not-worth'"
+        :class="policy.recommendation === 'use' ? 'is-worth' : 'not-worth'"
       >
-        <template v-if="item.analysis.analysis.worthSubmitting">
-          ✓ Einreichen lohnt sich – die Erstattung übersteigt den Bonus.
-        </template>
-        <template v-else-if="item.analysis.analysis.shortfallToBreakEven !== null">
-          Noch nicht lohnend: erst ab {{ euro(item.analysis.analysis.shortfallToBreakEven) }} mehr
-          Rechnungssumme übersteigt die Erstattung den Bonus.
-        </template>
-        <template v-else>
-          Einreichen lohnt sich hier nicht – die Obergrenze bleibt unter dem Bonus.
-        </template>
+        {{ verdict(policy) }}
       </p>
     </div>
   </section>
@@ -126,6 +185,10 @@ const distribution = computed(() =>
   font-weight: 600;
 }
 
+.eu-summary__recommendation {
+  margin: 1rem 0 0;
+}
+
 .eu-summary__contract {
   margin-top: 1.25rem;
   padding-top: 1rem;
@@ -133,6 +196,10 @@ const distribution = computed(() =>
 }
 
 .eu-summary__contract h4 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
   margin: 0 0 0.6rem;
   font-family: var(--eu-font-heading);
 }

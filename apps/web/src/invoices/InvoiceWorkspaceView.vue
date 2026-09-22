@@ -27,7 +27,7 @@ import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/useTableSort';
 import {
   type InvoiceDto,
-  type ReimbursementAnalysisDto,
+  type ReimbursementPlanDto,
   createAllocation,
   createBilling,
   createInvoice,
@@ -35,7 +35,7 @@ import {
   deleteInvoice,
   listInvoiceYears,
   listInvoices,
-  reimbursementAnalysis,
+  reimbursementPlan,
   updateBilling,
   updateInvoice,
 } from './api';
@@ -78,7 +78,7 @@ const agencyById = ref<Map<string, { name: string; bankAccount: string }>>(new M
 const agencyIbanMap = computed(() =>
   Object.fromEntries([...agencyById.value].map(([uid, a]) => [uid, a.bankAccount])),
 );
-const analyses = ref<Array<{ label: string; analysis: ReimbursementAnalysisDto }>>([]);
+const plan = ref<ReimbursementPlanDto | null>(null);
 const selected = ref<Set<string>>(new Set());
 
 const loading = ref(false);
@@ -192,12 +192,7 @@ function paymentView(invoice: InvoiceDto) {
 async function loadYearData(): Promise<void> {
   selected.value = new Set();
   invoices.value = await listInvoices(props.accountUID, activeYear.value);
-  analyses.value = await Promise.all(
-    contracts.value.map(async (c) => ({
-      label: contractLabel(c),
-      analysis: await reimbursementAnalysis(c.contractUID, activeYear.value),
-    })),
-  );
+  plan.value = await reimbursementPlan(props.accountUID, activeYear.value);
 }
 
 async function refreshYears(): Promise<void> {
@@ -678,7 +673,7 @@ function confirmDelete(): void {
     <InvoiceSummary
       v-if="!loading && !loadError && invoices.length > 0"
       :invoices="invoices"
-      :contract-analyses="analyses"
+      :plan="plan"
     />
 
     <InvoiceDetailDialog

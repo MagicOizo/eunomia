@@ -81,23 +81,62 @@ export interface BillingListDto extends BillingDto {
   invoiceNumbers: string | null;
 }
 
-export interface ReimbursementAnalysisDto {
+/** How a policy's bonus stands in the planned year (see the API's reimbursement-plan.ts). */
+export type PlanBonusStatus = 'at-stake' | 'forfeited' | 'paid' | 'none';
+
+export interface PlanPolicyDto {
   contractUID: string;
-  year: number;
+  contractNumber: string;
+  companyName: string;
+  contractKind: 'FULL' | 'SUPPLEMENTARY';
+  /** False when no terms exist for the year: deductible 0, no cap, 100 % are assumed. */
+  hasTerms: boolean;
   deductible: number;
-  bonus: number;
-  /** True while the bonus scale is not modelled yet (Slice 18): `bonus` is then 0. */
-  bonusPending: boolean;
   reimbursementCap: number | null;
+  reimbursementRate: number;
+  bonusStatus: PlanBonusStatus;
+  /** Bonus at stake or received; 0 when forfeited or none. */
+  bonusAmount: number;
+  /** Claim-free streak a use would break; null unless the bonus is at stake. */
+  claimFreeStreak: number | null;
+  pendingClaims: number;
+  tiersInherited: boolean;
+  recommendation: 'use' | 'spare';
+  actualReimbursement: number;
+  expectedReimbursement: number;
+  /** For a spared policy with a bonus at stake: further costs above which using it pays off. */
+  worthUsingAbove: number | null;
+}
+
+export type PlanInvoicePolicyAction =
+  'excluded' | 'answered' | 'submitted' | 'submit' | 'withdraw' | 'none';
+
+export interface PlanInvoiceDto {
+  invoiceUID: string;
+  invoiceNumber: string | null;
+  action: 'submit' | 'withdraw' | 'hold' | 'done' | 'not-reimbursable';
+  policies: Array<{ contractUID: string; action: PlanInvoicePolicyAction; reimbursement: number }>;
+}
+
+export interface PlanStrategyDto {
+  usedContractUIDs: string[];
+  sparedContractUIDs: string[];
+  reimbursements: Record<string, number>;
+  bonusTotal: number;
+  total: number;
+}
+
+/** The reimbursement optimizer's plan for one insured person and treatment year. */
+export interface ReimbursementPlanDto {
+  accountUID: string;
+  year: number;
   invoiceTotal: number;
-  alreadyReimbursed: number;
-  analysis: {
-    reimbursement: number;
-    worthSubmitting: boolean;
-    cappedOut: boolean;
-    breakEvenInvoiceTotal: number | null;
-    shortfallToBreakEven: number | null;
-  };
+  /** Lead of the recommended strategy over the next best; null if there is no alternative. */
+  advantage: number | null;
+  /** Best first; the first one is the recommendation. */
+  strategies: PlanStrategyDto[];
+  policies: PlanPolicyDto[];
+  invoices: PlanInvoiceDto[];
 }
 
 const unwrap = <T>(res: { data: T }): T => res.data;
@@ -232,13 +271,13 @@ export async function createAllocation(body: {
   await apiFetch('/allocations', { method: 'POST', body });
 }
 
-export async function reimbursementAnalysis(
-  contractUID: string,
+export async function reimbursementPlan(
+  accountUID: string,
   year: number,
-): Promise<ReimbursementAnalysisDto> {
+): Promise<ReimbursementPlanDto> {
   return unwrap(
-    await apiFetch<{ data: ReimbursementAnalysisDto }>(
-      `/contracts/${contractUID}/reimbursement-analysis?year=${year}`,
+    await apiFetch<{ data: ReimbursementPlanDto }>(
+      `/accounts/${accountUID}/reimbursement-plan?year=${year}`,
     ),
   );
 }

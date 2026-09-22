@@ -454,7 +454,7 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 
 **Entscheidungen (Planmodus):**
 - Beim Erfassen der Erstattung ein **Schalter „Diese Abrechnung verwirkt den Bonus“**, vorbelegt aus der Regel der Police (und bei „erst durch Erstattung“ aus dem Betrag > 0). Gespeichert wird immer ein fester Wert; `NULL` bleibt nur für Abrechnungen ohne diese Abfrage und folgt der Regel.
-- Die Jahres-Zusammenfassung der Rechnungsübersicht bleibt bis Slice 19 unverändert (`bonusPending`).
+- Die Jahres-Zusammenfassung der Rechnungsübersicht bleibt bis Slice 19 unverändert (`bonusPending`) — in Slice 19 auf den Erstattungsplan umgestellt.
 
 **Umgesetzt (2026-09-22).** Entscheidungen beim Bau:
 - Migration `008-bonus-scale`: `ContractBonusTiers` (PK `termsUID` + Jahre, als Menge ersetzt, ohne UID/Status), `ContractYears` (PK Police + Jahr, hart gelöscht, sobald alle Felder leer sind), `ServiceBillings.forfeitsBonus` (nullable).
@@ -471,6 +471,19 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - Tests: die drei Beispieljahre aus 2.3 wörtlich, dazu Grenzfälle (keine Zusatzversicherung, Obergrenze < Bonus, Bonus bereits verwirkt, alle Rechnungen ausgeschlossen, Erstattungssatz < 100 %).
 
 **DoD:** Alle Beispieljahre liefern die erwartete Empfehlung; der Endpoint liefert Strategie, Schwellen und Empfehlung je Rechnung.
+
+**Entscheidungen (Planmodus):**
+- **Realität hat Vorrang:** Erfasste Einreichungen, Erstattungen, verwirkte Boni und tatsächlich erhaltene Rückerstattungen gehen fest ein; modelliert wird nur, was noch offen ist.
+- Verglichen wird nur der Bonus des betrachteten Jahres; dass ein verwirktes Jahr auch die Serie der Folgejahre zurücksetzt, wird als Hinweis angezeigt, aber nicht in € eingerechnet.
+- Der alte Endpoint entfällt; die Zusammenfassung der Rechnungsübersicht wird minimal auf den Plan umgestellt. Der Neuentwurf mit Alternativen-Vergleich und Badges je Rechnung bleibt Slice 20.
+
+**Umgesetzt (2026-09-22).** Entscheidungen beim Bau:
+- Reine Funktion `domain/reimbursement-optimizer.ts` (Cent-Arithmetik), Loader und Endpoint in `domain/reimbursement-plan.ts`; `reimbursement.ts` und `reimbursement-analysis.ts` sind entfernt.
+- Bonus-Modus je Police aus dem Jahr der Slice-18-Timeline: `choice` (Bonus erwartet, nicht verwirkt) wird enumeriert; `forfeited` (verwirkt, keine Staffel oder Jahr außerhalb der Zählung) wird immer genutzt; `paid` (tatsächliche Rückerstattung erfasst) wird immer geschont.
+- Reihenfolge: Vollversicherungen vor Zusatzversicherungen (dann nach Vertragsnummer), Rechnungen nach Behandlungsdatum. SB und Obergrenze einer Police werden zuerst von den schon abgerechneten Rechnungen verbraucht (verbrauchte SB ≈ Betrag − Erstattung/Satz), dann von den modellierten. Basis einer Rechnung ist ihr noch offener Betrag, deshalb gilt das Bereicherungsverbot auch im Modell.
+- Bei Gleichstand gewinnt die Strategie, die mehr Policen schont.
+- Schwelle `worthUsingAbove` nur für geschonte Policen mit Bonus im Spiel: weitere Kosten (hypothetische, überall erstattungsfähige Rechnung), ab denen das Nutzen mit dem Schonen gleichzieht; `null`, wenn das nie passiert (z. B. Obergrenze < Bonus). Gesucht in 10-€-Schritten, dann per Bisektion auf den Cent.
+- Empfehlung je Rechnung und Police: `answered`, `submitted`, `submit`, `withdraw` (liegt ohne Abrechnung bei einer geschonten Police), `excluded`, `none`; daraus die Gesamtaktion `submit`/`withdraw`/`hold`/`done`/`not-reimbursable`. Eine genutzte Police wird auch unterhalb der SB empfohlen, weil die Rechnung dort auf die SB zählt; eine Zusatzversicherung mit ausgeschöpfter Obergrenze nicht mehr.
 
 ## Slice 20 — Übersicht & Empfehlungen
 **Ziel:** In der Rechnungsübersicht ist auf einen Blick klar, wo welche Rechnung eingereicht werden sollte.

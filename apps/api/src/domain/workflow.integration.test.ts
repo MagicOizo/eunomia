@@ -15,6 +15,7 @@ import { hashPassword } from '../lib/password.js';
  * allocate -> settle, plus the cross-entity invariants and account scoping.
  * Slice 17 adds the multi-policy loop: partial reimbursement at x, remainder
  * at y, exclusions, withdrawal and the "no enrichment" rule.
+ * Slice 19 checks the reimbursement plan against that recorded reality.
  * Skips when no DB is configured; CI provides one.
  */
 
@@ -311,21 +312,48 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       },
     );
 
-    await t.test('reimbursement analysis reflects the year total', async () => {
-      const res = await request(app)
-        .get(`/api/v1/contracts/${contractA}/reimbursement-analysis?year=2024`)
-        .set(admin);
+    const plan = async (
+      account: string,
+      query = 'year=2024',
+      headers: Record<string, string> = admin,
+    ) => request(app).get(`/api/v1/accounts/${account}/reimbursement-plan?${query}`).set(headers);
+    type PlanInvoice = {
+      invoiceUID: string;
+      action: string;
+      policies: Array<{ contractUID: string; action: string; reimbursement: number }>;
+    };
+    type PlanPolicy = Record<string, unknown> & { contractUID: string };
+    const planPolicy = (body: { data: { policies: PlanPolicy[] } }, uid: string) =>
+      body.data.policies.find((p) => p.contractUID === uid);
+    const planInvoice = (body: { data: { invoices: PlanInvoice[] } }, uid: string) =>
+      body.data.invoices.find((i) => i.invoiceUID === uid);
+
+    await t.test('the reimbursement plan builds on the recorded reality', async () => {
+      const res = await plan(accountA);
       assert.equal(res.status, 200);
       // account A's active 2024 invoices: 500 + 500 + the 100 "loose" one = 1100.
       assert.equal(res.body.data.invoiceTotal, 1100);
-      assert.equal(res.body.data.alreadyReimbursed, 200);
-      // Deductible comes from the contract terms in force for 2024.
-      assert.equal(res.body.data.deductible, 300);
-      assert.equal(res.body.data.analysis.reimbursement, 800); // 1100 - 300 deductible
-      // No bonus scale yet (Slice 18): the bonus is 0 and flagged as pending.
-      assert.equal(res.body.data.bonus, 0);
-      assert.equal(res.body.data.bonusPending, true);
-      assert.equal(res.body.data.analysis.worthSubmitting, true);
+      const x = planPolicy(res.body, contractA);
+      assert.equal(x?.deductible, 300);
+      // The 200 € reimbursement already forfeited the year, so x is simply used.
+      assert.equal(x?.bonusStatus, 'forfeited');
+      assert.equal(x?.recommendation, 'use');
+      assert.equal(x?.actualReimbursement, 200);
+      // The answered 500 € invoice used up the deductible (500 - 200 paid > 300),
+      // so the rest is modelled in full: 200 actual + 500 + 100.
+      assert.equal(x?.expectedReimbursement, 800);
+      assert.equal(planInvoice(res.body, inv1)?.policies[0]?.action, 'answered');
+      assert.equal(planInvoice(res.body, inv2)?.action, 'done');
+      const loose = res.body.data.invoices.find(
+        (i: PlanInvoice & { invoiceNumber: string }) => i.invoiceNumber === 'R-loose',
+      );
+      assert.equal(loose?.action, 'submit');
+
+      const badYear = await plan(accountA, 'year=abc');
+      assert.equal(badYear.status, 400);
+      const scoped = await scopedNutzer(pool, app, 'plan-scope@example.com', accountB);
+      assert.equal((await plan(accountA, 'year=2024', scoped)).status, 403);
+      assert.equal((await plan(accountB, 'year=2024', scoped)).status, 200);
 
       // All of account A's invoices were treated in 2024.
       const years = await request(app)
@@ -422,15 +450,11 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(res.body.data.workflowStatus, 'erledigt');
     });
 
-    await t.test('the analysis counts only the policy’s own reimbursements', async () => {
-      const x = await request(app)
-        .get(`/api/v1/contracts/${contractA}/reimbursement-analysis?year=2024`)
-        .set(admin);
-      assert.equal(x.body.data.alreadyReimbursed, 200);
-      const y = await request(app)
-        .get(`/api/v1/contracts/${contractY}/reimbursement-analysis?year=2024`)
-        .set(admin);
-      assert.equal(y.body.data.alreadyReimbursed, 300);
+    await t.test('the plan counts each policy’s own reimbursements', async () => {
+      const res = await plan(accountA);
+      assert.equal(planPolicy(res.body, contractA)?.actualReimbursement, 200);
+      assert.equal(planPolicy(res.body, contractY)?.actualReimbursement, 300);
+      assert.equal(planPolicy(res.body, contractY)?.contractKind, 'SUPPLEMENTARY');
     });
 
     await t.test('an exclusion blocks submitting to that policy', async () => {
@@ -460,12 +484,11 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       });
       assert.equal(submit.status, 409);
 
-      // Excluded invoices do not count towards that policy's year total:
-      // 500 + 500 + 100 (loose) - 500 (inv2).
-      const y = await request(app)
-        .get(`/api/v1/contracts/${contractY}/reimbursement-analysis?year=2024`)
-        .set(admin);
-      assert.equal(y.body.data.invoiceTotal, 600);
+      // The plan leaves the excluded invoice out at that policy.
+      const excludedAt = planInvoice((await plan(accountA)).body, inv2)?.policies.find(
+        (p) => p.contractUID === contractY,
+      );
+      assert.equal(excludedAt?.action, 'excluded');
 
       const alreadySubmitted = await post(`/api/v1/invoices/${inv1}/exclusions`, {
         contractUID: contractY,
