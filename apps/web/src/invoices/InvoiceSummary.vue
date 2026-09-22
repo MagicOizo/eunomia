@@ -3,7 +3,7 @@ import { faStar } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
-import { euro } from '../lib/format';
+import { euro, plural } from '../lib/format';
 import type { InvoiceDto, PlanPolicyDto, ReimbursementPlanDto } from './api';
 import {
   POLICY_STATUS_BADGE,
@@ -152,7 +152,10 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
           <p class="eu-summary__detail">
             {{ bonusView(policy).detail
             }}<template v-if="policy.claimFreeStreak !== null"
-              >; Serie: {{ policy.claimFreeStreak }} leistungsfreie(s) Jahr(e)</template
+              >; Serie:
+              {{
+                plural(policy.claimFreeStreak, 'leistungsfreies Jahr', 'leistungsfreie Jahre')
+              }}</template
             >
           </p>
         </div>

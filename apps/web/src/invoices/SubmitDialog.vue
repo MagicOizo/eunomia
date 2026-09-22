@@ -6,6 +6,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
+import { plural } from '../lib/format';
 
 const props = defineProps<{
   open: boolean;
@@ -53,9 +54,11 @@ function submit(): void {
 <template>
   <EuDialog :open="open" title="Rechnungen einreichen" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
-      <p class="eu-form__note">{{ count }} Rechnung(en) werden als eine Einreichung gebündelt.</p>
+      <p class="eu-form__note">
+        {{ plural(count, 'Rechnung wird', 'Rechnungen werden') }} als eine Einreichung gebündelt.
+      </p>
       <p v-if="contracts.length === 0" class="eu-form__note" role="status">
-        Keine Police verfügbar: Die Rechnung(en) liegen bereits bei allen Policen oder sind dort als
+        Keine Police verfügbar: Die Rechnungen liegen bereits bei allen Policen oder sind dort als
         nicht erstattungsfähig markiert.
       </p>
       <template v-else>

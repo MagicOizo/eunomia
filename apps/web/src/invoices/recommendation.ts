@@ -12,7 +12,7 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { euro } from '../lib/format';
+import { euro, plural } from '../lib/format';
 import type {
   PlanInvoiceDto,
   PlanInvoicePolicyAction,
@@ -186,7 +186,7 @@ export function bonusView(policy: PlanPolicyDto): BonusView {
           tone: 'submitted',
           icon: faTriangleExclamation,
           label: 'In Gefahr',
-          detail: `${euro(policy.bonusAmount)} erwartet${inherited} – ${policy.pendingClaims} Einreichung(en) noch ohne Abrechnung`,
+          detail: `${euro(policy.bonusAmount)} erwartet${inherited} – ${plural(policy.pendingClaims, 'Einreichung', 'Einreichungen')} noch ohne Abrechnung`,
         };
       }
       return {
@@ -261,7 +261,7 @@ export function policyVerdict(policy: PlanPolicyDto, plan: ReimbursementPlanDto)
     const streak =
       policy.claimFreeStreak === null
         ? ''
-        : ` Dafür endet die Serie von ${policy.claimFreeStreak} leistungsfreien Jahren.`;
+        : ` Dafür endet die Serie von ${plural(policy.claimFreeStreak, 'leistungsfreien Jahr', 'leistungsfreien Jahren')}.`;
     return `Die Erstattung übersteigt den Bonus – alle Rechnungen hier einreichen.${streak}`;
   }
   if (policy.bonusStatus === 'forfeited') {

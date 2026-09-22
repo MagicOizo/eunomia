@@ -18,7 +18,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { apiFetch } from '../lib/api';
-import { euro, germanDate } from '../lib/format';
+import { euro, germanDate, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/useTableSort';
@@ -628,7 +628,7 @@ function confirmDelete(): void {
       @submit="submitSettle"
     />
     <EuDialog :open="deleteTargets.length > 0" title="Rechnung löschen" @close="deleteTargets = []">
-      <p>{{ deleteTargets.length }} Rechnung(en) wirklich löschen?</p>
+      <p>{{ plural(deleteTargets.length, 'Rechnung', 'Rechnungen') }} wirklich löschen?</p>
       <p v-if="dialogError" class="eu-ws__error" role="alert">{{ dialogError }}</p>
       <template #footer>
         <EuButton variant="secondary" @click="deleteTargets = []">Abbrechen</EuButton>

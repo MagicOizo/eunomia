@@ -18,7 +18,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
-import { euro, germanDate } from '../lib/format';
+import { euro, germanDate, plural } from '../lib/format';
 import { HttpError } from '../lib/http';
 import { useTableSort } from '../lib/useTableSort';
 import { type BillingListDto, deleteBilling, listContractBillings, updateBilling } from './api';
@@ -391,8 +391,14 @@ function confirmDelete(): void {
           Leistungsabrechnung <strong>{{ selected.billingNumber }}</strong> wirklich löschen?
         </p>
         <p v-if="selected.invoiceCount > 0" class="eu-billings__warn">
-          {{ selected.invoiceCount }} zugeordnete Rechnung(en) verlieren dadurch ihre Erstattung und
-          gehen zurück auf „eingereicht".
+          {{
+            plural(
+              selected.invoiceCount,
+              'zugeordnete Rechnung verliert',
+              'zugeordnete Rechnungen verlieren',
+            )
+          }}
+          dadurch ihre Erstattung und gehen zurück auf „eingereicht".
         </p>
         <p v-if="dialogError" class="eu-billings__error" role="alert">{{ dialogError }}</p>
       </div>

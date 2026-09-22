@@ -151,7 +151,8 @@ describe('bonusView', () => {
 
   it('is at risk when the recommendation uses the policy or a submission is pending', () => {
     expect(bonusView(policy({ recommendation: 'use' })).label).toBe('In Gefahr');
-    expect(bonusView(policy({ pendingClaims: 2 })).detail).toContain('2 Einreichung(en)');
+    expect(bonusView(policy({ pendingClaims: 2 })).detail).toContain('2 Einreichungen');
+    expect(bonusView(policy({ pendingClaims: 1 })).detail).toContain('1 Einreichung noch');
   });
 
   it('flags a bonus scale that was not updated for the year', () => {
