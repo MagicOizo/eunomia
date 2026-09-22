@@ -48,6 +48,7 @@ npm run dev:web              # apps/web with hot reload (Vite)
 ## Quality checks
 
 ```bash
+npm run format               # Prettier: format the whole repo (format:check only checks)
 npm run lint                 # ESLint across the whole repo
 npm run typecheck            # tsc / vue-tsc, no emit
 npm run test                  # backend (node:test) + frontend (vitest)
@@ -57,6 +58,12 @@ npm run build                 # production build of every workspace
 The backend integration tests need a MariaDB and **skip** when no `DB_*` env is set, so
 `npm run test` is runnable without a database (CI provides one). To run them against a database,
 export `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` first.
+
+Code is always Prettier-formatted, and CI fails on unformatted files. `npm install` installs a
+pre-commit hook (husky + lint-staged) that runs `eslint --fix` and `prettier --write` on the staged
+files only. `git commit --no-verify` skips it in an emergency. Formatting drift is fixed in its own
+commit, whose hash goes into `.git-blame-ignore-revs`. To have local `git blame` skip those commits:
+`git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 ## Migrations & seed data (by hand)
 

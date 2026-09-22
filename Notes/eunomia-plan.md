@@ -412,9 +412,14 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **Arbeitsablauf:** `format`/`format:check` gehört ab jetzt in die Verifikation jeder Slice; Formatierungs-Drift wird als eigener Commit behoben.
 - `Notes/` bleibt in `.prettierignore`.
 
-**Offene Entscheidung (im Planmodus klären):** zusätzlich ein Pre-Commit-Hook (z. B. husky + lint-staged), der geänderte Dateien vor jedem Commit formatiert — fängt Drift früher ab, kostet eine Dev-Abhängigkeit.
+**Entscheidung (Planmodus):** ja, Pre-Commit-Hook mit husky + lint-staged, der auf den gestagten Dateien `eslint --fix` und `prettier --write` ausführt.
 
 **DoD:** `npm run format:check` ist grün im ganzen Repo; `npm run lint`/`typecheck`/`test` bleiben grün; die CI schlägt bei unformatiertem Code fehl.
+
+**Umgesetzt (2026-09-22).** Entscheidungen beim Bau:
+- Der Konflikt lag nicht am `||`, sondern an den Template-Casts `(modelValue as number | null)`: Prettier entfernt die Klammern, danach liest `vue/no-deprecated-filter` das `|` des Union-Typs als Filter. Die Casts stehen jetzt in `computed`s (`numberValue`/`stringValue`/`booleanValue`).
+- Das `prepare`-Skript importiert husky per `node -e` und überspringt ihn stillschweigend, wenn husky fehlt: Das Docker-Image führt `npm ci --omit=dev` aus und kopiert dabei nur die `package.json`, deshalb würden `"prepare": "husky"` oder eine Skriptdatei den Build brechen.
+- CI: `format:check` läuft vor `lint`. Der Formatierungs-Commit steht in `.git-blame-ignore-revs`, und DEV.md beschreibt den Hook.
 
 ## Slice 17 — Mehrfach-Einreichung
 **Ziel:** Eine Rechnung kann bei mehreren Policen eingereicht werden, bei derselben Police aber nur einmal.

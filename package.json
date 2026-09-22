@@ -23,7 +23,15 @@
     "dev:api": "npm run dev --workspace apps/api",
     "dev:web": "npm run dev --workspace apps/web",
     "dev:up": "bash scripts/dev.sh",
-    "dev:down": "bash scripts/dev-down.sh"
+    "dev:down": "bash scripts/dev-down.sh",
+    "prepare": "node -e \"import('husky').then((m) => console.log(m.default()), () => {})\""
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,vue}": [
+      "eslint --fix --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,md,css,html,yml,yaml}": "prettier --write"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -33,6 +41,8 @@
     "eslint-plugin-jsdoc": "^63.2.0",
     "eslint-plugin-vue": "^10.10.0",
     "globals": "^17.7.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.1",
     "prettier": "^3.9.6",
     "tsx": "^4.23.1",
     "typescript": "^6.0.3",
