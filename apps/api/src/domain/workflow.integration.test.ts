@@ -79,7 +79,9 @@ async function scopedNutzer(
     [email, 'Scoped', await hashPassword(password)],
   )) as { insertId: number };
   const nutzer = (
-    await pool.query<Array<{ roleID: number }>>("SELECT roleID FROM Roles WHERE roleName = 'Nutzer'")
+    await pool.query<Array<{ roleID: number }>>(
+      "SELECT roleID FROM Roles WHERE roleName = 'Nutzer'",
+    )
   )[0];
   await pool.query('INSERT INTO UserAccountRoles (userID, roleID, accountUID) VALUES (?, ?, ?)', [
     insert.insertId,
@@ -128,9 +130,8 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     const accountA = (
       await post('/api/v1/accounts', { firstname: 'Anna', birthDate: '1985-04-12' })
     ).body.data.accountUID as string;
-    const accountB = (
-      await post('/api/v1/accounts', { firstname: 'Bea', birthDate: '1990-02-02' })
-    ).body.data.accountUID as string;
+    const accountB = (await post('/api/v1/accounts', { firstname: 'Bea', birthDate: '1990-02-02' }))
+      .body.data.accountUID as string;
     const companyUID = (await post('/api/v1/companies', { companyName: 'Kranken AG' })).body.data
       .companyUID as string;
     const contractA = (
@@ -223,7 +224,9 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     await t.test('GET /billings?contractUID lists the contract billings, enriched', async () => {
       const res = await request(app).get(`/api/v1/billings?contractUID=${contractA}`).set(admin);
       assert.equal(res.status, 200);
-      const billing = res.body.data.find((b: { billingUID: string }) => b.billingUID === billingUID);
+      const billing = res.body.data.find(
+        (b: { billingUID: string }) => b.billingUID === billingUID,
+      );
       assert.ok(billing, 'the created billing is listed for its contract');
       assert.equal(billing.contractNumber, 'PKV-A');
       assert.equal(Number(billing.reimbursedTotal), 200);
@@ -231,29 +234,32 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.ok((billing.invoiceNumbers ?? '').includes('R-1'));
     });
 
-    await t.test('filing an objection on the billing flags the invoice; resolving clears it', async () => {
-      let inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
-      assert.equal(inv.body.data.hasOpenObjection, false);
+    await t.test(
+      'filing an objection on the billing flags the invoice; resolving clears it',
+      async () => {
+        let inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
+        assert.equal(inv.body.data.hasOpenObjection, false);
 
-      const filed = await request(app)
-        .patch(`/api/v1/billings/${billingUID}`)
-        .set(admin)
-        .send({ objectionDate: '2024-07-15', objectionNote: 'Betrag zu niedrig' });
-      assert.equal(filed.status, 200);
-      assert.ok(filed.body.data.objectionDate);
+        const filed = await request(app)
+          .patch(`/api/v1/billings/${billingUID}`)
+          .set(admin)
+          .send({ objectionDate: '2024-07-15', objectionNote: 'Betrag zu niedrig' });
+        assert.equal(filed.status, 200);
+        assert.ok(filed.body.data.objectionDate);
 
-      inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
-      assert.equal(inv.body.data.hasOpenObjection, true);
+        inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
+        assert.equal(inv.body.data.hasOpenObjection, true);
 
-      const resolved = await request(app)
-        .patch(`/api/v1/billings/${billingUID}`)
-        .set(admin)
-        .send({ objectionResolvedDate: '2024-09-01' });
-      assert.equal(resolved.status, 200);
+        const resolved = await request(app)
+          .patch(`/api/v1/billings/${billingUID}`)
+          .set(admin)
+          .send({ objectionResolvedDate: '2024-09-01' });
+        assert.equal(resolved.status, 200);
 
-      inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
-      assert.equal(inv.body.data.hasOpenObjection, false);
-    });
+        inv = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
+        assert.equal(inv.body.data.hasOpenObjection, false);
+      },
+    );
 
     await t.test('deleting a billing cascades: its invoice reverts to eingereicht', async () => {
       const delBilling = (
@@ -263,7 +269,11 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
           billingNumber: 'LA-DEL',
         })
       ).body.data.billingUID as string;
-      await post('/api/v1/allocations', { billingUID: delBilling, invoiceUID: inv2, reimbursement: 150 });
+      await post('/api/v1/allocations', {
+        billingUID: delBilling,
+        invoiceUID: inv2,
+        reimbursement: 150,
+      });
 
       let inv = await request(app).get(`/api/v1/invoices/${inv2}`).set(admin);
       assert.equal(inv.body.data.workflowStatus, 'abgerechnet');
@@ -276,15 +286,18 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(Number(inv.body.data.reimbursedTotal), 0);
     });
 
-    await t.test('allocation across submissions violates the same-submission invariant', async () => {
-      const loose = await makeInvoice(accountA, 100, 'R-loose'); // never submitted
-      const res = await post('/api/v1/allocations', {
-        billingUID,
-        invoiceUID: loose,
-        reimbursement: 50,
-      });
-      assert.equal(res.status, 400);
-    });
+    await t.test(
+      'allocation across submissions violates the same-submission invariant',
+      async () => {
+        const loose = await makeInvoice(accountA, 100, 'R-loose'); // never submitted
+        const res = await post('/api/v1/allocations', {
+          billingUID,
+          invoiceUID: loose,
+          reimbursement: 50,
+        });
+        assert.equal(res.status, 400);
+      },
+    );
 
     await t.test('settling the invoice (transferDate) moves it to erledigt', async () => {
       const res = await request(app)
@@ -312,7 +325,9 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(res.body.data.analysis.worthSubmitting, true);
 
       // All of account A's invoices were treated in 2024.
-      const years = await request(app).get(`/api/v1/invoices/years?accountUID=${accountA}`).set(admin);
+      const years = await request(app)
+        .get(`/api/v1/invoices/years?accountUID=${accountA}`)
+        .set(admin);
       assert.equal(years.status, 200);
       assert.deepEqual(years.body.data, [2024]);
     });
@@ -328,22 +343,30 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       );
 
       // Nutzer has MANAGE_INVOICES: may create for their account, not for another.
-      const own = await post('/api/v1/invoices', {
-        invoiceNumber: 'R-own',
-        invoiceDate: '2024-09-01',
-        treatmentDate: '2024-09-01',
-        accountUID: accountA,
-        invoiceAmount: 50,
-      }, user);
+      const own = await post(
+        '/api/v1/invoices',
+        {
+          invoiceNumber: 'R-own',
+          invoiceDate: '2024-09-01',
+          treatmentDate: '2024-09-01',
+          accountUID: accountA,
+          invoiceAmount: 50,
+        },
+        user,
+      );
       assert.equal(own.status, 201);
 
-      const foreign = await post('/api/v1/invoices', {
-        invoiceNumber: 'R-foreign',
-        invoiceDate: '2024-09-01',
-        treatmentDate: '2024-09-01',
-        accountUID: accountB,
-        invoiceAmount: 50,
-      }, user);
+      const foreign = await post(
+        '/api/v1/invoices',
+        {
+          invoiceNumber: 'R-foreign',
+          invoiceDate: '2024-09-01',
+          treatmentDate: '2024-09-01',
+          accountUID: accountB,
+          invoiceAmount: 50,
+        },
+        user,
+      );
       assert.equal(foreign.status, 403);
     });
   } finally {

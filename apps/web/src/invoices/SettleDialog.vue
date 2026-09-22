@@ -44,7 +44,9 @@ function submit(): void {
         Rechnung {{ invoice.invoiceNumber }} als erstattet/bezahlt markieren.
       </p>
       <EuTextField v-model="transferDate" label="Zahlungsdatum" type="date" />
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">{{ error ?? localError }}</p>
+      <p v-if="error ?? localError" class="eu-form__error" role="alert">
+        {{ error ?? localError }}
+      </p>
     </form>
 
     <template #footer>

@@ -50,7 +50,11 @@ function safeEquals(a: string, b: string): boolean {
 }
 
 /** Signs an access token and issues + stores a fresh refresh token for a user. */
-async function issueSession(pool: Pool, config: AuthConfig, user: AuthUser): Promise<IssuedSession> {
+async function issueSession(
+  pool: Pool,
+  config: AuthConfig,
+  user: AuthUser,
+): Promise<IssuedSession> {
   const accessToken = await signAccessToken(
     user.uuidText,
     config.jwtSecret,

@@ -83,7 +83,8 @@ async function load(): Promise<void> {
     accountUID.value = contract.data.accountUID;
     billings.value = await listContractBillings(props.contractUID);
   } catch (err) {
-    loadError.value = err instanceof HttpError ? err.message : 'Abrechnungen konnten nicht geladen werden.';
+    loadError.value =
+      err instanceof HttpError ? err.message : 'Abrechnungen konnten nicht geladen werden.';
   } finally {
     loading.value = false;
   }
@@ -183,7 +184,10 @@ function openDelete(b: BillingListDto): void {
 function confirmDelete(): void {
   const billing = selected.value;
   if (!billing) return;
-  void run(() => deleteBilling(billing.billingUID), () => (deleteOpen.value = false));
+  void run(
+    () => deleteBilling(billing.billingUID),
+    () => (deleteOpen.value = false),
+  );
 }
 </script>
 
@@ -215,11 +219,28 @@ function confirmDelete(): void {
       <table class="eu-billings__table">
         <thead>
           <tr>
-            <EuSortableTh label="Nummer" :state="sort.stateOf('number')" @sort="sort.toggle('number')" />
+            <EuSortableTh
+              label="Nummer"
+              :state="sort.stateOf('number')"
+              @sort="sort.toggle('number')"
+            />
             <EuSortableTh label="Datum" :state="sort.stateOf('date')" @sort="sort.toggle('date')" />
-            <EuSortableTh label="Erstattung" align="center" :state="sort.stateOf('reimbursed')" @sort="sort.toggle('reimbursed')" />
-            <EuSortableTh label="Rechnungen" :state="sort.stateOf('invoices')" @sort="sort.toggle('invoices')" />
-            <EuSortableTh label="Widerspruch" :state="sort.stateOf('objection')" @sort="sort.toggle('objection')" />
+            <EuSortableTh
+              label="Erstattung"
+              align="center"
+              :state="sort.stateOf('reimbursed')"
+              @sort="sort.toggle('reimbursed')"
+            />
+            <EuSortableTh
+              label="Rechnungen"
+              :state="sort.stateOf('invoices')"
+              @sort="sort.toggle('invoices')"
+            />
+            <EuSortableTh
+              label="Widerspruch"
+              :state="sort.stateOf('objection')"
+              @sort="sort.toggle('objection')"
+            />
             <th class="eu-billings__actions-head">Aktionen</th>
           </tr>
         </thead>
@@ -317,7 +338,11 @@ function confirmDelete(): void {
         <EuButton v-if="selectedOpen" :disabled="busy" @click="resolveObjection">
           Als aufgelöst markieren
         </EuButton>
-        <EuButton v-else-if="selected && !selected.objectionDate" :disabled="busy" @click="fileObjection">
+        <EuButton
+          v-else-if="selected && !selected.objectionDate"
+          :disabled="busy"
+          @click="fileObjection"
+        >
           Widerspruch einlegen
         </EuButton>
       </template>
@@ -332,7 +357,9 @@ function confirmDelete(): void {
       </form>
       <template #footer>
         <EuButton variant="secondary" @click="editOpen = false">Abbrechen</EuButton>
-        <EuButton :disabled="busy" @click="saveEdit">{{ busy ? 'Speichern…' : 'Speichern' }}</EuButton>
+        <EuButton :disabled="busy" @click="saveEdit">{{
+          busy ? 'Speichern…' : 'Speichern'
+        }}</EuButton>
       </template>
     </EuDialog>
 
@@ -357,7 +384,9 @@ function confirmDelete(): void {
       </div>
       <template #footer>
         <EuButton variant="secondary" @click="deleteOpen = false">Abbrechen</EuButton>
-        <EuButton :disabled="busy" @click="confirmDelete">{{ busy ? 'Löschen…' : 'Löschen' }}</EuButton>
+        <EuButton :disabled="busy" @click="confirmDelete">{{
+          busy ? 'Löschen…' : 'Löschen'
+        }}</EuButton>
       </template>
     </EuDialog>
   </section>

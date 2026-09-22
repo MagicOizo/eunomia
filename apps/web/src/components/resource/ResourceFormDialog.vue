@@ -98,12 +98,7 @@ function submit(): void {
           :label="field.label"
           @update:model-value="values[field.key] = $event === null ? '' : String($event)"
         />
-        <EuTextField
-          v-else
-          v-model="values[field.key]"
-          :label="field.label"
-          :type="field.type"
-        />
+        <EuTextField v-else v-model="values[field.key]" :label="field.label" :type="field.type" />
       </template>
       <p v-if="error ?? localError" class="eu-form__error" role="alert">
         {{ error ?? localError }}

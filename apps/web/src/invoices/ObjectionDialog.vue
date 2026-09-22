@@ -42,7 +42,8 @@ async function load(): Promise<void> {
       forms[b.billingUID] ??= { date: today(), note: '' };
     }
   } catch (err) {
-    error.value = err instanceof HttpError ? err.message : 'Abrechnungen konnten nicht geladen werden.';
+    error.value =
+      err instanceof HttpError ? err.message : 'Abrechnungen konnten nicht geladen werden.';
   } finally {
     loading.value = false;
   }

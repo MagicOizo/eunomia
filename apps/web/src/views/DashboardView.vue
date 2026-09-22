@@ -61,7 +61,9 @@ const cards = mainNav.filter((item) => item.to !== '/');
   text-decoration: none;
   color: var(--eu-color-text);
   font-family: var(--eu-font-heading);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .eu-dashboard__card:hover {

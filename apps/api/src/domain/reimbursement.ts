@@ -65,7 +65,9 @@ export function evaluateReimbursement(input: ReimbursementInput): ReimbursementR
   const capNeverClearsBonus = cap !== null && cap <= bonus;
   const breakEvenInvoiceTotal = capNeverClearsBonus ? null : roundCents(deductible + bonus);
   const shortfallToBreakEven =
-    breakEvenInvoiceTotal === null ? null : roundCents(Math.max(breakEvenInvoiceTotal - invoiceTotal, 0));
+    breakEvenInvoiceTotal === null
+      ? null
+      : roundCents(Math.max(breakEvenInvoiceTotal - invoiceTotal, 0));
 
   return { reimbursement, worthSubmitting, cappedOut, breakEvenInvoiceTotal, shortfallToBreakEven };
 }

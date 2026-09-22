@@ -13,7 +13,10 @@ type Queryable = Pool | PoolConnection;
  * does not exist (or is soft-deleted).
  */
 
-export async function accountForContract(db: Queryable, contractUID: string): Promise<string | null> {
+export async function accountForContract(
+  db: Queryable,
+  contractUID: string,
+): Promise<string | null> {
   const rows = await db.query<Array<{ accountUID: string }>>(
     'SELECT accountUID FROM Contracts WHERE contractUID = ? AND contractStatus <> -1 LIMIT 1',
     [contractUID],
@@ -21,7 +24,10 @@ export async function accountForContract(db: Queryable, contractUID: string): Pr
   return rows[0]?.accountUID ?? null;
 }
 
-export async function accountForSubmission(db: Queryable, submissionUID: string): Promise<string | null> {
+export async function accountForSubmission(
+  db: Queryable,
+  submissionUID: string,
+): Promise<string | null> {
   const rows = await db.query<Array<{ accountUID: string }>>(
     `SELECT c.accountUID
        FROM Submissions s

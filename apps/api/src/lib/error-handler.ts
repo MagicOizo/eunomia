@@ -40,7 +40,9 @@ export function errorHandler(
 ): void {
   const apiError = err instanceof ApiError ? err : isSqlError(err) ? mapSqlError(err) : null;
   if (apiError) {
-    res.status(apiError.httpStatus).json({ error: { code: apiError.code, message: apiError.message } });
+    res
+      .status(apiError.httpStatus)
+      .json({ error: { code: apiError.code, message: apiError.message } });
     return;
   }
 

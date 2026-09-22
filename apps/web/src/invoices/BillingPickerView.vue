@@ -46,7 +46,9 @@ onMounted(async () => {
 
 <template>
   <section>
-    <p class="eu-picker__lead">Für welchen Vertrag möchtest du die Leistungsabrechnungen ansehen?</p>
+    <p class="eu-picker__lead">
+      Für welchen Vertrag möchtest du die Leistungsabrechnungen ansehen?
+    </p>
 
     <p v-if="loading" class="eu-picker__hint">Wird geladen…</p>
     <p v-else-if="tiles.length === 0" class="eu-picker__hint">Noch keine Verträge erfasst.</p>

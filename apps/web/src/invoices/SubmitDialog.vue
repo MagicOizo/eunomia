@@ -61,7 +61,9 @@ function submit(): void {
         @update:model-value="contractUID = $event ?? ''"
       />
       <EuTextField v-model="submittedDate" label="Einreichungsdatum" type="date" />
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">{{ error ?? localError }}</p>
+      <p v-if="error ?? localError" class="eu-form__error" role="alert">
+        {{ error ?? localError }}
+      </p>
     </form>
 
     <template #footer>

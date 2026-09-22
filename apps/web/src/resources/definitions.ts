@@ -71,23 +71,49 @@ const contracts: ResourceConfig = {
     { key: 'contractNumber', label: 'Vertragsnummer' },
     { key: 'accountUID', label: 'Versicherter', lookup: 'accounts' },
     { key: 'companyUID', label: 'Versicherung', lookup: 'companies', wrap: true },
-    { key: 'contractKind', label: 'Art', format: (value) => CONTRACT_KIND_SHORT_LABEL[value as ContractKind] ?? '–' },
+    {
+      key: 'contractKind',
+      label: 'Art',
+      format: (value) => CONTRACT_KIND_SHORT_LABEL[value as ContractKind] ?? '–',
+    },
     { key: 'currentMonthlyPremium', label: 'Beitrag aktuell', format: euro, align: 'right' },
     { key: 'currentDeductible', label: 'SB aktuell', format: euro, align: 'right' },
     {
       key: 'contractBegin',
       label: 'Laufzeit',
       format: (value, row) =>
-        row.contractEnd ? `${germanDate(value)} – ${germanDate(row.contractEnd)}` : `seit ${germanDate(value)}`,
+        row.contractEnd
+          ? `${germanDate(value)} – ${germanDate(row.contractEnd)}`
+          : `seit ${germanDate(value)}`,
     },
   ],
   // Create form only (editing opens ContractDetailDialog). The initial* fields
   // become the first premium and the first yearly terms.
   fields: [
     { key: 'contractNumber', label: 'Vertragsnummer', type: 'text', required: true },
-    { key: 'accountUID', label: 'Versicherter', type: 'select', required: true, immutable: true, optionsFrom: 'accounts' },
-    { key: 'companyUID', label: 'Versicherung', type: 'select', required: true, optionsFrom: 'companies' },
-    { key: 'contractKind', label: 'Art', type: 'select', required: true, options: optionsOf(CONTRACT_KIND_LABEL), defaultValue: 'FULL' },
+    {
+      key: 'accountUID',
+      label: 'Versicherter',
+      type: 'select',
+      required: true,
+      immutable: true,
+      optionsFrom: 'accounts',
+    },
+    {
+      key: 'companyUID',
+      label: 'Versicherung',
+      type: 'select',
+      required: true,
+      optionsFrom: 'companies',
+    },
+    {
+      key: 'contractKind',
+      label: 'Art',
+      type: 'select',
+      required: true,
+      options: optionsOf(CONTRACT_KIND_LABEL),
+      defaultValue: 'FULL',
+    },
     { key: 'contractBegin', label: 'Vertragsbeginn', type: 'date', required: true },
     { key: 'contractEnd', label: 'Vertragsende', type: 'date' },
     { key: 'initialMonthlyPremium', label: 'Monatsbeitrag ab Vertragsbeginn', type: 'currency' },
@@ -104,7 +130,11 @@ const contracts: ResourceConfig = {
   ],
   lookups: {
     accounts: { path: '/accounts', idKey: 'accountUID', label: personName },
-    companies: { path: '/companies', idKey: 'companyUID', label: (row) => String(row.companyName ?? '') },
+    companies: {
+      path: '/companies',
+      idKey: 'companyUID',
+      label: (row) => String(row.companyName ?? ''),
+    },
   },
   detailDialog: ContractDetailDialog,
 };

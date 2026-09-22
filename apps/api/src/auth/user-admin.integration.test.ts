@@ -111,10 +111,16 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
     assert.ok(nutzerRole && adminRole);
 
     const accountA = (
-      await request(app).post('/api/v1/accounts').set(admin).send({ firstname: 'Anna', birthDate: '1985-04-12' })
+      await request(app)
+        .post('/api/v1/accounts')
+        .set(admin)
+        .send({ firstname: 'Anna', birthDate: '1985-04-12' })
     ).body.data.accountUID as string;
     const accountB = (
-      await request(app).post('/api/v1/accounts').set(admin).send({ firstname: 'Bea', birthDate: '1990-02-02' })
+      await request(app)
+        .post('/api/v1/accounts')
+        .set(admin)
+        .send({ firstname: 'Bea', birthDate: '1990-02-02' })
     ).body.data.accountUID as string;
 
     let clerkUuid = '';
@@ -132,7 +138,9 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
         .set(admin)
         .send({ grants: [{ accountUID: accountA, roleUID: nutzerRole.roleUID }] });
       assert.equal(granted.status, 200);
-      assert.deepEqual(granted.body.data.accountGrants, [{ accountUID: accountA, roleName: 'Nutzer' }]);
+      assert.deepEqual(granted.body.data.accountGrants, [
+        { accountUID: accountA, roleName: 'Nutzer' },
+      ]);
     });
 
     await t.test('the new user sees only the granted account', async () => {
@@ -147,7 +155,10 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
         accounts.body.data.map((a: { accountUID: string }) => a.accountUID),
         [accountA],
       );
-      assert.equal((await request(app).get(`/api/v1/accounts/${accountB}/ping`).set(clerk)).status, 403);
+      assert.equal(
+        (await request(app).get(`/api/v1/accounts/${accountB}/ping`).set(clerk)).status,
+        403,
+      );
 
       // A non-admin cannot use the admin API.
       assert.equal((await request(app).get('/api/v1/users').set(clerk)).status, 403);
@@ -155,13 +166,21 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
 
     await t.test('safety guards protect the last admin', async () => {
       assert.equal(
-        (await request(app).patch(`/api/v1/users/${adminUuid}`).set(admin).send({ status: 0 })).status,
+        (await request(app).patch(`/api/v1/users/${adminUuid}`).set(admin).send({ status: 0 }))
+          .status,
         400,
       );
-      assert.equal((await request(app).delete(`/api/v1/users/${adminUuid}`).set(admin)).status, 400);
       assert.equal(
-        (await request(app).put(`/api/v1/users/${adminUuid}/global-roles`).set(admin).send({ roleUIDs: [] }))
-          .status,
+        (await request(app).delete(`/api/v1/users/${adminUuid}`).set(admin)).status,
+        400,
+      );
+      assert.equal(
+        (
+          await request(app)
+            .put(`/api/v1/users/${adminUuid}/global-roles`)
+            .set(admin)
+            .send({ roleUIDs: [] })
+        ).status,
         400,
       );
       // Admin is still there and still admin.
@@ -171,7 +190,12 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
 
     await t.test('validation and duplicate email are rejected', async () => {
       assert.equal(
-        (await request(app).post('/api/v1/users').set(admin).send({ email: 'x@x.de', firstname: 'X' })).status,
+        (
+          await request(app)
+            .post('/api/v1/users')
+            .set(admin)
+            .send({ email: 'x@x.de', firstname: 'X' })
+        ).status,
         400, // missing password
       );
       assert.equal(

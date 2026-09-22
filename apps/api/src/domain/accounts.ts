@@ -7,7 +7,14 @@ import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { optionalPathParam, pathParam } from '../crud/params.js';
-import { type CrudTable, getRow, insertRow, listRows, softDeleteRow, updateRow } from '../crud/repository.js';
+import {
+  type CrudTable,
+  getRow,
+  insertRow,
+  listRows,
+  softDeleteRow,
+  updateRow,
+} from '../crud/repository.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 

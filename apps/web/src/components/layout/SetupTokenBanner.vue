@@ -11,7 +11,11 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 <template>
   <div class="eu-setup-warning" role="alert">
-    <FontAwesomeIcon :icon="faTriangleExclamation" class="eu-setup-warning__icon" aria-hidden="true" />
+    <FontAwesomeIcon
+      :icon="faTriangleExclamation"
+      class="eu-setup-warning__icon"
+      aria-hidden="true"
+    />
     <div>
       <strong>Sicherheitshinweis: Das SETUP_TOKEN ist noch aktiv.</strong>
       <p>

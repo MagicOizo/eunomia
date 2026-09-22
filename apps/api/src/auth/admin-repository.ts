@@ -38,7 +38,14 @@ export async function userIdByUuid(pool: Pool, uuid: string): Promise<number | n
 /** Lists all non-deleted users with their global roles and account grants. */
 export async function listUsers(pool: Pool): Promise<AdminUser[]> {
   const users = await pool.query<
-    Array<{ userID: number; uuid: string; email: string; firstname: string; surname: string | null; status: number }>
+    Array<{
+      userID: number;
+      uuid: string;
+      email: string;
+      firstname: string;
+      surname: string | null;
+      status: number;
+    }>
   >(
     `SELECT userID, uuidText AS uuid, email, firstname, surname, userStatus AS status
        FROM Users WHERE userStatus <> -1 ORDER BY email`,
@@ -74,7 +81,13 @@ export async function getUser(pool: Pool, uuid: string): Promise<AdminUser | nul
 export async function updateUser(
   pool: Pool,
   uuid: string,
-  fields: { email?: string; firstname?: string; surname?: string | null; status?: number; passwordHash?: string },
+  fields: {
+    email?: string;
+    firstname?: string;
+    surname?: string | null;
+    status?: number;
+    passwordHash?: string;
+  },
 ): Promise<number> {
   const columns: string[] = [];
   const values: unknown[] = [];
@@ -109,7 +122,11 @@ export async function softDeleteUser(pool: Pool, uuid: string): Promise<number> 
 }
 
 /** Replaces a user's global roles (UserRoles) with the given role UIDs. */
-export async function setGlobalRoles(pool: Pool, userId: number, roleUIDs: string[]): Promise<void> {
+export async function setGlobalRoles(
+  pool: Pool,
+  userId: number,
+  roleUIDs: string[],
+): Promise<void> {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -159,7 +176,9 @@ export async function setAccountRoles(
 export async function listRoles(pool: Pool): Promise<AdminRole[]> {
   const roles = await pool.query<
     Array<{ roleUID: string; roleName: string; description: string | null; isSystem: number }>
-  >('SELECT roleUID, roleName, description, isSystem FROM Roles WHERE roleStatus = 1 ORDER BY roleName');
+  >(
+    'SELECT roleUID, roleName, description, isSystem FROM Roles WHERE roleStatus = 1 ORDER BY roleName',
+  );
   const perms = await pool.query<Array<{ roleUID: string; permissionKey: string }>>(
     `SELECT r.roleUID, p.permissionKey
        FROM RolePermissions rp

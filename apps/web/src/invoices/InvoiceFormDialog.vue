@@ -62,8 +62,16 @@ watch(
 // Ad-hoc create ("‹typed name› hinzufügen") — reuses the resource create form.
 type CreateKind = 'facility' | 'agency';
 const kinds: Record<CreateKind, { path: string; config: ResourceConfig; noun: string }> = {
-  facility: { path: '/facilities', config: resourceConfigs['/facilities'], noun: 'Leistungserbringer' },
-  agency: { path: '/agencies', config: resourceConfigs['/agencies'], noun: 'Abrechnungsdienstleister' },
+  facility: {
+    path: '/facilities',
+    config: resourceConfigs['/facilities'],
+    noun: 'Leistungserbringer',
+  },
+  agency: {
+    path: '/agencies',
+    config: resourceConfigs['/agencies'],
+    noun: 'Abrechnungsdienstleister',
+  },
 };
 const createOpen = ref(false);
 const createKind = ref<CreateKind>('facility');
@@ -129,7 +137,8 @@ function submit(): void {
   localError.value = null;
   const f = form.value;
   if (!f.invoiceNumber.trim() || !f.invoiceDate || !f.treatmentDate || f.invoiceAmount === null) {
-    localError.value = 'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
+    localError.value =
+      'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
     return;
   }
 
@@ -192,7 +201,9 @@ function submit(): void {
       </template>
 
       <EuTextField v-model="form.documentLink" label="Dokument-Link" />
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">{{ error ?? localError }}</p>
+      <p v-if="error ?? localError" class="eu-form__error" role="alert">
+        {{ error ?? localError }}
+      </p>
     </form>
 
     <template #footer>

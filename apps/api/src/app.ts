@@ -40,7 +40,9 @@ function limiter(windowMs: number, max: number) {
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: { code: 'RATE_LIMITED', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' } },
+    message: {
+      error: { code: 'RATE_LIMITED', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
+    },
   });
 }
 

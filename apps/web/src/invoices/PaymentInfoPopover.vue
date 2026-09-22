@@ -44,7 +44,14 @@ const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.
       </template>
 
       <template v-if="invoice.transferUntilDate">
-        <dt><FontAwesomeIcon :icon="faCalendarDay" fixed-width title="Zahlungsziel" :style="{ color: dueColor }" /></dt>
+        <dt>
+          <FontAwesomeIcon
+            :icon="faCalendarDay"
+            fixed-width
+            title="Zahlungsziel"
+            :style="{ color: dueColor }"
+          />
+        </dt>
         <dd>{{ germanDate(invoice.transferUntilDate) }}</dd>
       </template>
 
@@ -62,7 +69,13 @@ const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.
       </template>
 
       <template v-if="agencyName">
-        <dt><FontAwesomeIcon :icon="faSackDollar" fixed-width title="Abrechnungsdienstleister / Empfänger" /></dt>
+        <dt>
+          <FontAwesomeIcon
+            :icon="faSackDollar"
+            fixed-width
+            title="Abrechnungsdienstleister / Empfänger"
+          />
+        </dt>
         <dd>{{ agencyName }}</dd>
       </template>
 

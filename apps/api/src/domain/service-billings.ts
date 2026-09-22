@@ -61,8 +61,10 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const where = ['b.billingStatus <> -1'];
     const params: unknown[] = [];
 
-    const submissionUID = typeof req.query.submissionUID === 'string' ? req.query.submissionUID : undefined;
-    const contractUID = typeof req.query.contractUID === 'string' ? req.query.contractUID : undefined;
+    const submissionUID =
+      typeof req.query.submissionUID === 'string' ? req.query.submissionUID : undefined;
+    const contractUID =
+      typeof req.query.contractUID === 'string' ? req.query.contractUID : undefined;
     if (submissionUID !== undefined) {
       const account = await accountForSubmission(pool, submissionUID);
       if (account === null) throw notFound('Submission');

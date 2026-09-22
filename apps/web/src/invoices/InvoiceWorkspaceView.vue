@@ -101,7 +101,9 @@ const selectedOffen = computed(() =>
     .filter((i) => i.workflowStatus === 'offen' && selected.value.has(i.invoiceUID))
     .map((i) => i.invoiceUID),
 );
-const allSelected = computed(() => invoices.value.length > 0 && selected.value.size === invoices.value.length);
+const allSelected = computed(
+  () => invoices.value.length > 0 && selected.value.size === invoices.value.length,
+);
 const someSelected = computed(() => selected.value.size > 0 && !allSelected.value);
 
 const selectAllEl = ref<HTMLInputElement | null>(null);
@@ -147,13 +149,17 @@ async function loadStatic(): Promise<void> {
       companyName: c.companyName,
     }));
 
-  const facilities = await listResource<{ facilityUID: string; facilityName: string }>('/facilities');
+  const facilities = await listResource<{ facilityUID: string; facilityName: string }>(
+    '/facilities',
+  );
   facilityOptions.value = facilities.map((f) => ({ value: f.facilityUID, label: f.facilityName }));
   facilityNameById.value = new Map(facilities.map((f) => [f.facilityUID, f.facilityName]));
 
-  const agencies = await listResource<{ agencyUID: string; agencyName: string; bankAccount: string }>(
-    '/agencies',
-  );
+  const agencies = await listResource<{
+    agencyUID: string;
+    agencyName: string;
+    bankAccount: string;
+  }>('/agencies');
   agencyOptions.value = agencies.map((a) => ({ value: a.agencyUID, label: a.agencyName }));
   agencyById.value = new Map(
     agencies.map((a) => [a.agencyUID, { name: a.agencyName, bankAccount: a.bankAccount }]),
@@ -226,9 +232,7 @@ function toggleSelect(invoice: InvoiceDto): void {
 }
 
 function toggleSelectAll(): void {
-  selected.value = allSelected.value
-    ? new Set()
-    : new Set(invoices.value.map((i) => i.invoiceUID));
+  selected.value = allSelected.value ? new Set() : new Set(invoices.value.map((i) => i.invoiceUID));
 }
 
 // --- dialog openers ---
@@ -291,10 +295,13 @@ async function runDialog(action: () => Promise<void>, close: () => void): Promis
 }
 
 function submitInvoiceForm(payload: Record<string, unknown>): void {
-  void runDialog(async () => {
-    if (editing.value) await updateInvoice(editing.value.invoiceUID, payload);
-    else await createInvoice(payload);
-  }, () => (formOpen.value = false));
+  void runDialog(
+    async () => {
+      if (editing.value) await updateInvoice(editing.value.invoiceUID, payload);
+      else await createInvoice(payload);
+    },
+    () => (formOpen.value = false),
+  );
 }
 
 function submitSubmission(payload: { contractUID: string; submittedDate: string }): void {
@@ -312,19 +319,25 @@ function submitBilling(payload: {
 }): void {
   const invoice = dialogInvoice.value;
   if (!invoice?.submissionUID) return;
-  void runDialog(async () => {
-    let billingUID = payload.billingUID;
-    if (payload.newBilling) {
-      const billing = await createBilling({ submissionUID: invoice.submissionUID!, ...payload.newBilling });
-      billingUID = billing.billingUID;
-    }
-    await createAllocation({
-      billingUID: billingUID!,
-      invoiceUID: invoice.invoiceUID,
-      reimbursement: payload.reimbursement,
-      ...(payload.receiptNumber ? { receiptNumber: payload.receiptNumber } : {}),
-    });
-  }, () => (billingOpen.value = false));
+  void runDialog(
+    async () => {
+      let billingUID = payload.billingUID;
+      if (payload.newBilling) {
+        const billing = await createBilling({
+          submissionUID: invoice.submissionUID!,
+          ...payload.newBilling,
+        });
+        billingUID = billing.billingUID;
+      }
+      await createAllocation({
+        billingUID: billingUID!,
+        invoiceUID: invoice.invoiceUID,
+        reimbursement: payload.reimbursement,
+        ...(payload.receiptNumber ? { receiptNumber: payload.receiptNumber } : {}),
+      });
+    },
+    () => (billingOpen.value = false),
+  );
 }
 
 function submitSettle(transferDate: string): void {
@@ -401,7 +414,9 @@ function confirmDelete(): void {
 
     <p v-if="loading" class="eu-ws__hint">Wird geladen…</p>
     <p v-else-if="loadError" class="eu-ws__error" role="alert">{{ loadError }}</p>
-    <p v-else-if="invoices.length === 0" class="eu-ws__hint">Keine Rechnungen für {{ activeYear }}.</p>
+    <p v-else-if="invoices.length === 0" class="eu-ws__hint">
+      Keine Rechnungen für {{ activeYear }}.
+    </p>
 
     <div v-else class="eu-ws__table-wrap">
       <table class="eu-ws__table">
@@ -416,13 +431,43 @@ function confirmDelete(): void {
                 @change="toggleSelectAll"
               />
             </th>
-            <EuSortableTh label="Status" :state="sort.stateOf('status')" @sort="sort.toggle('status')" />
-            <EuSortableTh label="Rechnungsdatum" :state="sort.stateOf('invoiceDate')" @sort="sort.toggle('invoiceDate')" />
-            <EuSortableTh label="Behandlung" :state="sort.stateOf('treatmentDate')" @sort="sort.toggle('treatmentDate')" />
-            <EuSortableTh label="Nummer" :state="sort.stateOf('number')" @sort="sort.toggle('number')" />
-            <EuSortableTh label="Leistungserbringer" :state="sort.stateOf('facility')" @sort="sort.toggle('facility')" />
-            <EuSortableTh label="Betrag" align="center" :state="sort.stateOf('amount')" @sort="sort.toggle('amount')" />
-            <EuSortableTh label="Erstattung" align="center" :state="sort.stateOf('reimbursed')" @sort="sort.toggle('reimbursed')" />
+            <EuSortableTh
+              label="Status"
+              :state="sort.stateOf('status')"
+              @sort="sort.toggle('status')"
+            />
+            <EuSortableTh
+              label="Rechnungsdatum"
+              :state="sort.stateOf('invoiceDate')"
+              @sort="sort.toggle('invoiceDate')"
+            />
+            <EuSortableTh
+              label="Behandlung"
+              :state="sort.stateOf('treatmentDate')"
+              @sort="sort.toggle('treatmentDate')"
+            />
+            <EuSortableTh
+              label="Nummer"
+              :state="sort.stateOf('number')"
+              @sort="sort.toggle('number')"
+            />
+            <EuSortableTh
+              label="Leistungserbringer"
+              :state="sort.stateOf('facility')"
+              @sort="sort.toggle('facility')"
+            />
+            <EuSortableTh
+              label="Betrag"
+              align="center"
+              :state="sort.stateOf('amount')"
+              @sort="sort.toggle('amount')"
+            />
+            <EuSortableTh
+              label="Erstattung"
+              align="center"
+              :state="sort.stateOf('reimbursed')"
+              @sort="sort.toggle('reimbursed')"
+            />
             <th class="eu-ws__actions-head">Aktionen</th>
           </tr>
         </thead>
@@ -464,9 +509,17 @@ function confirmDelete(): void {
                 <span>{{ euro(invoice.invoiceAmount) }}</span>
                 <PaymentInfoPopover
                   :invoice="invoice"
-                  :facility-name="invoice.facilityUID ? facilityNameById.get(invoice.facilityUID) ?? null : null"
-                  :agency-name="invoice.agencyUID ? agencyById.get(invoice.agencyUID)?.name ?? null : null"
-                  :bank-account="invoice.agencyUID ? agencyById.get(invoice.agencyUID)?.bankAccount ?? null : null"
+                  :facility-name="
+                    invoice.facilityUID ? (facilityNameById.get(invoice.facilityUID) ?? null) : null
+                  "
+                  :agency-name="
+                    invoice.agencyUID ? (agencyById.get(invoice.agencyUID)?.name ?? null) : null
+                  "
+                  :bank-account="
+                    invoice.agencyUID
+                      ? (agencyById.get(invoice.agencyUID)?.bankAccount ?? null)
+                      : null
+                  "
                 >
                   <template #trigger>
                     <button
@@ -521,7 +574,9 @@ function confirmDelete(): void {
                 @click="openSettle(invoice)"
               />
               <EuButton
-                v-if="invoice.workflowStatus === 'abgerechnet' || invoice.workflowStatus === 'erledigt'"
+                v-if="
+                  invoice.workflowStatus === 'abgerechnet' || invoice.workflowStatus === 'erledigt'
+                "
                 variant="secondary"
                 icon-only
                 :icon="faGavel"

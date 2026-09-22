@@ -36,12 +36,7 @@ const PERMISSIONS: ReadonlyArray<readonly [key: string, description: string]> = 
 ];
 
 /** Permission keys granted to the non-admin default role. Admin gets everything. */
-const NUTZER_PERMISSIONS = [
-  'VIEW_INVOICES',
-  'MANAGE_INVOICES',
-  'VIEW_ACCOUNTS',
-  'VIEW_CONTRACTS',
-];
+const NUTZER_PERMISSIONS = ['VIEW_INVOICES', 'MANAGE_INVOICES', 'VIEW_ACCOUNTS', 'VIEW_CONTRACTS'];
 
 /** Expands a UUID's HEX form into the canonical dashed, lowercased text form. */
 const UUID_TEXT_EXPR =

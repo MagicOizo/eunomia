@@ -15,7 +15,10 @@ const auth = useAuthStore();
 
 const sidebarOpen = ref(false);
 // Close the mobile drawer whenever the route changes.
-watch(() => route.fullPath, () => (sidebarOpen.value = false));
+watch(
+  () => route.fullPath,
+  () => (sidebarOpen.value = false),
+);
 </script>
 
 <template>

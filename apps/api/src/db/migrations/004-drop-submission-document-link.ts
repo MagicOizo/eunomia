@@ -12,5 +12,7 @@ export async function up({ context: pool }: MigrationContext): Promise<void> {
 }
 
 export async function down({ context: pool }: MigrationContext): Promise<void> {
-  await pool.query('ALTER TABLE Submissions ADD COLUMN documentLink VARCHAR(255) DEFAULT NULL AFTER submittedDate');
+  await pool.query(
+    'ALTER TABLE Submissions ADD COLUMN documentLink VARCHAR(255) DEFAULT NULL AFTER submittedDate',
+  );
 }

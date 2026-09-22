@@ -31,7 +31,10 @@ const busy = ref(false);
 const error = ref<string | null>(null);
 
 const submissionOptions = computed(() =>
-  submissions.value.map((s) => ({ value: s.submissionUID, label: `Einreichung vom ${germanDate(s.submittedDate)}` })),
+  submissions.value.map((s) => ({
+    value: s.submissionUID,
+    label: `Einreichung vom ${germanDate(s.submittedDate)}`,
+  })),
 );
 /** The invoices of the currently selected submission — the allocation targets. */
 const submissionInvoices = computed(() =>
@@ -49,7 +52,10 @@ watch(
     documentLink.value = '';
     loading.value = true;
     try {
-      const [subs, invs] = await Promise.all([listSubmissions(), listAccountInvoices(props.accountUID)]);
+      const [subs, invs] = await Promise.all([
+        listSubmissions(),
+        listAccountInvoices(props.accountUID),
+      ]);
       submissions.value = subs.filter((s) => s.contractUID === props.contractUID);
       invoices.value = invs;
       if (submissions.value.length > 0) submissionUID.value = submissions.value[0].submissionUID;
@@ -92,7 +98,11 @@ function save(): void {
         documentLink: documentLink.value.trim() ? documentLink.value.trim() : null,
       });
       for (const a of allocations) {
-        await createAllocation({ billingUID: billing.billingUID, invoiceUID: a.invoiceUID, reimbursement: a.amount });
+        await createAllocation({
+          billingUID: billing.billingUID,
+          invoiceUID: a.invoiceUID,
+          reimbursement: a.amount,
+        });
       }
       emit('created');
       emit('close');

@@ -9,11 +9,7 @@ import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern, generateEntityId } from '../lib/ids.js';
-import {
-  accountForContract,
-  accountForSubmission,
-  authorizeAccount,
-} from './workflow-access.js';
+import { accountForContract, accountForSubmission, authorizeAccount } from './workflow-access.js';
 
 const createSchema = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
@@ -51,7 +47,9 @@ function assertInvoicesSubmittable(
   }
   const wrongAccount = requested.filter((uid) => byUid.get(uid)?.accountUID !== contractAccount);
   if (wrongAccount.length > 0) {
-    throw badRequest(`Invoices do not belong to the contract's account: ${wrongAccount.join(', ')}`);
+    throw badRequest(
+      `Invoices do not belong to the contract's account: ${wrongAccount.join(', ')}`,
+    );
   }
   const alreadySubmitted = requested.filter((uid) => byUid.get(uid)?.submissionUID !== null);
   if (alreadySubmitted.length > 0) {

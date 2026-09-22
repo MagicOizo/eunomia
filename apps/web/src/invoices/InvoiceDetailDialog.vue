@@ -90,7 +90,8 @@ function submit(): void {
     !values.treatmentDate ||
     values.invoiceAmount === null
   ) {
-    localError.value = 'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
+    localError.value =
+      'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
     return;
   }
   const dp = directPayment.value;
@@ -210,7 +211,11 @@ function submit(): void {
 
       <!-- Zuordnungsblock (Karten je Leistungsabrechnung): Slice 16. -->
 
-      <EuDetailField label="Erstattung" type="readonly" :model-value="euro(invoice.reimbursedTotal)" />
+      <EuDetailField
+        label="Erstattung"
+        type="readonly"
+        :model-value="euro(invoice.reimbursedTotal)"
+      />
     </div>
 
     <p v-if="error ?? localError" class="eu-detail-grid__error" role="alert">

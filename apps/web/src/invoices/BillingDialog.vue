@@ -38,7 +38,10 @@ const receiptNumber = ref('');
 const localError = ref<string | null>(null);
 
 const billingOptions = computed(() =>
-  existingBillings.value.map((b) => ({ value: b.billingUID, label: `${b.billingNumber} (${b.billingDate})` })),
+  existingBillings.value.map((b) => ({
+    value: b.billingUID,
+    label: `${b.billingNumber} (${b.billingDate})`,
+  })),
 );
 
 watch(
@@ -99,7 +102,12 @@ function submit(): void {
         Rechnung {{ invoice.invoiceNumber }} über {{ euro(invoice.invoiceAmount) }}
       </p>
 
-      <div v-if="existingBillings.length > 0" class="eu-form__modes" role="radiogroup" aria-label="Abrechnung">
+      <div
+        v-if="existingBillings.length > 0"
+        class="eu-form__modes"
+        role="radiogroup"
+        aria-label="Abrechnung"
+      >
         <label><input v-model="mode" type="radio" value="existing" /> Bestehende Abrechnung</label>
         <label><input v-model="mode" type="radio" value="new" /> Neue Abrechnung</label>
       </div>
@@ -119,7 +127,9 @@ function submit(): void {
 
       <EuCurrencyField v-model="reimbursement" label="Erstattungsbetrag" />
       <EuTextField v-model="receiptNumber" label="Belegnummer" />
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">{{ error ?? localError }}</p>
+      <p v-if="error ?? localError" class="eu-form__error" role="alert">
+        {{ error ?? localError }}
+      </p>
     </form>
 
     <template #footer>

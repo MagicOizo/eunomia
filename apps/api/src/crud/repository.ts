@@ -40,7 +40,10 @@ function outputColumns(t: CrudTable): string {
 }
 
 /** Keeps only entries whose key is a known writable column of the table. */
-function pickColumns(t: CrudTable, data: Record<string, unknown>): [columns: string[], values: unknown[]] {
+function pickColumns(
+  t: CrudTable,
+  data: Record<string, unknown>,
+): [columns: string[], values: unknown[]] {
   const columns: string[] = [];
   const values: unknown[] = [];
   for (const column of t.columns) {
@@ -76,15 +79,19 @@ export async function getRow(pool: Queryable, t: CrudTable, uid: string): Promis
 }
 
 /** Inserts a row (generating its UID) and returns the created row. */
-export async function insertRow(pool: Queryable, t: CrudTable, data: Record<string, unknown>): Promise<Row> {
+export async function insertRow(
+  pool: Queryable,
+  t: CrudTable,
+  data: Record<string, unknown>,
+): Promise<Row> {
   const uid = generateEntityId(t.entity);
   const [columns, values] = pickColumns(t, data);
   const allColumns = [t.uidColumn, ...columns];
   const placeholders = allColumns.map(() => '?').join(', ');
-  await pool.query(
-    `INSERT INTO ${t.table} (${allColumns.join(', ')}) VALUES (${placeholders})`,
-    [uid, ...values],
-  );
+  await pool.query(`INSERT INTO ${t.table} (${allColumns.join(', ')}) VALUES (${placeholders})`, [
+    uid,
+    ...values,
+  ]);
   const created = await getRow(pool, t, uid);
   if (!created) throw new Error(`Row ${uid} vanished immediately after insert into ${t.table}`);
   return created;

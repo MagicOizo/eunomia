@@ -18,7 +18,10 @@ const table: CrudTable = {
 const base = z.object({
   agencyName: z.string().trim().min(1).max(100),
   // IBAN — kept as a loose length/charset check; not a full checksum validation.
-  bankAccount: z.string().trim().regex(/^[A-Z0-9]{15,34}$/, 'Expected an IBAN-like account'),
+  bankAccount: z
+    .string()
+    .trim()
+    .regex(/^[A-Z0-9]{15,34}$/, 'Expected an IBAN-like account'),
 });
 
 /** CRUD router for collection agencies (Inkasso). */

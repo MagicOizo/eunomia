@@ -8,7 +8,14 @@ import type { AppConfig } from '../config/env.js';
 import { notFound } from '../lib/api-error.js';
 import { sendData } from './envelope.js';
 import { pathParam } from './params.js';
-import { type CrudTable, getRow, insertRow, listRows, softDeleteRow, updateRow } from './repository.js';
+import {
+  type CrudTable,
+  getRow,
+  insertRow,
+  listRows,
+  softDeleteRow,
+  updateRow,
+} from './repository.js';
 
 export interface MasterDataOptions {
   table: CrudTable;

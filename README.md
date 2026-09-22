@@ -101,19 +101,19 @@ docker compose pull && docker compose up -d
 All variables are read from `.env` (see `.env.example` for the template — never commit the real
 `.env`).
 
-| Variable                        | Purpose                                                                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `NODE_ENV`                      | `production` or `development`. In `production` the refresh-token cookie is marked Secure (HTTPS-only).       |
-| `PORT`                          | Port the app listens on (also the host port mapping in `docker-compose.yml`).                                |
-| `DB_HOST` / `DB_PORT`           | Host and port the API uses to reach the database (`db` / `3306` in compose).                                 |
-| `DB_USER` / `DB_PASSWORD`       | Credentials the API connects with — the dedicated application user, never root.                              |
-| `DB_NAME`                       | Database/schema name the API connects to.                                                                    |
-| `JWT_SECRET`                    | Secret signing the access-token JWTs (≥32 chars, enforced in production; 64 recommended — `openssl rand -base64 64`). Rotating it invalidates all sessions. |
-| `ACCESS_TOKEN_TTL_SECONDS`      | Access-token lifetime (default `900` = 15 min).                                                              |
-| `REFRESH_TOKEN_TTL_SECONDS`     | Refresh-token lifetime (default `2592000` = 30 days).                                                        |
-| `SETUP_TOKEN`                   | One-time token enabling `POST /api/v1/setup` for the first admin. Remove after setup to disable it.          |
-| `TRUST_PROXY`                   | Proxy hops in front of the app so rate limiting uses the real client IP (default `1`).                       |
-| `RATE_LIMIT_*`                  | Optional overrides for the auth / global rate limits (defaults in `.env.example`).                           |
+| Variable                    | Purpose                                                                                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                  | `production` or `development`. In `production` the refresh-token cookie is marked Secure (HTTPS-only).                                                      |
+| `PORT`                      | Port the app listens on (also the host port mapping in `docker-compose.yml`).                                                                               |
+| `DB_HOST` / `DB_PORT`       | Host and port the API uses to reach the database (`db` / `3306` in compose).                                                                                |
+| `DB_USER` / `DB_PASSWORD`   | Credentials the API connects with — the dedicated application user, never root.                                                                             |
+| `DB_NAME`                   | Database/schema name the API connects to.                                                                                                                   |
+| `JWT_SECRET`                | Secret signing the access-token JWTs (≥32 chars, enforced in production; 64 recommended — `openssl rand -base64 64`). Rotating it invalidates all sessions. |
+| `ACCESS_TOKEN_TTL_SECONDS`  | Access-token lifetime (default `900` = 15 min).                                                                                                             |
+| `REFRESH_TOKEN_TTL_SECONDS` | Refresh-token lifetime (default `2592000` = 30 days).                                                                                                       |
+| `SETUP_TOKEN`               | One-time token enabling `POST /api/v1/setup` for the first admin. Remove after setup to disable it.                                                         |
+| `TRUST_PROXY`               | Proxy hops in front of the app so rate limiting uses the real client IP (default `1`).                                                                      |
+| `RATE_LIMIT_*`              | Optional overrides for the auth / global rate limits (defaults in `.env.example`).                                                                          |
 
 The MariaDB container is bootstrapped from `DB_NAME` / `DB_USER` / `DB_PASSWORD` (see
 `docker-compose.yml`), so there are no separate `MYSQL_*` variables to set — root gets a random

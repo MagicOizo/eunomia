@@ -184,9 +184,11 @@ test('auth flow: setup, login, protected access, scoping, refresh, logout', asyn
         'INSERT INTO Users (email, firstname, passwordHash) VALUES (?, ?, ?)',
         [userCreds.email, 'Uwe', await hashPassword(userCreds.password)],
       )) as { insertId: number };
-      const nutzer = (await pool.query<Array<{ roleID: number }>>(
-        "SELECT roleID FROM Roles WHERE roleName = 'Nutzer'",
-      ))[0];
+      const nutzer = (
+        await pool.query<Array<{ roleID: number }>>(
+          "SELECT roleID FROM Roles WHERE roleName = 'Nutzer'",
+        )
+      )[0];
       assert.ok(nutzer);
       await pool.query(
         'INSERT INTO UserAccountRoles (userID, roleID, accountUID) VALUES (?, ?, ?)',
@@ -254,7 +256,9 @@ test('auth flow: setup, login, protected access, scoping, refresh, logout', asyn
       let lastStatus = 0;
       for (let i = 0; i < 5; i += 1) {
         lastStatus = (
-          await request(strict).post('/api/v1/auth/login').send({ email: 'x@example.com', password: 'nope' })
+          await request(strict)
+            .post('/api/v1/auth/login')
+            .send({ email: 'x@example.com', password: 'nope' })
         ).status;
       }
       assert.equal(lastStatus, 429); // over the 3-per-window limit

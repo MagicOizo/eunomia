@@ -25,7 +25,11 @@ const table: CrudTable = {
 const base = z.object({
   companyName: z.string().trim().min(1).max(100),
   addressStreet: z.string().trim().min(1).max(255).nullish(),
-  addressPostalCode: z.string().trim().regex(/^\d{5}$/, 'Expected a 5-digit postal code').nullish(),
+  addressPostalCode: z
+    .string()
+    .trim()
+    .regex(/^\d{5}$/, 'Expected a 5-digit postal code')
+    .nullish(),
   addressCity: z.string().trim().min(1).max(100).nullish(),
   serviceHotline: z.string().trim().min(1).max(30).nullish(),
   url: z.string().trim().url().max(255).nullish(),

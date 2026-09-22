@@ -64,10 +64,9 @@ export async function createUser(
     [user.email, user.firstname, user.surname, user.passwordHash],
   )) as InsertResult;
 
-  const rows = await pool.query<AuthUser[]>(
-    `SELECT ${USER_COLUMNS} FROM Users WHERE userID = ?`,
-    [result.insertId],
-  );
+  const rows = await pool.query<AuthUser[]>(`SELECT ${USER_COLUMNS} FROM Users WHERE userID = ?`, [
+    result.insertId,
+  ]);
   const created = rows[0];
   if (!created) throw new Error('User row vanished immediately after insert');
   return created;
@@ -94,10 +93,11 @@ export async function insertRefreshToken(
   tokenHash: string,
   expiresAt: Date,
 ): Promise<void> {
-  await pool.query(
-    `INSERT INTO RefreshTokens (userID, tokenHash, expiresAt) VALUES (?, ?, ?)`,
-    [userId, tokenHash, expiresAt],
-  );
+  await pool.query(`INSERT INTO RefreshTokens (userID, tokenHash, expiresAt) VALUES (?, ?, ?)`, [
+    userId,
+    tokenHash,
+    expiresAt,
+  ]);
 }
 
 /**

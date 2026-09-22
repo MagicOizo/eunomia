@@ -49,7 +49,9 @@ export function useTableSort<T>(rows: Ref<T[]>, getValue: (row: T, key: string) 
     const factor = direction.value === 'asc' ? 1 : -1;
     // Copy first — Array.prototype.sort is in-place and stable, so ties keep
     // their original order and the source array stays untouched.
-    return [...rows.value].sort((a, b) => factor * compareValues(getValue(a, key), getValue(b, key)));
+    return [...rows.value].sort(
+      (a, b) => factor * compareValues(getValue(a, key), getValue(b, key)),
+    );
   });
 
   // reactive() so consumers can read `sort.sorted` / `sort.stateOf(...)` in a

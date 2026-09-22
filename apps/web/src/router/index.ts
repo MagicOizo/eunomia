@@ -30,7 +30,9 @@ declare module 'vue-router' {
 // '/invoices' (picker + workspace) and '/billings' (bespoke view) have their own
 // routes below, so they are excluded from the generated placeholder/CRUD routes.
 const navRoutes = [
-  ...mainNav.filter((item) => item.to !== '/' && item.to !== '/invoices' && item.to !== '/billings'),
+  ...mainNav.filter(
+    (item) => item.to !== '/' && item.to !== '/invoices' && item.to !== '/billings',
+  ),
   ...systemNav.filter((item) => item.to !== '/system/users'),
 ].map((item) => {
   const config = resourceConfigs[item.to];
@@ -50,8 +52,18 @@ const navRoutes = [
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/login', name: 'login', component: LoginView, meta: { layout: 'blank', title: 'Anmelden' } },
-    { path: '/', name: 'home', component: DashboardView, meta: { title: 'Startseite', requiresAuth: true } },
+    {
+      path: '/login',
+      name: 'login',
+      component: LoginView,
+      meta: { layout: 'blank', title: 'Anmelden' },
+    },
+    {
+      path: '/',
+      name: 'home',
+      component: DashboardView,
+      meta: { title: 'Startseite', requiresAuth: true },
+    },
     {
       path: '/invoices',
       name: '/invoices',

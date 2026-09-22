@@ -26,13 +26,18 @@ function dueIn(days: number): string {
 
 describe('calcPaymentState', () => {
   it('is "paid" once the invoice has been transferred', () => {
-    expect(calcPaymentState(invoice({ transferDate: '2026-06-10', transferUntilDate: dueIn(-5) }), today)).toBe(
-      'paid',
-    );
+    expect(
+      calcPaymentState(
+        invoice({ transferDate: '2026-06-10', transferUntilDate: dueIn(-5) }),
+        today,
+      ),
+    ).toBe('paid');
   });
 
   it('is "paid" for direct/cash payment even without a transfer date', () => {
-    expect(calcPaymentState(invoice({ directPayment: 1, transferUntilDate: dueIn(-30) }), today)).toBe('paid');
+    expect(
+      calcPaymentState(invoice({ directPayment: 1, transferUntilDate: dueIn(-30) }), today),
+    ).toBe('paid');
   });
 
   it('is "overdue" when unpaid and the due date has passed', () => {
@@ -44,11 +49,15 @@ describe('calcPaymentState', () => {
   });
 
   it(`is "due" up to the day before the ${DUE_SOON_DAYS}-day threshold`, () => {
-    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(DUE_SOON_DAYS - 1) }), today)).toBe('due');
+    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(DUE_SOON_DAYS - 1) }), today)).toBe(
+      'due',
+    );
   });
 
   it(`is "uncritical" exactly at the ${DUE_SOON_DAYS}-day threshold`, () => {
-    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(DUE_SOON_DAYS) }), today)).toBe('uncritical');
+    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(DUE_SOON_DAYS) }), today)).toBe(
+      'uncritical',
+    );
   });
 
   it('is "uncritical" when the due date is comfortably ahead', () => {

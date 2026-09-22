@@ -22,7 +22,12 @@ async function logout(): Promise<void> {
 
 <template>
   <aside class="eu-sidebar" :class="{ 'eu-sidebar--open': open }">
-    <RouterLink class="eu-sidebar__brand" to="/" title="Eunomia Startseite" @click="emit('navigate')">
+    <RouterLink
+      class="eu-sidebar__brand"
+      to="/"
+      title="Eunomia Startseite"
+      @click="emit('navigate')"
+    >
       <img :src="eunomiaLogo" alt="" class="eu-sidebar__logo" />
       <span class="eu-sidebar__wordmark">Eunomia</span>
     </RouterLink>

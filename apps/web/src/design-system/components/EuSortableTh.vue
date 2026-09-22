@@ -12,7 +12,11 @@ import type { SortState } from '../../lib/useTableSort';
  * descending (faSortDown); the default (unsorted) state shows no icon.
  * Reports the current state to assistive tech via `aria-sort`.
  */
-const props = defineProps<{ label: string; state: SortState; align?: 'left' | 'center' | 'right' }>();
+const props = defineProps<{
+  label: string;
+  state: SortState;
+  align?: 'left' | 'center' | 'right';
+}>();
 const emit = defineEmits<{ sort: [] }>();
 
 const icon = computed(() => (props.state === 'asc' ? faSortUp : faSortDown));
@@ -25,7 +29,12 @@ const ariaSort = computed(() =>
   <th :aria-sort="ariaSort" :style="align ? { textAlign: align } : undefined">
     <button type="button" class="eu-sort" @click="emit('sort')">
       <span>{{ label }}</span>
-      <FontAwesomeIcon v-if="state !== 'none'" :icon="icon" class="eu-sort__icon" aria-hidden="true" />
+      <FontAwesomeIcon
+        v-if="state !== 'none'"
+        :icon="icon"
+        class="eu-sort__icon"
+        aria-hidden="true"
+      />
     </button>
   </th>
 </template>

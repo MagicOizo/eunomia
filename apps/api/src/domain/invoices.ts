@@ -109,11 +109,7 @@ function present(row: InvoiceRow): Record<string, unknown> {
 }
 
 /** Enriched invoice query: joins allocations for the reimbursed total + count. */
-async function queryInvoices(
-  pool: Pool,
-  where: string,
-  params: unknown[],
-): Promise<InvoiceRow[]> {
+async function queryInvoices(pool: Pool, where: string, params: unknown[]): Promise<InvoiceRow[]> {
   return pool.query<InvoiceRow[]>(
     `SELECT ${INVOICE_COLUMNS},
             COALESCE(SUM(a.reimbursement), 0) AS reimbursedTotal,
@@ -147,7 +143,8 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const where: string[] = ['i.invoiceStatus <> -1'];
     const params: unknown[] = [];
 
-    const requestedAccount = typeof req.query.accountUID === 'string' ? req.query.accountUID : undefined;
+    const requestedAccount =
+      typeof req.query.accountUID === 'string' ? req.query.accountUID : undefined;
     if (requestedAccount !== undefined) {
       if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_INVOICES, requestedAccount))) {
         throw forbidden();
@@ -184,7 +181,8 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const where: string[] = ['invoiceStatus <> -1'];
     const params: unknown[] = [];
 
-    const requestedAccount = typeof req.query.accountUID === 'string' ? req.query.accountUID : undefined;
+    const requestedAccount =
+      typeof req.query.accountUID === 'string' ? req.query.accountUID : undefined;
     if (requestedAccount !== undefined) {
       if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_INVOICES, requestedAccount))) {
         throw forbidden();
@@ -208,14 +206,22 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
         WHERE ${where.join(' AND ')} ORDER BY year DESC`,
       params,
     );
-    sendData(res, rows.map((row) => row.year));
+    sendData(
+      res,
+      rows.map((row) => row.year),
+    );
   });
 
   router.get('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const invoice = await getInvoice(pool, pathParam(req, 'uid'));
     if (!invoice) throw notFound('Invoice');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, invoice.accountUID as string);
+    await authorizeAccount(
+      pool,
+      user.userId,
+      PERMISSIONS.VIEW_INVOICES,
+      invoice.accountUID as string,
+    );
     sendData(res, present(invoice));
   });
 

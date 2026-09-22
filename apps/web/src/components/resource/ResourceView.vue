@@ -84,7 +84,9 @@ watch(() => props.config.path, reload, { immediate: true });
 function cell(row: ResourceRow, column: ColumnConfig): string {
   const raw = row[column.key];
   if (column.lookup) {
-    return lookups.value[column.lookup]?.byId.get(String(raw)) ?? (raw === null ? '–' : String(raw));
+    return (
+      lookups.value[column.lookup]?.byId.get(String(raw)) ?? (raw === null ? '–' : String(raw))
+    );
   }
   if (column.format) return column.format(raw, row);
   return raw === null || raw === undefined || raw === '' ? '–' : String(raw);
@@ -180,7 +182,10 @@ async function confirmDelete(): Promise<void> {
             <td
               v-for="column in config.columns"
               :key="column.key"
-              :class="{ 'eu-resource__num': column.align === 'right', 'eu-resource__wrap': column.wrap }"
+              :class="{
+                'eu-resource__num': column.align === 'right',
+                'eu-resource__wrap': column.wrap,
+              }"
             >
               {{ cell(row, column) }}
             </td>

@@ -11,7 +11,13 @@ import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import type { AdminUserDto, RoleDto } from './api';
 
 export interface UserFormPayload {
-  user: { email: string; firstname: string; surname: string | null; status?: number; password?: string };
+  user: {
+    email: string;
+    firstname: string;
+    surname: string | null;
+    status?: number;
+    password?: string;
+  };
   globalRoleUIDs: string[];
   grants: Array<{ accountUID: string; roleUID: string }>;
 }
@@ -40,7 +46,9 @@ const roleUidByName = computed(() => new Map(props.roles.map((r) => [r.roleName,
 const roleOptions = computed<SelectOption[]>(() =>
   props.roles.map((r) => ({ value: r.roleUID, label: r.roleName })),
 );
-const defaultRoleUID = computed(() => roleUidByName.value.get('Nutzer') ?? props.roles[0]?.roleUID ?? '');
+const defaultRoleUID = computed(
+  () => roleUidByName.value.get('Nutzer') ?? props.roles[0]?.roleUID ?? '',
+);
 
 watch(
   () => [props.open, props.editing] as const,
@@ -54,7 +62,9 @@ watch(
     password.value = '';
     active.value = e ? e.status === 1 : true;
     globalRoleUIDs.value = new Set(
-      (e?.globalRoles ?? []).map((name) => roleUidByName.value.get(name)).filter((v): v is string => Boolean(v)),
+      (e?.globalRoles ?? [])
+        .map((name) => roleUidByName.value.get(name))
+        .filter((v): v is string => Boolean(v)),
     );
     grants.value = (e?.accountGrants ?? []).map((g) => ({
       accountUID: g.accountUID,
@@ -103,7 +113,11 @@ function submit(): void {
 </script>
 
 <template>
-  <EuDialog :open="open" :title="editing ? 'Nutzer bearbeiten' : 'Neuer Nutzer'" @close="emit('close')">
+  <EuDialog
+    :open="open"
+    :title="editing ? 'Nutzer bearbeiten' : 'Neuer Nutzer'"
+    @close="emit('close')"
+  >
     <form class="eu-form" @submit.prevent="submit">
       <EuTextField v-model="email" label="E-Mail" type="email" />
       <EuTextField v-model="firstname" label="Vorname" />
@@ -152,10 +166,14 @@ function submit(): void {
             @click="removeGrant(index)"
           />
         </div>
-        <EuButton variant="secondary" :icon="faPlus" @click="addGrant">Konto-Zugriff hinzufügen</EuButton>
+        <EuButton variant="secondary" :icon="faPlus" @click="addGrant"
+          >Konto-Zugriff hinzufügen</EuButton
+        >
       </fieldset>
 
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">{{ error ?? localError }}</p>
+      <p v-if="error ?? localError" class="eu-form__error" role="alert">
+        {{ error ?? localError }}
+      </p>
     </form>
 
     <template #footer>

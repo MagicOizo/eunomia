@@ -33,8 +33,13 @@ export async function createUser(body: {
   return unwrap(await apiFetch<{ data: AdminUserDto }>('/users', { method: 'POST', body }));
 }
 
-export async function updateUser(uuid: string, body: Record<string, unknown>): Promise<AdminUserDto> {
-  return unwrap(await apiFetch<{ data: AdminUserDto }>(`/users/${uuid}`, { method: 'PATCH', body }));
+export async function updateUser(
+  uuid: string,
+  body: Record<string, unknown>,
+): Promise<AdminUserDto> {
+  return unwrap(
+    await apiFetch<{ data: AdminUserDto }>(`/users/${uuid}`, { method: 'PATCH', body }),
+  );
 }
 
 export async function deleteUser(uuid: string): Promise<void> {

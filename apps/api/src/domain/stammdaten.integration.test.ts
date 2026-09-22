@@ -73,7 +73,9 @@ async function scopedNutzer(
     [email, 'Scoped', await hashPassword(password)],
   )) as { insertId: number };
   const nutzer = (
-    await pool.query<Array<{ roleID: number }>>("SELECT roleID FROM Roles WHERE roleName = 'Nutzer'")
+    await pool.query<Array<{ roleID: number }>>(
+      "SELECT roleID FROM Roles WHERE roleName = 'Nutzer'",
+    )
   )[0];
   await pool.query('INSERT INTO UserAccountRoles (userID, roleID, accountUID) VALUES (?, ?, ?)', [
     insert.insertId,
@@ -256,8 +258,14 @@ test('master-data CRUD and account scoping', async (t) => {
         userList.body.data.map((c: { contractUID: string }) => c.contractUID),
         [contractAUID],
       );
-      assert.equal((await request(app).get(`/api/v1/contracts/${contractAUID}`).set(user)).status, 200);
-      assert.equal((await request(app).get(`/api/v1/contracts/${contractBUID}`).set(user)).status, 403);
+      assert.equal(
+        (await request(app).get(`/api/v1/contracts/${contractAUID}`).set(user)).status,
+        200,
+      );
+      assert.equal(
+        (await request(app).get(`/api/v1/contracts/${contractBUID}`).set(user)).status,
+        403,
+      );
 
       // Nutzer may VIEW but not MANAGE contracts.
       const userPatch = await request(app)

@@ -68,7 +68,9 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
   async function assertKeepsAnAdmin(uuid: string, willRemainAdmin: boolean): Promise<void> {
     if (willRemainAdmin) return;
     if ((await isActiveAdmin(pool, uuid)) && (await countActiveAdmins(pool)) <= 1) {
-      throw badRequest('Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.');
+      throw badRequest(
+        'Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.',
+      );
     }
   }
 

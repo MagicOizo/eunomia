@@ -70,7 +70,9 @@ export interface ReimbursementAnalysisDto {
 const unwrap = <T>(res: { data: T }): T => res.data;
 
 export async function listInvoices(accountUID: string, year: number): Promise<InvoiceDto[]> {
-  return unwrap(await apiFetch<{ data: InvoiceDto[] }>(`/invoices?accountUID=${accountUID}&year=${year}`));
+  return unwrap(
+    await apiFetch<{ data: InvoiceDto[] }>(`/invoices?accountUID=${accountUID}&year=${year}`),
+  );
 }
 
 /** All invoices of an account (every year) — used to pick allocation targets. */
@@ -98,8 +100,13 @@ export async function createInvoice(body: Record<string, unknown>): Promise<Invo
   return unwrap(await apiFetch<{ data: InvoiceDto }>('/invoices', { method: 'POST', body }));
 }
 
-export async function updateInvoice(uid: string, body: Record<string, unknown>): Promise<InvoiceDto> {
-  return unwrap(await apiFetch<{ data: InvoiceDto }>(`/invoices/${uid}`, { method: 'PATCH', body }));
+export async function updateInvoice(
+  uid: string,
+  body: Record<string, unknown>,
+): Promise<InvoiceDto> {
+  return unwrap(
+    await apiFetch<{ data: InvoiceDto }>(`/invoices/${uid}`, { method: 'PATCH', body }),
+  );
 }
 
 export async function deleteInvoice(uid: string): Promise<void> {
@@ -111,7 +118,9 @@ export async function createSubmission(body: {
   submittedDate: string;
   invoiceUIDs: string[];
 }): Promise<{ submissionUID: string }> {
-  return unwrap(await apiFetch<{ data: { submissionUID: string } }>('/submissions', { method: 'POST', body }));
+  return unwrap(
+    await apiFetch<{ data: { submissionUID: string } }>('/submissions', { method: 'POST', body }),
+  );
 }
 
 export async function listBillings(submissionUID: string): Promise<BillingDto[]> {
@@ -144,7 +153,9 @@ export async function updateBilling(
     objectionNote?: string | null;
   },
 ): Promise<BillingDto> {
-  return unwrap(await apiFetch<{ data: BillingDto }>(`/billings/${uid}`, { method: 'PATCH', body }));
+  return unwrap(
+    await apiFetch<{ data: BillingDto }>(`/billings/${uid}`, { method: 'PATCH', body }),
+  );
 }
 
 /** Deletes a billing, cascading to its allocations (affected invoices revert). */

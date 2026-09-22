@@ -61,9 +61,11 @@ async function reload(): Promise<void> {
   try {
     users.value = await listUsers();
     roles.value = await listRoles();
-    const accounts = await listResource<{ accountUID: string; firstname: string; surname: string | null }>(
-      '/accounts',
-    );
+    const accounts = await listResource<{
+      accountUID: string;
+      firstname: string;
+      surname: string | null;
+    }>('/accounts');
     accountOptions.value = accounts.map((a) => ({
       value: a.accountUID,
       label: [a.firstname, a.surname].filter(Boolean).join(' '),
@@ -142,11 +144,27 @@ async function confirmDelete(): Promise<void> {
       <table class="eu-users__table">
         <thead>
           <tr>
-            <EuSortableTh label="E-Mail" :state="sort.stateOf('email')" @sort="sort.toggle('email')" />
+            <EuSortableTh
+              label="E-Mail"
+              :state="sort.stateOf('email')"
+              @sort="sort.toggle('email')"
+            />
             <EuSortableTh label="Name" :state="sort.stateOf('name')" @sort="sort.toggle('name')" />
-            <EuSortableTh label="Status" :state="sort.stateOf('status')" @sort="sort.toggle('status')" />
-            <EuSortableTh label="Globale Rollen" :state="sort.stateOf('roles')" @sort="sort.toggle('roles')" />
-            <EuSortableTh label="Konto-Zugriffe" :state="sort.stateOf('grants')" @sort="sort.toggle('grants')" />
+            <EuSortableTh
+              label="Status"
+              :state="sort.stateOf('status')"
+              @sort="sort.toggle('status')"
+            />
+            <EuSortableTh
+              label="Globale Rollen"
+              :state="sort.stateOf('roles')"
+              @sort="sort.toggle('roles')"
+            />
+            <EuSortableTh
+              label="Konto-Zugriffe"
+              :state="sort.stateOf('grants')"
+              @sort="sort.toggle('grants')"
+            />
             <th class="eu-users__actions-head">Aktionen</th>
           </tr>
         </thead>

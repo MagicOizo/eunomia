@@ -12,7 +12,9 @@ const props = defineProps<{
   contractAnalyses: Array<{ label: string; analysis: ReimbursementAnalysisDto }>;
 }>();
 
-const totalSpend = computed(() => props.invoices.reduce((sum, inv) => sum + Number(inv.invoiceAmount), 0));
+const totalSpend = computed(() =>
+  props.invoices.reduce((sum, inv) => sum + Number(inv.invoiceAmount), 0),
+);
 
 const distribution = computed(() =>
   STATUS_ORDER.map((status) => ({
@@ -39,24 +41,50 @@ const distribution = computed(() =>
       <span class="eu-summary__spend">Gesamtausgaben: {{ euro(totalSpend) }}</span>
     </div>
 
-    <div v-for="item in contractAnalyses" :key="item.analysis.contractUID" class="eu-summary__contract">
+    <div
+      v-for="item in contractAnalyses"
+      :key="item.analysis.contractUID"
+      class="eu-summary__contract"
+    >
       <h4>{{ item.label }}</h4>
       <dl class="eu-summary__grid">
-        <div><dt>Selbstbeteiligung</dt><dd>{{ euro(item.analysis.deductible) }}</dd></div>
+        <div>
+          <dt>Selbstbeteiligung</dt>
+          <dd>{{ euro(item.analysis.deductible) }}</dd>
+        </div>
         <div>
           <dt>Bonus</dt>
-          <dd>{{ item.analysis.bonusPending ? 'noch nicht erfasst' : euro(item.analysis.bonus) }}</dd>
+          <dd>
+            {{ item.analysis.bonusPending ? 'noch nicht erfasst' : euro(item.analysis.bonus) }}
+          </dd>
         </div>
-        <div><dt>Obergrenze</dt><dd>{{ euro(item.analysis.reimbursementCap) }}</dd></div>
-        <div><dt>Rechnungssumme (Jahr)</dt><dd>{{ euro(item.analysis.invoiceTotal) }}</dd></div>
-        <div><dt>Bereits erstattet</dt><dd>{{ euro(item.analysis.alreadyReimbursed) }}</dd></div>
-        <div><dt>Mögliche Erstattung</dt><dd>{{ euro(item.analysis.analysis.reimbursement) }}</dd></div>
+        <div>
+          <dt>Obergrenze</dt>
+          <dd>{{ euro(item.analysis.reimbursementCap) }}</dd>
+        </div>
+        <div>
+          <dt>Rechnungssumme (Jahr)</dt>
+          <dd>{{ euro(item.analysis.invoiceTotal) }}</dd>
+        </div>
+        <div>
+          <dt>Bereits erstattet</dt>
+          <dd>{{ euro(item.analysis.alreadyReimbursed) }}</dd>
+        </div>
+        <div>
+          <dt>Mögliche Erstattung</dt>
+          <dd>{{ euro(item.analysis.analysis.reimbursement) }}</dd>
+        </div>
       </dl>
       <p v-if="item.analysis.bonusPending" class="eu-summary__verdict not-worth">
-        Mögliche Erstattung nach Selbstbeteiligung und Obergrenze: {{ euro(item.analysis.analysis.reimbursement) }}.
-        Der Bonus ist noch nicht berücksichtigt – ob sich das Einreichen lohnt, lässt sich noch nicht bewerten.
+        Mögliche Erstattung nach Selbstbeteiligung und Obergrenze:
+        {{ euro(item.analysis.analysis.reimbursement) }}. Der Bonus ist noch nicht berücksichtigt –
+        ob sich das Einreichen lohnt, lässt sich noch nicht bewerten.
       </p>
-      <p v-else class="eu-summary__verdict" :class="item.analysis.analysis.worthSubmitting ? 'is-worth' : 'not-worth'">
+      <p
+        v-else
+        class="eu-summary__verdict"
+        :class="item.analysis.analysis.worthSubmitting ? 'is-worth' : 'not-worth'"
+      >
         <template v-if="item.analysis.analysis.worthSubmitting">
           ✓ Einreichen lohnt sich – die Erstattung übersteigt den Bonus.
         </template>
