@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  faCalendarDay,
   faCircleCheck,
   faCircleHalfStroke,
   faFileInvoiceDollar,
@@ -11,6 +12,7 @@ import { ref } from 'vue';
 import EuBadge from './components/EuBadge.vue';
 import EuButton from './components/EuButton.vue';
 import EuDialog from './components/EuDialog.vue';
+import EuIconLabel from './components/EuIconLabel.vue';
 import EuTextField from './components/EuTextField.vue';
 import EuTooltip from './components/EuTooltip.vue';
 
@@ -71,6 +73,13 @@ const invalidValue = ref('12,50');
         </EuTooltip>
         to see the tooltip — it works with keyboard focus, not only the mouse.
       </p>
+      <p>
+        <EuIconLabel :icon="faCalendarDay" label="Zahlungsziel" />
+        <span class="eu-style-guide__icon-note">
+          12.05.2026 — <code>EuIconLabel</code> lets an icon stand in for a label where space is
+          tight: tooltip on hover and focus, hidden text for screen readers.
+        </span>
+      </p>
     </section>
 
     <section>
@@ -102,6 +111,10 @@ const invalidValue = ref('12,50');
 
 section {
   margin-block: 2rem;
+}
+
+.eu-style-guide__icon-note {
+  margin-left: 0.5rem;
 }
 
 .row {

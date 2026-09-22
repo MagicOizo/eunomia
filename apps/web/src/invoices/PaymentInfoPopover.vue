@@ -11,9 +11,9 @@ import {
   faReceipt,
   faSackDollar,
 } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed } from 'vue';
 
+import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
 import { euro, germanDate } from '../lib/format';
 import type { InvoiceDto } from './api';
@@ -36,65 +36,56 @@ const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.
     </template>
 
     <!-- Icon + value only, like the reference: the label lives in the icon's
-         title (hover tooltip + accessible name), keeping the bubble compact. -->
+         tooltip (and, for screen readers, in its hidden text), which keeps the
+         bubble compact. -->
     <dl class="eu-pay-grid">
       <template v-if="facilityName">
-        <dt><FontAwesomeIcon :icon="faHouseMedical" fixed-width title="Leistungserbringer" /></dt>
+        <dt><EuIconLabel :icon="faHouseMedical" label="Leistungserbringer" /></dt>
         <dd>{{ facilityName }}</dd>
       </template>
 
       <template v-if="invoice.transferUntilDate">
-        <dt>
-          <FontAwesomeIcon
-            :icon="faCalendarDay"
-            fixed-width
-            title="Zahlungsziel"
-            :style="{ color: dueColor }"
-          />
-        </dt>
+        <dt><EuIconLabel :icon="faCalendarDay" label="Zahlungsziel" :color="dueColor" /></dt>
         <dd>{{ germanDate(invoice.transferUntilDate) }}</dd>
       </template>
 
       <template v-if="invoice.transferDate">
-        <dt><FontAwesomeIcon :icon="faCalendarCheck" fixed-width title="Überweisungsdatum" /></dt>
+        <dt><EuIconLabel :icon="faCalendarCheck" label="Überweisungsdatum" /></dt>
         <dd>{{ germanDate(invoice.transferDate) }}</dd>
       </template>
 
-      <dt><FontAwesomeIcon :icon="faEuroSign" fixed-width title="Rechnungssumme" /></dt>
+      <dt><EuIconLabel :icon="faEuroSign" label="Rechnungssumme" /></dt>
       <dd>{{ euro(invoice.invoiceAmount) }}</dd>
 
       <template v-if="invoice.documentLink">
-        <dt><FontAwesomeIcon :icon="faReceipt" fixed-width title="Dokument" /></dt>
+        <dt><EuIconLabel :icon="faReceipt" label="Dokument" /></dt>
         <dd><a :href="invoice.documentLink" target="_blank" rel="noopener">Dokument öffnen</a></dd>
       </template>
 
       <template v-if="agencyName">
-        <dt>
-          <FontAwesomeIcon
-            :icon="faSackDollar"
-            fixed-width
-            title="Abrechnungsdienstleister / Empfänger"
-          />
-        </dt>
+        <dt><EuIconLabel :icon="faSackDollar" label="Abrechnungsdienstleister / Empfänger" /></dt>
         <dd>{{ agencyName }}</dd>
       </template>
 
       <template v-if="bankAccount">
-        <dt><FontAwesomeIcon :icon="faMoneyCheckDollar" fixed-width title="IBAN" /></dt>
+        <dt><EuIconLabel :icon="faMoneyCheckDollar" label="IBAN" /></dt>
         <dd class="eu-pay-grid__mono">{{ bankAccount }}</dd>
       </template>
 
       <template v-if="invoice.transferSubject">
-        <dt><FontAwesomeIcon :icon="faHashtag" fixed-width title="Verwendungszweck" /></dt>
+        <dt><EuIconLabel :icon="faHashtag" label="Verwendungszweck" /></dt>
         <dd>{{ invoice.transferSubject }}</dd>
       </template>
 
       <dt>
-        <FontAwesomeIcon
+        <EuIconLabel
           :icon="invoice.directPayment === 1 ? faCircleCheck : faCircleXmark"
-          :class="invoice.directPayment === 1 ? 'eu-pay-grid__yes' : 'eu-pay-grid__no'"
-          fixed-width
-          title="Barzahlung"
+          label="Barzahlung"
+          :color="
+            invoice.directPayment === 1
+              ? 'var(--eu-color-status-done-fg)'
+              : 'var(--eu-color-status-open-fg)'
+          "
         />
       </dt>
       <dd>{{ invoice.directPayment === 1 ? 'Ja' : 'Nein' }}</dd>
@@ -128,13 +119,5 @@ const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.
 
 .eu-pay-grid__mono {
   font-family: var(--eu-font-data);
-}
-
-.eu-pay-grid__yes {
-  color: var(--eu-color-status-done-fg);
-}
-
-.eu-pay-grid__no {
-  color: var(--eu-color-status-open-fg);
 }
 </style>
