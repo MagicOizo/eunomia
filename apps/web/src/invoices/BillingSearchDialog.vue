@@ -116,7 +116,7 @@ function confirm(): void {
       <p v-else-if="results.length === 0" class="eu-form__note" role="status">
         Keine Leistungsabrechnung passt zu diesen Filtern.
       </p>
-      <ul v-else class="eu-bsearch__results">
+      <ul v-else class="eu-bsearch__results eu-scroll-focus-safe">
         <li v-for="billing in results" :key="billing.billingUID">
           <button
             type="button"
@@ -191,10 +191,12 @@ function confirm(): void {
   font-size: 1rem;
 }
 
+/* Scrolls once the hits outgrow it, which would cut the focus ring off the
+   result buttons flush with its edges — `eu-scroll-focus-safe` reserves the
+   room and owns this list's margin/padding (including the browser's default
+   list indent), so don't set either here: scoped rules would override it. */
 .eu-bsearch__results {
   list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;

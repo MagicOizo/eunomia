@@ -30,7 +30,7 @@ watch(
       <div class="eu-main-col">
         <main class="eu-main">
           <AppHeader :title="title" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-          <div class="eu-main__content">
+          <div class="eu-main__content eu-scroll-focus-safe">
             <SetupTokenBanner v-if="auth.isAdmin && auth.setupTokenActive" />
             <slot />
           </div>
@@ -71,6 +71,8 @@ watch(
   box-shadow: 0 1rem 2rem rgb(0 0 0 / 18%);
 }
 
+/* Scrolls sideways when a page is wider than the card; `eu-scroll-focus-safe`
+   keeps that from cutting the focus ring off fields at the content edge. */
 .eu-main__content {
   min-width: 0;
   overflow-x: auto;

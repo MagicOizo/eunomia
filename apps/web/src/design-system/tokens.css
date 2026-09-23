@@ -41,6 +41,14 @@
   --eu-color-focus-ring: #1d6fd6; /* on light surfaces */
   --eu-color-focus-ring-on-brand: #80bdff; /* on the brand-blue sidebar; original focus ring color */
 
+  /* Geometry of the focus ring (see global.css). The ring is painted outside
+     the element's border box, so a scroll container (anything with overflow
+     other than `visible`) clips it off a child that sits flush with its edge.
+     Such a container reserves `--eu-focus-ring-space` around its content. */
+  --eu-focus-ring-width: 3px;
+  --eu-focus-ring-offset: 2px;
+  --eu-focus-ring-space: calc(var(--eu-focus-ring-width) + var(--eu-focus-ring-offset));
+
   /* Feedback */
   --eu-color-error-bg: #fbe0df;
   --eu-color-error-fg: #8f2317;

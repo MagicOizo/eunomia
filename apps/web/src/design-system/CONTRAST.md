@@ -58,6 +58,26 @@ works, and replaced with `#1d6fd6` for general use).
 | billed    | `#a8d4ff` on `#123a5c` | 7.58:1 ✅ |
 | done      | `#9ee8ac` on `#163d1d` | 8.49:1 ✅ |
 
+## Focus ring: contrast is not enough, it also has to be visible
+
+The ring (`global.css`, `:focus-visible`) is painted **outside** the element's border box:
+`--eu-focus-ring-width` `3px` plus `--eu-focus-ring-offset` `2px`, so it needs
+`--eu-focus-ring-space` `5px` of room on every side. An element flush with the edge of a
+**scroll container** — anything whose `overflow` is not `visible`, and note that `overflow-x: auto`
+alone also makes the y axis clip — loses that part of its ring. A ring cut in half fails WCAG 2.4.11
+however good its contrast is, and it is easy to miss: nothing in the DOM measurements shows it
+(`scrollWidth` ignores outlines), only a keyboard-focused screenshot does.
+
+Remedy: put `eu-scroll-focus-safe` (`global.css`) on the scrolling element. It pads the container by
+`--eu-focus-ring-space` and pulls the same amount back with a negative margin, so the content stays
+where it was and only the area the container paints in grows. Applied to `.eu-main__content`
+(`DefaultLayout.vue`) and `.eu-bsearch__results` (`BillingSearchDialog.vue`). Containers with at
+least `5px` of padding of their own — the dialog body (`1.25em`), table cells in the scrolling table
+wrappers (`0.6rem`) — already have the room and need nothing.
+
+When adding a scroll container: either give it that padding or the class, and check it by tabbing
+into the element in its top-left corner.
+
 ## Re-running this audit
 
 The ratios above were computed with a small throwaway Node script (relative-luminance formula,

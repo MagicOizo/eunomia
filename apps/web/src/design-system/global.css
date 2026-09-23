@@ -31,8 +31,20 @@ h4 {
  * mouse clicks, matching modern browser default UX.
  */
 :focus-visible {
-  outline: 3px solid var(--eu-color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--eu-focus-ring-width) solid var(--eu-color-focus-ring);
+  outline-offset: var(--eu-focus-ring-offset);
+}
+
+/*
+ * Scroll containers clip whatever their children paint outside the padding
+ * box, so a focused element flush with the edge loses part of its ring. This
+ * keeps the content where it was and only widens the box the container paints
+ * in — apply it to every element that scrolls, not just the ones where a field
+ * happens to sit at the edge today.
+ */
+.eu-scroll-focus-safe {
+  padding: var(--eu-focus-ring-space);
+  margin: calc(-1 * var(--eu-focus-ring-space));
 }
 
 .eu-sidebar :focus-visible {
