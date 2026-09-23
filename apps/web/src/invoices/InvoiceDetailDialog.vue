@@ -22,7 +22,7 @@ import {
   removeExclusion,
   withdrawSubmission,
 } from './api';
-import { type BillingAllocationPayload, saveBillingAllocation } from './billing-actions';
+import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
 import BillingDialog from './BillingDialog.vue';
 import { submittableContracts } from './eligibility';
 import ExclusionDialog from './ExclusionDialog.vue';
@@ -222,7 +222,7 @@ async function saveBilling(payload: BillingAllocationPayload): Promise<void> {
   if (!inv) return;
   billingError.value = null;
   const ok = await runBlock(
-    () => saveBillingAllocation(inv.invoiceUID, payload),
+    () => saveBillingAllocations(payload),
     (m) => (billingError.value = m),
     `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${euro(inv.remainingAmount)}).`,
   );
@@ -509,7 +509,7 @@ function submit(): void {
   />
   <BillingDialog
     :open="billingOpen"
-    :invoice="invoice"
+    :invoices="invoice ? [invoice] : []"
     :preset-submission="billingSubmission?.submissionUID ?? null"
     :submitting="blockBusy"
     :error="billingError"

@@ -13,7 +13,7 @@ import { HttpError } from '../lib/http';
 import {
   type InvoiceDto,
   type SubmissionDto,
-  createAllocation,
+  createAllocations,
   createBilling,
   listAccountInvoices,
   listSubmissions,
@@ -119,12 +119,11 @@ function save(): void {
         documentLink: documentLink.value.trim() ? documentLink.value.trim() : null,
         forfeitsBonus: forfeit.value.value,
       });
-      for (const a of allocations) {
-        await createAllocation({
-          billingUID: billing.billingUID,
-          invoiceUID: a.invoiceUID,
-          reimbursement: a.amount,
-        });
+      if (allocations.length > 0) {
+        await createAllocations(
+          billing.billingUID,
+          allocations.map((a) => ({ invoiceUID: a.invoiceUID, reimbursement: a.amount })),
+        );
       }
       emit('created');
       emit('close');

@@ -12,6 +12,7 @@ import { ref } from 'vue';
 import EuBadge from './components/EuBadge.vue';
 import EuButton from './components/EuButton.vue';
 import EuDialog from './components/EuDialog.vue';
+import EuEntityPicker from './components/EuEntityPicker.vue';
 import EuIconLabel from './components/EuIconLabel.vue';
 import EuTextField from './components/EuTextField.vue';
 import EuTooltip from './components/EuTooltip.vue';
@@ -19,6 +20,12 @@ import EuTooltip from './components/EuTooltip.vue';
 const isDialogOpen = ref(false);
 const textValue = ref('');
 const invalidValue = ref('12,50');
+const pickerValue = ref<string | null>(null);
+const pickerAction = ref('');
+const pickerOptions = [
+  { value: 'b-1', label: 'LA-42', hint: '01.04.2025' },
+  { value: 'b-2', label: 'LA-43', hint: '12.05.2025' },
+];
 </script>
 
 <template>
@@ -61,6 +68,22 @@ const invalidValue = ref('12,50');
           label="Betrag"
           error="Bitte einen gültigen Betrag im Format 0,00 eingeben."
         />
+        <EuEntityPicker
+          v-model="pickerValue"
+          label="Leistungsabrechnung"
+          allow-search
+          allow-create
+          create-noun="Leistungsabrechnung"
+          :options="pickerOptions"
+          @search="pickerAction = 'Suche geöffnet'"
+          @create="pickerAction = 'Anlegen geöffnet'"
+        />
+        <p class="eu-style-guide__icon-note">
+          Typeahead mit den In-Feld-Aktionen Suchen, Hinzufügen und Löschen (in dieser Reihenfolge).
+          Suchen und Hinzufügen melden sich beim Elternteil, das den passenden Dialog
+          öffnet<template v-if="pickerAction"> — zuletzt: {{ pickerAction }}</template
+          >.
+        </p>
       </div>
     </section>
 

@@ -6,10 +6,11 @@ import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
 import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
-import { pathParam } from '../crud/params.js';
+import { parseQuery, pathParam } from '../crud/params.js';
 import { type CrudTable, type Row, getRow, insertRow, updateRow } from '../crud/repository.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
+import { allocationEntriesSchema, createAllocationsForBilling } from './allocations.js';
 import {
   accountForBilling,
   accountForContract,
@@ -59,6 +60,26 @@ const objection = z.object({
 // are editable.
 const updateSchema = base.omit({ submissionUID: true }).extend(objection.shape).partial();
 
+/**
+ * Filters for the billings list, used by the "Leistungsabrechnung auswählen"
+ * sub-dialog and the filter bar of the billings list. `submissionUID` and
+ * `contractUID` scope the result to one entity (and are mutually exclusive);
+ * the rest narrow it down further.
+ */
+const listQuery = z.object({
+  submissionUID: z.string().trim().min(1).optional(),
+  contractUID: z.string().trim().min(1).optional(),
+  /** Free text over billing number, policy number, insured person and invoice numbers. */
+  q: z.string().trim().min(1).optional(),
+  from: z.string().date().optional(),
+  to: z.string().date().optional(),
+  /** 'true' keeps only billings without a reimbursement booked on them yet. */
+  unlinked: z.enum(['true', 'false']).optional(),
+  minReimbursement: z.coerce.number().min(0).max(99999999.99).optional(),
+  maxReimbursement: z.coerce.number().min(0).max(99999999.99).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+
 /** Exposes the TINYINT(1) forfeit flag as boolean | null. */
 function toBillingDto(row: Row | null): Row | null {
   if (row === null) return null;
@@ -72,13 +93,13 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
 
   router.get('/', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
+    const filters = parseQuery(req, listQuery);
     const where = ['b.billingStatus <> -1'];
+    const having: string[] = [];
     const params: unknown[] = [];
+    const havingParams: unknown[] = [];
 
-    const submissionUID =
-      typeof req.query.submissionUID === 'string' ? req.query.submissionUID : undefined;
-    const contractUID =
-      typeof req.query.contractUID === 'string' ? req.query.contractUID : undefined;
+    const { submissionUID, contractUID } = filters;
     if (submissionUID !== undefined) {
       const account = await accountForSubmission(pool, submissionUID);
       if (account === null) throw notFound('Submission');
@@ -103,6 +124,45 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
       }
     }
 
+    if (filters.q !== undefined) {
+      // The invoice numbers are matched through their own EXISTS rather than
+      // the joined rows, so the free text never changes the aggregates below.
+      where.push(`(b.billingNumber LIKE ? OR c.contractNumber LIKE ?
+                   OR CONCAT_WS(' ', acc.firstname, acc.surname) LIKE ?
+                   OR EXISTS (
+                        SELECT 1 FROM Allocations qa
+                          JOIN Invoices qi ON qi.invoiceUID = qa.invoiceUID AND qi.invoiceStatus <> -1
+                         WHERE qa.billingUID = b.billingUID AND qa.allocationStatus <> -1
+                           AND qi.invoiceNumber LIKE ?
+                      ))`);
+      const like = `%${filters.q}%`;
+      params.push(like, like, like, like);
+    }
+    if (filters.from !== undefined) {
+      where.push('b.billingDate >= ?');
+      params.push(filters.from);
+    }
+    if (filters.to !== undefined) {
+      where.push('b.billingDate <= ?');
+      params.push(filters.to);
+    }
+    if (filters.unlinked === 'true') {
+      where.push(
+        `NOT EXISTS (SELECT 1 FROM Allocations ua
+                      WHERE ua.billingUID = b.billingUID AND ua.allocationStatus <> -1)`,
+      );
+    }
+    if (filters.minReimbursement !== undefined) {
+      having.push('COALESCE(SUM(al.reimbursement), 0) >= ?');
+      havingParams.push(filters.minReimbursement);
+    }
+    if (filters.maxReimbursement !== undefined) {
+      having.push('COALESCE(SUM(al.reimbursement), 0) <= ?');
+      havingParams.push(filters.maxReimbursement);
+    }
+    // Safe to inline: zod has narrowed it to an integer within range.
+    const limit = filters.limit === undefined ? '' : ` LIMIT ${filters.limit}`;
+
     const rows = await pool.query<Row[]>(
       `SELECT b.billingUID, b.submissionUID, b.billingDate, b.billingNumber, b.documentLink,
               b.forfeitsBonus, b.objectionDate, b.objectionResolvedDate, b.objectionNote, b.billingStatus,
@@ -119,8 +179,9 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
          LEFT JOIN Invoices inv ON inv.invoiceUID = al.invoiceUID AND inv.invoiceStatus <> -1
         WHERE ${where.join(' AND ')}
         GROUP BY b.billingID
-        ORDER BY b.billingDate DESC, b.billingUID`,
-      params,
+        ${having.length > 0 ? `HAVING ${having.join(' AND ')}` : ''}
+        ORDER BY b.billingDate DESC, b.billingUID${limit}`,
+      [...params, ...havingParams],
     );
     sendData(res, rows.map(toBillingDto));
   });
@@ -141,6 +202,16 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     if (account === null) throw notFound('Submission');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
     sendData(res, toBillingDto(await insertRow(pool, table, data)), 201);
+  });
+
+  // Booking reimbursements is billing-scoped: the submission — and with it the
+  // set of invoices that may be booked at all — follows from the billing, so
+  // the client never has to repeat it per entry.
+  router.post('/:uid/allocations', requireAuth, async (req, res) => {
+    const user = getAuthUser(res);
+    const uid = pathParam(req, 'uid');
+    const { entries } = allocationEntriesSchema.parse(req.body);
+    sendData(res, await createAllocationsForBilling(pool, user.userId, uid, entries), 201);
   });
 
   router.patch('/:uid', requireAuth, async (req, res) => {

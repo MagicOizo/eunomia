@@ -240,10 +240,8 @@ test('bonus scale and claim-free years', async (t) => {
       assert.equal(billing.status, 201);
       assert.equal(billing.body.data.forfeitsBonus, null);
       billingUID = billing.body.data.billingUID;
-      const alloc = await send('post', '/api/v1/allocations', {
-        invoiceUID: inv2023,
-        billingUID,
-        reimbursement: 150,
+      const alloc = await send('post', `/api/v1/billings/${billingUID}/allocations`, {
+        entries: [{ invoiceUID: inv2023, reimbursement: 150 }],
       });
       assert.equal(alloc.status, 201);
 

@@ -245,15 +245,29 @@ export async function removeExclusion(invoiceUID: string, contractUID: string): 
   await apiFetch(`/invoices/${invoiceUID}/exclusions/${contractUID}`, { method: 'DELETE' });
 }
 
-export async function listBillings(submissionUID: string): Promise<BillingListDto[]> {
-  return unwrap(
-    await apiFetch<{ data: BillingListDto[] }>(`/billings?submissionUID=${submissionUID}`),
-  );
+/** The filters of the billings search; every one of them is optional. */
+export interface BillingSearchParams {
+  submissionUID?: string;
+  contractUID?: string;
+  /** Free text over billing number, policy number, person and invoice numbers. */
+  q?: string;
+  from?: string;
+  to?: string;
+  /** Only billings that have no reimbursement booked on them yet. */
+  unlinked?: boolean;
+  minReimbursement?: number;
+  maxReimbursement?: number;
+  limit?: number;
 }
 
-/** Enriched service billings for one contract (Leistungsabrechnungen list). */
-export async function listContractBillings(contractUID: string): Promise<BillingListDto[]> {
-  return unwrap(await apiFetch<{ data: BillingListDto[] }>(`/billings?contractUID=${contractUID}`));
+/** Searches service billings server-side (the filter dialog and the list's filter bar). */
+export async function searchBillings(params: BillingSearchParams): Promise<BillingListDto[]> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === '' || value === false) continue;
+    query.set(key, String(value));
+  }
+  return unwrap(await apiFetch<{ data: BillingListDto[] }>(`/billings?${query.toString()}`));
 }
 
 export async function createBilling(body: {
@@ -289,13 +303,23 @@ export async function deleteBilling(uid: string): Promise<void> {
   await apiFetch(`/billings/${uid}`, { method: 'DELETE' });
 }
 
-export async function createAllocation(body: {
-  billingUID: string;
+/** One reimbursement of a billing, booked onto an invoice of its submission. */
+export interface AllocationEntry {
   invoiceUID: string;
   reimbursement: number;
   receiptNumber?: string;
-}): Promise<void> {
-  await apiFetch('/allocations', { method: 'POST', body });
+}
+
+/**
+ * Books the reimbursements of one billing in a single transaction: either all
+ * invoices are booked or none is, and the server reports every entry that
+ * breaks a rule at once.
+ */
+export async function createAllocations(
+  billingUID: string,
+  entries: AllocationEntry[],
+): Promise<void> {
+  await apiFetch(`/billings/${billingUID}/allocations`, { method: 'POST', body: { entries } });
 }
 
 /** Removes a booked reimbursement; the billing itself stays. */

@@ -220,10 +220,8 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         })
       ).body.data.billingUID as string;
 
-      const alloc = await post('/api/v1/allocations', {
-        billingUID,
-        invoiceUID: inv1,
-        reimbursement: 200,
+      const alloc = await post(`/api/v1/billings/${billingUID}/allocations`, {
+        entries: [{ invoiceUID: inv1, reimbursement: 200 }],
       });
       assert.equal(alloc.status, 201);
 
@@ -290,10 +288,8 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
           billingNumber: 'LA-DEL',
         })
       ).body.data.billingUID as string;
-      await post('/api/v1/allocations', {
-        billingUID: delBilling,
-        invoiceUID: inv2,
-        reimbursement: 150,
+      await post(`/api/v1/billings/${delBilling}/allocations`, {
+        entries: [{ invoiceUID: inv2, reimbursement: 150 }],
       });
 
       let inv = await request(app).get(`/api/v1/invoices/${inv2}`).set(admin);
@@ -311,10 +307,8 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       'allocation across submissions violates the same-submission invariant',
       async () => {
         const loose = await makeInvoice(accountA, 100, 'R-loose'); // never submitted
-        const res = await post('/api/v1/allocations', {
-          billingUID,
-          invoiceUID: loose,
-          reimbursement: 50,
+        const res = await post(`/api/v1/billings/${billingUID}/allocations`, {
+          entries: [{ invoiceUID: loose, reimbursement: 50 }],
         });
         assert.equal(res.status, 400);
       },
@@ -424,17 +418,13 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         })
       ).body.data.billingUID as string;
 
-      const tooMuch = await post('/api/v1/allocations', {
-        billingUID: billingY,
-        invoiceUID: inv1,
-        reimbursement: 300.01,
+      const tooMuch = await post(`/api/v1/billings/${billingY}/allocations`, {
+        entries: [{ invoiceUID: inv1, reimbursement: 300.01 }],
       });
       assert.equal(tooMuch.status, 409);
 
-      const rest = await post('/api/v1/allocations', {
-        billingUID: billingY,
-        invoiceUID: inv1,
-        reimbursement: 300,
+      const rest = await post(`/api/v1/billings/${billingY}/allocations`, {
+        entries: [{ invoiceUID: inv1, reimbursement: 300 }],
       });
       assert.equal(rest.status, 201);
 
@@ -581,12 +571,10 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         })
       ).body.data.billingUID as string;
       const allocationUID = (
-        await post('/api/v1/allocations', {
-          billingUID: billing,
-          invoiceUID: inv5,
-          reimbursement: 50,
+        await post(`/api/v1/billings/${billing}/allocations`, {
+          entries: [{ invoiceUID: inv5, reimbursement: 50 }],
         })
-      ).body.data.allocationUID as string;
+      ).body.data[0].allocationUID as string;
 
       const res = await request(app).delete(`/api/v1/allocations/${allocationUID}`).set(admin);
       assert.equal(res.status, 204);
@@ -596,6 +584,147 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(inv.submissions[0].status, 'eingereicht');
       assert.equal(inv.workflowStatus, 'eingereicht');
       assert.equal(inv.remainingAmount, 120);
+    });
+
+    // Slice 22: booking one Leistungsabrechnung over several invoices, and the
+    // filters the "Leistungsabrechnung auswählen" sub-dialog searches with.
+    const contractB = (
+      await post('/api/v1/contracts', {
+        contractNumber: 'PKV-B',
+        companyUID,
+        accountUID: accountB,
+        contractBegin: '2020-01-01',
+        initialDeductible: 0,
+      })
+    ).body.data.contractUID as string;
+    const invB1 = await makeInvoice(accountB, 200, 'R-B1');
+    const invB2 = await makeInvoice(accountB, 300, 'R-B2');
+    const submissionB = (
+      await post('/api/v1/submissions', {
+        contractUID: contractB,
+        submittedDate: '2024-08-01',
+        invoiceUIDs: [invB1, invB2],
+      })
+    ).body.data.submissionUID as string;
+    const billingB = (
+      await post('/api/v1/billings', {
+        submissionUID: submissionB,
+        billingDate: '2024-08-10',
+        billingNumber: 'LA-B1',
+      })
+    ).body.data.billingUID as string;
+
+    const billings = async (query: string): Promise<Array<{ billingUID: string }>> =>
+      (await request(app).get(`/api/v1/billings?contractUID=${contractB}&${query}`).set(admin)).body
+        .data;
+
+    await t.test('a billing without reimbursements is found as "unverknüpft"', async () => {
+      const found = await billings('unlinked=true');
+      assert.deepEqual(
+        found.map((b) => b.billingUID),
+        [billingB],
+      );
+    });
+
+    await t.test('a rejected entry books none of the others', async () => {
+      const loose = await makeInvoice(accountB, 100, 'R-B-loose'); // never submitted
+      const res = await post(`/api/v1/billings/${billingB}/allocations`, {
+        entries: [
+          { invoiceUID: invB1, reimbursement: 100 },
+          { invoiceUID: loose, reimbursement: 50 },
+        ],
+      });
+      assert.equal(res.status, 400);
+      assert.match(res.body.error.message, /R-B-loose/);
+
+      const inv = await request(app).get(`/api/v1/invoices/${invB1}`).set(admin);
+      assert.equal(inv.body.data.workflowStatus, 'eingereicht');
+      assert.equal(Number(inv.body.data.reimbursedTotal), 0);
+    });
+
+    await t.test('the same invoice cannot be booked twice in one request', async () => {
+      const res = await post(`/api/v1/billings/${billingB}/allocations`, {
+        entries: [
+          { invoiceUID: invB1, reimbursement: 10 },
+          { invoiceUID: invB1, reimbursement: 20 },
+        ],
+      });
+      assert.equal(res.status, 400);
+    });
+
+    await t.test('an over-reimbursement names the offending invoice', async () => {
+      const res = await post(`/api/v1/billings/${billingB}/allocations`, {
+        entries: [
+          { invoiceUID: invB1, reimbursement: 100 },
+          { invoiceUID: invB2, reimbursement: 300.01 },
+        ],
+      });
+      assert.equal(res.status, 409);
+      assert.match(res.body.error.message, /R-B2/);
+    });
+
+    await t.test('one request books the reimbursements of both invoices', async () => {
+      const res = await post(`/api/v1/billings/${billingB}/allocations`, {
+        entries: [
+          { invoiceUID: invB1, reimbursement: 100, receiptNumber: 'BEL-B1' },
+          { invoiceUID: invB2, reimbursement: 300 },
+        ],
+      });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.data.length, 2);
+
+      const first = await request(app).get(`/api/v1/invoices/${invB1}`).set(admin);
+      assert.equal(first.body.data.workflowStatus, 'teilabgerechnet');
+      assert.equal(first.body.data.submissions[0].allocations[0].receiptNumber, 'BEL-B1');
+      const second = await request(app).get(`/api/v1/invoices/${invB2}`).set(admin);
+      assert.equal(second.body.data.workflowStatus, 'abgerechnet');
+      assert.equal(Number(second.body.data.reimbursedTotal), 300);
+    });
+
+    await t.test('the billing filters narrow the list', async () => {
+      assert.deepEqual(await billings('unlinked=true'), [], 'it is linked now');
+
+      const byNumber = await billings('q=LA-B1');
+      assert.deepEqual(
+        byNumber.map((b) => b.billingUID),
+        [billingB],
+      );
+      const byInvoiceNumber = await billings('q=R-B2');
+      assert.deepEqual(
+        byInvoiceNumber.map((b) => b.billingUID),
+        [billingB],
+        'the free text also matches the invoice numbers behind the billing',
+      );
+      assert.deepEqual(await billings('q=gibtesnicht'), []);
+
+      assert.equal((await billings('from=2024-08-10&to=2024-08-10')).length, 1);
+      assert.deepEqual(await billings('from=2024-08-11'), []);
+      assert.deepEqual(await billings('to=2024-08-09'), []);
+
+      assert.equal((await billings('minReimbursement=400&maxReimbursement=400')).length, 1);
+      assert.deepEqual(await billings('minReimbursement=400.01'), []);
+      assert.deepEqual(await billings('maxReimbursement=399.99'), []);
+
+      assert.equal((await billings('limit=1')).length, 1);
+    });
+
+    await t.test('an unusable filter is rejected with a named parameter', async () => {
+      const res = await request(app).get('/api/v1/billings?from=irgendwann').set(admin);
+      assert.equal(res.status, 400);
+      assert.match(res.body.error.message, /from/);
+
+      const limit = await request(app).get('/api/v1/billings?limit=0').set(admin);
+      assert.equal(limit.status, 400);
+    });
+
+    await t.test('booking is refused for a foreign account', async () => {
+      const user = await scopedNutzer(pool, app, 'scoped-b@example.com', accountA);
+      const res = await post(
+        `/api/v1/billings/${billingB}/allocations`,
+        { entries: [{ invoiceUID: invB1, reimbursement: 1 }] },
+        user,
+      );
+      assert.equal(res.status, 403);
     });
 
     await t.test('account scoping: a scoped user is confined to their account', async () => {

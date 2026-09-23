@@ -6,7 +6,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { germanDate } from '../lib/format';
 import { HttpError } from '../lib/http';
-import { type BillingDto, type InvoiceDto, listBillings, updateBilling } from './api';
+import { type BillingDto, type InvoiceDto, searchBillings, updateBilling } from './api';
 
 const props = defineProps<{
   open: boolean;
@@ -51,7 +51,7 @@ async function load(): Promise<void> {
     const lists = await Promise.all(
       invoice.submissions
         .filter((s) => s.billingCount > 0)
-        .map((s) => listBillings(s.submissionUID)),
+        .map((s) => searchBillings({ submissionUID: s.submissionUID })),
     );
     billings.value = lists.flat();
     for (const b of billings.value) {

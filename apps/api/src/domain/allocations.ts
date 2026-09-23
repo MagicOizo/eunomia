@@ -7,7 +7,7 @@ import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
-import { type CrudTable, getRow, insertRow, softDeleteRow } from '../crud/repository.js';
+import { type CrudTable, type Row, getRow, insertRow, softDeleteRow } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
@@ -21,73 +21,135 @@ const table: CrudTable = {
   columns: ['invoiceUID', 'billingUID', 'receiptNumber', 'reimbursement'],
 };
 
-const createSchema = z.object({
-  invoiceUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.invoice)),
-  billingUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.serviceBilling)),
-  receiptNumber: z.string().trim().min(1).max(50).nullish(),
-  reimbursement: z.number().min(0).max(99999999.99),
+/**
+ * One reimbursement to book. Several of them are created in one request, so a
+ * Leistungsabrechnung that answers a submission of five invoices is entered in
+ * a single step (see createAllocationsForBilling).
+ */
+export const allocationEntriesSchema = z.object({
+  entries: z
+    .array(
+      z.object({
+        invoiceUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.invoice)),
+        receiptNumber: z.string().trim().min(1).max(50).nullish(),
+        reimbursement: z.number().min(0).max(99999999.99),
+      }),
+    )
+    .min(1)
+    .refine(
+      (entries) => new Set(entries.map((e) => e.invoiceUID)).size === entries.length,
+      'entries must not repeat an invoice',
+    ),
 });
+
+type AllocationEntry = z.infer<typeof allocationEntriesSchema>['entries'][number];
+
+interface CandidateInvoice {
+  invoiceUID: string;
+  invoiceNumber: string;
+  invoiceAmount: number;
+  /** Whether the invoice is part of the billing's submission. */
+  inSubmission: number;
+  /** What this invoice was already reimbursed, over every policy. */
+  allocated: number;
+}
+
+/**
+ * Validates every requested reimbursement against the billing's submission.
+ * Like assertInvoicesSubmittable in submissions.ts, each rule reports all the
+ * invoices that fail it, so a bulk entry does not have to be fixed one
+ * rejection at a time. Invoices are named by their number where known — that
+ * is what the user sees in the list.
+ */
+function assertEntriesBookable(candidates: CandidateInvoice[], entries: AllocationEntry[]): void {
+  const byUid = new Map(candidates.map((c) => [c.invoiceUID, c]));
+
+  const unknown = entries.filter((e) => !byUid.has(e.invoiceUID)).map((e) => e.invoiceUID);
+  if (unknown.length > 0) {
+    throw badRequest(`Unknown or inactive invoices: ${unknown.join(', ')}`);
+  }
+  const foreign = entries
+    .filter((e) => !Number(byUid.get(e.invoiceUID)?.inSubmission))
+    .map((e) => byUid.get(e.invoiceUID)?.invoiceNumber);
+  if (foreign.length > 0) {
+    throw badRequest(
+      `Invoices do not belong to the service billing's submission: ${foreign.join(', ')}`,
+    );
+  }
+  // No enrichment ("Bereicherungsverbot"): all reimbursements of an invoice,
+  // over every policy, together never exceed its amount.
+  const exceeding = entries
+    .filter((entry) => {
+      const candidate = byUid.get(entry.invoiceUID) as CandidateInvoice;
+      const totalCents =
+        Math.round(Number(candidate.allocated) * 100) + Math.round(entry.reimbursement * 100);
+      return totalCents > Math.round(Number(candidate.invoiceAmount) * 100);
+    })
+    .map((e) => byUid.get(e.invoiceUID)?.invoiceNumber);
+  if (exceeding.length > 0) {
+    throw conflict(`The reimbursements would exceed the invoice amount: ${exceeding.join(', ')}`);
+  }
+}
+
+/**
+ * Books the reimbursements of one service billing onto its submission's
+ * invoices, all or nothing. The invoices are locked first so concurrent
+ * bookings (and amount edits) are checked against the same totals.
+ */
+export async function createAllocationsForBilling(
+  pool: Pool,
+  userId: number,
+  billingUID: string,
+  entries: AllocationEntry[],
+): Promise<Row[]> {
+  const [billing] = await pool.query<Array<{ submissionUID: string; accountUID: string }>>(
+    `SELECT b.submissionUID, c.accountUID
+       FROM ServiceBillings b
+       JOIN Submissions s ON s.submissionUID = b.submissionUID
+       JOIN Contracts c ON c.contractUID = s.contractUID
+      WHERE b.billingUID = ? AND b.billingStatus <> -1
+      LIMIT 1`,
+    [billingUID],
+  );
+  if (!billing) throw notFound('Service billing');
+
+  await authorizeAccount(pool, userId, PERMISSIONS.MANAGE_INVOICES, billing.accountUID);
+
+  return withTransaction(pool, async (conn) => {
+    const invoiceUIDs = entries.map((e) => e.invoiceUID);
+    const placeholders = invoiceUIDs.map(() => '?').join(', ');
+    await conn.query(
+      `SELECT invoiceUID FROM Invoices WHERE invoiceUID IN (${placeholders}) FOR UPDATE`,
+      invoiceUIDs,
+    );
+    const candidates = await conn.query<CandidateInvoice[]>(
+      `SELECT i.invoiceUID, i.invoiceNumber, i.invoiceAmount,
+              EXISTS (
+                SELECT 1 FROM SubmissionInvoices si
+                 WHERE si.submissionUID = ? AND si.invoiceUID = i.invoiceUID
+              ) AS inSubmission,
+              COALESCE((
+                SELECT SUM(a.reimbursement) FROM Allocations a
+                 WHERE a.invoiceUID = i.invoiceUID AND a.allocationStatus <> -1
+              ), 0) AS allocated
+         FROM Invoices i
+        WHERE i.invoiceUID IN (${placeholders}) AND i.invoiceStatus <> -1`,
+      [billing.submissionUID, ...invoiceUIDs],
+    );
+    assertEntriesBookable(candidates, entries);
+
+    const created: Row[] = [];
+    for (const entry of entries) {
+      created.push(await insertRow(conn, table, { ...entry, billingUID }));
+    }
+    return created;
+  });
+}
 
 /** Router for allocations: mapping a service billing's reimbursement to an invoice. */
 export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
   const router = Router();
   const requireAuth = createRequireAuth(pool, config);
-
-  router.post('/', requireAuth, async (req, res) => {
-    const user = getAuthUser(res);
-    const data = createSchema.parse(req.body);
-
-    const [billing] = await pool.query<Array<{ submissionUID: string; accountUID: string }>>(
-      `SELECT b.submissionUID, c.accountUID
-         FROM ServiceBillings b
-         JOIN Submissions s ON s.submissionUID = b.submissionUID
-         JOIN Contracts c ON c.contractUID = s.contractUID
-        WHERE b.billingUID = ? AND b.billingStatus <> -1
-        LIMIT 1`,
-      [data.billingUID],
-    );
-    if (!billing) throw notFound('Service billing');
-
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, billing.accountUID);
-
-    const created = await withTransaction(pool, async (conn) => {
-      // Locks the invoice so concurrent allocations (and amount edits) are
-      // checked against the same total.
-      const [invoice] = await conn.query<Array<{ invoiceAmount: number }>>(
-        `SELECT invoiceAmount FROM Invoices
-          WHERE invoiceUID = ? AND invoiceStatus <> -1
-          LIMIT 1 FOR UPDATE`,
-        [data.invoiceUID],
-      );
-      if (!invoice) throw notFound('Invoice');
-
-      // The core cross-entity invariant: an invoice can only be allocated a
-      // reimbursement from a billing of a submission it is part of.
-      const [membership] = await conn.query<Array<{ n: number }>>(
-        'SELECT COUNT(*) AS n FROM SubmissionInvoices WHERE submissionUID = ? AND invoiceUID = ?',
-        [billing.submissionUID, data.invoiceUID],
-      );
-      if (Number(membership?.n ?? 0) === 0) {
-        throw badRequest('Invoice and service billing must belong to the same submission');
-      }
-
-      // No enrichment ("Bereicherungsverbot"): all reimbursements of an
-      // invoice, over every policy, together never exceed its amount.
-      const [allocated] = await conn.query<Array<{ total: number }>>(
-        `SELECT COALESCE(SUM(reimbursement), 0) AS total
-           FROM Allocations WHERE invoiceUID = ? AND allocationStatus <> -1`,
-        [data.invoiceUID],
-      );
-      const totalCents =
-        Math.round((allocated?.total ?? 0) * 100) + Math.round(data.reimbursement * 100);
-      if (totalCents > Math.round(invoice.invoiceAmount * 100)) {
-        throw conflict('The reimbursements would exceed the invoice amount');
-      }
-
-      return insertRow(conn, table, data);
-    });
-    sendData(res, created, 201);
-  });
 
   router.get('/', requireAuth, async (req, res) => {
     const user = getAuthUser(res);

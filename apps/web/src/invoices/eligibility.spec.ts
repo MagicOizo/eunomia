@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InvoiceDto, InvoiceSubmissionDto } from './api';
 import {
+  commonSubmissions,
   commonSubmittableContracts,
   submittableContracts,
   unbilledSubmissions,
@@ -82,6 +83,34 @@ describe('commonSubmittableContracts', () => {
       exclusions: [{ contractUID: 'pY', contractNumber: 'pY', companyName: 'AG', note: null }],
     });
     expect(values(commonSubmittableContracts([a, b], contracts))).toEqual(['pZ']);
+  });
+});
+
+describe('commonSubmissions', () => {
+  const atX = submission('pX', 'eingereicht');
+  const atY = submission('pY', 'eingereicht');
+
+  it('keeps the submissions all invoices are part of', () => {
+    const a = invoice({ workflowStatus: 'eingereicht', submissions: [atX, atY] });
+    const b = invoice({ workflowStatus: 'eingereicht', submissions: [atY] });
+    expect(commonSubmissions([a, b]).map((s) => s.submissionUID)).toEqual([atY.submissionUID]);
+  });
+
+  it('offers nothing for invoices without a shared submission', () => {
+    const a = invoice({ workflowStatus: 'eingereicht', submissions: [atX] });
+    const b = invoice({ workflowStatus: 'eingereicht', submissions: [atY] });
+    expect(commonSubmissions([a, b])).toEqual([]);
+  });
+
+  it('offers nothing when an invoice is closed by hand, or none is selected', () => {
+    const open = invoice({ workflowStatus: 'eingereicht', submissions: [atX] });
+    const closed = invoice({
+      workflowStatus: 'eingereicht',
+      reimbursementClosed: true,
+      submissions: [atX],
+    });
+    expect(commonSubmissions([open, closed])).toEqual([]);
+    expect(commonSubmissions([])).toEqual([]);
   });
 });
 

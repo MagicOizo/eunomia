@@ -547,6 +547,18 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 
 **DoD:** Mehrere kompatible Rechnungen in einem Zug verknüpfen; die Suche filtert korrekt.
 
+**Umgesetzt (2026-09-23).** Entscheidungen beim Bau:
+- **Bulk-Einreichen war schon da** (Slice 17: `POST /submissions` mit `invoiceUIDs[]`, `commonSubmittableContracts()`, serverseitig `assertInvoicesSubmittable`). Diese Scheibe baut nur das fehlende Gegenstück: Bulk-**Verknüpfen**.
+- `GET /billings` bekam die Filter `q` (Freitext über Abrechnungs-, Vertrags-, Personen- und **Rechnungsnummern**), `from`/`to`, `unlinked`, `minReimbursement`/`maxReimbursement`, `limit` — kein eigener `/search`-Pfad, wie schon bei `GET /invoices`. Die Rechnungsnummern werden über ein eigenes `EXISTS` gematcht, nicht über einen weiteren Join, sonst vervielfachen sich `reimbursedTotal` und `invoiceCount`.
+- Neu als Konvention: `parseQuery(req, schema)` in `crud/params.ts` validiert Query-Parameter per zod und antwortet mit einem 400, das den Parameter nennt — Bodies bleiben bei `schema.parse()` mit der ZodError-Antwort „Invalid request body".
+- **`POST /billings/:uid/allocations`** (`entries[]`, transaktional) ersetzt das Einzel-`POST /allocations`. Die Prüfungen laufen gebündelt wie `assertInvoicesSubmittable` und nennen alle betroffenen **Rechnungsnummern**: unbekannt/inaktiv (400), nicht in der Einreichung der Abrechnung (400), Erstattungen über dem Rechnungsbetrag (409). Die Einreichung folgt aus der Abrechnung, der Client wiederholt sie nicht je Eintrag. `GET`/`DELETE /allocations` bleiben.
+- `EuEntityPicker` hat jetzt `allowSearch` + `search`-Emit; die In-Feld-Aktionen sind 🔍 ＋ ✕ in dieser Reihenfolge (＋ öffnet den Create-Dialog jetzt auch direkt am Feld, nicht nur über die Listenzeile).
+- `BillingDialog` arbeitet auf **N Rechnungen** (`invoices[]` statt `invoice`), mit einer Karte je Rechnung (eigener Betrag, Belegnummer, Entfernen), einem Picker zum Nachladen weiterer Rechnungen derselben Einreichung und ohne die alte Radio-Gruppe „bestehende/neue Abrechnung" — neu anlegen läuft über ＋. Der Einzelfall aus dem Detaildialog ist derselbe Dialog mit einer Karte.
+- Neu: `BillingSearchDialog` („Leistungsabrechnung auswählen", serverseitig gesucht, auf die Einreichung gescoped) und `BillingFormDialog` (schlankes Anlegen unter bekannter Einreichung). Entprellt über `lib/debounce.ts`.
+- `commonSubmissions()` in `eligibility.ts` ist die Kompatibilitätsprüfung fürs Verknüpfen; im Workspace hängt daran der Toolbar-Button „Abrechnung zuordnen (n)".
+- `BillingsView` filtert über denselben Endpunkt (Filterleiste über der Tabelle).
+- **Offen (Ausblick):** `NewBillingDialog` (Anlegen mit Betragsraster aus der Vertragssicht) und der erweiterte `BillingDialog` überschneiden sich inhaltlich — die Zusammenführung wäre ein eigener kleiner Slice.
+
 **Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14); View/Edit-Umstieg nur Rechnung-Pilot vs. alle Entitäten (15).
 
 ## Ausblick (nicht Teil dieser Slices)

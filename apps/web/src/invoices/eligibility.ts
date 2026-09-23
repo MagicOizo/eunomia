@@ -40,3 +40,24 @@ export function unbilledSubmissions(
 ): InvoiceSubmissionDto[] {
   return invoice.submissions.filter((s) => s.status === 'eingereicht');
 }
+
+/**
+ * Submissions every one of the invoices belongs to — the choice for booking
+ * one Leistungsabrechnung over several invoices at once. A billing can only
+ * reimburse invoices of its own submission, so a mixed selection has nothing
+ * in common and nothing to offer. An invoice marked as billed is out: its
+ * reimbursement is closed. Mirrors the server-side checks of
+ * `POST /billings/:uid/allocations`.
+ */
+export function commonSubmissions(
+  invoices: Pick<InvoiceDto, 'submissions' | 'reimbursementClosed'>[],
+): InvoiceSubmissionDto[] {
+  if (invoices.length === 0) return [];
+  if (invoices.some((invoice) => invoice.reimbursementClosed)) return [];
+  const [first, ...rest] = invoices;
+  return first.submissions.filter((submission) =>
+    rest.every((invoice) =>
+      invoice.submissions.some((s) => s.submissionUID === submission.submissionUID),
+    ),
+  );
+}

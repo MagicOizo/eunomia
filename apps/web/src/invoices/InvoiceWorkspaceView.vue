@@ -2,6 +2,7 @@
 import {
   faChevronLeft,
   faCircleCheck,
+  faFileInvoiceDollar,
   faPaperPlane,
   faPen,
   faPlus,
@@ -33,7 +34,9 @@ import {
   reimbursementPlan,
   updateInvoice,
 } from './api';
-import { commonSubmittableContracts, submittableContracts } from './eligibility';
+import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
+import BillingDialog from './BillingDialog.vue';
+import { commonSubmissions, commonSubmittableContracts, submittableContracts } from './eligibility';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
@@ -89,6 +92,8 @@ const detailOpen = ref(false);
 const editing = ref<InvoiceDto | null>(null);
 const submitOpen = ref(false);
 const submitTargets = ref<InvoiceDto[]>([]);
+const billingOpen = ref(false);
+const billingTargets = ref<InvoiceDto[]>([]);
 const settleOpen = ref(false);
 const dialogInvoice = ref<InvoiceDto | null>(null);
 const dialogBusy = ref(false);
@@ -110,6 +115,16 @@ const canSubmit = (invoice: InvoiceDto): boolean =>
 // to some policy; the dialog offers the policies they have in common).
 const selectedSubmittable = computed(() =>
   invoices.value.filter((i) => selected.value.has(i.invoiceUID) && canSubmit(i)),
+);
+const selectedInvoices = computed(() =>
+  invoices.value.filter((i) => selected.value.has(i.invoiceUID)),
+);
+/**
+ * One Leistungsabrechnung only reimburses invoices of its own submission, so
+ * booking several at once needs a submission they all belong to.
+ */
+const selectedBookable = computed(() =>
+  commonSubmissions(selectedInvoices.value).length > 0 ? selectedInvoices.value : [],
 );
 const allSelected = computed(
   () => invoices.value.length > 0 && selected.value.size === invoices.value.length,
@@ -266,6 +281,11 @@ function openSubmit(targets: InvoiceDto[]): void {
   dialogError.value = null;
   submitOpen.value = true;
 }
+function openBilling(targets: InvoiceDto[]): void {
+  billingTargets.value = targets;
+  dialogError.value = null;
+  billingOpen.value = true;
+}
 function openSettle(invoice: InvoiceDto): void {
   dialogInvoice.value = invoice;
   dialogError.value = null;
@@ -328,6 +348,14 @@ function submitSubmission(payload: { contractUID: string; submittedDate: string 
   );
 }
 
+function submitBilling(payload: BillingAllocationPayload): void {
+  void runDialog(
+    () => saveBillingAllocations(payload),
+    () => (billingOpen.value = false),
+    'Die Erstattungen einer Rechnung dürfen zusammen den Rechnungsbetrag nicht übersteigen.',
+  );
+}
+
 function submitSettle(transferDate: string): void {
   const invoice = dialogInvoice.value;
   if (!invoice) return;
@@ -374,6 +402,14 @@ function confirmDelete(): void {
         @click="openSubmit(selectedSubmittable)"
       >
         Einreichen ({{ selectedSubmittable.length }})
+      </EuButton>
+      <EuButton
+        :icon="faFileInvoiceDollar"
+        variant="secondary"
+        :disabled="selectedBookable.length === 0"
+        @click="openBilling(selectedBookable)"
+      >
+        Abrechnung zuordnen ({{ selectedBookable.length }})
       </EuButton>
       <EuButton
         :icon="faTrash"
@@ -618,6 +654,14 @@ function confirmDelete(): void {
       :error="dialogError"
       @close="submitOpen = false"
       @submit="submitSubmission"
+    />
+    <BillingDialog
+      :open="billingOpen"
+      :invoices="billingTargets"
+      :submitting="dialogBusy"
+      :error="dialogError"
+      @close="billingOpen = false"
+      @submit="submitBilling"
     />
     <SettleDialog
       :open="settleOpen"

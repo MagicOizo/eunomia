@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, size, useFloating } from '@floating-ui/vue';
-import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, ref, useId, useTemplateRef } from 'vue';
 
@@ -14,9 +14,10 @@ export interface PickerOption {
 /**
  * Typeahead picker for a related entity — replaces a plain dropdown so long,
  * growing lists stay searchable. Stores the option's UID as `modelValue` and
- * shows its label. Optional in-field actions: clear, and (when `allowCreate`)
- * an "add ‹query›" row that emits `create` so the parent can open a create
- * dialog. Filtering is client-side over `options`.
+ * shows its label. In-field actions, in the order the design fixes them
+ * (Notes/dialog-design.md): search, add, clear. Filtering is client-side over
+ * `options`; `allowSearch` is for lists that outgrow that — the parent opens a
+ * filter dialog and sets the value it finds.
  */
 const props = withDefaults(
   defineProps<{
@@ -26,17 +27,27 @@ const props = withDefaults(
     required?: boolean;
     disabled?: boolean;
     allowCreate?: boolean;
+    /** Shows the search action; the parent answers `search` with a filter dialog. */
+    allowSearch?: boolean;
     /** Display-mask mode: no visible label, border only on hover/focus. */
     bare?: boolean;
     /** Noun used in the "‹query› hinzufügen" row, e.g. "Leistungserbringer". */
     createNoun?: string;
   }>(),
-  { required: false, disabled: false, allowCreate: false, bare: false, createNoun: 'Eintrag' },
+  {
+    required: false,
+    disabled: false,
+    allowCreate: false,
+    allowSearch: false,
+    bare: false,
+    createNoun: 'Eintrag',
+  },
 );
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | null];
   create: [query: string];
+  search: [query: string];
 }>();
 
 const inputId = useId();
@@ -107,6 +118,11 @@ function triggerCreate(): void {
   open.value = false;
 }
 
+function triggerSearch(): void {
+  emit('search', query.value.trim());
+  open.value = false;
+}
+
 function onInput(event: Event): void {
   query.value = (event.target as HTMLInputElement).value;
   open.value = true;
@@ -161,6 +177,30 @@ function onKeydown(event: KeyboardEvent): void {
         @blur="open = false"
         @keydown="onKeydown"
       />
+      <!-- @mousedown.prevent on every action: without it the input's @blur
+           closes the list (and steals the click) before it is handled. -->
+      <button
+        v-if="allowSearch && !disabled && !bare"
+        type="button"
+        class="eu-picker__action"
+        :aria-label="`${label} suchen`"
+        :title="`${label} suchen`"
+        @mousedown.prevent
+        @click="triggerSearch"
+      >
+        <FontAwesomeIcon :icon="faMagnifyingGlass" aria-hidden="true" />
+      </button>
+      <button
+        v-if="allowCreate && !disabled && !bare"
+        type="button"
+        class="eu-picker__action"
+        :aria-label="`${createNoun} hinzufügen`"
+        :title="`${createNoun} hinzufügen`"
+        @mousedown.prevent
+        @click="triggerCreate"
+      >
+        <FontAwesomeIcon :icon="faPlus" aria-hidden="true" />
+      </button>
       <button
         v-if="modelValue && !required && !disabled && !bare"
         type="button"

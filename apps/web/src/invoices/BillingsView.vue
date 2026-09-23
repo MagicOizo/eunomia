@@ -9,19 +9,21 @@ import {
   faUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
+import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
+import { useDebouncedCallback } from '../lib/debounce';
 import { euro, germanDate, plural } from '../lib/format';
 import { HttpError } from '../lib/http';
 import { useTableSort } from '../lib/useTableSort';
-import { type BillingListDto, deleteBilling, listContractBillings, updateBilling } from './api';
+import { type BillingListDto, deleteBilling, searchBillings, updateBilling } from './api';
 import NewBillingDialog from './NewBillingDialog.vue';
 
 const props = defineProps<{ contractUID: string }>();
@@ -33,6 +35,25 @@ const forfeitRule = ref<BonusForfeitRule>('ON_REIMBURSEMENT');
 const newOpen = ref(false);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
+
+/** Server-side filters over this contract's billings (see the API's GET /billings). */
+const filters = reactive({
+  q: '',
+  from: '',
+  to: '',
+  unlinked: false,
+  min: null as number | null,
+  max: null as number | null,
+});
+const filtered = computed(
+  () =>
+    filters.q !== '' ||
+    filters.from !== '' ||
+    filters.to !== '' ||
+    filters.unlinked ||
+    filters.min !== null ||
+    filters.max !== null,
+);
 
 function billingSortValue(b: BillingListDto, key: string): string | number | null {
   switch (key) {
@@ -72,6 +93,22 @@ function isOpenObjection(b: BillingListDto): boolean {
   return b.objectionDate !== null && b.objectionResolvedDate === null;
 }
 
+/** The billings matching the current filters; also the reload after a change. */
+async function loadBillings(): Promise<void> {
+  billings.value = await searchBillings({
+    contractUID: props.contractUID,
+    q: filters.q.trim() || undefined,
+    from: filters.from || undefined,
+    to: filters.to || undefined,
+    unlinked: filters.unlinked,
+    minReimbursement: filters.min ?? undefined,
+    maxReimbursement: filters.max ?? undefined,
+  });
+}
+
+const scheduleFilter = useDebouncedCallback(() => void loadBillings());
+watch(filters, scheduleFilter);
+
 async function load(): Promise<void> {
   loading.value = true;
   loadError.value = null;
@@ -86,7 +123,7 @@ async function load(): Promise<void> {
     heading.value = `${contract.data.contractNumber} · ${person}`;
     accountUID.value = contract.data.accountUID;
     forfeitRule.value = contract.data.bonusForfeitRule;
-    billings.value = await listContractBillings(props.contractUID);
+    await loadBillings();
   } catch (err) {
     loadError.value =
       err instanceof HttpError ? err.message : 'Abrechnungen konnten nicht geladen werden.';
@@ -217,100 +254,119 @@ function confirmDelete(): void {
 
     <p v-if="loading" class="eu-billings__hint">Wird geladen…</p>
     <p v-else-if="loadError" class="eu-billings__error" role="alert">{{ loadError }}</p>
-    <p v-else-if="billings.length === 0" class="eu-billings__hint">
-      Für diesen Vertrag gibt es noch keine Leistungsabrechnungen. Sie entstehen im
-      Rechnungs-Workflow über „Abrechnung zuordnen".
-    </p>
 
-    <div v-else class="eu-billings__table-wrap">
-      <table class="eu-billings__table">
-        <thead>
-          <tr>
-            <EuSortableTh
-              label="Nummer"
-              :state="sort.stateOf('number')"
-              @sort="sort.toggle('number')"
-            />
-            <EuSortableTh label="Datum" :state="sort.stateOf('date')" @sort="sort.toggle('date')" />
-            <EuSortableTh
-              label="Erstattung"
-              align="center"
-              :state="sort.stateOf('reimbursed')"
-              @sort="sort.toggle('reimbursed')"
-            />
-            <EuSortableTh
-              label="Rechnungen"
-              :state="sort.stateOf('invoices')"
-              @sort="sort.toggle('invoices')"
-            />
-            <EuSortableTh
-              label="Widerspruch"
-              :state="sort.stateOf('objection')"
-              @sort="sort.toggle('objection')"
-            />
-            <th class="eu-billings__actions-head">Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="b in sort.sorted" :key="b.billingUID">
-            <td>{{ b.billingNumber }}</td>
-            <td>{{ germanDate(b.billingDate) }}</td>
-            <td class="eu-billings__num">{{ euro(b.reimbursedTotal) }}</td>
-            <td>{{ b.invoiceNumbers ?? '–' }}</td>
-            <td>
-              <span
-                v-if="isOpenObjection(b)"
-                class="eu-billings__objection"
-                role="img"
-                :aria-label="`Im Widerspruch offen seit ${germanDate(b.objectionDate)}`"
-                :title="`Im Widerspruch offen seit ${germanDate(b.objectionDate)}`"
-              >
-                <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
-              </span>
-              <span v-else-if="b.objectionDate" class="eu-billings__resolved">
-                aufgelöst am {{ germanDate(b.objectionResolvedDate) }}
-              </span>
-              <span v-else class="eu-billings__muted">–</span>
-            </td>
-            <td class="eu-billings__actions">
-              <EuButton
-                v-if="b.documentLink"
-                variant="secondary"
-                icon-only
-                :icon="faUpRightFromSquare"
-                aria-label="Dokument öffnen"
-                title="Hinterlegtes Dokument öffnen"
-                @click="openDocument(b)"
+    <template v-else>
+      <div class="eu-billings__filters">
+        <EuTextField v-model="filters.q" label="Abrechnungs- oder Rechnungsnummer" />
+        <EuTextField v-model="filters.from" label="Abrechnung ab" type="date" />
+        <EuTextField v-model="filters.to" label="Abrechnung bis" type="date" />
+        <EuCurrencyField v-model="filters.min" label="Erstattung ab" />
+        <EuCurrencyField v-model="filters.max" label="Erstattung bis" />
+        <EuToggle v-model="filters.unlinked" label="Nur unverknüpfte" />
+      </div>
+
+      <p v-if="billings.length === 0 && filtered" class="eu-billings__hint" role="status">
+        Keine Leistungsabrechnung passt zu diesen Filtern.
+      </p>
+      <p v-else-if="billings.length === 0" class="eu-billings__hint">
+        Für diesen Vertrag gibt es noch keine Leistungsabrechnungen. Sie entstehen im
+        Rechnungs-Workflow über „Abrechnung zuordnen".
+      </p>
+
+      <div v-else class="eu-billings__table-wrap">
+        <table class="eu-billings__table">
+          <thead>
+            <tr>
+              <EuSortableTh
+                label="Nummer"
+                :state="sort.stateOf('number')"
+                @sort="sort.toggle('number')"
               />
-              <EuButton
-                variant="secondary"
-                icon-only
-                :icon="faGavel"
-                aria-label="Widerspruch"
-                title="Widerspruch einlegen oder auflösen"
-                @click="openObjection(b)"
+              <EuSortableTh
+                label="Datum"
+                :state="sort.stateOf('date')"
+                @sort="sort.toggle('date')"
               />
-              <EuButton
-                variant="secondary"
-                icon-only
-                :icon="faPen"
-                aria-label="Bearbeiten"
-                title="Abrechnung bearbeiten"
-                @click="openEdit(b)"
+              <EuSortableTh
+                label="Erstattung"
+                align="center"
+                :state="sort.stateOf('reimbursed')"
+                @sort="sort.toggle('reimbursed')"
               />
-              <EuButton
-                variant="secondary"
-                icon-only
-                :icon="faTrash"
-                aria-label="Löschen"
-                title="Abrechnung löschen"
-                @click="openDelete(b)"
+              <EuSortableTh
+                label="Rechnungen"
+                :state="sort.stateOf('invoices')"
+                @sort="sort.toggle('invoices')"
               />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+              <EuSortableTh
+                label="Widerspruch"
+                :state="sort.stateOf('objection')"
+                @sort="sort.toggle('objection')"
+              />
+              <th class="eu-billings__actions-head">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="b in sort.sorted" :key="b.billingUID">
+              <td>{{ b.billingNumber }}</td>
+              <td>{{ germanDate(b.billingDate) }}</td>
+              <td class="eu-billings__num">{{ euro(b.reimbursedTotal) }}</td>
+              <td>{{ b.invoiceNumbers ?? '–' }}</td>
+              <td>
+                <span
+                  v-if="isOpenObjection(b)"
+                  class="eu-billings__objection"
+                  role="img"
+                  :aria-label="`Im Widerspruch offen seit ${germanDate(b.objectionDate)}`"
+                  :title="`Im Widerspruch offen seit ${germanDate(b.objectionDate)}`"
+                >
+                  <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
+                </span>
+                <span v-else-if="b.objectionDate" class="eu-billings__resolved">
+                  aufgelöst am {{ germanDate(b.objectionResolvedDate) }}
+                </span>
+                <span v-else class="eu-billings__muted">–</span>
+              </td>
+              <td class="eu-billings__actions">
+                <EuButton
+                  v-if="b.documentLink"
+                  variant="secondary"
+                  icon-only
+                  :icon="faUpRightFromSquare"
+                  aria-label="Dokument öffnen"
+                  title="Hinterlegtes Dokument öffnen"
+                  @click="openDocument(b)"
+                />
+                <EuButton
+                  variant="secondary"
+                  icon-only
+                  :icon="faGavel"
+                  aria-label="Widerspruch"
+                  title="Widerspruch einlegen oder auflösen"
+                  @click="openObjection(b)"
+                />
+                <EuButton
+                  variant="secondary"
+                  icon-only
+                  :icon="faPen"
+                  aria-label="Bearbeiten"
+                  title="Abrechnung bearbeiten"
+                  @click="openEdit(b)"
+                />
+                <EuButton
+                  variant="secondary"
+                  icon-only
+                  :icon="faTrash"
+                  aria-label="Löschen"
+                  title="Abrechnung löschen"
+                  @click="openDelete(b)"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
 
     <EuDialog :open="objectionOpen" title="Widerspruch" @close="objectionOpen = false">
       <div v-if="selected" class="eu-form">
@@ -469,6 +525,19 @@ function confirmDelete(): void {
   margin: 0;
   color: var(--eu-color-status-submitted-fg);
   font-size: 0.9rem;
+}
+
+.eu-billings__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.eu-billings__filters > * {
+  flex: 1 1 10rem;
+  min-width: 0;
 }
 
 .eu-billings__table-wrap {
