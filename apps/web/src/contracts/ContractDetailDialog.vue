@@ -16,6 +16,7 @@ import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import type { DetailValue } from '../design-system/components/EuDetailField.vue';
 import EuDetailField from '../design-system/components/EuDetailField.vue';
+import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import { describeError } from '../lib/errors';
 import { euro, germanDate } from '../lib/format';
@@ -321,7 +322,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
   <EuDialog :open="open" :title="title" wide @close="emit('close')">
     <p v-if="loadError" class="eu-contract__error" role="alert">{{ loadError }}</p>
     <template v-if="contract">
-      <div class="eu-detail-grid">
+      <EuDetailMask>
         <EuDetailField
           v-model="values.contractNumber"
           :saved-value="saved.contractNumber"
@@ -380,7 +381,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
           label="Zählbeginn (Jahr)"
           type="text"
         />
-      </div>
+      </EuDetailMask>
       <p v-if="saveError" class="eu-contract__error" role="alert">{{ saveError }}</p>
 
       <section class="eu-contract__block" aria-labelledby="eu-contract-premiums">
@@ -618,15 +619,6 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
 </template>
 
 <style scoped>
-.eu-detail-grid {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 1rem;
-  row-gap: 0.35rem;
-  font-family: var(--eu-font-data);
-}
-
 .eu-contract__block {
   margin-top: 1.5rem;
   padding-top: 1rem;

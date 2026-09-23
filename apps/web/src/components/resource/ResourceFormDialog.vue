@@ -6,19 +6,21 @@ import EuCurrencyField from '../../design-system/components/EuCurrencyField.vue'
 import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
-import type { ResourceRow } from '../../lib/resource';
 import type { FieldConfig } from '../../resources/config';
 import { type SelectOption } from './EuSelectField.vue';
 
+/**
+ * The classic create form: fields full width, one below the other. Viewing and
+ * editing an existing row is the display mask instead (ResourceDetailDialog),
+ * the separation dialog-design.md asks for.
+ */
 const props = defineProps<{
   open: boolean;
   title: string;
   fields: FieldConfig[];
   /** Select options keyed by lookup name (see ResourceConfig.lookups). */
   options: Record<string, SelectOption[]>;
-  /** The row being edited, or null when creating. */
-  editing: ResourceRow | null;
-  /** Seeds field values in create mode (e.g. an ad-hoc name typed elsewhere). */
+  /** Seeds field values (e.g. an ad-hoc name typed elsewhere). */
   prefill?: Record<string, string>;
   submitting: boolean;
   /** Server-side error message to show above the buttons. */
@@ -31,42 +33,34 @@ const values = ref<Record<string, string>>({});
 const localError = ref<string | null>(null);
 
 /**
- * Keeps `values` in sync with the fields and the edited row (create = empty,
- * edit = row). Runs even while closed so every field always has a string value
- * (never undefined) — the dialog body is rendered even when hidden, so an
- * undefined bound to a field component would warn. Depends on `fields` too, so
- * switching resources (the view is reused) rebuilds for the new keys.
+ * Keeps `values` in sync with the fields (prefill, then the field's default).
+ * Runs even while closed so every field always has a string value (never
+ * undefined) — the dialog body is rendered even when hidden, so an undefined
+ * bound to a field component would warn. Depends on `fields` too, so switching
+ * resources (the view is reused) rebuilds for the new keys.
  */
 watch(
-  () => [props.open, props.editing, props.fields, props.prefill] as const,
+  () => [props.open, props.fields, props.prefill] as const,
   () => {
     localError.value = null;
     const next: Record<string, string> = {};
     for (const field of props.fields) {
-      const raw = props.editing?.[field.key];
-      if (raw !== null && raw !== undefined) next[field.key] = String(raw);
-      else if (props.editing) next[field.key] = '';
-      else next[field.key] = props.prefill?.[field.key] ?? field.defaultValue ?? '';
+      next[field.key] = props.prefill?.[field.key] ?? field.defaultValue ?? '';
     }
     values.value = next;
   },
   { immediate: true },
 );
 
-const isEditing = (): boolean => props.editing !== null;
-
 function submit(): void {
   localError.value = null;
   const payload: Record<string, unknown> = {};
 
   for (const field of props.fields) {
-    // Immutable fields (e.g. a contract's account) cannot change after creation.
-    if (field.immutable && isEditing()) continue;
-
     const value = (values.value[field.key] ?? '').trim();
     if (value === '') {
       if (field.required) {
-        localError.value = `Bitte „${field.label}" ausfüllen.`;
+        localError.value = `Bitte „${field.label}“ ausfüllen.`;
         return;
       }
       continue; // omit empty optionals so the server keeps its default / null
@@ -88,7 +82,6 @@ function submit(): void {
           :model-value="values[field.key] || null"
           :label="field.label"
           :required="field.required"
-          :disabled="field.immutable && isEditing()"
           :options="field.options ?? (field.optionsFrom ? (options[field.optionsFrom] ?? []) : [])"
           @update:model-value="values[field.key] = $event ?? ''"
         />

@@ -562,7 +562,30 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **Nachgezogen:** Dialoge, die auf eine Auswahl wirken, nennen nicht mehr nur eine Anzahl. `InvoiceBriefList` listet Nummer, Leistungserbringer, Datum und Betrag je Rechnung — im Einreichen-Dialog, in der Löschen-Bestätigung und (als Teil der Karten) beim Zuordnen. Die Namen kommen als `facilityUID → Name` von der jeweiligen Sicht.
 - **Offen (Ausblick):** `NewBillingDialog` (Anlegen mit Betragsraster aus der Vertragssicht) und der erweiterte `BillingDialog` überschneiden sich inhaltlich — die Zusammenführung wäre ein eigener kleiner Slice.
 
-**Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14); View/Edit-Umstieg nur Rechnung-Pilot vs. alle Entitäten (15).
+## Slice 23 — Anzeigemaske für die Stammdaten (Rollout aus Slice 15)
+**Ziel:** Ansehen/Bearbeiten ist überall die 3-Spalten-Maske, Anlegen überall das klassische Formular.
+- Generischer, aus `ResourceConfig.fields` gespeister Detaildialog für Versicherte, Versicherungen, Leistungserbringer und Abrechnungsdienstleister (Rechnung und Police haben ihre eigenen Masken).
+- Clear/Reset je Feld nach den Regeln aus `dialog-design.md`; abgeleitete/nicht änderbare Felder ohne Action-Items.
+
+**DoD:** Jede Stammdaten-Ressource lässt sich in der Maske ansehen und punktuell editieren; Clear eines optionalen Feldes wird auch gespeichert; „Neu" öffnet weiterhin das Formular.
+
+**Entscheidungen (Planmodus):**
+- Die offene Entscheidung aus Slice 15 ist beantwortet: **alle Entitäten**, nicht nur der Rechnungs-Pilot.
+- **Nicht dabei:** Benutzerverwaltung (Rollen-/Berechtigungs-Fieldsets passen nicht ins Label|Wert|Aktionen-Raster) und „Abrechnung bearbeiten" in der Leistungsabrechnungs-Liste (eigener Dialog ohne `ResourceConfig`).
+- Fehler bleiben **eine** Meldung unter dem Raster (Pflichtfelder clientseitig, Formatfehler vom Server) — kein Feld-Fehler-Mapping.
+
+**Umgesetzt (2026-09-23).** Entscheidungen beim Bau:
+- `ResourceDetailDialog.vue` ist wie `ResourceFormDialog` **dumm**: Es sammelt nur Werte, die Requests bleiben in `ResourceView` (`onSubmit` entscheidet weiter PATCH vs. POST). Dadurch teilen Formular und Maske eine Speicherlogik.
+- **Unterschied im Payload:** Das Create-Formular lässt leere Optionale weg (Server-Default), die Maske schickt sie als `null` — sonst käme ein geleertes Feld nie beim Server an. Die zod-Schemata der Stammdaten sind bei allen optionalen Feldern `.nullish()`, das passt ohne API-Änderung.
+- `ResourceFormDialog` ist damit reiner Create-Dialog (`editing`-Prop und der `immutable`-Zweig sind raus); der Ad-hoc-Create aus `InvoiceFormDialog` nutzt ihn unverändert weiter.
+- Das Raster steckt jetzt in `EuDetailMask.vue`; Rechnungs- und Policen-Dialog nutzen es statt je einer eigenen Kopie der Grid-CSS.
+- `EuDetailField` kennt zusätzlich `number` (mit `step`, leer = `null`) für die Entfernung des Leistungserbringers und `email`.
+- Neu `ResourceConfig.detailTitle`: Die Maske nennt den Datensatz („Versicherung: Beispiel Krankenversicherung AG") statt „… bearbeiten".
+- `EuDialog.is-wide` hat jetzt auch eine **Mindestbreite** (38rem): Ohne sie war eine Maske mit zwei kurzen Feldern exakt so breit wie das Create-Formular, der vom Design gewollte Breitenunterschied fehlte.
+- Im laufenden System geprüft (Playwright, Light/Dark, 390 px): Clear auf Pflichtfeldern deaktiviert, Reset erst nach Änderung, geleerte Entfernung ist nach dem Speichern wirklich leer, PLZ-Fehler der API erscheint unter dem Raster.
+- **Aufgefallen, nicht in dieser Scheibe behoben:** Validierungsmeldungen der API sind englisch („Expected a 5-digit postal code") — betrifft Formular und Maske gleichermaßen.
+
+**Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14).
 
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.

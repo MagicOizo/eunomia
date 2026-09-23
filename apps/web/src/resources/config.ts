@@ -53,6 +53,11 @@ export interface ResourceConfig {
   fields: FieldConfig[];
   lookups?: Record<string, LookupConfig>;
   /**
+   * Title of the view/edit mask, naming the record ("Versicherung: AXA").
+   * Falls back to "<Singular> bearbeiten".
+   */
+  detailTitle?: (row: ResourceRow) => string;
+  /**
    * Opened instead of the generic form when editing an existing row (create
    * keeps the classic form). Receives `open`, `uid` and the resolved lookup
    * `options`; emits `close`, and `changed` whenever the list should reload.

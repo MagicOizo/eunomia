@@ -6,6 +6,7 @@ import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import type { DetailValue } from '../design-system/components/EuDetailField.vue';
 import EuDetailField from '../design-system/components/EuDetailField.vue';
+import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { describeError } from '../lib/errors';
@@ -304,7 +305,7 @@ function submit(): void {
 
 <template>
   <EuDialog :open="open" title="Rechnungsdetails" wide @close="emit('close')">
-    <div v-if="invoice" class="eu-detail-grid">
+    <EuDetailMask v-if="invoice">
       <EuDetailField
         v-model="values.invoiceNumber"
         :saved-value="saved.invoiceNumber"
@@ -417,9 +418,9 @@ function submit(): void {
           type="toggle"
         />
       </template>
-    </div>
+    </EuDetailMask>
 
-    <p v-if="error ?? localError" class="eu-detail-grid__error" role="alert">
+    <p v-if="error ?? localError" class="eu-detail__error" role="alert">
       {{ error ?? localError }}
     </p>
 
@@ -492,7 +493,7 @@ function submit(): void {
           </article>
         </div>
       </section>
-      <p v-if="blockError" class="eu-detail-grid__error" role="alert">{{ blockError }}</p>
+      <p v-if="blockError" class="eu-detail__error" role="alert">{{ blockError }}</p>
     </template>
 
     <template #footer>
@@ -583,16 +584,7 @@ function submit(): void {
 </template>
 
 <style scoped>
-.eu-detail-grid {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 1rem;
-  row-gap: 0.35rem;
-  font-family: var(--eu-font-data);
-}
-
-.eu-detail-grid__error {
+.eu-detail__error {
   margin: 1rem 0 0;
   color: var(--eu-color-error-fg);
   font-size: 0.9rem;

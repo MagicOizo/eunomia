@@ -87,7 +87,11 @@ watch(
   max-height: 90vh;
 }
 
+/* The display mask sits wider than the create form on purpose (see
+   dialog-design.md), so the floor goes up with the ceiling — otherwise a mask
+   with few, short fields is indistinguishable in width from the form. */
 .eu-dialog.is-wide {
+  min-width: min(38rem, calc(100vw - 2rem));
   max-width: min(44rem, calc(100vw - 2rem));
 }
 

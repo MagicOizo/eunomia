@@ -16,6 +16,7 @@ import {
 } from '../../lib/resource';
 import type { ColumnConfig, ResourceConfig } from '../../resources/config';
 import type { SelectOption } from './EuSelectField.vue';
+import ResourceDetailDialog from './ResourceDetailDialog.vue';
 import ResourceFormDialog from './ResourceFormDialog.vue';
 
 const props = defineProps<{ config: ResourceConfig }>();
@@ -30,7 +31,10 @@ const lookups = ref<Record<string, LookupData>>({});
 const loading = ref(false);
 const loadError = ref<string | null>(null);
 
-const dialogOpen = ref(false);
+// Creating uses the classic form, viewing/editing the display mask
+// (dialog-design.md) — two dialogs, one submit path.
+const createOpen = ref(false);
+const maskOpen = ref(false);
 const editing = ref<ResourceRow | null>(null);
 const submitting = ref(false);
 const formError = ref<string | null>(null);
@@ -41,10 +45,14 @@ const detailUid = ref<string | null>(null);
 const confirmTarget = ref<ResourceRow | null>(null);
 const deleteError = ref<string | null>(null);
 
-// Article-neutral so it reads correctly for every gender ("Police anlegen",
-// "Versicherung bearbeiten", …) instead of a wrong "Neuer Police".
-const dialogTitle = computed(
-  () => `${props.config.singular} ${editing.value ? 'bearbeiten' : 'anlegen'}`,
+// Article-neutral so it reads correctly for every gender ("Police anlegen")
+// instead of a wrong "Neue Police".
+const createTitle = computed(() => `${props.config.singular} anlegen`);
+// The mask names the record it shows, like the invoice and policy masks do.
+const maskTitle = computed(() =>
+  editing.value
+    ? (props.config.detailTitle?.(editing.value) ?? `${props.config.singular} bearbeiten`)
+    : '',
 );
 const optionsForForm = computed<Record<string, SelectOption[]>>(() =>
   Object.fromEntries(Object.entries(lookups.value).map(([name, data]) => [name, data.options])),
@@ -106,7 +114,7 @@ const sort = useTableSort(rows, sortValue);
 function openCreate(): void {
   editing.value = null;
   formError.value = null;
-  dialogOpen.value = true;
+  createOpen.value = true;
 }
 
 function openEdit(row: ResourceRow): void {
@@ -116,7 +124,7 @@ function openEdit(row: ResourceRow): void {
   }
   editing.value = row;
   formError.value = null;
-  dialogOpen.value = true;
+  maskOpen.value = true;
 }
 
 async function onSubmit(payload: Record<string, unknown>): Promise<void> {
@@ -128,7 +136,8 @@ async function onSubmit(payload: Record<string, unknown>): Promise<void> {
     } else {
       await createResource(props.config.path, payload);
     }
-    dialogOpen.value = false;
+    createOpen.value = false;
+    maskOpen.value = false;
     await reload();
   } catch (error) {
     formError.value = describeError(error);
@@ -211,14 +220,25 @@ async function confirmDelete(): Promise<void> {
     </div>
 
     <ResourceFormDialog
-      :open="dialogOpen"
-      :title="dialogTitle"
+      :open="createOpen"
+      :title="createTitle"
+      :fields="config.fields"
+      :options="optionsForForm"
+      :submitting="submitting"
+      :error="formError"
+      @close="createOpen = false"
+      @submit="onSubmit"
+    />
+
+    <ResourceDetailDialog
+      :open="maskOpen"
+      :title="maskTitle"
       :fields="config.fields"
       :options="optionsForForm"
       :editing="editing"
       :submitting="submitting"
       :error="formError"
-      @close="dialogOpen = false"
+      @close="maskOpen = false"
       @submit="onSubmit"
     />
 

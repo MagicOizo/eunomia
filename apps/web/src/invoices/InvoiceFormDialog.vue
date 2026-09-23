@@ -220,7 +220,6 @@ function submit(): void {
     :title="`${kinds[createKind].config.singular} anlegen`"
     :fields="kinds[createKind].config.fields"
     :options="{}"
-    :editing="null"
     :prefill="createPrefill"
     :submitting="createBusy"
     :error="createError"

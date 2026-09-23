@@ -39,6 +39,7 @@ const accounts: ResourceConfig = {
   lookups: {
     accounts: { path: '/accounts', idKey: 'accountUID', label: personName },
   },
+  detailTitle: (row) => `Versicherter: ${personName(row)}`,
 };
 
 const companies: ResourceConfig = {
@@ -59,6 +60,7 @@ const companies: ResourceConfig = {
     { key: 'serviceHotline', label: 'Service-Hotline', type: 'text' },
     { key: 'url', label: 'Website', type: 'text' },
   ],
+  detailTitle: (row) => `Versicherung: ${String(row.companyName ?? '')}`,
 };
 
 const contracts: ResourceConfig = {
@@ -156,6 +158,7 @@ const facilities: ResourceConfig = {
     { key: 'facilityName', label: 'Name', type: 'text', required: true },
     { key: 'distanceKm', label: 'Entfernung (km)', type: 'number', step: '1' },
   ],
+  detailTitle: (row) => `Leistungserbringer: ${String(row.facilityName ?? '')}`,
 };
 
 const agencies: ResourceConfig = {
@@ -171,6 +174,7 @@ const agencies: ResourceConfig = {
     { key: 'agencyName', label: 'Name', type: 'text', required: true },
     { key: 'bankAccount', label: 'IBAN', type: 'text', required: true },
   ],
+  detailTitle: (row) => `Abrechnungsdienstleister: ${String(row.agencyName ?? '')}`,
 };
 
 /** Resource configs keyed by their route path. */

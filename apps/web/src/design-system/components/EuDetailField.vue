@@ -7,7 +7,8 @@ import EuCurrencyField from './EuCurrencyField.vue';
 import EuEntityPicker, { type PickerOption } from './EuEntityPicker.vue';
 import EuToggle from './EuToggle.vue';
 
-export type DetailType = 'text' | 'date' | 'currency' | 'select' | 'toggle' | 'readonly';
+export type DetailType =
+  'text' | 'email' | 'number' | 'date' | 'currency' | 'select' | 'toggle' | 'readonly';
 export type DetailValue = string | number | boolean | null;
 
 /**
@@ -27,6 +28,8 @@ const props = withDefaults(
     required?: boolean;
     disabled?: boolean;
     options?: PickerOption[];
+    /** For `number`: the input's granularity, e.g. '1' for whole kilometres. */
+    step?: string;
   }>(),
   {
     type: 'text',
@@ -35,6 +38,7 @@ const props = withDefaults(
     required: false,
     disabled: false,
     options: () => [],
+    step: undefined,
   },
 );
 
@@ -43,13 +47,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: DetailValue] }>();
 const isEmpty = computed(
   () => props.modelValue === null || props.modelValue === undefined || props.modelValue === '',
 );
-const clearable = computed(
-  () =>
-    props.type === 'text' ||
-    props.type === 'date' ||
-    props.type === 'currency' ||
-    props.type === 'select',
-);
+const clearable = computed(() => props.type !== 'toggle' && props.type !== 'readonly');
 const canReset = computed(
   () =>
     props.type !== 'readonly' &&
@@ -62,12 +60,22 @@ const numberValue = computed(() => props.modelValue as number | null);
 const stringValue = computed(() => props.modelValue as string | null);
 const booleanValue = computed(() => props.modelValue as boolean);
 
+/** Types whose empty value is `null` rather than an empty string. */
+const nullWhenEmpty = (type: DetailType): boolean =>
+  type === 'number' || type === 'currency' || type === 'select';
+
 function onText(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
   emit('update:modelValue', value === '' ? '' : value);
 }
+function onNumber(event: Event): void {
+  // A number input reports invalid content as an empty string, so anything
+  // that is not empty parses cleanly here.
+  const value = (event.target as HTMLInputElement).value;
+  emit('update:modelValue', value === '' ? null : Number(value));
+}
 function clear(): void {
-  emit('update:modelValue', props.type === 'currency' || props.type === 'select' ? null : '');
+  emit('update:modelValue', nullWhenEmpty(props.type) ? null : '');
 }
 function reset(): void {
   emit('update:modelValue', props.savedValue ?? null);
@@ -84,13 +92,24 @@ function reset(): void {
           {{ modelValue === null || modelValue === '' ? '–' : modelValue }}
         </span>
         <input
-          v-else-if="type === 'text' || type === 'date'"
+          v-else-if="type === 'text' || type === 'email' || type === 'date'"
           class="eu-detail__input"
-          :type="type === 'date' ? 'date' : 'text'"
+          :type="type === 'text' ? 'text' : type"
           :value="modelValue ?? ''"
           :aria-label="label"
           :disabled="disabled"
           @input="onText"
+        />
+        <input
+          v-else-if="type === 'number'"
+          class="eu-detail__input"
+          type="number"
+          inputmode="numeric"
+          :step="step"
+          :value="modelValue ?? ''"
+          :aria-label="label"
+          :disabled="disabled"
+          @input="onNumber"
         />
         <EuCurrencyField
           v-else-if="type === 'currency'"
