@@ -21,6 +21,7 @@ import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from 
 import { apiFetch } from '../lib/api';
 import { useDebouncedCallback } from '../lib/debounce';
 import { euro, germanDate, plural } from '../lib/format';
+import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { useTableSort } from '../lib/useTableSort';
 import { type BillingListDto, deleteBilling, searchBillings, updateBilling } from './api';
@@ -126,7 +127,7 @@ async function load(): Promise<void> {
     await loadBillings();
   } catch (err) {
     loadError.value =
-      err instanceof HttpError ? err.message : 'Abrechnungen konnten nicht geladen werden.';
+      err instanceof HttpError ? describeError(err) : 'Abrechnungen konnten nicht geladen werden.';
   } finally {
     loading.value = false;
   }
@@ -157,7 +158,7 @@ async function run(action: () => Promise<unknown>, close: () => void): Promise<v
     close();
     await load();
   } catch (err) {
-    dialogError.value = err instanceof HttpError ? err.message : 'Aktion fehlgeschlagen.';
+    dialogError.value = err instanceof HttpError ? describeError(err) : 'Aktion fehlgeschlagen.';
   } finally {
     busy.value = false;
   }

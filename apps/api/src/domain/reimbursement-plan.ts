@@ -7,6 +7,7 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { badRequest, notFound } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import type { BonusYear } from './bonus-timeline.js';
 import type { ContractRow } from './contract-access.js';
 import { termsForYear } from './contract-history.js';
@@ -71,7 +72,7 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
     if (req.query.year !== undefined) {
       year = Number(req.query.year);
       if (!Number.isInteger(year) || year < 1900 || year > 2999) {
-        throw badRequest('The year must be a whole number');
+        throw badRequest('The year must be a whole number', { code: ERROR_CODES.INVALID_YEAR });
       }
     }
 

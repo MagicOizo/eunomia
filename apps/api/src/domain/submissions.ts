@@ -8,6 +8,7 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import { withTransaction } from '../db/transaction.js';
 import { ENTITY_PREFIX, entityIdPattern, generateEntityId } from '../lib/ids.js';
 import { accountForContract, accountForSubmission, authorizeAccount } from './workflow-access.js';
@@ -24,6 +25,7 @@ const createSchema = z.object({
 
 interface CandidateInvoice {
   invoiceUID: string;
+  invoiceNumber: string;
   accountUID: string;
   reimbursementClosed: number;
   /** Whether the invoice is already submitted to the requested contract. */
@@ -48,34 +50,48 @@ function assertInvoicesSubmittable(
   contractAccount: string,
 ): void {
   const byUid = new Map(candidates.map((c) => [c.invoiceUID, c]));
+  // Failing invoices are named by their number — that is what the user sees in
+  // the list, and what the UI puts into its message (see lib/error-codes.ts).
   const failing = (predicate: (c: CandidateInvoice) => boolean): string[] =>
-    requested.filter((uid) => predicate(byUid.get(uid) as CandidateInvoice));
+    requested
+      .map((uid) => byUid.get(uid) as CandidateInvoice)
+      .filter(predicate)
+      .map((c) => c.invoiceNumber);
 
   const unknown = requested.filter((uid) => !byUid.has(uid));
   if (unknown.length > 0) {
-    throw badRequest(`Unknown or inactive invoices: ${unknown.join(', ')}`);
+    throw badRequest(`Unknown or inactive invoices: ${unknown.join(', ')}`, {
+      code: ERROR_CODES.INVOICES_UNKNOWN,
+      details: { invoices: unknown },
+    });
   }
   const wrongAccount = failing((c) => c.accountUID !== contractAccount);
   if (wrongAccount.length > 0) {
     throw badRequest(
       `Invoices do not belong to the contract's account: ${wrongAccount.join(', ')}`,
+      { code: ERROR_CODES.INVOICES_WRONG_ACCOUNT, details: { invoices: wrongAccount } },
     );
   }
   const alreadySubmitted = failing((c) => Number(c.alreadySubmitted) > 0);
   if (alreadySubmitted.length > 0) {
     throw conflict(
       `Invoices are already submitted to this contract: ${alreadySubmitted.join(', ')}`,
+      { code: ERROR_CODES.INVOICES_ALREADY_SUBMITTED, details: { invoices: alreadySubmitted } },
     );
   }
   const excluded = failing((c) => Number(c.excluded) > 0);
   if (excluded.length > 0) {
     throw conflict(
       `Invoices are marked as not reimbursable under this contract: ${excluded.join(', ')}`,
+      { code: ERROR_CODES.INVOICES_EXCLUDED, details: { invoices: excluded } },
     );
   }
   const closed = failing((c) => Boolean(c.reimbursementClosed));
   if (closed.length > 0) {
-    throw conflict(`Invoices are already marked as billed: ${closed.join(', ')}`);
+    throw conflict(`Invoices are already marked as billed: ${closed.join(', ')}`, {
+      code: ERROR_CODES.INVOICES_ALREADY_BILLED,
+      details: { invoices: closed },
+    });
   }
 }
 
@@ -102,7 +118,7 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
         input.invoiceUIDs,
       );
       const candidates = await conn.query<CandidateInvoice[]>(
-        `SELECT i.invoiceUID, i.accountUID, i.reimbursementClosed,
+        `SELECT i.invoiceUID, i.invoiceNumber, i.accountUID, i.reimbursementClosed,
                 EXISTS (
                   SELECT 1 FROM SubmissionInvoices si
                     JOIN Submissions s
@@ -233,7 +249,9 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
         [uid],
       );
       if (Number(billings?.n ?? 0) > 0) {
-        throw conflict('A submission with service billings cannot be withdrawn');
+        throw conflict('A submission with service billings cannot be withdrawn', {
+          code: ERROR_CODES.SUBMISSION_HAS_BILLINGS,
+        });
       }
       const removed = (await conn.query(
         'DELETE FROM SubmissionInvoices WHERE submissionUID = ? AND invoiceUID = ?',

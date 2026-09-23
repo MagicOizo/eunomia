@@ -636,6 +636,9 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       });
       assert.equal(res.status, 400);
       assert.match(res.body.error.message, /R-B-loose/);
+      // The UI translates the code and names the invoices from the details.
+      assert.equal(res.body.error.code, 'INVOICES_NOT_IN_SUBMISSION');
+      assert.deepEqual(res.body.error.details, { invoices: ['R-B-loose'] });
 
       const inv = await request(app).get(`/api/v1/invoices/${invB1}`).set(admin);
       assert.equal(inv.body.data.workflowStatus, 'eingereicht');
@@ -661,6 +664,8 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       });
       assert.equal(res.status, 409);
       assert.match(res.body.error.message, /R-B2/);
+      assert.equal(res.body.error.code, 'REIMBURSEMENT_EXCEEDS_INVOICE');
+      assert.deepEqual(res.body.error.details, { invoices: ['R-B2'] });
     });
 
     await t.test('one request books the reimbursements of both invoices', async () => {

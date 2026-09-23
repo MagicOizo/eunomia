@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 
 import { ApiError } from './api-error.js';
+import { ERROR_CODES } from './error-codes.js';
 
 /** MariaDB driver error shape we care about (a subset of SqlError). */
 interface SqlErrorLike {
@@ -16,11 +17,19 @@ function isSqlError(err: unknown): err is SqlErrorLike {
 function mapSqlError(err: SqlErrorLike): ApiError | null {
   switch (err.errno) {
     case 1062: // ER_DUP_ENTRY
-      return new ApiError(409, 'CONFLICT', 'A record with the same unique value already exists');
+      return new ApiError(
+        409,
+        ERROR_CODES.DUPLICATE_VALUE,
+        'A record with the same unique value already exists',
+      );
     case 1451: // ER_ROW_IS_REFERENCED_2 — still referenced by another row
-      return new ApiError(409, 'CONFLICT', 'Record is still referenced by other records');
+      return new ApiError(
+        409,
+        ERROR_CODES.STILL_REFERENCED,
+        'Record is still referenced by other records',
+      );
     case 1452: // ER_NO_REFERENCED_ROW_2 — points at a missing row
-      return new ApiError(400, 'BAD_REQUEST', 'A referenced record does not exist');
+      return new ApiError(400, ERROR_CODES.MISSING_REFERENCE, 'A referenced record does not exist');
     default:
       return null;
   }
@@ -40,19 +49,23 @@ export function errorHandler(
 ): void {
   const apiError = err instanceof ApiError ? err : isSqlError(err) ? mapSqlError(err) : null;
   if (apiError) {
-    res
-      .status(apiError.httpStatus)
-      .json({ error: { code: apiError.code, message: apiError.message } });
+    res.status(apiError.httpStatus).json({
+      error: { code: apiError.code, message: apiError.message, details: apiError.details },
+    });
     return;
   }
 
   if (err instanceof ZodError) {
     res.status(400).json({
-      error: { code: 'VALIDATION_ERROR', message: 'Invalid request body', details: err.issues },
+      error: {
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: 'Invalid request body',
+        details: err.issues,
+      },
     });
     return;
   }
 
   console.error('Unhandled error:', err);
-  res.status(500).json({ error: { code: 'INTERNAL', message: 'Internal server error' } });
+  res.status(500).json({ error: { code: ERROR_CODES.INTERNAL, message: 'Internal server error' } });
 }

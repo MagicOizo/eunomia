@@ -197,7 +197,6 @@ async function confirmWithdraw(): Promise<void> {
   await runBlock(
     () => withdrawSubmission(submission.submissionUID, inv.invoiceUID),
     (m) => (blockError.value = m),
-    'Zu dieser Einreichung gibt es bereits eine Leistungsabrechnung, sie kann nicht mehr zurückgezogen werden.',
   );
   pendingWithdraw.value = null;
 }
@@ -212,7 +211,6 @@ async function saveSubmission(payload: {
   const ok = await runBlock(
     () => createSubmission({ ...payload, invoiceUIDs: [inv.invoiceUID] }),
     (m) => (submitError.value = m),
-    'Die Rechnung liegt bei dieser Police bereits, ist dort als nicht erstattungsfähig markiert oder schon abgerechnet.',
   );
   if (ok) submitOpen.value = false;
 }
@@ -253,7 +251,6 @@ async function saveExclusion(payload: { contractUID: string; note: string | null
   const ok = await runBlock(
     () => addExclusion(inv.invoiceUID, payload),
     (m) => (exclusionError.value = m),
-    'Bei dieser Police ist die Rechnung bereits eingereicht oder schon markiert.',
   );
   if (ok) exclusionOpen.value = false;
 }

@@ -81,7 +81,8 @@ watch(
       invoices.value = invs;
       if (submissions.value.length > 0) submissionUID.value = submissions.value[0].submissionUID;
     } catch (err) {
-      error.value = err instanceof HttpError ? err.message : 'Daten konnten nicht geladen werden.';
+      error.value =
+        err instanceof HttpError ? describeError(err) : 'Daten konnten nicht geladen werden.';
     } finally {
       loading.value = false;
     }
@@ -128,10 +129,7 @@ function save(): void {
       emit('created');
       emit('close');
     } catch (err) {
-      error.value = describeError(
-        err,
-        'Die Erstattungen einer Rechnung dürfen zusammen den Rechnungsbetrag nicht übersteigen.',
-      );
+      error.value = describeError(err);
     } finally {
       busy.value = false;
     }

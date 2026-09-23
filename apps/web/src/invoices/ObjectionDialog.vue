@@ -5,6 +5,7 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { germanDate } from '../lib/format';
+import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { type BillingDto, type InvoiceDto, searchBillings, updateBilling } from './api';
 
@@ -59,7 +60,7 @@ async function load(): Promise<void> {
     }
   } catch (err) {
     error.value =
-      err instanceof HttpError ? err.message : 'Abrechnungen konnten nicht geladen werden.';
+      err instanceof HttpError ? describeError(err) : 'Abrechnungen konnten nicht geladen werden.';
   } finally {
     loading.value = false;
   }
@@ -81,7 +82,7 @@ async function run(billingUID: string, action: () => Promise<unknown>): Promise<
     await load();
     emit('changed');
   } catch (err) {
-    error.value = err instanceof HttpError ? err.message : 'Aktion fehlgeschlagen.';
+    error.value = err instanceof HttpError ? describeError(err) : 'Aktion fehlgeschlagen.';
   } finally {
     busyUID.value = null;
   }

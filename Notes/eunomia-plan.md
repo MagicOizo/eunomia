@@ -585,6 +585,24 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - Im laufenden System geprüft (Playwright, Light/Dark, 390 px): Clear auf Pflichtfeldern deaktiviert, Reset erst nach Änderung, geleerte Entfernung ist nach dem Speichern wirklich leer, PLZ-Fehler der API erscheint unter dem Raster.
 - **Aufgefallen, nicht in dieser Scheibe behoben:** Validierungsmeldungen der API sind englisch („Expected a 5-digit postal code") — betrifft Formular und Maske gleichermaßen.
 
+## Slice 24 — Fehlermeldungen: in der UI durchgängig deutsch
+**Anlass:** In Slice 23 quittierte eine falsche PLZ die Stammdaten-Maske mit „Expected a 5-digit postal code". Kein Einzelfall: Auch „Record is still referenced by other records" oder „Invoice not found" landeten wörtlich in deutschen Dialogen, und fünf Stellen zeigten `err.message` sogar ganz ohne `describeError`.
+
+**Festlegung des Autors:** Was der Nutzer in der UI sieht, ist deutsch; Konsolen-Logs und die API-Antworten selbst bleiben englisch. Fehler**codes** sind maschinenlesbar, keine Sprache — die API darf also präzisere Codes bekommen, ohne ihre Texte zu ändern.
+
+**DoD:** Jede Meldung, die ein Dialog oder eine Liste anzeigt, ist ein deutscher Satz — auch der Fallback für einen (noch) nicht übersetzten Code.
+
+**Umgesetzt (2026-09-23).** Entscheidungen beim Bau:
+- Neu `apps/api/src/lib/error-codes.ts` als **Vertrag mit der UI**: ~35 Codes statt der bisherigen Sammelcodes `CONFLICT`/`BAD_REQUEST`. `ApiError` trägt jetzt optionale `details`, die der Error-Handler mitserialisiert — Daten, die bisher nur im Satz standen (betroffene Rechnungsnummern, Ressourcenname, `kind: premium|terms`), sind damit maschinenlesbar.
+- Die englischen Messages blieben, wo Tests sie prüfen. **Eine Ausnahme mit Absicht:** Die Einreichungs-Prüfung nannte Rechnungen bisher per UID, jetzt per Nummer (wie der Allocations-Pfad es schon tat) — die UID sagt dem Nutzer nichts.
+- Die beiden einzigen deutschen Sätze in der API (Nutzerverwaltung) sind jetzt englisch mit Code; Deutsch steht nur noch im Web.
+- Web: `lib/field-labels.ts` (Payload-Key → Label + Formathinweis für Regex-Regeln) und `lib/error-messages.ts` (zod-Issue → Satz über `code`/`validation`, Code → Satz mit Interpolation aus `details`). `describeError` setzt beides zusammen.
+- **Kein englischer Fallback mehr:** Ein unbekannter Code ergibt „Die Aktion ist fehlgeschlagen." und einen `console.error` mit dem Original.
+- `conflictMessage` bleibt als kontextabhängige Übersteuerung (Rechnungsbetrag senken vs. Erstattung buchen); die vier Aufrufer, deren Text der Code jetzt genauer sagt, geben ihn ab.
+- Nachgezogen: `BillingsView`, `ObjectionDialog`, `NewBillingDialog` und `InvoiceFormDialog` rendern nicht mehr `err.message`.
+- Geprüft im laufenden System: PLZ- und URL-Regel, doppelter Beitragsstand (409) und — in zwei Sitzungen — das Speichern einer inzwischen gelöschten Leistungsabrechnung (404).
+- **Am Rande festgestellt:** Stammdaten werden soft-deleted, `STILL_REFERENCED` kann dort also gar nicht auftreten; der Satz gilt nur für harte Löschungen.
+
 **Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14).
 
 ## Ausblick (nicht Teil dieser Slices)

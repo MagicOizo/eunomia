@@ -352,7 +352,6 @@ function submitSubmission(payload: { contractUID: string; submittedDate: string 
   void runDialog(
     () => createSubmission({ ...payload, invoiceUIDs }).then(() => undefined),
     () => (submitOpen.value = false),
-    'Mindestens eine Rechnung liegt bereits bei dieser Police, ist dort als nicht erstattungsfähig markiert oder schon abgerechnet.',
   );
 }
 
@@ -360,7 +359,6 @@ function submitBilling(payload: BillingAllocationPayload): void {
   void runDialog(
     () => saveBillingAllocations(payload),
     () => (billingOpen.value = false),
-    'Die Erstattungen einer Rechnung dürfen zusammen den Rechnungsbetrag nicht übersteigen.',
   );
 }
 

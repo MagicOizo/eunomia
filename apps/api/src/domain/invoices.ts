@@ -17,6 +17,7 @@ import {
 } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { deriveInvoiceStatus, deriveSubmissionStatus } from './invoice-status.js';
 import { accountForContract, accountForInvoice, authorizeAccount } from './workflow-access.js';
@@ -441,10 +442,13 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       ) {
         throw conflict(
           'The invoice amount cannot be lower than the reimbursements allocated to it',
+          { code: ERROR_CODES.INVOICE_AMOUNT_BELOW_REIMBURSED },
         );
       }
       if (data.reimbursementClosed === 1 && (await submissionCount(conn, uid)) === 0) {
-        throw conflict('Only a submitted invoice can be marked as billed');
+        throw conflict('Only a submitted invoice can be marked as billed', {
+          code: ERROR_CODES.INVOICE_NOT_SUBMITTED,
+        });
       }
       await updateRow(conn, table, uid, data);
     });
@@ -465,7 +469,9 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const contractAccount = await accountForContract(pool, data.contractUID);
     if (contractAccount === null) throw notFound('Contract');
     if (contractAccount !== account) {
-      throw badRequest("The contract does not belong to the invoice's account");
+      throw badRequest("The contract does not belong to the invoice's account", {
+        code: ERROR_CODES.CONTRACT_ACCOUNT_MISMATCH,
+      });
     }
 
     await withTransaction(pool, async (conn) => {
@@ -478,14 +484,18 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
         [uid, data.contractUID],
       );
       if (Number(submitted?.n ?? 0) > 0) {
-        throw conflict('The invoice is already submitted to this contract');
+        throw conflict('The invoice is already submitted to this contract', {
+          code: ERROR_CODES.INVOICE_ALREADY_SUBMITTED,
+        });
       }
       const [existing] = await conn.query<Array<{ n: number }>>(
         'SELECT COUNT(*) AS n FROM InvoiceExclusions WHERE invoiceUID = ? AND contractUID = ?',
         [uid, data.contractUID],
       );
       if (Number(existing?.n ?? 0) > 0) {
-        throw conflict('The invoice is already marked as not reimbursable under this contract');
+        throw conflict('The invoice is already marked as not reimbursable under this contract', {
+          code: ERROR_CODES.INVOICE_ALREADY_EXCLUDED,
+        });
       }
       await conn.query(
         'INSERT INTO InvoiceExclusions (invoiceUID, contractUID, note) VALUES (?, ?, ?)',

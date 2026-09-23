@@ -9,6 +9,7 @@ import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import type { Queryable } from '../crud/repository.js';
 import { badRequest } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import {
   type BonusClaim,
   type BonusForfeitRule,
@@ -95,7 +96,9 @@ const yearSchema = z.object({
 function assertYearWithinContract(contract: ContractRow, year: number): void {
   const endYear = contract.contractEnd === null ? 2999 : yearOf(contract.contractEnd);
   if (!Number.isInteger(year) || year < yearOf(contract.contractBegin) || year > endYear) {
-    throw badRequest('The year must lie within the contract term');
+    throw badRequest('The year must lie within the contract term', {
+      code: ERROR_CODES.YEAR_OUTSIDE_CONTRACT,
+    });
   }
 }
 

@@ -1,4 +1,5 @@
 import { ApiError } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 
 /**
  * Auth failures are ApiErrors with auth-specific codes; the shared error
@@ -7,22 +8,26 @@ import { ApiError } from '../lib/api-error.js';
 export class AuthError extends ApiError {}
 
 export const invalidCredentials = (): AuthError =>
-  new AuthError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+  new AuthError(401, ERROR_CODES.INVALID_CREDENTIALS, 'Invalid email or password');
 
 export const invalidRefreshToken = (): AuthError =>
-  new AuthError(401, 'INVALID_REFRESH_TOKEN', 'Refresh token is missing, invalid or expired');
+  new AuthError(
+    401,
+    ERROR_CODES.INVALID_REFRESH_TOKEN,
+    'Refresh token is missing, invalid or expired',
+  );
 
 export const setupDisabled = (): AuthError =>
-  new AuthError(403, 'SETUP_DISABLED', 'Setup is disabled (no SETUP_TOKEN configured)');
+  new AuthError(403, ERROR_CODES.SETUP_DISABLED, 'Setup is disabled (no SETUP_TOKEN configured)');
 
 export const invalidSetupToken = (): AuthError =>
-  new AuthError(403, 'INVALID_SETUP_TOKEN', 'Invalid setup token');
+  new AuthError(403, ERROR_CODES.INVALID_SETUP_TOKEN, 'Invalid setup token');
 
 export const setupAlreadyDone = (): AuthError =>
-  new AuthError(409, 'SETUP_ALREADY_DONE', 'Setup has already been completed');
+  new AuthError(409, ERROR_CODES.SETUP_ALREADY_DONE, 'Setup has already been completed');
 
 export const unauthenticated = (): AuthError =>
-  new AuthError(401, 'UNAUTHENTICATED', 'Authentication required');
+  new AuthError(401, ERROR_CODES.UNAUTHENTICATED, 'Authentication required');
 
 export const forbidden = (): AuthError =>
-  new AuthError(403, 'FORBIDDEN', 'You do not have permission to perform this action');
+  new AuthError(403, ERROR_CODES.FORBIDDEN, 'You do not have permission to perform this action');

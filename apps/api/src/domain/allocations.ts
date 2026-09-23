@@ -10,6 +10,7 @@ import { pathParam } from '../crud/params.js';
 import { type CrudTable, type Row, getRow, insertRow, softDeleteRow } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { authorizeAccount } from './workflow-access.js';
 
@@ -66,7 +67,10 @@ function assertEntriesBookable(candidates: CandidateInvoice[], entries: Allocati
 
   const unknown = entries.filter((e) => !byUid.has(e.invoiceUID)).map((e) => e.invoiceUID);
   if (unknown.length > 0) {
-    throw badRequest(`Unknown or inactive invoices: ${unknown.join(', ')}`);
+    throw badRequest(`Unknown or inactive invoices: ${unknown.join(', ')}`, {
+      code: ERROR_CODES.INVOICES_UNKNOWN,
+      details: { invoices: unknown },
+    });
   }
   const foreign = entries
     .filter((e) => !Number(byUid.get(e.invoiceUID)?.inSubmission))
@@ -74,6 +78,7 @@ function assertEntriesBookable(candidates: CandidateInvoice[], entries: Allocati
   if (foreign.length > 0) {
     throw badRequest(
       `Invoices do not belong to the service billing's submission: ${foreign.join(', ')}`,
+      { code: ERROR_CODES.INVOICES_NOT_IN_SUBMISSION, details: { invoices: foreign } },
     );
   }
   // No enrichment ("Bereicherungsverbot"): all reimbursements of an invoice,
@@ -87,7 +92,10 @@ function assertEntriesBookable(candidates: CandidateInvoice[], entries: Allocati
     })
     .map((e) => byUid.get(e.invoiceUID)?.invoiceNumber);
   if (exceeding.length > 0) {
-    throw conflict(`The reimbursements would exceed the invoice amount: ${exceeding.join(', ')}`);
+    throw conflict(`The reimbursements would exceed the invoice amount: ${exceeding.join(', ')}`, {
+      code: ERROR_CODES.REIMBURSEMENT_EXCEEDS_INVOICE,
+      details: { invoices: exceeding },
+    });
   }
 }
 

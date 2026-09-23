@@ -18,6 +18,7 @@ import {
 } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import { type ContractRow, loadAuthorizedContract } from './contract-access.js';
 
 /**
@@ -100,10 +101,16 @@ const premiumSpec: HistorySpec = {
   assertWithinContract: (contract, validity) => {
     const validFrom = String(validity);
     if (validFrom < contract.contractBegin) {
-      throw badRequest('A premium cannot start before the contract begins');
+      throw badRequest('A premium cannot start before the contract begins', {
+        code: ERROR_CODES.HISTORY_BEFORE_CONTRACT,
+        details: { kind: 'premium' },
+      });
     }
     if (contract.contractEnd !== null && validFrom > contract.contractEnd) {
-      throw badRequest('A premium cannot start after the contract ends');
+      throw badRequest('A premium cannot start after the contract ends', {
+        code: ERROR_CODES.HISTORY_AFTER_CONTRACT,
+        details: { kind: 'premium' },
+      });
     }
   },
 };
@@ -117,10 +124,16 @@ const termsSpec: HistorySpec = {
   assertWithinContract: (contract, validity) => {
     const year = Number(validity);
     if (year < yearOf(contract.contractBegin)) {
-      throw badRequest('Terms cannot start before the year the contract begins');
+      throw badRequest('Terms cannot start before the year the contract begins', {
+        code: ERROR_CODES.HISTORY_BEFORE_CONTRACT,
+        details: { kind: 'terms' },
+      });
     }
     if (contract.contractEnd !== null && year > yearOf(contract.contractEnd)) {
-      throw badRequest('Terms cannot start after the year the contract ends');
+      throw badRequest('Terms cannot start after the year the contract ends', {
+        code: ERROR_CODES.HISTORY_AFTER_CONTRACT,
+        details: { kind: 'terms' },
+      });
     }
   },
   saveChildren: async (db, termsUID, data) => {
@@ -159,7 +172,10 @@ async function assertValidityFree(
     [contractUID, validity],
   );
   if (rows.some((row) => row.uid !== ownUID)) {
-    throw conflict(`${spec.label} with this start already exists for the contract`);
+    throw conflict(`${spec.label} with this start already exists for the contract`, {
+      code: ERROR_CODES.HISTORY_START_EXISTS,
+      details: { kind: spec.segment === 'premiums' ? 'premium' : 'terms' },
+    });
   }
 }
 

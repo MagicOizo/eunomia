@@ -212,12 +212,7 @@ async function saveEntry(
     await load();
     emit('changed');
   } catch (error) {
-    entryError.value = describeError(
-      error,
-      segment === 'premiums'
-        ? 'Für dieses Datum gibt es bereits einen Beitragsstand.'
-        : 'Für dieses Jahr gibt es bereits Konditionen.',
-    );
+    entryError.value = describeError(error);
   } finally {
     entrySaving.value = false;
   }

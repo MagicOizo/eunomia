@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import type { AppConfig } from '../config/env.js';
 import { badRequest, notFound } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { hashPassword } from '../lib/password.js';
 import {
@@ -60,7 +61,9 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
   /** Rejects an operation on the caller's own account. */
   function assertNotSelf(res: Response, uuid: string): void {
     if (getAuthUser(res).uuidText === uuid) {
-      throw badRequest('Diese Aktion ist für das eigene Konto nicht möglich.');
+      throw badRequest('This action is not possible on your own account', {
+        code: ERROR_CODES.SELF_ACCOUNT_ACTION,
+      });
     }
   }
 
@@ -68,9 +71,9 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
   async function assertKeepsAnAdmin(uuid: string, willRemainAdmin: boolean): Promise<void> {
     if (willRemainAdmin) return;
     if ((await isActiveAdmin(pool, uuid)) && (await countActiveAdmins(pool)) <= 1) {
-      throw badRequest(
-        'Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.',
-      );
+      throw badRequest('The last active administrator cannot be removed or deactivated', {
+        code: ERROR_CODES.LAST_ADMIN,
+      });
     }
   }
 

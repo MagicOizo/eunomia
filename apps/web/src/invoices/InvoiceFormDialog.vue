@@ -9,6 +9,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
+import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { createResource } from '../lib/resource';
 import type { ResourceConfig } from '../resources/config';
@@ -105,7 +106,7 @@ async function onCreateSubmit(payload: Record<string, unknown>): Promise<void> {
     }
     createOpen.value = false;
   } catch (err) {
-    createError.value = err instanceof HttpError ? err.message : 'Anlegen fehlgeschlagen.';
+    createError.value = err instanceof HttpError ? describeError(err) : 'Anlegen fehlgeschlagen.';
   } finally {
     createBusy.value = false;
   }
