@@ -257,12 +257,16 @@ function confirmDelete(): void {
 
     <template v-else>
       <div class="eu-billings__filters">
-        <EuTextField v-model="filters.q" label="Abrechnungs- oder Rechnungsnummer" />
+        <EuTextField
+          v-model="filters.q"
+          class="eu-billings__search"
+          label="Abrechnungs- oder Rechnungsnummer"
+        />
         <EuTextField v-model="filters.from" label="Abrechnung ab" type="date" />
         <EuTextField v-model="filters.to" label="Abrechnung bis" type="date" />
         <EuCurrencyField v-model="filters.min" label="Erstattung ab" />
         <EuCurrencyField v-model="filters.max" label="Erstattung bis" />
-        <EuToggle v-model="filters.unlinked" label="Nur unverknüpfte" />
+        <EuToggle v-model="filters.unlinked" class="eu-billings__toggle" label="Nur unverknüpfte" />
       </div>
 
       <p v-if="billings.length === 0 && filtered" class="eu-billings__hint" role="status">
@@ -535,9 +539,20 @@ function confirmDelete(): void {
   margin-bottom: 1rem;
 }
 
+/* The date and amount filters need no more than their own width; without the
+   cap they share the row evenly with the search field, whose long label then
+   breaks over two lines while they sit half empty. */
 .eu-billings__filters > * {
-  flex: 1 1 10rem;
+  flex: 0 1 11rem;
   min-width: 0;
+}
+
+.eu-billings__search {
+  flex: 1 1 21rem;
+}
+
+.eu-billings__toggle {
+  flex: 0 0 auto;
 }
 
 .eu-billings__table-wrap {
