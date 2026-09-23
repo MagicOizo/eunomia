@@ -5,6 +5,7 @@ import { runMigrations } from '../db/migrate.js';
 import { createPool, waitForDatabase } from '../db/pool.js';
 import { hashPassword } from '../lib/password.js';
 import { seedExampleYears } from './example-years.js';
+import { seedFamilyPolicy } from './family-policy.js';
 import { daysFromToday, seedDate, seedId, seedRow, seedYear } from './helpers.js';
 import { clearData } from './reset.js';
 
@@ -13,7 +14,8 @@ import { clearData } from './reset.js';
  * cases worth clicking through: every workflow status, both payment traffic
  * lights, an objection, a correction, a policy whose bonus scale was not
  * updated, and an insured person without any policy. The author's three
- * example years live in `example-years.ts`.
+ * example years live in `example-years.ts`, the parent/child policy case in
+ * `family-policy.ts`.
  *
  * Every row uses a deterministic public ID (see `helpers.ts`), so a repeat run
  * changes nothing. `--reset` empties the database first — the way to get rid
@@ -483,6 +485,13 @@ export async function seedDatabase(pool: Pool): Promise<void> {
   await seedContracts(pool);
   await seedInvoices(pool);
   await seedWorkflow(pool);
+  await seedFamilyPolicy(pool, {
+    leadAccountUID: ids.accountAnna,
+    parentContractUID: ids.contractAnna,
+    companyUID: ids.company,
+    facilityDoctorUID: ids.facilityDoctor,
+    facilityRadiologyUID: ids.facilityRadiology,
+  });
   await seedExampleYears(pool);
 }
 

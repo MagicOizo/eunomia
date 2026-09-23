@@ -8,11 +8,26 @@ import { ENTITY_PREFIX, ID_ALPHABET, type EntityName } from '../lib/ids.js';
  * touches the same rows and never duplicates them.
  */
 
+/**
+ * The digits and capitals of the ID alphabet. Seed IDs stay out of its
+ * lowercase half on purpose: the UID columns use a case-insensitive collation
+ * (utf8mb4_uca1400_ai_ci), so a lowercase body would fold onto the capital of
+ * the same letter — `iSEEDaaaaaaa` and `iSEEDAAAAAAA` are one and the same row
+ * to the UNIQUE index, and `seedRow`'s ON DUPLICATE KEY UPDATE would drop the
+ * second one without a word.
+ */
+const SEED_ALPHABET = ID_ALPHABET.slice(0, 32);
+
 /** Builds a stable, valid public ID for a seed row from its entity and index. */
 export function seedId(entity: EntityName, index: number): string {
-  // charAt returns a plain string (never undefined); indices stay well within
-  // the alphabet, so the body is always 7 valid characters.
-  const body = ID_ALPHABET.charAt(index % ID_ALPHABET.length).repeat(7);
+  if (!Number.isInteger(index) || index < 0 || index >= SEED_ALPHABET.length) {
+    throw new Error(
+      `Seed index ${index} is out of range: use 0..${SEED_ALPHABET.length - 1} (see SEED_ALPHABET).`,
+    );
+  }
+  // charAt returns a plain string (never undefined); the guard above keeps the
+  // index inside the alphabet, so the body is always 7 valid characters.
+  const body = SEED_ALPHABET.charAt(index).repeat(7);
   return `${ENTITY_PREFIX[entity]}SEED${body}`;
 }
 
