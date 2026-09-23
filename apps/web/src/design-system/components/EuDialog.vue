@@ -77,6 +77,10 @@ watch(
   padding: 0;
   color: var(--eu-color-text);
   background-color: var(--eu-color-surface-bg);
+  /* A floor as well as a ceiling: without it a short form (two fields and two
+     buttons) shrinks to its content and looks cramped. Both clamp to the
+     viewport so the dialog never grows wider than a phone screen. */
+  min-width: min(30rem, calc(100vw - 2rem));
   max-width: min(32rem, calc(100vw - 2rem));
   /* Never taller than the viewport: header and footer stay put, only the body
      scrolls (see __body). Flex column drives that split. */
