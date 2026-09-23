@@ -7,11 +7,15 @@ import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import { plural } from '../lib/format';
+import type { InvoiceDto } from './api';
+import InvoiceBriefList from './InvoiceBriefList.vue';
 
 const props = defineProps<{
   open: boolean;
-  /** How many invoices will be submitted. */
-  count: number;
+  /** The invoices that will be submitted, listed so the selection is visible. */
+  invoices: InvoiceDto[];
+  /** facilityUID → name, for the list's provider column. */
+  facilityNames: Record<string, string>;
   /** Only the policies every selected invoice can still go to (see eligibility.ts). */
   contracts: SelectOption[];
   submitting: boolean;
@@ -55,8 +59,10 @@ function submit(): void {
   <EuDialog :open="open" title="Rechnungen einreichen" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <p class="eu-form__note">
-        {{ plural(count, 'Rechnung wird', 'Rechnungen werden') }} als eine Einreichung gebündelt.
+        {{ plural(invoices.length, 'Rechnung wird', 'Rechnungen werden') }} als eine Einreichung
+        gebündelt.
       </p>
+      <InvoiceBriefList :invoices="invoices" :facility-names="facilityNames" />
       <p v-if="contracts.length === 0" class="eu-form__note" role="status">
         Keine Police verfügbar: Die Rechnungen liegen bereits bei allen Policen oder sind dort als
         nicht erstattungsfähig markiert.

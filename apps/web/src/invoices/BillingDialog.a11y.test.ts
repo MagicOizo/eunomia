@@ -39,7 +39,7 @@ function invoice(number: string, overrides: Partial<InvoiceDto> = {}): InvoiceDt
     invoiceDate: '2025-02-01',
     treatmentDate: '2025-01-15',
     accountUID: 'a-1',
-    facilityUID: null,
+    facilityUID: 'f-1',
     invoiceAmount: 400,
     transferUntilDate: null,
     transferDate: null,
@@ -84,7 +84,14 @@ const invoices = [invoice('R-1'), invoice('R-2')];
 
 async function openDialog(props: Partial<InstanceType<typeof BillingDialog>['$props']> = {}) {
   const wrapper = mount(BillingDialog, {
-    props: { open: true, invoices, submitting: false, error: null, ...props },
+    props: {
+      open: true,
+      invoices,
+      facilityNames: { 'f-1': 'Hausarztpraxis Dr. Beispiel' },
+      submitting: false,
+      error: null,
+      ...props,
+    },
     attachTo: document.body,
   });
   await flushPromises();
@@ -105,6 +112,7 @@ describe('BillingDialog with several invoices', () => {
     expect(text).toContain('R-1');
     expect(text).toContain('R-2');
     expect(wrapper.findAll('.eu-bill__card')).toHaveLength(2);
+    expect(text).toContain('Hausarztpraxis Dr. Beispiel');
     // The single existing billing is preselected, with its date shown read-only.
     expect(text).toContain('01.04.2025');
     wrapper.unmount();

@@ -557,6 +557,7 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - Neu: `BillingSearchDialog` („Leistungsabrechnung auswählen", serverseitig gesucht, auf die Einreichung gescoped) und `BillingFormDialog` (schlankes Anlegen unter bekannter Einreichung). Entprellt über `lib/debounce.ts`.
 - `commonSubmissions()` in `eligibility.ts` ist die Kompatibilitätsprüfung fürs Verknüpfen; im Workspace hängt daran der Toolbar-Button „Abrechnung zuordnen (n)".
 - `BillingsView` filtert über denselben Endpunkt (Filterleiste über der Tabelle).
+- **Nachgezogen:** Dialoge, die auf eine Auswahl wirken, nennen nicht mehr nur eine Anzahl. `InvoiceBriefList` listet Nummer, Leistungserbringer, Datum und Betrag je Rechnung — im Einreichen-Dialog, in der Löschen-Bestätigung und (als Teil der Karten) beim Zuordnen. Die Namen kommen als `facilityUID → Name` von der jeweiligen Sicht.
 - **Offen (Ausblick):** `NewBillingDialog` (Anlegen mit Betragsraster aus der Vertragssicht) und der erweiterte `BillingDialog` überschneiden sich inhaltlich — die Zusammenführung wäre ein eigener kleiner Slice.
 
 **Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14); View/Edit-Umstieg nur Rechnung-Pilot vs. alle Entitäten (15).

@@ -144,6 +144,11 @@ watch(
 const policyLabel = (p: { contractNumber: string; companyName: string }): string =>
   `${p.contractNumber} · ${p.companyName}`;
 
+/** facilityUID → name, for the invoice lists of the sub-dialogs. */
+const facilityNames = computed(() =>
+  Object.fromEntries(props.facilities.map((f) => [f.value, f.label])),
+);
+
 /** Policies that can still be marked: not submitted there and not marked yet. */
 const markableContracts = computed(() => {
   const inv = props.invoice;
@@ -500,7 +505,8 @@ function submit(): void {
 
   <SubmitDialog
     :open="submitOpen"
-    :count="1"
+    :invoices="invoice ? [invoice] : []"
+    :facility-names="facilityNames"
     :contracts="openContracts"
     :submitting="blockBusy"
     :error="submitError"
@@ -510,6 +516,7 @@ function submit(): void {
   <BillingDialog
     :open="billingOpen"
     :invoices="invoice ? [invoice] : []"
+    :facility-names="facilityNames"
     :preset-submission="billingSubmission?.submissionUID ?? null"
     :submitting="blockBusy"
     :error="billingError"

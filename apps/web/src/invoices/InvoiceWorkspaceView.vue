@@ -38,6 +38,7 @@ import { type BillingAllocationPayload, saveBillingAllocations } from './billing
 import BillingDialog from './BillingDialog.vue';
 import { commonSubmissions, commonSubmittableContracts, submittableContracts } from './eligibility';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
+import InvoiceBriefList from './InvoiceBriefList.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
 import PaymentInfoPopover from './PaymentInfoPopover.vue';
@@ -71,6 +72,8 @@ const agencyById = ref<Map<string, { name: string; bankAccount: string }>>(new M
 const agencyIbanMap = computed(() =>
   Object.fromEntries([...agencyById.value].map(([uid, a]) => [uid, a.bankAccount])),
 );
+/** facilityUID → name, for the invoice lists of the dialogs. */
+const facilityNameMap = computed(() => Object.fromEntries(facilityNameById.value));
 const plan = ref<ReimbursementPlanDto | null>(null);
 /** The optimizer's advice per invoice; invoices with nothing to do have no entry. */
 const recommendationBadges = computed(() => {
@@ -302,6 +305,11 @@ async function detailChanged(): Promise<void> {
   await afterMutation();
   dialogInvoice.value = invoices.value.find((i) => i.invoiceUID === uid) ?? dialogInvoice.value;
 }
+/** The invoices behind the pending delete, for the confirmation's list. */
+const deleteInvoices = computed(() =>
+  invoices.value.filter((i) => deleteTargets.value.includes(i.invoiceUID)),
+);
+
 function openDelete(uids: string[]): void {
   deleteTargets.value = uids;
   dialogError.value = null;
@@ -648,7 +656,8 @@ function confirmDelete(): void {
     />
     <SubmitDialog
       :open="submitOpen"
-      :count="submitTargets.length"
+      :invoices="submitTargets"
+      :facility-names="facilityNameMap"
       :contracts="submitContractOptions"
       :submitting="dialogBusy"
       :error="dialogError"
@@ -658,6 +667,7 @@ function confirmDelete(): void {
     <BillingDialog
       :open="billingOpen"
       :invoices="billingTargets"
+      :facility-names="facilityNameMap"
       :submitting="dialogBusy"
       :error="dialogError"
       @close="billingOpen = false"
@@ -673,6 +683,7 @@ function confirmDelete(): void {
     />
     <EuDialog :open="deleteTargets.length > 0" title="Rechnung löschen" @close="deleteTargets = []">
       <p>{{ plural(deleteTargets.length, 'Rechnung', 'Rechnungen') }} wirklich löschen?</p>
+      <InvoiceBriefList :invoices="deleteInvoices" :facility-names="facilityNameMap" />
       <p v-if="dialogError" class="eu-ws__error" role="alert">{{ dialogError }}</p>
       <template #footer>
         <EuButton variant="secondary" @click="deleteTargets = []">Abbrechen</EuButton>

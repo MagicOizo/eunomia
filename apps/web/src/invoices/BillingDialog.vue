@@ -33,6 +33,8 @@ const props = defineProps<{
   open: boolean;
   /** The invoices to book; they must share a submission (see eligibility.ts). */
   invoices: InvoiceDto[];
+  /** facilityUID → name, for the provider on each invoice card. */
+  facilityNames: Record<string, string>;
   /** Preselected submission (policy) when opened from one card. */
   presetSubmission?: string | null;
   submitting: boolean;
@@ -306,8 +308,12 @@ function submit(): void {
           <div class="eu-bill__head">
             <span class="eu-bill__number">{{ invoice.invoiceNumber }}</span>
             <span class="eu-bill__meta">
-              {{ germanDate(invoice.invoiceDate) }} · {{ euro(invoice.invoiceAmount) }} · noch offen
-              {{ euro(invoice.remainingAmount) }}
+              {{
+                (invoice.facilityUID && facilityNames[invoice.facilityUID]) ||
+                'ohne Leistungserbringer'
+              }}
+              · {{ germanDate(invoice.invoiceDate) }} · {{ euro(invoice.invoiceAmount) }} · noch
+              offen {{ euro(invoice.remainingAmount) }}
             </span>
             <EuButton
               v-if="rows.length > 1"
