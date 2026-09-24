@@ -7,6 +7,13 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.11.0-slice.2 — 2026-09-24
+
+- **The browser tab names the environment.** A non-production instance titles itself `Eunomia-DEV`
+  (or `Eunomia-<NAME>` for any other environment), so an open tab shows at a glance which instance
+  it belongs to. The environment comes from the public version endpoint, which means a container
+  started with `NODE_ENV=development` marks itself as well — not only the local dev server.
+
 ## 0.11.0-slice.1 — 2026-09-24
 
 - **System settings.** The admin area's settings page is no longer a placeholder. Values an

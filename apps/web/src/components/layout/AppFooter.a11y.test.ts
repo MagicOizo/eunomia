@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { apiFetch } from '../../lib/api';
+import { resetAppInfo } from '../../lib/app-info';
 import { request } from '../../lib/http';
 import { useAuthStore } from '../../stores/auth';
 import AppFooter from './AppFooter.vue';
@@ -37,7 +38,10 @@ describe('AppFooter', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
-    requestMock.mockResolvedValue({ version: '0.9.0' });
+    // The version request is shared with the browser title and answered once
+    // per page load, so each case has to start from an unasked state.
+    resetAppInfo();
+    requestMock.mockResolvedValue({ version: '0.9.0', environment: 'production' });
   });
 
   it('shows the backend version', async () => {

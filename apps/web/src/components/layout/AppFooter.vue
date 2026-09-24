@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, onMounted, ref, watch } from 'vue';
 
 import { apiFetch } from '../../lib/api';
-import { request } from '../../lib/http';
+import { loadAppInfo } from '../../lib/app-info';
 import { useAuthStore } from '../../stores/auth';
 
 /** Mirrors the API's UpdateStatus (apps/api/src/lib/update-check.ts). */
@@ -22,14 +22,10 @@ const version = ref<string | null>(null);
 const update = ref<UpdateStatus | null>(null);
 
 // The backend version comes from the public version endpoint (Slice 0). Shown
-// in the footer per Notes/eunomia-plan.md, Slice 6.
+// in the footer per Notes/eunomia-plan.md, Slice 6. Shared with the browser
+// title, which needs the environment from the same answer — one request.
 onMounted(async () => {
-  try {
-    const res = await request<{ version: string }>('/version');
-    version.value = res.version;
-  } catch {
-    version.value = null;
-  }
+  version.value = (await loadAppInfo())?.version ?? null;
 });
 
 /*
