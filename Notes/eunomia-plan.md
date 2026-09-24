@@ -607,3 +607,13 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.
+
+### GiroCode (EPC-QR-Code) in den Zahlungsinformationen (Wunsch des Autors, 2026-09-24)
+**Ziel:** Im Zahlungsinfo-Popover (`PaymentInfoPopover.vue`, aus dem Slice-8-Backlog) und/oder im Rechnungs-Detaildialog lässt sich ein **GiroCode** anzeigen, den man mit der Banking-App scannt, statt IBAN, Betrag und Verwendungszweck abzutippen.
+
+- **Format:** EPC-QR nach EPC069-12 — Datensatz `BCD` / Version `002` / UTF-8 (`1`) / `SCT`, danach BIC (bei Version 002 im EWR optional), Empfängername (≤ 70), IBAN, Betrag als `EUR12.34`, Purpose-Code, Verwendungszweck (unstrukturiert ≤ 140). Nutzlast ≤ 331 Byte, Fehlerkorrektur-Level M.
+- **Erzeugung lokal, nicht über einen Web-Dienst:** IBAN und Betrag dürfen nicht an einen fremden QR-Generator gehen. Also eine kleine Client-Lib (z. B. `qrcode`) im Web-Bundle; die Zeichenkette selbst ist ein Dreizeiler und gehört neben `payment.ts`.
+- **Datenlage ist die eigentliche Vorarbeit:** Eine IBAN führt heute nur `CollectionAgencies.bankAccount`. **Leistungserbringer haben gar keine Bankverbindung** (`Facilities`: nur Name und Entfernung) — für Rechnungen ohne Abrechnungsdienstleister gäbe es also nichts zu kodieren. Entweder bekommt `Facilities` IBAN (+ optional BIC) als optionale Felder samt Migration, Zod-Schema und Stammdaten-Maske, oder der GiroCode erscheint bewusst nur bei Rechnungen mit Empfänger.
+- **Sichtbarkeit:** Nur sinnvoll, solange etwas zu zahlen ist — bei `transferDate ≠ null` oder `directPayment = 1` (Zahlungs-Ampel `paid`) entfällt der Code. Ohne IBAN oder mit Betrag ≤ 0 statt eines kaputten QR-Codes ein erklärender Satz.
+- **Barrierefreiheit:** Ein QR-Code ist ein Bild ohne Textalternative für Screenreader — die Daten müssen daneben weiterhin als Text stehen (tun sie im Popover bereits), das Bild bekommt eine beschreibende `alt`-Angabe, und der Kontrast muss in Light **und** Dark Mode stimmen (QR immer auf hellem Grund rendern, nicht auf die Dark-Mode-Fläche durchscheinen lassen).
+- **Offene Entscheidung vor dem Bau:** eigenes Stammdatenfeld für die Facility-Bankverbindung ja/nein (siehe oben) — das entscheidet, ob es ein kleiner UI-Slice oder ein Slice mit Migration wird.
