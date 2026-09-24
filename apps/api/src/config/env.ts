@@ -27,6 +27,18 @@ function optionalInt(name: string, fallback: number): number {
   return parsed;
 }
 
+/** Reads an optional boolean variable (`true`/`false`/`1`/`0`), falling back to the default. */
+function optionalBoolean(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
+  if (value === undefined || value.trim() === '') {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1') return true;
+  if (normalized === 'false' || normalized === '0') return false;
+  throw new Error(`Environment variable ${name} must be true or false, got: ${value}`);
+}
+
 export interface DatabaseConfig {
   host: string;
   port: number;
@@ -60,6 +72,21 @@ export interface RateLimitConfig {
   globalWindowMs: number;
 }
 
+export interface UpdateCheckConfig {
+  /** Whether the instance may call out to GitHub at all (UPDATE_CHECK_ENABLED). */
+  enabled: boolean;
+  /** `owner/repo` to read the latest release from. */
+  repository: string;
+  /**
+   * Optional read-only GitHub token. The project repository is private, so
+   * without one the API answers 404 and the check stays silent — it is not
+   * required to run Eunomia, only to learn about new releases.
+   */
+  token: string | undefined;
+  /** How long a successful lookup is reused before asking GitHub again. */
+  cacheTtlMs: number;
+}
+
 export interface AppConfig {
   nodeEnv: string;
   port: number;
@@ -69,12 +96,27 @@ export interface AppConfig {
   database: DatabaseConfig;
   auth: AuthConfig;
   rateLimit: RateLimitConfig;
+  updateCheck: UpdateCheckConfig;
 }
 
 /** Reads an optional string variable, returning undefined when unset/empty. */
 function optionalString(name: string): string | undefined {
   const value = process.env[name];
   return value === undefined || value.trim() === '' ? undefined : value;
+}
+
+/**
+ * Reads an `owner/repo` slug. Validated here rather than at request time so a
+ * typo surfaces at startup instead of as a puzzling 404 half a day later.
+ */
+function repositorySlug(name: string, fallback: string): string {
+  const value = optionalString(name);
+  if (value === undefined) return fallback;
+  const slug = value.trim();
+  if (!/^[\w.-]+\/[\w.-]+$/.test(slug)) {
+    throw new Error(`Environment variable ${name} must look like 'owner/repo', got: ${value}`);
+  }
+  return slug;
 }
 
 /**
@@ -123,6 +165,12 @@ export function loadConfig(): AppConfig {
       authWindowMs: optionalInt('RATE_LIMIT_AUTH_WINDOW_MS', 15 * 60 * 1000),
       globalMax: optionalInt('RATE_LIMIT_GLOBAL_MAX', 300),
       globalWindowMs: optionalInt('RATE_LIMIT_GLOBAL_WINDOW_MS', 60 * 1000),
+    },
+    updateCheck: {
+      enabled: optionalBoolean('UPDATE_CHECK_ENABLED', true),
+      repository: repositorySlug('UPDATE_CHECK_REPO', 'MagicOizo/eunomia'),
+      token: optionalString('UPDATE_CHECK_TOKEN'),
+      cacheTtlMs: optionalInt('UPDATE_CHECK_TTL_SECONDS', 6 * 60 * 60) * 1000,
     },
   };
 }

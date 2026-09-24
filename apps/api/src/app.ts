@@ -24,6 +24,7 @@ import { createReimbursementPlanRouter } from './domain/reimbursement-plan.js';
 import { createServiceBillingsRouter } from './domain/service-billings.js';
 import { createSubmissionsRouter } from './domain/submissions.js';
 import { errorHandler } from './lib/error-handler.js';
+import { createUpdateCheckRouter } from './routes/update-check.js';
 import { versionRouter } from './routes/version.js';
 
 /** Optional dependencies for the routes that need a database and config. */
@@ -78,6 +79,7 @@ export function createApp(deps?: AppDependencies): Express {
     const { pool, config, webRoot } = deps;
     app.use('/api/v1', createAuthRouter(pool, config));
     app.use('/api/v1', createUserAdminRouter(pool, config));
+    app.use('/api/v1', createUpdateCheckRouter(pool, config));
     app.use('/api/v1/accounts', createAccountsRouter(pool, config));
     app.use('/api/v1/accounts', createReimbursementPlanRouter(pool, config));
     app.use('/api/v1/companies', createInsuranceCompaniesRouter(pool, config));

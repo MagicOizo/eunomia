@@ -1,10 +1,25 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { faArrowUp } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { computed, onMounted, ref, watch } from 'vue';
 
+import { apiFetch } from '../../lib/api';
 import { request } from '../../lib/http';
+import { useAuthStore } from '../../stores/auth';
 
+/** Mirrors the API's UpdateStatus (apps/api/src/lib/update-check.ts). */
+interface UpdateStatus {
+  current: string;
+  latest: string | null;
+  updateAvailable: boolean;
+  releaseUrl: string | null;
+  status: 'ok' | 'disabled' | 'unavailable';
+}
+
+const auth = useAuthStore();
 const year = new Date().getFullYear();
 const version = ref<string | null>(null);
+const update = ref<UpdateStatus | null>(null);
 
 // The backend version comes from the public version endpoint (Slice 0). Shown
 // in the footer per Notes/eunomia-plan.md, Slice 6.
@@ -16,12 +31,55 @@ onMounted(async () => {
     version.value = null;
   }
 });
+
+/*
+ * The update check is admin-only and authenticated, so it waits for /me to
+ * report the permissions — watching instead of onMounted, because this footer
+ * is already mounted while that request is still in flight. Any failure (no
+ * permission, no network, GitHub unreachable) leaves the notice off: knowing
+ * about a new release is a convenience, never something to complain about.
+ */
+watch(
+  () => auth.isAdmin,
+  async (isAdmin) => {
+    if (!isAdmin) return;
+    try {
+      const res = await apiFetch<{ data: UpdateStatus }>('/update-check');
+      update.value = res.data;
+    } catch {
+      update.value = null;
+    }
+  },
+  { immediate: true },
+);
+
+const availableUpdate = computed(() => {
+  const status = update.value;
+  if (!status || status.status !== 'ok' || !status.updateAvailable) return null;
+  if (!status.latest || !status.releaseUrl) return null;
+  return { version: status.latest, url: status.releaseUrl };
+});
 </script>
 
 <template>
   <footer class="eu-footer">
     <span>&copy; {{ year }} Max Zöller</span>
-    <span v-if="version" class="eu-footer__version">Backend v{{ version }}</span>
+    <span v-if="version" class="eu-footer__version">
+      Backend v{{ version }}
+      <template v-if="availableUpdate">
+        <span aria-hidden="true">·</span>
+        <a
+          class="eu-footer__update"
+          :href="availableUpdate.url"
+          target="_blank"
+          rel="noopener"
+          :aria-label="`Version ${availableUpdate.version} ist verfügbar — Release-Notes öffnen (neuer Tab)`"
+        >
+          <FontAwesomeIcon :icon="faArrowUp" aria-hidden="true" />
+          v{{ availableUpdate.version }} verfügbar
+        </a>
+      </template>
+    </span>
   </footer>
 </template>
 
@@ -37,5 +95,18 @@ onMounted(async () => {
 
 .eu-footer__version {
   font-family: var(--eu-font-data);
+}
+
+/* Brighter than the muted footer text: this one is a link and has to carry
+   AA contrast on the brand-blue page background by itself. */
+.eu-footer__update {
+  color: var(--eu-color-text-inverse);
+  white-space: nowrap;
+}
+
+/* Same as the sidebar — the default ring colour is tuned for the white card,
+   not for the blue page this footer sits on. */
+.eu-footer :focus-visible {
+  outline-color: var(--eu-color-focus-ring-on-brand);
 }
 </style>

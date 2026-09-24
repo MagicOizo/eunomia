@@ -174,7 +174,7 @@ Explizit **nicht** Teil der in Abschnitt 3 geplanten Slices, aber beim Datenmode
 - **E-Mail-Benachrichtigungen** (Zahlungserinnerungen, ggf. TOTP-Versand) — Vorgaben für die spätere Umsetzung siehe 2.6.
 - **Paperless/Nextcloud API-Push-Integration** (Paperless schiebt aktiv eine neue Rechnung in Eunomia) — laut 1.1 ohnehin "später einmal"; v1 bietet nur den reinen Link auf das externe Dokument.
 - **Mehrmandantenfähigkeit** (mehrere unabhängige Haushalte in einer Instanz).
-- **Aktive Update-Prüfung gegen das Git-Repository** (Abgleich der laufenden Backend-Version mit dem neuesten Release/Tag im Repo, Hinweis in der UI bei verfügbarer Aktualisierung) — Backlog-Punkt, baut auf dem Versions-Endpoint aus Slice 0 auf (siehe dort und 3).
+- ~~**Aktive Update-Prüfung gegen das Git-Repository**~~ — in Slice 25 umgesetzt (siehe dort).
 
 ## 2.6 System-Konfiguration & Verschlüsselung (Vorgaben für spätere Umsetzung)
 
@@ -603,7 +603,23 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - Geprüft im laufenden System: PLZ- und URL-Regel, doppelter Beitragsstand (409) und — in zwei Sitzungen — das Speichern einer inzwischen gelöschten Leistungsabrechnung (404).
 - **Am Rande festgestellt:** Stammdaten werden soft-deleted, `STILL_REFERENCED` kann dort also gar nicht auftreten; der Satz gilt nur für harte Löschungen.
 
-**Offene Entscheidungen (vor Bau der jeweiligen Slice zu klären):** Währungs-Lib vs. custom (13); Typeahead client- vs. serverseitig (14).
+
+## Slice 25 — Update-Check gegen das neueste GitHub-Release
+**Ziel:** Eine laufende Instanz sagt Admins, wenn es eine neuere Version gibt — der Backlog-Punkt aus 2.5, aufgesetzt auf dem Versions-Endpunkt aus Slice 0.
+
+**DoD:** Ein Admin sieht im Footer neben „Backend v0.9.0" einen Link auf die Release-Notes, sobald das neueste Release neuer ist als die laufende Version; in jeder anderen Lage sieht er nichts.
+
+**Umgesetzt (2026-09-24).** Entscheidungen beim Bau:
+- **Quelle ist `…/releases/latest`**, nicht die Tags-API: Prereleases und Entwürfe fallen ohne eigene Sortierlogik heraus, und es gibt eine Seite, auf die der Hinweis verlinken kann. Preis: Ohne GitHub-Release gibt es nichts zu finden — ab 0.9.0 gehört zu jedem Tag ein Release.
+- **Das Repo ist privat**, anonym antwortet GitHub mit 404. Darum ein *optionaler* `UPDATE_CHECK_TOKEN` (fine-grained, read-only `Contents`): ohne ihn fragt die Instanz anonym und bleibt schlicht still. Kein Zwang zur Veröffentlichung, und wenn das Repo einmal öffentlich wird, funktioniert der Check ohne Konfigurationsänderung.
+- **Kein Fehlerpfad in der UI:** Der Endpunkt antwortet immer 200 mit `status: ok | disabled | unavailable`. 404, Timeout, Rate-Limit, kaputter Tag — alles wird zu `unavailable`, und der Footer zeigt dann gar nichts. Ein Update-Check darf nie wie eine Störung aussehen.
+- **Cache im Closure** von `createUpdateChecker`, nicht als Modul-Global: Erfolg 6 h (`UPDATE_CHECK_TTL_SECONDS`), Misserfolg nur 15 min, und gleichzeitige Anfragen teilen sich über eine gemerkte Promise **einen** GitHub-Aufruf. Der Footer fragt bei jedem Seitenaufruf — ohne das wäre das ein Dauerfeuer gegen api.github.com.
+- `lib/semver.ts` statt einer Abhängigkeit (~70 Zeilen inkl. Prerelease-Ordnung). `isNewerVersion` gibt bei unlesbarer Eingabe `false` zurück: lieber kein Hinweis als ein falscher.
+- Der `createRequire`-Trick zum Lesen der `package.json` ist als `lib/app-version.ts` herausgezogen, weil ihn jetzt Versions-Route und Update-Check brauchen.
+- **Guard `MANAGE_SETTINGS`** (seit Migration 002 im Katalog, bei Admin dabei) statt `MANAGE_USERS`: Die Aussage passt, und die Antwort verrät die laufende Version.
+- Web: Der Footer wartet per `watch` auf `auth.isAdmin` statt `onMounted` — er hängt im `DefaultLayout` und steht schon, während `/me` noch unterwegs ist.
+- Im laufenden System geprüft: gegen ein öffentliches Repo mit Releases (Link, Light/Dark, 390 px, Tastaturfokus — Ring vollständig, 28 px Luft zum Rand) und gegen das echte private Repo ohne Token (Footer still, eine Warnung im Server-Log, keine zusätzliche Fehlermeldung im Browser).
+- **Am Rande festgestellt:** Beim Kaltstart quittiert `/auth/refresh` ohne Cookie mit 401 und schreibt eine Konsolen-Fehlermeldung im Browser — harmlos, aber unschön; kein Teil dieser Scheibe.
 
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.

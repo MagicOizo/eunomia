@@ -82,6 +82,17 @@ docker compose pull && docker compose up -d
 Migrations run automatically on start, so the schema is brought up to date as part of the restart.
 Take a backup first (see above).
 
+### Knowing when there is something to update
+
+The app asks GitHub every few hours whether a newer release exists and shows admins a link to the
+release notes in the footer — nowhere else, and never to users who could not perform the update
+anyway. A failed lookup shows nothing at all; the check is a convenience, not a health signal.
+
+Because this repository is **private**, an anonymous request is answered with 404 and the notice
+never appears. To switch it on, create a fine-grained personal access token with read-only
+`Contents` access to this one repository and set `UPDATE_CHECK_TOKEN` in `.env`. To stop the
+instance from contacting GitHub at all, set `UPDATE_CHECK_ENABLED=false`.
+
 ### Updating to the policy model (migration 006)
 
 Migration 006 turns contracts into stable policies with a premium history and yearly terms. It
@@ -114,6 +125,10 @@ All variables are read from `.env` (see `.env.example` for the template — neve
 | `SETUP_TOKEN`               | One-time token enabling `POST /api/v1/setup` for the first admin. Remove after setup to disable it.                                                         |
 | `TRUST_PROXY`               | Proxy hops in front of the app so rate limiting uses the real client IP (default `1`).                                                                      |
 | `RATE_LIMIT_*`              | Optional overrides for the auth / global rate limits (defaults in `.env.example`).                                                                          |
+| `UPDATE_CHECK_ENABLED`      | Whether the instance may ask GitHub for the latest release (default `true`).                                                                                |
+| `UPDATE_CHECK_TOKEN`        | Read-only GitHub token for the update check. Required while the repository is private; without it the check stays silent.                                   |
+| `UPDATE_CHECK_REPO`         | Repository to read releases from (default `MagicOizo/eunomia`).                                                                                             |
+| `UPDATE_CHECK_TTL_SECONDS`  | How long a successful lookup is reused before asking again (default `21600` = 6 h).                                                                         |
 
 The MariaDB container is bootstrapped from `DB_NAME` / `DB_USER` / `DB_PASSWORD` (see
 `docker-compose.yml`), so there are no separate `MYSQL_*` variables to set — root gets a random
@@ -167,6 +182,12 @@ claim-free years → absolute amount). `GET /api/v1/contracts/:uid` returns the 
 claim-free streak and expected bonus per year, counted from the policy's start value, its forfeit
 rule and each billing's `forfeitsBonus`. `PUT /api/v1/contracts/:uid/years/:year` records the
 bonus actually paid and an optional "forfeited" override.
+
+**Instance** — `GET /api/v1/version` reports the running version and needs no token (it doubles as
+the container health check). `GET /api/v1/update-check` compares that version against the latest
+GitHub release and needs `MANAGE_SETTINGS`; it answers
+`{ current, latest, updateAvailable, releaseUrl, checkedAt, status }` with `status` one of `ok`,
+`disabled` or `unavailable` — never an error, so an unreachable GitHub stays invisible in the UI.
 
 ## License
 

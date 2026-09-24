@@ -44,6 +44,13 @@ function testConfig(database: DatabaseConfig): AppConfig {
     },
     trustProxy: 1,
     rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
+    // Disabled so no test ever reaches out to GitHub.
+    updateCheck: {
+      enabled: false,
+      repository: 'MagicOizo/eunomia',
+      token: undefined,
+      cacheTtlMs: 0,
+    },
   };
 }
 
