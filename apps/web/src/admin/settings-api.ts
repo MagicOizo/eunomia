@@ -8,7 +8,7 @@ import { apiFetch } from '../lib/api';
 
 export interface PublicSetting {
   key: string;
-  section: 'mail' | 'updateCheck';
+  section: 'mail' | 'updateCheck' | 'reminders';
   isSecret: boolean;
   readonly: boolean;
   /** Always null for a secret — the plaintext never leaves the API. */
@@ -42,6 +42,20 @@ export interface UpdateStatus {
     'no_token_private' | 'not_found' | 'network' | 'rate_limited' | 'unauthorized' | 'no_release';
 }
 
+/** What a reminder run reports back (apps/api/src/reminders/runner.ts). */
+export interface ReminderRunResult {
+  ranAt: string;
+  /** Unpaid invoices considered, before the due/overdue rule. */
+  invoices: number;
+  /** Recipients that had at least one invoice to hear about. */
+  recipients: number;
+  sent: number;
+  failed: number;
+  dryRun: boolean;
+  /** Filled for a dry run only — a real run has already delivered these. */
+  preview: Array<{ email: string; subject: string; text: string }>;
+}
+
 export type SettingWrite = Record<string, string | number | boolean | null>;
 
 const unwrap = <T>(res: { data: T }): T => res.data;
@@ -64,6 +78,19 @@ export async function sendTestMail(): Promise<{ recipient: string; status: MailS
   return unwrap(
     await apiFetch<{ data: { recipient: string; status: MailStatus } }>('/settings/mail/test', {
       method: 'POST',
+    }),
+  );
+}
+
+/**
+ * Runs the payment reminders now. `dryRun` renders what would go out without
+ * sending anything or remembering that it did.
+ */
+export async function runReminders(dryRun: boolean): Promise<ReminderRunResult> {
+  return unwrap(
+    await apiFetch<{ data: ReminderRunResult }>('/settings/reminders/run', {
+      method: 'POST',
+      body: { dryRun },
     }),
   );
 }

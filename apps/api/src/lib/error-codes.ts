@@ -69,6 +69,8 @@ export const ERROR_CODES = {
   MAIL_NOT_CONFIGURED: 'MAIL_NOT_CONFIGURED',
   /** The mail server refused or could not be reached; `details.reason` has its words. */
   MAIL_SEND_FAILED: 'MAIL_SEND_FAILED',
+  /** Payment reminders are switched off; the run button does not bypass that. */
+  REMINDERS_DISABLED: 'REMINDERS_DISABLED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

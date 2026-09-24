@@ -7,6 +7,20 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.11.0-slice.3 — 2026-09-24
+
+- **Payment reminders.** Eunomia now speaks up on its own when an invoice's payment falls due or is
+  already overdue, instead of only showing it to whoever happens to open the app. Each user gets one
+  mail about exactly the invoices they are allowed to see.
+- **Once, then again when it gets worse.** A due invoice is announced once; an overdue one repeats
+  at a configurable interval until it is paid. A mail that could not be delivered is retried on the
+  next run rather than silently counted as sent.
+- **Preview before it goes out.** The settings page renders what a run would send without sending
+  it, and can trigger a real run. Both refuse while the reminders are switched off.
+- **A daily schedule that survives a restart.** The run happens at a configured hour in a configured
+  time zone; a window missed while the machine was off is caught up at the next check instead of
+  waiting for the next day.
+
 ## 0.11.0-slice.2 — 2026-09-24
 
 - **The browser tab names the environment.** A non-production instance titles itself `Eunomia-DEV`

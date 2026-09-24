@@ -105,6 +105,87 @@ export async function getAccessibleAccounts(
   return { all: false, accountUIDs: rows.map((row) => row.accountUID) };
 }
 
+/** A user who may exercise a permission, and on which accounts. */
+export interface PermittedUser {
+  userId: number;
+  email: string;
+  firstname: string;
+  surname: string | null;
+  /** True when a global grant covers every account — `accountUIDs` is then empty. */
+  all: boolean;
+  accountUIDs: string[];
+}
+
+/**
+ * The inverse of `getAccessibleAccounts`: not "which accounts may this user
+ * see" but "who may see this account". The payment reminders need it, because
+ * a scheduled run has no logged-in user to start from — it has invoices and
+ * has to find everyone allowed to hear about them.
+ *
+ * Deactivated users (`userStatus <> 1`) are left out: someone who cannot log in
+ * should not keep receiving mail about the household's invoices. Grants from a
+ * deactivated role never count, as everywhere else in this model.
+ *
+ * Lives next to its inverse on purpose — the two queries share every join, and
+ * a change to the rights model has to reach both.
+ */
+export async function listUsersWithAccess(
+  pool: Pool,
+  permission: PermissionKey,
+): Promise<PermittedUser[]> {
+  const rows = await pool.query<
+    Array<{
+      userID: number;
+      email: string;
+      firstname: string;
+      surname: string | null;
+      accountUID: string | null;
+    }>
+  >(
+    `SELECT u.userID, u.email, u.firstname, u.surname, grants.accountUID
+       FROM Users u
+       JOIN (
+              SELECT ur.userID, NULL AS accountUID
+                FROM UserRoles ur
+                JOIN Roles r ON r.roleID = ur.roleID AND r.roleStatus = 1
+                JOIN RolePermissions rp ON rp.roleID = ur.roleID
+                JOIN Permissions p ON p.permissionID = rp.permissionID
+               WHERE p.permissionKey = ?
+               UNION ALL
+              SELECT uar.userID, uar.accountUID
+                FROM UserAccountRoles uar
+                JOIN Roles r ON r.roleID = uar.roleID AND r.roleStatus = 1
+                JOIN RolePermissions rp ON rp.roleID = uar.roleID
+                JOIN Permissions p ON p.permissionID = rp.permissionID
+               WHERE p.permissionKey = ?
+            ) grants ON grants.userID = u.userID
+      WHERE u.userStatus = 1
+      ORDER BY u.userID`,
+    [permission, permission],
+  );
+
+  const users = new Map<number, PermittedUser>();
+  for (const row of rows) {
+    const user = users.get(row.userID) ?? {
+      userId: row.userID,
+      email: row.email,
+      firstname: row.firstname,
+      surname: row.surname,
+      all: false,
+      accountUIDs: [],
+    };
+    if (row.accountUID === null) {
+      // A global grant subsumes every scoped one, so the list stops mattering.
+      user.all = true;
+      user.accountUIDs = [];
+    } else if (!user.all && !user.accountUIDs.includes(row.accountUID)) {
+      user.accountUIDs.push(row.accountUID);
+    }
+    users.set(row.userID, user);
+  }
+  return [...users.values()];
+}
+
 export interface EffectivePermissions {
   /** Permission keys granted globally (apply to every account). */
   global: string[];

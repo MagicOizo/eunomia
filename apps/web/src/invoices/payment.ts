@@ -18,7 +18,11 @@ import type { InvoiceDto } from './api';
  */
 export type PaymentState = 'paid' | 'uncritical' | 'due' | 'overdue';
 
-/** Due within this many days (but not yet overdue) counts as "due". */
+/**
+ * Due within this many days (but not yet overdue) counts as "due". The payment
+ * reminders apply the same rule server-side; keep both in step
+ * (apps/api/src/reminders/payment.ts).
+ */
 export const DUE_SOON_DAYS = 10;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;

@@ -171,7 +171,7 @@ Permissions ──n:n── RolePermissions ──n:n── Roles
 
 Explizit **nicht** Teil der in Abschnitt 3 geplanten Slices, aber beim Datenmodell nicht verbaut:
 
-- **E-Mail-Benachrichtigungen** (Zahlungserinnerungen, ggf. TOTP-Versand) — Vorgaben für die spätere Umsetzung siehe 2.6.
+- ~~**E-Mail-Benachrichtigungen** (Zahlungserinnerungen, ggf. TOTP-Versand)~~ — Infrastruktur in Slice 30, die Zahlungserinnerungen selbst in Slice 31 umgesetzt; der TOTP-Versand bleibt offen. Vorgaben siehe 2.6.
 - **Paperless/Nextcloud API-Push-Integration** (Paperless schiebt aktiv eine neue Rechnung in Eunomia) — laut 1.1 ohnehin "später einmal"; v1 bietet nur den reinen Link auf das externe Dokument.
 - **Mehrmandantenfähigkeit** (mehrere unabhängige Haushalte in einer Instanz).
 - ~~**Aktive Update-Prüfung gegen das Git-Repository**~~ — in Slice 25 umgesetzt (siehe dort).
@@ -186,7 +186,7 @@ Der E-Mail-Versand bleibt spätere Ausbaustufe (siehe 2.5), aber der Autor legt 
 - Dieser Mechanismus wird generisch gebaut (nicht E-Mail-spezifisch), damit er später auch für andere Secrets taugt — z.B. für die im alten `todo.md` skizzierte Idee, `JWT_SECRET` aus der `.env` in die DB zu verlagern (siehe `future-dev-environment.md` §8). Das ist aber kein Ziel dieser Iteration, nur eine Randnotiz zur Wiederverwendbarkeit.
 - Wird zusammen mit dem E-Mail-Feature gebaut (siehe "Ausblick" in Abschnitt 3), nicht vorab — vermeidet eine Abstraktion ohne aktuellen Verwendungszweck.
 
-**Umgesetzt in Slice 30** (siehe dort): `SystemSettings`, `CONFIG_ENCRYPTION_KEY`, die Einstellungsseite und als erster Verbraucher der SMTP-Versand. Die Benachrichtigungs-Mails selbst (Zahlungserinnerungen) bleiben Ausblick.
+**Umgesetzt in Slice 30** (siehe dort): `SystemSettings`, `CONFIG_ENCRYPTION_KEY`, die Einstellungsseite und als erster Verbraucher der SMTP-Versand. Die Benachrichtigungs-Mails selbst (Zahlungserinnerungen) sind in **Slice 31** dazugekommen.
 
 ## 2.7 Navigations-, Design- und Barrierefreiheits-Konzept
 
@@ -782,6 +782,42 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **Ratenbegrenzung für den Testversand** — heute deckt nur das globale Limit den Knopf ab.
 - **Testkonfiguration der Integrationstests zusammenführen:** `testConfig` steht in sechs Testdateien als Kopie; jedes neue Feld in `AppConfig` muss in allen sechs nachgezogen werden (in dieser Scheibe geschehen).
 
+## Slice 31 — Zahlungserinnerungen per E-Mail (umgesetzt 2026-09-24)
+
+**Anlass:** Slice 30 hat die Mail-Infrastruktur gebaut und ausdrücklich für diesen Verbraucher zugeschnitten (`mail/mailer.ts`), der Verbraucher fehlte aber. Fachlich geht es um die **Geldseite**, nicht um die Erstattung: Eine Rechnung hat ein Zahlungsziel, und wer es verpasst, bekommt eine Mahnung. Bisher sah man das **nur beim Öffnen der App** — die Ampel `calcPaymentState` lief ausschließlich im Browser. Genau im wichtigsten Fall, wenn wochenlang niemand hineinschaut, schwieg Eunomia.
+
+**DoD:** Eine laufende Instanz meldet sich von selbst, wenn eine Zahlung fällig wird oder überfällig ist — je Nutzer, nur über das, was er sehen darf, ohne täglich dasselbe zu wiederholen; ein Admin kann den Lauf vorher gefahrlos ansehen und von Hand auslösen.
+
+**Entscheidungen (Planmodus):**
+
+- **Timer im Prozess** statt „am Request, wie der Update-Check": Letzteres schweigt genau dann, wenn niemand die App öffnet. Externes Cron wäre eine Betriebsaufgabe und ein zweiter Secret-Pfad mehr. Damit ist das **das erste Stück Hintergrundarbeit im Backend überhaupt** — vorher hing alles an einem eingehenden Request (einziger Timer-Treffer war die Retry-Schleife in `db/pool.ts`).
+- **Empfänger sind die Nutzer, die die Rechnung ohnehin sehen dürfen** (`VIEW_INVOICES`, global oder über `UserAccountRoles`, nur `userStatus = 1`). Jeder bekommt **einen** Digest über genau seine Rechnungen — kein Sammelpostfach und keine Daten an eine Adresse, die niemandem in der App gehört.
+- **Kadenz in Stufen je Rechnung:** einmal beim Eintritt ins Fälligkeitsfenster, einmal beim Überfälligwerden, danach alle `reminders.repeatDays` Tage. **Nur `overdue` wiederholt sich** — eine Rechnung ohne Zahlungsziel gilt per Definition als fällig und würde sonst für immer nachfassen.
+- **Nur Zahlungsziele.** Unbeantwortete Einreichungen und der Bonus-Hinweis wären je eine zweite Erinnerungsart mit eigener Schwelle und eigener Kadenz — eigene Scheiben.
+
+**Umgesetzt (2026-09-24).** Entscheidungen beim Bau:
+
+- **Das Fälligkeitsfenster (10 Tage) ist bewusst keine Einstellung.** Was „fällig" heißt, definiert die Ampel in der Rechnungsliste; eine zweite, editierbare Zahl könnte davon abweichen („die Ampel ist gelb, aber es kam keine Mail"), und die Einstellungsseite ist für Nutzer ohne `MANAGE_SETTINGS` nicht einmal lesbar. Konfigurierbar ist nur der Wiederholungsabstand.
+- **Die Regel steht serverseitig neu** (`reminders/payment.ts`) als bewusste Zweitschrift zu `apps/web/src/invoices/payment.ts`, mit gegenseitigem Kommentarverweis und derselben Schwelle in beiden Testdateien. Das einzige echte Zuhause wäre ein geteiltes Paket — `packages/shared-types` ist bis heute ein leerer Platzhalter, den keine App importiert, und der erste app-übergreifende Import samt Build-Reihenfolge, Vite-Alias und Dockerfile wäre ein Nebenbau. → Backlog.
+- **Alles ist Kalenderarithmetik, keine Zeitstempel.** `InvoiceReminders.sentOn` ist ein `DATE`, der „heutige Tag" eines Laufs ist das Datum in der eingestellten Zone, und `daysUntil` rechnet auf `YYYY-MM-DD`. Damit kann weder die Zone des Servers noch die Sommerzeit ein Zahlungsziel um einen Tag verschieben. Die Zonenrechnung selbst macht `Intl` (`reminders/schedule.ts`) — die Zonendatenbank liegt der Laufzeit bei, eine Bibliothek wäre dafür zu viel.
+- **`reminders.lastRunAt` ist Status *und* Wasserstandsmarke** des Timers, damit es nicht zwei Werte gibt, die sich widersprechen können. Der Tick (alle 5 min, `unref()`, jeder Durchlauf in `try/catch`) fragt nur: Ist die Stunde in der Zone erreicht und war der letzte Lauf an einem früheren Tag? Ein verpasstes Fenster (Rechner war um 7:00 aus) wird dadurch **nachgeholt** statt übersprungen.
+- **Gestempelt wird erst nach angenommener Mail.** Ein Fehlschlag hinterlässt keine Zeile, wird also beim nächsten Lauf erneut versucht; ein Fehler bei einem Empfänger bricht den Lauf nicht ab. Im laufenden System geprüft.
+- **Der Runner kennt die Datenbank nicht** (`ReminderStore`, wie `MailSettingsStore` in Slice 30) — seine Tests brauchen weder DB noch Socket, und die gesamte SQL liegt an einer Stelle.
+- **Kein roter Status ohne Versuch:** Ist der Mailversand aus, protokolliert der Lauf `REMINDERS_SKIPPED` und lässt den Status unberührt — dieselbe Linie wie beim Mailer.
+- **Der Knopf „Jetzt ausführen" ist bei ausgeschaltetem Hauptschalter ein 409** (`REMINDERS_DISABLED`) statt eines stillen Nichtstuns: Ein Knopf, der bei „aus" echte Mails an alle Nutzer schickt, wäre eine böse Überraschung — dieselbe Vorsicht wie beim fehlenden Empfängerfeld der Testmail. Daneben steht **Vorschau** (`dryRun`): rechnet alles, rendert die Mails, verschickt nichts, stempelt nichts, schreibt keinen Status.
+- **Kein eigenes Statusfeld am Snapshot:** Die `reminders.lastRun*`-Schlüssel stehen als readonly-Einträge ohnehin in `getPublicSettings`; der separate `mailStatus` ist insofern die Ausnahme, nicht das Vorbild.
+- **Beim Bau gefunden:** `listUsersWithAccess` ist die Umkehrung von `getAccessibleAccounts` und steht bewusst daneben — eine Änderung am Rechtemodell muss beide erreichen. Ein globaler Grant hebt die Kontenliste auf, statt sie zu ergänzen.
+- **Im laufenden System geprüft** (Playwright, hell/dunkel, 390 px und 1440 px): kein Überhang, Abschnitt per Tastatur auf- und zuklappbar (`aria-expanded` gemessen), Fokusring im tastaturfokussierten Screenshot rundum vollständig. Versand gegen einen Wegwerf-SMTP-Server: Vorschau ohne Mail und ohne Zeile in `InvoiceReminders`; echter Lauf mit einer Mail, vier gestempelten Zeilen und `REMINDERS_RUN … sent=1` im Log; direkt danach ein zweiter Lauf ohne Mail; nach Rückdatierung um `repeatDays` eine erneute Mail, die **nur die zwei überfälligen** Rechnungen nennt — die zwei fälligen bleiben einmalig angekündigt.
+- **Am Rande behoben:** Zwei deutsche Sätze der Seite waren falsch gebeugt („1 Empfänger würden", „1 Erinnerung(en)"). Die Seite beugt jetzt richtig, statt die Klammerform zu benutzen.
+
+**Backlog aus dieser Scheibe:**
+
+- **Geteiltes Paket für die Fälligkeitsregel:** `calcPaymentState` und `DUE_SOON_DAYS` stehen in zwei Dateien. `packages/shared-types` (heute ein leerer Platzhalter) wäre das Zuhause — dafür braucht es Build-Reihenfolge, Vite-Alias und Dockerfile-Anpassung, also eine eigene Scheibe.
+- **Erinnerung an unbeantwortete Einreichungen** („seit über N Tagen eingereicht, keine Erstattung zugeordnet") — zweite Erinnerungsart mit eigener Schwelle und Kadenz.
+- **Abmeldelink je Nutzer:** Heute schaltet nur ein Admin die Erinnerungen ganz ab; ein einzelner Nutzer kann sich nicht abmelden.
+- **HTML-Teil der Mail** — heute reiner Text, was für eine Liste genügt, aber in manchen Clients spröde aussieht.
+- **Eigene Ratenbegrenzung für „Jetzt ausführen"** — heute deckt nur das globale Limit den Knopf ab (wie beim Testversand).
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.
@@ -790,4 +826,4 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
   - **Achtung, das kehrt eine Festlegung aus 2.3 um:** Dort sind die `ContractPremiums` ausdrücklich „rein informativ — **kein** Einfluss auf Selbstbeteiligung oder Bonus". Mit der Faktoren-Staffel wird der Monatsbeitrag zur Rechengröße der Bonusprognose und damit des Erstattungs-Optimierers (Slice 19). Die Scheibe muss deshalb klären, was passiert, wenn für ein Jahr kein Beitragsstand erfasst ist, und wie sich eine Beitragsanpassung mitten im Jahr auf den Faktor auswirkt (der Bonus ist eine Jahresgröße, der Beitrag gilt ab Datum).
 
 ## Ausblick (nicht Teil dieser Slices)
-E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.
+Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

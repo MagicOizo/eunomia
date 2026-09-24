@@ -6,8 +6,12 @@ import { createRequireAuth, createRequirePermission, getAuthUser } from '../auth
 import { PERMISSIONS } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
+import { ApiError } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import { type Mailer, type MailerDeps, createMailer } from '../mail/mailer.js';
 import { createMailSettingsStore } from '../mail/store.js';
+import { type ReminderRunner, createReminderRunner } from '../reminders/runner.js';
+import { createReminderStore } from '../reminders/store.js';
 import { type SettingKey, type SettingValue, validateIncoming } from './registry.js';
 import { getPublicSettings, setSettings } from './repository.js';
 
@@ -30,10 +34,15 @@ const updateSchema = z.object({
   values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
 });
 
+/** A reminder run asked for by hand, rather than by the clock. */
+const runSchema = z.object({ dryRun: z.boolean().optional() });
+
 export interface SettingsRouterDeps {
   /** Passed through to the mailer, so tests can inject a transport stub. */
   mailer?: Mailer;
   mailerDeps?: MailerDeps;
+  /** Injectable for the same reason: a run without a real mail server. */
+  reminderRunner?: ReminderRunner;
 }
 
 export function createSettingsRouter(
@@ -47,6 +56,9 @@ export function createSettingsRouter(
   const mailer =
     deps.mailer ??
     createMailer(createMailSettingsStore(pool, config.configEncryptionKey), deps.mailerDeps);
+  const reminderRunner =
+    deps.reminderRunner ??
+    createReminderRunner(createReminderStore(pool, config.configEncryptionKey), mailer);
 
   // Scoped to this router's own subtree, not blanket: mounted at /api/v1, a
   // router.use() without a path would guard every other router as well (see the
@@ -93,6 +105,40 @@ export function createSettingsRouter(
   router.post('/settings/mail/test', async (_req, res) => {
     const { email } = getAuthUser(res);
     sendData(res, { recipient: email, status: await mailer.sendTestMail(email) });
+  });
+
+  /**
+   * Runs the payment reminders now instead of waiting for the daily schedule.
+   * `dryRun` renders everything and sends nothing, which is how an admin sees
+   * what would go out before it goes out.
+   *
+   * With the reminders switched off this is a 409 rather than a silent no-op:
+   * a button that mails every user while the feature reads "off" would be a
+   * nasty surprise — the same caution as the test mail's missing recipient
+   * field.
+   */
+  router.post('/settings/reminders/run', async (req, res) => {
+    const { dryRun } = runSchema.parse(req.body ?? {});
+    const result = await reminderRunner.run({ dryRun });
+
+    if (result.skipped === 'disabled') {
+      throw new ApiError(
+        409,
+        ERROR_CODES.REMINDERS_DISABLED,
+        'Zahlungserinnerungen sind ausgeschaltet.',
+      );
+    }
+    if (result.skipped === 'mail_not_configured') {
+      throw new ApiError(
+        409,
+        ERROR_CODES.MAIL_NOT_CONFIGURED,
+        'Der E-Mail-Versand ist ausgeschaltet oder unvollständig eingerichtet.',
+      );
+    }
+
+    // The rendered texts are only interesting for a preview; a real run has
+    // already delivered them.
+    sendData(res, { ...result, preview: dryRun === true ? result.preview : [] });
   });
 
   return router;

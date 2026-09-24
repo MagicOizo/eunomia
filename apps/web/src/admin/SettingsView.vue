@@ -3,6 +3,8 @@ import {
   faCircleCheck,
   faCircleExclamation,
   faCircleInfo,
+  faBell,
+  faEye,
   faPaperPlane,
   faRotate,
   faTrash,
@@ -21,21 +23,23 @@ import { settingLabel } from '../lib/field-labels';
 import {
   type MailStatus,
   type PublicSetting,
+  type ReminderRunResult,
   type SettingWrite,
   type SettingsSnapshot,
   type UpdateStatus,
   loadSettings,
   loadUpdateStatus,
   refreshUpdateStatus,
+  runReminders,
   saveSettings,
   sendTestMail,
 } from './settings-api';
 
 /**
- * System settings (Slice 30). The first area of the admin section: which version
- * runs and whether a newer one exists, and the SMTP account the app sends
- * through — including a test that proves it works and a status that survives a
- * restart.
+ * System settings (Slice 30, extended in Slice 31). The first area of the admin
+ * section: which version runs and whether a newer one exists, the SMTP account
+ * the app sends through — including a test that proves it works and a status
+ * that survives a restart — and the payment reminders that go out on their own.
  */
 
 const loading = ref(true);
@@ -53,6 +57,11 @@ const updateBusy = ref(false);
 const updateError = ref<string | null>(null);
 const tokenSaved = ref(false);
 
+const reminderBusy = ref(false);
+const reminderError = ref<string | null>(null);
+const reminderSaved = ref(false);
+const reminderRun = ref<ReminderRunResult | null>(null);
+
 /** The editable mail form, filled from the snapshot on load. */
 const mail = reactive({
   enabled: false,
@@ -69,6 +78,15 @@ const passwordStored = ref(false);
 /** Token field, same rule as the password: empty means unchanged. */
 const token = ref('');
 const tokenStored = ref(false);
+
+/** The editable reminder form. Numbers are held as text, like the mail port. */
+const reminders = reactive({
+  enabled: false,
+  hour: '7',
+  timeZone: '',
+  repeatDays: '7',
+  appUrl: '',
+});
 
 function valueOf(settings: PublicSetting[], key: string): PublicSetting | undefined {
   return settings.find((entry) => entry.key === key);
@@ -88,6 +106,16 @@ function applySnapshot(next: SettingsSnapshot): void {
   passwordStored.value = valueOf(settings, 'mail.password')?.isSet === true;
   token.value = '';
   tokenStored.value = valueOf(settings, 'updateCheck.token')?.isSet === true;
+  reminders.enabled = valueOf(settings, 'reminders.enabled')?.value === true;
+  reminders.hour = String(valueOf(settings, 'reminders.hour')?.value ?? '7');
+  reminders.timeZone = String(valueOf(settings, 'reminders.timeZone')?.value ?? 'Europe/Berlin');
+  reminders.repeatDays = String(valueOf(settings, 'reminders.repeatDays')?.value ?? '7');
+  reminders.appUrl = String(valueOf(settings, 'reminders.appUrl')?.value ?? '');
+}
+
+/** Reads a readonly status setting the runner writes (see the registry). */
+function statusOf(key: string): string | number | boolean | null {
+  return valueOf(snapshot.value?.settings ?? [], key)?.value ?? null;
 }
 
 const encryptionAvailable = computed(() => snapshot.value?.encryptionAvailable !== false);
@@ -255,6 +283,96 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
   const status = update.value;
   if (!status || status.status !== 'ok') return 'neutral';
   return status.updateAvailable ? 'submitted' : 'done';
+});
+
+const hourError = computed(() => {
+  const parsed = Number(reminders.hour);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23
+    ? undefined
+    : 'Bitte eine volle Stunde zwischen 0 und 23 angeben.';
+});
+
+const repeatError = computed(() => {
+  const parsed = Number(reminders.repeatDays);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 90
+    ? undefined
+    : 'Bitte eine Zahl zwischen 1 und 90 angeben.';
+});
+
+const reminderStatus = computed(() => ({
+  lastRunAt: statusOf('reminders.lastRunAt') as string | null,
+  lastRunResult: statusOf('reminders.lastRunResult') as 'ok' | 'error' | null,
+  lastRunError: statusOf('reminders.lastRunError') as string | null,
+  lastRunSent: statusOf('reminders.lastRunSent') as number | null,
+}));
+
+async function saveReminders(): Promise<void> {
+  if (hourError.value || repeatError.value) return;
+  reminderBusy.value = true;
+  reminderError.value = null;
+  reminderSaved.value = false;
+  try {
+    applySnapshot(
+      await saveSettings({
+        'reminders.enabled': reminders.enabled,
+        'reminders.hour': Number(reminders.hour),
+        'reminders.timeZone': reminders.timeZone,
+        'reminders.repeatDays': Number(reminders.repeatDays),
+        'reminders.appUrl': reminders.appUrl,
+      }),
+    );
+    reminderSaved.value = true;
+  } catch (error) {
+    reminderError.value = describeError(error);
+  } finally {
+    reminderBusy.value = false;
+  }
+}
+
+/**
+ * Runs the reminders by hand. A dry run shows what would go out; a real run
+ * sends it — and its result belongs in the status, so the snapshot is reloaded
+ * either way.
+ */
+async function runNow(dryRun: boolean): Promise<void> {
+  reminderBusy.value = true;
+  reminderError.value = null;
+  reminderRun.value = null;
+  try {
+    reminderRun.value = await runReminders(dryRun);
+  } catch (error) {
+    reminderError.value = describeError(error);
+  } finally {
+    try {
+      applySnapshot(await loadSettings());
+    } catch {
+      /* the message above is what matters */
+    }
+    reminderBusy.value = false;
+  }
+}
+
+/** German plural without a library: the forms these sentences need. */
+function plural(n: number, singular: string, forms: string): string {
+  const [one, many] = forms.split('|');
+  return `${n} ${singular}${n === 1 ? one : many}`;
+}
+
+/** What the last manual run did, in one sentence. */
+const runSentence = computed(() => {
+  const result = reminderRun.value;
+  if (!result) return null;
+  if (result.recipients === 0) {
+    const checked = plural(result.invoices, 'offene Rechnung', '|en');
+    return `Keine fälligen Zahlungen: ${checked} geprüft, niemand zu benachrichtigen.`;
+  }
+  if (result.dryRun) {
+    const who = plural(result.recipients, 'Empfänger', '|');
+    const verb = result.recipients === 1 ? 'würde' : 'würden';
+    return `Vorschau: ${who} ${verb} eine Erinnerung bekommen. Es wurde nichts versendet.`;
+  }
+  const failed = result.failed > 0 ? `, ${result.failed} fehlgeschlagen` : '';
+  return `${plural(result.sent, 'Erinnerung', '|en')} versendet${failed}.`;
 });
 </script>
 
@@ -433,6 +551,104 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
           </p>
         </form>
       </EuCollapsibleSection>
+
+      <EuCollapsibleSection title="Zahlungserinnerungen">
+        <template #status>
+          <EuBadge
+            v-if="reminderStatus.lastRunResult"
+            :tone="reminderStatus.lastRunResult === 'ok' ? 'done' : 'open'"
+            :icon="reminderStatus.lastRunResult === 'ok' ? faCircleCheck : faCircleExclamation"
+          >
+            {{
+              `Letzter Lauf ${germanDateTime(reminderStatus.lastRunAt)}` +
+              (reminderStatus.lastRunResult === 'ok'
+                ? ` — ${reminderStatus.lastRunSent ?? 0} versendet`
+                : ' — fehlgeschlagen')
+            }}
+          </EuBadge>
+          <EuBadge v-else tone="neutral">Noch nicht gelaufen</EuBadge>
+        </template>
+
+        <form class="eu-settings__form" @submit.prevent="saveReminders">
+          <p class="eu-settings__hint">
+            Eunomia meldet sich von selbst, wenn die Zahlung einer Rechnung fällig wird oder
+            überfällig ist. Jeder Nutzer bekommt eine Mail über genau die Rechnungen, die er auch in
+            der App sehen darf. Eine fällige Rechnung wird einmal angekündigt, eine überfällige
+            wiederholt sich im eingestellten Abstand.
+          </p>
+
+          <EuToggle v-model="reminders.enabled" :label="settingLabel('reminders.enabled')" />
+          <p v-if="!mail.enabled" class="eu-settings__hint">
+            Der E-Mail-Versand ist ausgeschaltet — ohne ihn kann keine Erinnerung verschickt werden.
+          </p>
+
+          <div class="eu-settings__grid">
+            <EuTextField
+              v-model="reminders.hour"
+              :label="settingLabel('reminders.hour')"
+              :error="hourError"
+              type="text"
+            />
+            <EuTextField
+              v-model="reminders.repeatDays"
+              :label="settingLabel('reminders.repeatDays')"
+              :error="repeatError"
+              type="text"
+            />
+          </div>
+
+          <div class="eu-settings__grid">
+            <EuTextField v-model="reminders.timeZone" :label="settingLabel('reminders.timeZone')" />
+            <EuTextField v-model="reminders.appUrl" :label="settingLabel('reminders.appUrl')" />
+          </div>
+          <p class="eu-settings__hint">
+            Die Uhrzeit gilt in dieser Zeitzone. Ohne Adresse verschickt Eunomia die Erinnerung ohne
+            Link.
+          </p>
+
+          <div class="eu-settings__actions">
+            <EuButton type="submit" :disabled="reminderBusy || Boolean(hourError || repeatError)">
+              Speichern
+            </EuButton>
+            <EuButton
+              variant="secondary"
+              :icon="faEye"
+              :disabled="reminderBusy"
+              @click="runNow(true)"
+            >
+              Vorschau
+            </EuButton>
+            <EuButton
+              variant="secondary"
+              :icon="faBell"
+              :disabled="reminderBusy"
+              @click="runNow(false)"
+            >
+              Jetzt ausführen
+            </EuButton>
+          </div>
+
+          <p v-if="reminderSaved" class="eu-settings__ok" role="status">
+            Einstellungen gespeichert.
+          </p>
+          <p v-if="runSentence" class="eu-settings__ok" role="status">{{ runSentence }}</p>
+          <p v-if="reminderError" class="eu-settings__error" role="alert">{{ reminderError }}</p>
+          <p
+            v-if="reminderStatus.lastRunResult === 'error' && reminderStatus.lastRunError"
+            class="eu-settings__hint"
+          >
+            Meldung beim letzten Lauf: {{ reminderStatus.lastRunError }}
+          </p>
+
+          <template v-if="reminderRun?.dryRun && reminderRun.preview.length > 0">
+            <p class="eu-settings__hint">Das würde versendet:</p>
+            <div v-for="mailPreview in reminderRun.preview" :key="mailPreview.email">
+              <p class="eu-settings__hint">An {{ mailPreview.email }}: {{ mailPreview.subject }}</p>
+              <pre class="eu-settings__preview">{{ mailPreview.text }}</pre>
+            </div>
+          </template>
+        </form>
+      </EuCollapsibleSection>
     </template>
   </div>
 </template>
@@ -496,6 +712,24 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
 
 .eu-settings__ok {
   color: var(--eu-color-status-done-fg);
+}
+
+/* The rendered mail, shown verbatim in a dry run. It wraps rather than scrolls
+   sideways: a preview that needs a horizontal scrollbar on a phone is no
+   preview. */
+.eu-settings__preview {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--eu-color-border);
+  border-radius: 0.5rem;
+  /* The informational pair from the status scale: an AA-checked foreground on
+     its own background in both themes (design-system/CONTRAST.md). */
+  background-color: var(--eu-color-status-billed-bg);
+  color: var(--eu-color-status-billed-fg);
+  font-family: var(--eu-font-data);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .eu-settings__error {

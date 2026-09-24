@@ -5,6 +5,11 @@ import { loadConfig } from './config/env.js';
 import { createApp } from './app.js';
 import { runMigrations } from './db/migrate.js';
 import { createPool, waitForDatabase } from './db/pool.js';
+import { createMailer } from './mail/mailer.js';
+import { createMailSettingsStore } from './mail/store.js';
+import { createReminderRunner } from './reminders/runner.js';
+import { startReminderScheduler } from './reminders/schedule.js';
+import { createReminderStore } from './reminders/store.js';
 
 const config = loadConfig();
 const pool = createPool(config.database);
@@ -27,8 +32,30 @@ const server = app.listen(config.port, () => {
   console.log(`Eunomia API listening on port ${config.port}`);
 });
 
+/*
+ * The payment reminders are the one thing that has to happen without anyone
+ * asking (Slice 31), so the timer lives here and not in createApp(): that
+ * builds the app for supertest too, and a test suite must not start sending
+ * mail in the background. The schedule itself is in the settings; while the
+ * reminders are switched off the ticks do nothing but read them.
+ */
+const reminderStore = createReminderStore(pool, config.configEncryptionKey);
+const reminders = createReminderRunner(
+  reminderStore,
+  createMailer(createMailSettingsStore(pool, config.configEncryptionKey)),
+);
+const scheduler = startReminderScheduler({
+  readSchedule: async () => {
+    const settings = await reminderStore.readSettings();
+    const { lastRunAt } = await reminderStore.readStatus();
+    return { ...settings, lastRunAt };
+  },
+  run: () => reminders.run(),
+});
+
 /** Closes the HTTP server and database pool on shutdown signals. */
 async function shutdown(): Promise<void> {
+  scheduler.stop();
   server.close();
   await pool.end();
 }

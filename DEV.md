@@ -131,12 +131,32 @@ docker logs eunomia 2>&1 | grep MAIL_SEND_FAILED   # a rejected or unreachable m
 docker logs eunomia 2>&1 | grep MAIL_SEND_OK       # successful sends
 docker logs eunomia 2>&1 | grep MAIL_NOT_CONFIGURED        # switched off or incomplete
 docker logs eunomia 2>&1 | grep SETTINGS_SECRET_UNREADABLE # wrong/missing CONFIG_ENCRYPTION_KEY
+docker logs eunomia 2>&1 | grep REMINDERS_RUN     # one line per reminder run, with its counts
+docker logs eunomia 2>&1 | grep REMINDERS_SKIPPED # a run that found mail switched off
 docker logs eunomia 2>&1 | grep -E 'eunomia event=' # every event line
 ```
 
 A failure line carries the recipient, the host, the mail server's error code and its message — never
 a password. The settings page shows the same message next to the red status, and it survives a
 restart (it is stored with the settings).
+
+### Payment reminders
+
+The only thing the API does without being asked. A timer wakes every five minutes and runs the
+reminders once the configured hour has arrived in the configured time zone, using
+`reminders.lastRunAt` as its watermark — so a window missed while the machine was off is caught up
+at the next tick rather than skipped until tomorrow. It lives in `src/index.ts`, not in
+`createApp()`, so no test suite ever starts sending in the background.
+
+Each recipient hears only about the invoices they may see. A due invoice is announced once; an
+overdue one repeats every `reminders.repeatDays` days. What counts as "due" is not configurable: it
+is the same ten-day window as the traffic light in the invoice list
+(`apps/api/src/reminders/payment.ts` and `apps/web/src/invoices/payment.ts` — change one, change the
+other).
+
+On the settings page, **Vorschau** renders what would go out without sending or remembering
+anything, and **Jetzt ausführen** does it for real. With the reminders switched off both answer 409
+rather than quietly mailing everyone.
 
 ## Production image (build locally / release)
 

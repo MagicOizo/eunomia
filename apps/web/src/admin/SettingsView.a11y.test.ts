@@ -2,13 +2,19 @@ import { flushPromises, mount } from '@vue/test-utils';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { SettingWrite, SettingsSnapshot, UpdateStatus } from './settings-api';
+import type {
+  ReminderRunResult,
+  SettingWrite,
+  SettingsSnapshot,
+  UpdateStatus,
+} from './settings-api';
 
 const loadSettings = vi.fn<() => Promise<SettingsSnapshot>>();
 const saveSettings = vi.fn<(values: SettingWrite) => Promise<SettingsSnapshot>>();
 const sendTestMail = vi.fn();
 const loadUpdateStatus = vi.fn<() => Promise<UpdateStatus>>();
 const refreshUpdateStatus = vi.fn<() => Promise<UpdateStatus>>();
+const runReminders = vi.fn<(dryRun: boolean) => Promise<ReminderRunResult>>();
 
 vi.mock('./settings-api', () => ({
   loadSettings: (): Promise<SettingsSnapshot> => loadSettings(),
@@ -16,6 +22,7 @@ vi.mock('./settings-api', () => ({
   sendTestMail: (): Promise<unknown> => sendTestMail(),
   loadUpdateStatus: (): Promise<UpdateStatus> => loadUpdateStatus(),
   refreshUpdateStatus: (): Promise<UpdateStatus> => refreshUpdateStatus(),
+  runReminders: (dryRun: boolean): Promise<ReminderRunResult> => runReminders(dryRun),
 }));
 
 const { default: SettingsView } = await import('./SettingsView.vue');
@@ -102,8 +109,52 @@ function snapshot(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
         value: null,
         isSet: false,
       },
+      ...reminderSettings(),
     ],
     ...overrides,
+  };
+}
+
+/** The reminder keys, editable ones plus the status the runner writes. */
+function reminderSettings(overrides: Record<string, unknown> = {}): SettingsSnapshot['settings'] {
+  const values: Record<string, string | number | boolean | null> = {
+    'reminders.enabled': true,
+    'reminders.hour': 7,
+    'reminders.timeZone': 'Europe/Berlin',
+    'reminders.repeatDays': 7,
+    'reminders.appUrl': null,
+    'reminders.lastRunAt': '2026-09-24T05:00:00.000Z',
+    'reminders.lastRunResult': 'ok',
+    'reminders.lastRunError': null,
+    'reminders.lastRunSent': 2,
+    ...overrides,
+  };
+  return Object.entries(values).map(([key, value]) => ({
+    key,
+    section: 'reminders' as const,
+    isSecret: false,
+    readonly: key.startsWith('reminders.lastRun'),
+    value,
+    isSet: value !== null,
+  }));
+}
+
+/** What a dry run answers with. */
+function dryRunResult(): ReminderRunResult {
+  return {
+    ranAt: '2026-09-24T09:00:00.000Z',
+    invoices: 3,
+    recipients: 1,
+    sent: 0,
+    failed: 0,
+    dryRun: true,
+    preview: [
+      {
+        email: 'max@example.com',
+        subject: 'Eunomia: 1 fällige Zahlung',
+        text: 'Hallo Max,\n\nFällig:\n- Rechnung 2026-0042',
+      },
+    ],
   };
 }
 
@@ -130,6 +181,7 @@ describe('SettingsView', () => {
     saveSettings.mockImplementation(async () => snapshot());
     loadUpdateStatus.mockResolvedValue(privateRepo);
     refreshUpdateStatus.mockResolvedValue(privateRepo);
+    runReminders.mockResolvedValue(dryRunResult());
   });
 
   it('names why the update check stays silent instead of showing nothing', async () => {
@@ -170,8 +222,9 @@ describe('SettingsView', () => {
 
   it('sends the password only when one was typed', async () => {
     const wrapper = await mountView();
+    // Three forms, in order: update token, mail, reminders.
     const forms = wrapper.findAll('form');
-    const mailForm = forms[forms.length - 1];
+    const mailForm = forms[1];
     expect(mailForm).toBeDefined();
 
     await mailForm!.trigger('submit');
@@ -202,6 +255,40 @@ describe('SettingsView', () => {
 
     await toggle.trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('false');
+    wrapper.unmount();
+  });
+
+  it('shows what the last reminder run did', async () => {
+    const wrapper = await mountView();
+    expect(wrapper.text()).toContain('Letzter Lauf');
+    expect(wrapper.text()).toContain('2 versendet');
+    wrapper.unmount();
+  });
+
+  it('says that reminders cannot go out while mail is switched off', async () => {
+    loadSettings.mockResolvedValue(
+      snapshot({
+        settings: snapshot().settings.map((entry) =>
+          entry.key === 'mail.enabled' ? { ...entry, value: false } : entry,
+        ),
+      }),
+    );
+    const wrapper = await mountView();
+    expect(wrapper.text()).toContain('Der E-Mail-Versand ist ausgeschaltet');
+    wrapper.unmount();
+  });
+
+  it('a preview asks for a dry run and shows the rendered mail', async () => {
+    const wrapper = await mountView();
+    const preview = wrapper.findAll('button').find((button) => button.text().includes('Vorschau'));
+    expect(preview).toBeDefined();
+
+    await preview!.trigger('click');
+    await flushPromises();
+
+    expect(runReminders).toHaveBeenCalledWith(true);
+    expect(wrapper.text()).toContain('Es wurde nichts versendet');
+    expect(wrapper.find('pre').text()).toContain('Rechnung 2026-0042');
     wrapper.unmount();
   });
 

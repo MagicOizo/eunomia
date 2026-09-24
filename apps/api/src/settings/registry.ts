@@ -12,7 +12,7 @@ import { ERROR_CODES } from '../lib/error-codes.js';
  * storage is key-value (migration 009).
  */
 
-export type SettingSection = 'mail' | 'updateCheck';
+export type SettingSection = 'mail' | 'updateCheck' | 'reminders';
 
 export type SettingValue = string | number | boolean | null;
 
@@ -25,15 +25,46 @@ interface BaseDefinition {
   readonly?: true;
 }
 
+/**
+ * An extra check for a string beyond its length — a time zone the runtime does
+ * not know, or a URL that is not one, is a typo whose effect would only show
+ * up much later (a run at the wrong hour, a dead link in a mail).
+ */
+interface StringCheck {
+  ok: (value: string) => boolean;
+  /** Completes the sentence "Setting x must be …" in the 400. */
+  expected: string;
+}
+
 type SettingDefinition = BaseDefinition &
   (
-    | { type: 'string'; fallback: string | null; maxLength?: number }
+    | { type: 'string'; fallback: string | null; maxLength?: number; check?: StringCheck }
     | { type: 'int'; fallback: number | null; min: number; max: number }
     | { type: 'bool'; fallback: boolean }
     | { type: 'enum'; fallback: string; values: readonly string[] }
     /** Stored encrypted; never leaves the API as plaintext. */
     | { type: 'secret'; fallback: null }
   );
+
+/** Whether the runtime knows this IANA zone — Intl throws for one it does not. */
+function isTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** An absolute http(s) URL — the base the reminder mails link back to. */
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Mail settings cover one SMTP account, which is all a homelab instance needs.
@@ -64,6 +95,62 @@ export const SETTINGS = {
    * the token can be rotated without touching the container's environment.
    */
   'updateCheck.token': { section: 'updateCheck', type: 'secret', fallback: null },
+
+  /*
+   * Payment reminders (Slice 31). What "due" means is NOT configurable here:
+   * the traffic light in the invoice list defines it (DUE_SOON_DAYS, see
+   * reminders/payment.ts), and a second, editable number could drift from it —
+   * "the light is amber but no mail came". Only how often an overdue invoice
+   * nags again is a matter of taste.
+   */
+  'reminders.enabled': { section: 'reminders', type: 'bool', fallback: false },
+  /** Hour of the daily run, in `reminders.timeZone`. */
+  'reminders.hour': { section: 'reminders', type: 'int', fallback: 7, min: 0, max: 23 },
+  'reminders.timeZone': {
+    section: 'reminders',
+    type: 'string',
+    fallback: 'Europe/Berlin',
+    maxLength: 64,
+    check: { ok: isTimeZone, expected: 'a time zone this server knows, e.g. Europe/Berlin' },
+  },
+  /** Days between two reminders about the same overdue invoice. */
+  'reminders.repeatDays': { section: 'reminders', type: 'int', fallback: 7, min: 1, max: 90 },
+  /** Optional base URL; only when set do the mails carry a link back. */
+  'reminders.appUrl': {
+    section: 'reminders',
+    type: 'string',
+    fallback: null,
+    maxLength: 255,
+    check: { ok: isHttpUrl, expected: 'an absolute http(s) URL, e.g. https://eunomia.example.com' },
+  },
+  /**
+   * Status of the last run, written by the runner. `lastRunAt` doubles as the
+   * scheduler's watermark ("has today's run happened?"), so that there is one
+   * value rather than two that could disagree.
+   */
+  'reminders.lastRunAt': { section: 'reminders', type: 'string', fallback: null, readonly: true },
+  /** 'ok' | 'error' — a plain string, as with the mail status. */
+  'reminders.lastRunResult': {
+    section: 'reminders',
+    type: 'string',
+    fallback: null,
+    readonly: true,
+  },
+  'reminders.lastRunError': {
+    section: 'reminders',
+    type: 'string',
+    fallback: null,
+    readonly: true,
+  },
+  /** How many mails the last run sent — 0 is a perfectly good answer. */
+  'reminders.lastRunSent': {
+    section: 'reminders',
+    type: 'int',
+    fallback: null,
+    min: 0,
+    max: 1_000_000,
+    readonly: true,
+  },
 } as const satisfies Record<string, SettingDefinition>;
 
 export type SettingKey = keyof typeof SETTINGS;
@@ -183,6 +270,10 @@ export function validateIncoming(key: string, value: unknown): [SettingKey, Sett
       const trimmed = value.trim();
       if (def.maxLength !== undefined && trimmed.length > def.maxLength) {
         return invalid(`at most ${def.maxLength} characters long`);
+      }
+      // An empty value clears the setting, so it never reaches the check.
+      if (trimmed !== '' && def.check !== undefined && !def.check.ok(trimmed)) {
+        return invalid(def.check.expected);
       }
       return [key, trimmed === '' ? null : trimmed];
     }
