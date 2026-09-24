@@ -7,6 +7,26 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.10.0 — 2026-09-24
+
+Everything from the four `0.10.0-slice.N` previews below, as one release:
+
+- **Release mechanics.** `npm run version:next -- slice|minor|patch|major` moves the version through
+  all four workspaces and the lockfile, `npm run version:check` (in CI) fails when they drift apart,
+  and pushing a version tag builds the image and publishes the matching GitHub release from this
+  file. `latest` moves only for a final release, never for a preview.
+- **One dialog per service billing.** Booking a billing from a policy and from the invoice workspace
+  now use the same fields, including the check against what an invoice still has open.
+- **GiroCode next to the IBAN.** An invoice paid through a collection agency offers a scannable code
+  with beneficiary, IBAN, amount and reference, built in the browser — payment data is never sent
+  anywhere.
+- **Polish.** View/edit masks are usable on a phone, a policy's histories show the entry in force and
+  fold the rest away, notes appear as a bubble with their text as tooltip, and the invoice table fits
+  a 1440px screen again. Fields in a mask, the entity picker and the currency field show a focus ring
+  again — they were the only places in the application without one.
+- Fixed: the GiroCode button next to an IBAN was sized like a standalone button and made its row
+  twice as tall as the rest of the payment details, pulling that row out of line.
+
 ## 0.10.0-slice.4 — 2026-09-24
 
 - A policy's premium and terms histories no longer fill the dialog: each block shows the entry

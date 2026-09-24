@@ -23,13 +23,16 @@ const text = ref('');
 
 /**
  * Bare (display-mask) mode: the input hugs its content instead of stretching,
- * so the € sits next to the amount and not at the far end of the column. A
- * `ch` is the width of a zero, which overstates commas and dots — hence the
- * character count itself, plus half a zero of room for the caret.
+ * so the € sits next to the amount and not at the far end of the column.
+ * Tabular figures make every digit exactly one `ch`; a comma or dot is about
+ * 0.4 of one (measured), so counting characters alone would leave a visible
+ * hole in front of the €. The empty field keeps a clickable 4 `ch`.
  */
-const bareWidth = computed(() =>
-  props.bare ? `${Math.max(4, text.value.length) + 0.5}ch` : undefined,
-);
+const bareWidth = computed(() => {
+  if (!props.bare) return undefined;
+  const chars = [...text.value].reduce((sum, c) => sum + (/\d/.test(c) ? 1 : 0.4), 0);
+  return `${Math.max(4, chars + 0.2)}ch`;
+});
 
 const formatter = new Intl.NumberFormat('de-DE', {
   minimumFractionDigits: 2,
@@ -145,6 +148,9 @@ function onBlur(): void {
   display: inline-flex;
   border-color: transparent;
   padding: 0.2em 0.4em;
+  /* Reads as one value ("180,00 €"), so the € keeps a word space, not the
+     field gap the bordered variant needs. */
+  gap: 0.25em;
 }
 
 .eu-currency-field__control.is-bare:hover {

@@ -83,6 +83,7 @@ watch(
   <EuPopover title="GiroCode">
     <template #trigger="{ expanded, panelId }">
       <EuButton
+        class="eu-girocode__trigger"
         variant="ghost"
         icon-only
         :icon="faQrcode"
@@ -109,6 +110,22 @@ watch(
 </template>
 
 <style scoped>
+/*
+ * The trigger sits inside a line of text (the IBAN in the payment popover and
+ * in the invoice mask), so it takes that line's size instead of a button's
+ * own: at EuButton's 1rem and 0.5em padding it was twice the row height and
+ * pushed the row — and with it the label icon opposite — out of the list's
+ * rhythm.
+ */
+.eu-girocode__trigger {
+  font-size: inherit;
+  padding: 0.15em;
+  border-width: 0;
+  /* Without this, EuButton's square icon button would still be a hair taller
+     than the line and nudge the row. */
+  aspect-ratio: auto;
+}
+
 .eu-girocode {
   display: flex;
   flex-direction: column;
