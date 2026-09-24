@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(git push*)",
+      "Bash(gh release create*)",
+      "Bash(gh release edit*)",
+      "Bash(gh release delete*)",
+      "Bash(gh release upload*)",
+      "Bash(gh pr create*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh auth token*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/block-remote-writes.py\"",
+            "timeout": 10,
+            "statusMessage": "Checking for remote writes"
+          }
+        ]
+      }
+    ]
+  }
+}
