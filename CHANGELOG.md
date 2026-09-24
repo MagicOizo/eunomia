@@ -1,7 +1,8 @@
 # Changelog
 
 Each released version has its own section here; the release workflow publishes the matching section
-as the body of the GitHub release. Version numbers follow the rules in `Notes/eunomia-plan.md` §2.9:
+as the body of the GitHub release. Entries are written in English, like everything else that leaves
+the repository (`Notes/eunomia-plan.md` §2.8). Version numbers follow the rules in `Notes/eunomia-plan.md` §2.9:
 a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a preview while a
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
