@@ -75,8 +75,11 @@ onMounted(sync);
 
 <style scoped>
 .eu-dialog {
-  border: none;
+  /* An edge and a shadow: in dark mode the surface sits only a shade above the
+     dimmed page behind it, and without them the dialog has no outline at all. */
+  border: 1px solid var(--eu-color-border);
   border-radius: 0.5em;
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 35%);
   padding: 0;
   color: var(--eu-color-text);
   background-color: var(--eu-color-surface-bg);

@@ -7,6 +7,22 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.10.0-slice.4 — 2026-09-24
+
+- A policy's premium and terms histories no longer fill the dialog: each block shows the entry
+  currently in force, newest first, and folds the older ones behind one click. The same for the
+  year history.
+- A note on a premium or a year is now a speech bubble next to its period, with the text as its
+  tooltip — a note recorded for a year was stored but never shown until now.
+- View/edit masks are usable on a phone again: below 34rem the label moves above its value instead
+  of squeezing it into a column too narrow to read.
+- The invoice table fits the card on a 1440px screen, so the actions column is no longer pushed out
+  of sight; longer facility names are cut with the full name as a tooltip.
+- Fixed: fields in a display mask, the entity picker and the currency field showed no focus ring at
+  all for keyboard users — they replaced it with a thin border.
+- Amounts in a mask now line up with every other value instead of hanging at the right edge, labels
+  end with a colon, an empty field shows a dash, and dialogs have an edge in dark mode.
+
 ## 0.10.0-slice.3 — 2026-09-24
 
 - Invoices that are paid through a collection agency now offer a GiroCode next to the IBAN — in the

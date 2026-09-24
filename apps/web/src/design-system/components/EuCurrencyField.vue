@@ -21,6 +21,16 @@ const hasError = computed(() => Boolean(props.error));
 const focused = ref(false);
 const text = ref('');
 
+/**
+ * Bare (display-mask) mode: the input hugs its content instead of stretching,
+ * so the € sits next to the amount and not at the far end of the column. A
+ * `ch` is the width of a zero, which overstates commas and dots — hence the
+ * character count itself, plus half a zero of room for the caret.
+ */
+const bareWidth = computed(() =>
+  props.bare ? `${Math.max(4, text.value.length) + 0.5}ch` : undefined,
+);
+
 const formatter = new Intl.NumberFormat('de-DE', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -83,6 +93,7 @@ function onBlur(): void {
         :aria-label="bare ? label : undefined"
         :aria-invalid="hasError || undefined"
         :aria-describedby="hasError ? errorId : undefined"
+        :style="bare ? { width: bareWidth } : undefined"
         @focus="onFocus"
         @input="onInput"
         @blur="onBlur"
@@ -120,12 +131,18 @@ function onBlur(): void {
   border-color: var(--eu-color-accent);
 }
 
+.eu-currency-field__control:has(:focus-visible) {
+  outline: var(--eu-focus-ring-width) solid var(--eu-color-focus-ring);
+  outline-offset: var(--eu-focus-ring-offset);
+}
+
 .eu-currency-field__control.is-error {
   border-color: var(--eu-color-error-fg);
 }
 
 /* Display-mask mode: no border at rest, revealed on hover/focus. */
 .eu-currency-field__control.is-bare {
+  display: inline-flex;
   border-color: transparent;
   padding: 0.2em 0.4em;
 }
@@ -141,13 +158,18 @@ function onBlur(): void {
 .eu-currency-field__input {
   flex: 1;
   min-width: 0;
+  text-align: right;
   border: none;
   background: none;
   padding: 0;
   font: inherit;
   color: var(--eu-color-text);
-  text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.eu-currency-field__control.is-bare > .eu-currency-field__input {
+  flex: 0 1 auto;
+  text-align: left;
 }
 
 .eu-currency-field__input:focus {

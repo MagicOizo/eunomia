@@ -23,4 +23,19 @@
   row-gap: 0.35rem;
   font-family: var(--eu-font-data);
 }
+
+/*
+ * Narrow screens: the label column claims `max-content`, which on a phone
+ * leaves ~60px for the value and cuts every one of them off. Below this width
+ * the label moves onto its own line above the value; the actions stay on the
+ * value's line. The counterpart rules (label spanning, spacing) live in
+ * EuDetailField, next to the elements they style. The dialog is viewport-wide
+ * below 46rem, so the viewport width stands in for the dialog width here.
+ */
+@media (max-width: 34rem) {
+  .eu-detail-mask {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0;
+  }
+}
 </style>

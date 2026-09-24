@@ -74,6 +74,9 @@ const agencyIbanMap = computed(() =>
 );
 /** facilityUID → name, for the invoice lists of the dialogs. */
 const facilityNameMap = computed(() => Object.fromEntries(facilityNameById.value));
+/** The facility's name for one invoice, or null when it has none. */
+const facilityName = (invoice: InvoiceDto): string | null =>
+  invoice.facilityUID ? (facilityNameById.value.get(invoice.facilityUID) ?? null) : null;
 const plan = ref<ReimbursementPlanDto | null>(null);
 /** The optimizer's advice per invoice; invoices with nothing to do have no entry. */
 const recommendationBadges = computed(() => {
@@ -150,7 +153,7 @@ function invoiceSortValue(inv: InvoiceDto, key: string): string | number {
     case 'number':
       return inv.invoiceNumber;
     case 'facility':
-      return inv.facilityUID ? (facilityNameById.value.get(inv.facilityUID) ?? '') : '';
+      return facilityName(inv) ?? '';
     case 'amount':
       return inv.invoiceAmount;
     case 'reimbursed':
@@ -448,7 +451,7 @@ function confirmDelete(): void {
       Keine Rechnungen für {{ activeYear }}.
     </p>
 
-    <div v-else class="eu-ws__table-wrap">
+    <div v-else class="eu-ws__table-wrap eu-scroll-focus-safe">
       <table class="eu-ws__table">
         <thead>
           <tr>
@@ -537,15 +540,15 @@ function confirmDelete(): void {
             <td>{{ germanDate(invoice.invoiceDate) }}</td>
             <td>{{ germanDate(invoice.treatmentDate) }}</td>
             <td>{{ invoice.invoiceNumber }}</td>
-            <td>{{ invoice.facilityUID ? facilityNameById.get(invoice.facilityUID) : '–' }}</td>
+            <td class="eu-ws__facility" :title="facilityName(invoice) ?? undefined">
+              {{ facilityName(invoice) ?? '–' }}
+            </td>
             <td>
               <div class="eu-ws__amount">
                 <span>{{ euro(invoice.invoiceAmount) }}</span>
                 <PaymentInfoPopover
                   :invoice="invoice"
-                  :facility-name="
-                    invoice.facilityUID ? (facilityNameById.get(invoice.facilityUID) ?? null) : null
-                  "
+                  :facility-name="facilityName(invoice)"
                   :agency-name="
                     invoice.agencyUID ? (agencyById.get(invoice.agencyUID)?.name ?? null) : null
                   "
@@ -772,18 +775,29 @@ function confirmDelete(): void {
 
 .eu-ws__table th,
 .eu-ws__table td {
-  padding: 0.55rem 0.7rem;
+  padding: 0.55rem;
   text-align: left;
   border-bottom: 1px solid var(--eu-color-border);
   white-space: nowrap;
 }
 
+/* Nine columns of nowrap data did not fit the card at 1440px and pushed the
+   actions header out of sight. The headers are the widest part of three of
+   those columns, so they — and only they — may break. */
 .eu-ws__table th {
   font-family: var(--eu-font-heading);
   color: var(--eu-color-text-muted);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  white-space: normal;
+  hyphens: auto;
+}
+
+.eu-ws__table .eu-ws__facility {
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Shrink the actions column to its content so the data columns get the rest.

@@ -3,6 +3,7 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faCircleCheck,
   faCircleXmark,
+  faCommentDots,
   faHourglassHalf,
   faPen,
   faPlus,
@@ -18,8 +19,9 @@ import type { DetailValue } from '../design-system/components/EuDetailField.vue'
 import EuDetailField from '../design-system/components/EuDetailField.vue';
 import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { describeError } from '../lib/errors';
-import { euro, germanDate } from '../lib/format';
+import { euro, germanDate, plural } from '../lib/format';
 import {
   BONUS_FORFEIT_RULE_LABEL,
   type BonusTierDto,
@@ -64,6 +66,8 @@ const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
 const saving = ref(false);
 const saveError = ref<string | null>(null);
+/** Which history blocks show their older entries (see the history section). */
+const showOlder = reactive({ premiums: false, terms: false, years: false });
 
 const kindOptions = Object.entries(CONTRACT_KIND_LABEL).map(([value, label]) => ({ value, label }));
 const forfeitOptions = Object.entries(BONUS_FORFEIT_RULE_LABEL).map(([value, label]) => ({
@@ -103,6 +107,9 @@ watch(
   () => [props.open, props.uid] as const,
   ([open]) => {
     saveError.value = null;
+    showOlder.premiums = false;
+    showOlder.terms = false;
+    showOlder.years = false;
     if (open) void load();
     else contract.value = null;
   },
@@ -234,6 +241,22 @@ async function confirmDelete(): Promise<void> {
     deleteError.value = describeError(error);
   }
 }
+
+/**
+ * A policy running since 2018 fills two screens with history rows before the
+ * year list even starts. Only the entry in force is shown; the rest sits
+ * behind one button per block. Newest first everywhere — the API sorts both
+ * histories ascending, so the entry in force is their last one.
+ */
+const premiumsNewestFirst = computed(() => [...(contract.value?.premiums ?? [])].reverse());
+const termsNewestFirst = computed(() => [...(contract.value?.terms ?? [])].reverse());
+
+function visibleRows<T>(rows: T[], expanded: boolean): T[] {
+  return expanded ? rows : rows.slice(0, 1);
+}
+
+const olderLabel = (count: number, one = 'älteren Eintrag', many = 'ältere Einträge'): string =>
+  `${plural(count, one, many)} anzeigen`;
 
 const premiumPeriod = (p: PremiumDto): string =>
   p.validTo
@@ -389,21 +412,27 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
         <p v-if="contract.premiums.length === 0" class="eu-contract__hint">
           Noch kein Beitrag erfasst.
         </p>
-        <div v-else class="eu-contract__scroll">
+        <div v-else class="eu-contract__scroll eu-scroll-focus-safe">
           <table class="eu-contract__table">
             <thead>
               <tr>
                 <th scope="col">Gültig</th>
                 <th scope="col" class="eu-contract__num">Monatsbeitrag</th>
-                <th scope="col">Notiz</th>
                 <th scope="col" class="eu-contract__actions">Aktionen</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="premium in contract.premiums" :key="premium.premiumUID">
-                <td class="eu-contract__period">{{ premiumPeriod(premium) }}</td>
+              <tr
+                v-for="premium in visibleRows(premiumsNewestFirst, showOlder.premiums)"
+                :key="premium.premiumUID"
+              >
+                <td class="eu-contract__period">
+                  {{ premiumPeriod(premium) }}
+                  <span v-if="premium.note" class="eu-contract__note">
+                    <EuIconLabel :icon="faCommentDots" :label="premium.note" />
+                  </span>
+                </td>
                 <td class="eu-contract__num">{{ euro(premium.monthlyPremium) }}</td>
-                <td>{{ premium.note ?? '–' }}</td>
                 <td class="eu-contract__actions">
                   <EuButton
                     variant="secondary"
@@ -427,6 +456,21 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                   />
                 </td>
               </tr>
+              <tr v-if="contract.premiums.length > 1">
+                <td colspan="3" class="eu-contract__more">
+                  <button
+                    type="button"
+                    :aria-expanded="showOlder.premiums"
+                    @click="showOlder.premiums = !showOlder.premiums"
+                  >
+                    {{
+                      showOlder.premiums
+                        ? 'Ältere Einträge ausblenden'
+                        : olderLabel(contract.premiums.length - 1)
+                    }}
+                  </button>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -442,7 +486,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
         <p v-if="contract.terms.length === 0" class="eu-contract__hint">
           Noch keine Konditionen erfasst.
         </p>
-        <div v-else class="eu-contract__scroll">
+        <div v-else class="eu-contract__scroll eu-scroll-focus-safe">
           <table class="eu-contract__table">
             <thead>
               <tr>
@@ -457,7 +501,10 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="terms in contract.terms" :key="terms.termsUID">
+              <tr
+                v-for="terms in visibleRows(termsNewestFirst, showOlder.terms)"
+                :key="terms.termsUID"
+              >
                 <td class="eu-contract__period">{{ termsPeriod(terms) }}</td>
                 <td class="eu-contract__num">{{ euro(terms.deductible) }}</td>
                 <td class="eu-contract__num">
@@ -495,6 +542,21 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                   />
                 </td>
               </tr>
+              <tr v-if="contract.terms.length > 1">
+                <td colspan="6" class="eu-contract__more">
+                  <button
+                    type="button"
+                    :aria-expanded="showOlder.terms"
+                    @click="showOlder.terms = !showOlder.terms"
+                  >
+                    {{
+                      showOlder.terms
+                        ? 'Ältere Einträge ausblenden'
+                        : olderLabel(contract.terms.length - 1)
+                    }}
+                  </button>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -511,7 +573,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
         <p v-if="contract.years.length === 0" class="eu-contract__hint">
           Noch kein Jahr zu zählen – der Zählbeginn liegt in der Zukunft.
         </p>
-        <div v-else class="eu-contract__scroll">
+        <div v-else class="eu-contract__scroll eu-scroll-focus-safe">
           <table class="eu-contract__table">
             <thead>
               <tr>
@@ -526,8 +588,13 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="y in yearsNewestFirst" :key="y.year">
-                <th scope="row" class="eu-contract__period">{{ y.year }}</th>
+              <tr v-for="y in visibleRows(yearsNewestFirst, showOlder.years)" :key="y.year">
+                <th scope="row" class="eu-contract__period">
+                  {{ y.year }}
+                  <span v-if="y.note" class="eu-contract__note">
+                    <EuIconLabel :icon="faCommentDots" :label="y.note" />
+                  </span>
+                </th>
                 <td>
                   <EuBadge :tone="yearStatus(y).tone" :icon="yearStatus(y).icon">{{
                     yearStatus(y).label
@@ -559,6 +626,21 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     :aria-label="`Jahr ${y.year} erfassen (Rückerstattung, Verwirkung)`"
                     @click="openYear(y)"
                   />
+                </td>
+              </tr>
+              <tr v-if="contract.years.length > 1">
+                <td colspan="6" class="eu-contract__more">
+                  <button
+                    type="button"
+                    :aria-expanded="showOlder.years"
+                    @click="showOlder.years = !showOlder.years"
+                  >
+                    {{
+                      showOlder.years
+                        ? 'Ältere Jahre ausblenden'
+                        : olderLabel(contract.years.length - 1, 'älteres Jahr', 'ältere Jahre')
+                    }}
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -718,5 +800,31 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
 
 .eu-contract__actions button + button {
   margin-left: 0.4rem;
+}
+
+/* A recorded note: the bubble stands next to the period or year it belongs to,
+   the text itself is the tooltip (and the icon's accessible name). */
+.eu-contract__note {
+  margin-left: 0.4rem;
+  color: var(--eu-color-text-muted);
+}
+
+/* The disclosure row under a history table — a quiet link, not a data row. */
+.eu-contract__table .eu-contract__more {
+  border-bottom: none;
+  padding-top: 0.5rem;
+}
+
+.eu-contract__more button {
+  border: none;
+  background: none;
+  padding: 0.15rem 0;
+  font: inherit;
+  color: var(--eu-color-accent-text);
+  cursor: pointer;
+}
+
+.eu-contract__more button:hover {
+  text-decoration: underline;
 }
 </style>

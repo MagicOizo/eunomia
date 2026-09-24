@@ -710,5 +710,38 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **Im laufenden System geprüft** (Playwright, Light/Dark, 390 px und Desktop): Code im Popover und im Detaildialog, das äußere Zahlungsinfo-Popover bleibt beim Öffnen des inneren offen, Barzahlungs-Rechnung bietet keinen Code, ein eingetragenes Zahlungsdatum oder der Barzahlungs-Schalter lassen das Icon sofort verschwinden, Fokusring im scrollenden Dialogkörper nicht abgeschnitten.
 - **Aufgefallen, nicht in dieser Scheibe behoben:** Bei 390 px ist die Wertespalte der Anzeigemaske so schmal, dass **alle** Werte abgeschnitten werden („Hau…", „Beis…"); die IBAN wird dort jetzt mit Ellipse gekappt, damit sie nicht über das QR-Icon läuft. Die Maske als Ganzes braucht Breite — Punkt für die Politur-Scheibe (Slice-8-Backlog „Dialog-Layout überarbeiten").
 
+## Slice 29 — Politur: Anzeigemaske, Tabellen, Verläufe (umgesetzt 2026-09-24)
+
+**Anlass:** Die beiden vorangegangenen Scheiben haben je einen optischen Mangel notiert statt behoben („Punkt für die Politur-Scheibe"), und der Slice-8-Backlog führt „Dialog-Layout überarbeiten" und „Näher an den Stil der Referenz-App" seit Slice 8. Vorgeschaltet war die dort versprochene **Gegenüberstellung** mit den Referenz-Screenshots (`Rechnungsdetails.png`, `Rechnungen_Verknüpfen.png`, `Leistungsabrechnung auswählen.png`), im laufenden System mit Playwright aufgenommen.
+
+**Ergebnis der Gegenüberstellung:** Das Raster der Referenz ist übernommen, funktional liegen die Dialoge über ihr (Typeahead statt leerem Feld, Karten je Rechnung, Prüfung gegen den Restbetrag, GiroCode). Abweichungen waren die fehlenden Doppelpunkte hinter den Labels, rechtsbündige Beträge mitten unter linksbündigen Werten und unsichtbare Leerfelder. Dazu drei gemessene Defekte auf eigenen Flächen: Maske bei 390 px unlesbar (Wertspalte ~60 px), Rechnungstabelle bei 1440 px 60 px zu breit, Policen-Dialog 1395 px Inhalt in 726 px Körper.
+
+**DoD:** Die Maske ist auf dem Telefon lesbar, die Rechnungstabelle passt am 1440er in ihre Karte, der Policen-Dialog zeigt je Verlauf nur den geltenden Eintrag, und die Referenz-Abweichungen sind nachgezogen.
+
+**Entscheidungen (Planmodus):**
+
+- **Notizen als Sprechblase über `EuIconLabel`, nicht über `title`** (Abweichung von der Vorgabe des Autors, im Plan benannt und dort freigegeben): `title` erscheint bei Tastaturfokus nie und auf dem Telefon gar nicht; `EuIconLabel` + `EuTooltip` gibt es bereits und wird in den Zahlungsinformationen schon so benutzt.
+- **Kein `<details>` für die Verläufe:** Es darf nicht zwischen `<tbody>` und `<tr>` stehen. Stattdessen eine Schaltzeile mit `aria-expanded` und die weiteren Zeilen per `v-if`.
+- **Alle drei Verläufe neueste zuerst.** Beitragsverlauf und Konditionen kommen von der API aufsteigend; ohne das Drehen stünde der sichtbare Eintrag unten und die Aufklappung darüber. Der Jahresverlauf war schon so sortiert.
+- **Media Query, keine Container Query,** für den Maskenumbruch: `container-type: inline-size` nähme dem Raster die inhaltsabhängige Spaltenbreite, und der Dialog ist unterhalb 46 rem ohnehin viewport-breit — die Bildschirmbreite ist ein exakter Stellvertreter.
+- **Tabellen-CSS nicht zusammengeführt:** Sieben Dateien halten je eine Kopie der `border-collapse`/`th`/`td`-Regeln. Das ist ein Refactoring mit Regressionsrisiko in sieben Ansichten, keine Politur — Backlog.
+
+**Umgesetzt (2026-09-24).** Entscheidungen beim Bau:
+
+- `showOlder` steht **oben** bei den übrigen Zuständen, nicht bei den Verlaufs-Helfern: Der `immediate`-Watcher setzt es beim Öffnen zurück und läuft noch während des Setups — weiter unten deklariert liefe er in die temporale Totzone. (Beim Bau genau einmal passiert.)
+- Die Sprechblase steckt in einem `<span class="eu-contract__note">`: `EuIconLabel` hat zwei Wurzelknoten (Auslöser + Blase), eine Klasse an der Komponente selbst landet also nirgends.
+- **Fokusring:** `outline: none` in `EuDetailField` ersatzlos entfernt (die globale `:focus-visible`-Regel greift dann wieder); Picker und Währungsfeld tragen ihn über `:has(:focus-visible)` am Control, damit er außen um das Feld liegt und nicht innen um das randlose `<input>`. Die drei waren die einzigen Stellen der App ohne den Ring — gemessen `outline-style: none` am tastaturfokussierten Feld.
+- **Betrag in der Maske:** Das Feld wird über `ch` auf seinen Inhalt bemessen, statt die Spalte zu füllen — sonst klebt das € am rechten Rand statt am Betrag. Ein `ch` ist die Breite der Null und überschätzt Komma und Punkt, daher die Zeichenzahl plus ein halbes Zeichen für den Cursor.
+- `.eu-ws__table-wrap` hat jetzt `eu-scroll-focus-safe`, nach der Regel in `global.css`: an **jeden** Scroll-Container, nicht nur an die, wo heute zufällig ein Feld am Rand sitzt.
+- **Im laufenden System geprüft** (Playwright, Light/Dark, 390 px und 1440 px): kein einziger Wert der Maske bei 390 px mehr abgeschnitten (gemessen `scrollWidth` gegen `clientWidth` über alle Felder), Rechnungstabelle bei 1440 px ohne Überhang und mit sichtbarer Aktionen-Spalte, Sprechblase bei Hover **und** Tastaturfokus, Fokusring der Schaltzeile per Tab-Taste aufgenommen und vollständig (die Ringkappung sieht keine DOM-Messung).
+- **Nicht vollständig erreicht:** Der Policen-Dialog ist von 1395 px auf 1000 px Inhalt geschrumpft (bei 724 px Sichthöhe) — deutlich weniger, aber immer noch nicht eine Bildschirmhöhe. Und die Rechnungstabelle passt erst ab etwa 1400 px; bei 1280 px bleiben 119 px Überhang, den der `overflow-x` des Wrappers auffängt (die Spalten sind dort schmaler als vorher, der Überhang also kleiner — aber eben nicht weg). Neun Spalten mit Status-Badges und vier Aktionsknöpfen passen dort nicht ohne Spaltenverzicht — das wäre eine eigene Entscheidung, keine Politur.
+- **Am Rande behoben:** `BonusYearDto.note` wurde gespeichert, aber in keiner Ansicht ausgegeben; die Notiz eines Jahres war nach dem Erfassen unsichtbar.
+
+**Backlog aus dieser Scheibe:**
+
+- **Startseite mit Inhalt:** Sie ist reine Kachel-Navigation. Offene Rechnungen, fällige Zahlungen und die Empfehlung des Optimierers gehören dorthin — ein Feature, keine Politur.
+- **Tabellen-CSS zusammenführen** (siehe Entscheidungen oben).
+- **Rechnungstabelle unter 1400 px:** entweder eine Spalte ausblenden oder die Aktionsspalte am rechten Rand festhalten (`position: sticky`).
+
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.

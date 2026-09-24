@@ -98,6 +98,7 @@ function reset(): void {
           :value="modelValue ?? ''"
           :aria-label="label"
           :disabled="disabled"
+          placeholder="–"
           @input="onText"
         />
         <input
@@ -109,6 +110,7 @@ function reset(): void {
           :value="modelValue ?? ''"
           :aria-label="label"
           :disabled="disabled"
+          placeholder="–"
           @input="onNumber"
         />
         <EuCurrencyField
@@ -177,6 +179,10 @@ function reset(): void {
   white-space: nowrap;
 }
 
+.eu-detail__label::after {
+  content: ':';
+}
+
 .eu-detail__value {
   min-width: 0;
 }
@@ -212,7 +218,12 @@ function reset(): void {
 
 .eu-detail__input:focus {
   border-color: var(--eu-color-accent);
-  outline: none;
+}
+
+/* An empty field is invisible without this — the dash says a value can go
+   here, and it only shows while the field is empty. */
+.eu-detail__input::placeholder {
+  color: var(--eu-color-text-muted);
 }
 
 .eu-detail__actions {
@@ -239,5 +250,23 @@ function reset(): void {
 .eu-detail__action:disabled {
   opacity: 0.3;
   cursor: default;
+}
+
+/*
+ * Narrow screens (see EuDetailMask): the label sits on its own line above its
+ * value, and closer to it than to the row above — the spacing rule
+ * dialog-design.md gives for the create form, which is what this layout turns
+ * into. The value keeps column 1, the actions column 2.
+ */
+@media (max-width: 34rem) {
+  .eu-detail__label {
+    grid-column: 1 / -1;
+    margin-top: 0.7rem;
+    font-size: 0.85rem;
+  }
+
+  .eu-detail__value {
+    padding-bottom: 0.15rem;
+  }
 }
 </style>

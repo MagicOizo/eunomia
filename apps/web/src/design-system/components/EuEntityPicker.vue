@@ -165,7 +165,7 @@ function onKeydown(event: KeyboardEvent): void {
         ref="input"
         class="eu-picker__input"
         :value="displayValue"
-        :placeholder="open && selected ? selected.label : ''"
+        :placeholder="open && selected ? selected.label : bare ? '–' : ''"
         :disabled="disabled"
         :aria-label="bare ? label : undefined"
         autocomplete="off"
@@ -268,6 +268,11 @@ function onKeydown(event: KeyboardEvent): void {
   border-color: var(--eu-color-accent);
 }
 
+.eu-picker__control:has(:focus-visible) {
+  outline: var(--eu-focus-ring-width) solid var(--eu-color-focus-ring);
+  outline-offset: var(--eu-focus-ring-offset);
+}
+
 .eu-picker__control.is-disabled {
   opacity: 0.6;
 }
@@ -299,6 +304,11 @@ function onKeydown(event: KeyboardEvent): void {
 
 .eu-picker__input:focus {
   outline: none;
+}
+
+/* The dash of the display mask (see the placeholder binding above). */
+.eu-picker__input::placeholder {
+  color: var(--eu-color-text-muted);
 }
 
 .eu-picker__action {
