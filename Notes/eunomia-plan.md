@@ -581,7 +581,7 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - `commonSubmissions()` in `eligibility.ts` ist die Kompatibilitätsprüfung fürs Verknüpfen; im Workspace hängt daran der Toolbar-Button „Abrechnung zuordnen (n)".
 - `BillingsView` filtert über denselben Endpunkt (Filterleiste über der Tabelle).
 - **Nachgezogen:** Dialoge, die auf eine Auswahl wirken, nennen nicht mehr nur eine Anzahl. `InvoiceBriefList` listet Nummer, Leistungserbringer, Datum und Betrag je Rechnung — im Einreichen-Dialog, in der Löschen-Bestätigung und (als Teil der Karten) beim Zuordnen. Die Namen kommen als `facilityUID → Name` von der jeweiligen Sicht.
-- **Offen (Ausblick):** `NewBillingDialog` (Anlegen mit Betragsraster aus der Vertragssicht) und der erweiterte `BillingDialog` überschneiden sich inhaltlich — die Zusammenführung wäre ein eigener kleiner Slice.
+- **Offen gewesen:** `NewBillingDialog` (Anlegen mit Betragsraster aus der Vertragssicht) und der erweiterte `BillingDialog` überschnitten sich inhaltlich — zusammengeführt in Slice 27.
 
 ## Slice 23 — Anzeigemaske für die Stammdaten (Rollout aus Slice 15)
 **Ziel:** Ansehen/Bearbeiten ist überall die 3-Spalten-Maske, Anlegen überall das klassische Formular.
@@ -660,6 +660,30 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **Lockfile wird geparst und neu geschrieben**, nicht per Textersatz: `"version": "0.9.0"` kommt auch als Version einer Abhängigkeit vor. Geprüft, dass `JSON.stringify(…, null, 2)` die Datei byte-identisch reproduziert — der Bump ist damit ein Diff von fünf Zeilen.
 - `version:next patch` verweigert den Sprung aus einem Prerelease heraus, und `set` verweigert eine Version, die nicht neuer ist als die laufende (`--force` hebt es auf): beides Fälle, in denen die Nummer sonst leise falsch wird.
 - **Diese Scheibe selbst bekommt `0.10.0-slice.1`**, obwohl 2.9 reine Build-Commits von der Zählung ausnimmt: sie ändert die Veröffentlichung selbst, bringt eine betreiberseitige `CHANGELOG.md` mit, und der erste echte Durchlauf der neuen Mechanik ist ihr eigenes Tag — schlägt er fehl, betrifft es nur ein Prerelease und nicht `:latest`.
+
+## Slice 27 — Abrechnungs-Dialoge zusammenführen (umgesetzt 2026-09-24)
+
+**Anlass:** Der Ausblick-Punkt aus Slice 22. Die vier Felder einer Leistungsabrechnung — Nummer, Datum, Dokument-Link, Bonus-Toggle samt Regelhinweis — standen an drei Stellen im Repo: `NewBillingDialog` (Vertragssicht), `BillingFormDialog` (Subdialog am ＋ des Abrechnungs-Pickers) und das Inline-Formular „Abrechnung bearbeiten" in `BillingsView`. `NewBillingDialog` hatte dazu ein zweites, schwächeres Betragsraster: rohes `<input type="number">` statt `EuCurrencyField`, keine Belegnummer, keine Prüfung gegen den offenen Restbetrag — alles Dinge, die `BillingDialog` seit Slice 22 kann. Wer über die Vertragssicht buchte, bekam also weniger Hilfe als wer über den Arbeitsbereich buchte.
+
+**DoD:** Der Feldsatz steht genau einmal im Repo, aus der Vertragssicht wird mit demselben Raster gebucht wie überall sonst, `NewBillingDialog` ist gelöscht.
+
+**Entscheidungen (Planmodus):**
+
+- **„Neu" bleibt ein Ein-Schritt-Ablauf, aber aus zwei Dialogen:** anlegen (mit Einreichungs-Auswahl), dann direkt `BillingDialog` mit den offenen Rechnungen dieser Einreichung. Die Alternative „Neu legt nur an, gebucht wird im Arbeitsbereich" wäre weniger Code, nimmt der Vertragssicht aber ihren Zweck.
+- **„Abrechnung bearbeiten" zieht mit** — sonst bliebe nach dem Merge weiter eine Kopie des Feldsatzes übrig.
+- **Kein Backend-Eingriff:** `GET /submissions` bleibt ungefiltert, gefiltert wird clientseitig auf den Vertrag, wie `NewBillingDialog` es schon tat.
+- **Optische Politur Richtung Referenz-App ist nicht Teil dieser Scheibe** (siehe Backlog aus Slice 8); sie bekommt eine eigene, nach einer Gegenüberstellung mit den Referenz-Screenshots.
+
+**Umgesetzt (2026-09-24).** Entscheidungen beim Bau:
+
+- `BillingFormDialog` ist der eine Dialog für die Abrechnung selbst: Anlegen **und** Bearbeiten, mit Einreichungs-Picker nur dann, wenn die Einreichung nicht feststeht — die Einreichung einer bestehenden Abrechnung wird nicht verschoben. Emit `created` → `saved`.
+- Er **speichert weiter selbst** (`createBilling`/`updateBilling`), die Sicht lädt nur neu. Die „dummen" Dialoge aus Slice 23 sind die `ResourceConfig`-Masken; hier teilen sich zwei Aufrufer denselben Request, eine Auslagerung hätte ihn nur verdoppelt.
+- `BillingDialog` bekam als einzige Änderung `presetBilling`, angewendet **nur** im `open`-Watcher: nach einem Policenwechsel im offenen Dialog darf die Vorauswahl nicht zurückkommen. Ohne sie bliebe die frisch angelegte Abrechnung in einer Einreichung mit mehreren Abrechnungen unausgewählt.
+- `BillingsView` lädt jetzt auch Einreichungen, die Rechnungen des Kontos und die Leistungserbringer-Namen. Die Rechnungen kommen aus `load()` (das nach jeder Änderung läuft), damit die Karten nie einen Restbetrag zeigen, den eine Buchung dazwischen schon verbraucht hat.
+- **Altfehler gefunden und behoben:** `EuDialog` öffnete sich nie, wenn die Komponente bereits mit `open=true` gemountet wurde — der Fall, den ein `v-if` erzeugt, dessen Bedingung und `open` im selben Tick wahr werden. Der `immediate`-Watcher lief vor dem Template-Ref und traf `null`. `flush: 'post'` hilft nicht (Vue führt den Erstlauf eines `immediate`-Watchers synchron aus, egal welcher Flush); die Synchronisierung hängt jetzt zusätzlich an `onMounted`. Regressionstest in `EuDialog.test.ts`.
+- Dazu neu ein Vitest-Setup (`apps/web/src/test/setup.ts`): jsdom rendert `<dialog>`, kennt aber `showModal()`/`close()` nicht. Vorher fiel das nicht auf, weil der Watcher ohnehin nichts tat — die Dialog-Tests liefen also an einem nie geöffneten Dialog.
+- **Im laufenden System geprüft** (Playwright, Light/Dark, 390 px): Anlegen → Buchen-Kette mit Karten je Rechnung, ein Betrag über dem Restbetrag wird vor dem Request abgelehnt und nennt die Rechnung, die Zeile zeigt danach die Summe und beide Rechnungsnummern, der Bearbeiten-Dialog ist vorbelegt (inkl. gespeichertem Bonus-Toggle), und der ＋-Subdialog im Buchen-Dialog übernimmt die getippte Nummer und wird nach dem Anlegen ausgewählt. Fokusring im scrollenden Dialogkörper nicht abgeschnitten.
+- **Aufgefallen, nicht in dieser Scheibe behoben:** Im Buchen-Dialog stehen Erstattung und Belegnummer auch bei 390 px nebeneinander, wodurch die Labels dreizeilig brechen — ein Punkt für die Politur-Scheibe.
 
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.

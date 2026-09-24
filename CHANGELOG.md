@@ -7,6 +7,16 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.10.0-slice.2 — 2026-09-24
+
+- Creating a service billing from a policy's billing list now leads straight into booking its
+  reimbursements, with the same invoice cards as the invoice workspace: an amount field per invoice,
+  a receipt number, and a check against what the invoice still has open.
+- Creating and editing a service billing now use one and the same dialog, so its fields behave
+  identically wherever they are reached from.
+- Fixed: a dialog that appeared on screen already open stayed invisible. No dialog in the
+  application reached that state before this release.
+
 ## 0.10.0-slice.1 — 2026-09-24
 
 - Versioning mechanics for the rules agreed in §2.9: `npm run version:next -- slice|minor|patch|major`

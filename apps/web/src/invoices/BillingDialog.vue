@@ -37,6 +37,8 @@ const props = defineProps<{
   facilityNames: Record<string, string>;
   /** Preselected submission (policy) when opened from one card. */
   presetSubmission?: string | null;
+  /** Billing to preselect — the one just created from the contract side. */
+  presetBilling?: string | null;
   submitting: boolean;
   error: string | null;
 }>();
@@ -169,6 +171,9 @@ watch(
       shared[0]?.submissionUID ??
       '';
     await loadBillings();
+    // Only here, not in loadBillings(): switching the policy afterwards must
+    // not bring the preselection back.
+    if (props.presetBilling) selectedBilling.value = props.presetBilling;
     forfeit.reset();
     accountInvoices.value = await listAccountInvoices(rows.value[0].accountUID);
   },
@@ -193,7 +198,7 @@ function removeInvoice(uid: string): void {
   delete entries[uid];
 }
 
-function onBillingCreated(billing: BillingDto): void {
+function onBillingSaved(billing: BillingDto): void {
   billings.value = [
     { ...billing, reimbursedTotal: 0, invoiceCount: 0, invoiceNumbers: null } as BillingListDto,
     ...billings.value,
@@ -387,7 +392,7 @@ function submit(): void {
     :bonus-forfeit-rule="selectedSubmission.bonusForfeitRule"
     :preset-number="createPrefill"
     @close="createOpen = false"
-    @created="onBillingCreated"
+    @saved="onBillingSaved"
   />
 </template>
 

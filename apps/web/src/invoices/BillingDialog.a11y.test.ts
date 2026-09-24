@@ -139,6 +139,19 @@ describe('BillingDialog with several invoices', () => {
     wrapper.unmount();
   });
 
+  it('preselects the billing it was handed, even with several candidates', async () => {
+    const second: BillingListDto = { ...billing, billingUID: 'b-2', billingNumber: 'LA-43' };
+    searchBillings.mockResolvedValue([billing, second]);
+    const wrapper = await openDialog({ presetBilling: 'b-2' });
+
+    const picker = wrapper.find<HTMLInputElement>('input[role="combobox"]');
+    // The dialog focuses its first field, and a focused picker shows the typed
+    // query rather than the selected label.
+    await picker.trigger('blur');
+    expect(picker.element.value).toBe('LA-43');
+    wrapper.unmount();
+  });
+
   it('has no automatically detectable accessibility violations', async () => {
     const wrapper = await openDialog();
     const results = await axe.run(wrapper.element, {

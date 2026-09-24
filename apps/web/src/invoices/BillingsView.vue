@@ -17,22 +17,38 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
-import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from '../contracts/api';
+import type { PickerOption } from '../design-system/components/EuEntityPicker.vue';
+import { type BonusForfeitRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
 import { useDebouncedCallback } from '../lib/debounce';
 import { euro, germanDate, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
+import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/useTableSort';
-import { type BillingListDto, deleteBilling, searchBillings, updateBilling } from './api';
-import NewBillingDialog from './NewBillingDialog.vue';
+import {
+  type BillingDto,
+  type BillingListDto,
+  type InvoiceDto,
+  type SubmissionDto,
+  deleteBilling,
+  listAccountInvoices,
+  listSubmissions,
+  searchBillings,
+  updateBilling,
+} from './api';
+import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
+import BillingDialog from './BillingDialog.vue';
+import BillingFormDialog from './BillingFormDialog.vue';
 
 const props = defineProps<{ contractUID: string }>();
 
 const billings = ref<BillingListDto[]>([]);
 const heading = ref('');
-const accountUID = ref('');
 const forfeitRule = ref<BonusForfeitRule>('ON_REIMBURSEMENT');
+const submissions = ref<SubmissionDto[]>([]);
+const accountInvoices = ref<InvoiceDto[]>([]);
+const facilityNames = ref<Record<string, string>>({});
 const newOpen = ref(false);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
@@ -83,10 +99,18 @@ const busy = ref(false);
 const dialogError = ref<string | null>(null);
 const formDate = ref('');
 const formNote = ref('');
-const editNumber = ref('');
-const editDate = ref('');
-const editLink = ref('');
-const editForfeits = ref(false);
+const bookOpen = ref(false);
+const bookBilling = ref<BillingDto | null>(null);
+const bookInvoices = ref<InvoiceDto[]>([]);
+
+/** The submissions a new billing can belong to — newest first. */
+const submissionOptions = computed<PickerOption[]>(() =>
+  submissions.value.map((s) => ({
+    value: s.submissionUID,
+    label: `Einreichung vom ${germanDate(s.submittedDate)}`,
+    hint: plural(s.invoiceUIDs.length, 'Rechnung', 'Rechnungen'),
+  })),
+);
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -122,8 +146,22 @@ async function load(): Promise<void> {
     );
     const person = [account.data.firstname, account.data.surname].filter(Boolean).join(' ');
     heading.value = `${contract.data.contractNumber} · ${person}`;
-    accountUID.value = contract.data.accountUID;
     forfeitRule.value = contract.data.bonusForfeitRule;
+    // The invoices and the provider names are what the booking dialog needs
+    // after a billing has been created; reloaded here so its cards never show
+    // an amount that a booking in between has already used up.
+    const [subs, invoices, facilities] = await Promise.all([
+      listSubmissions(),
+      listAccountInvoices(contract.data.accountUID),
+      listResource<{ facilityUID: string; facilityName: string }>('/facilities'),
+    ]);
+    submissions.value = subs
+      .filter((s) => s.contractUID === props.contractUID)
+      .sort((a, b) => b.submittedDate.localeCompare(a.submittedDate));
+    accountInvoices.value = invoices;
+    facilityNames.value = Object.fromEntries(
+      facilities.map((f) => [f.facilityUID, f.facilityName]),
+    );
     await loadBillings();
   } catch (err) {
     loadError.value =
@@ -194,29 +232,40 @@ function resolveObjection(): void {
 function openEdit(b: BillingListDto): void {
   selected.value = b;
   dialogError.value = null;
-  editNumber.value = b.billingNumber;
-  editDate.value = b.billingDate;
-  editLink.value = b.documentLink ?? '';
-  editForfeits.value = b.forfeitsBonus ?? forfeitsByRule(forfeitRule.value, b.reimbursedTotal);
   editOpen.value = true;
 }
 
-function saveEdit(): void {
-  const billing = selected.value;
-  if (!billing) return;
-  if (!editNumber.value.trim() || !editDate.value) {
-    dialogError.value = 'Bitte Abrechnungsnummer und -datum angeben.';
-    return;
-  }
+/**
+ * A new billing goes straight on to booking its amounts: the letter and the
+ * reimbursements it pays out arrive together, so the two dialogs are one flow.
+ * A submission without an open invoice ends after the letter — there is
+ * nothing to book.
+ */
+async function onCreated(billing: BillingDto): Promise<void> {
+  newOpen.value = false;
+  await load();
+  if (loadError.value) return;
+  const open = accountInvoices.value.filter(
+    (invoice) =>
+      !invoice.reimbursementClosed &&
+      invoice.submissions.some((s) => s.submissionUID === billing.submissionUID),
+  );
+  if (open.length === 0) return;
+  dialogError.value = null;
+  bookBilling.value = billing;
+  bookInvoices.value = open;
+  bookOpen.value = true;
+}
+
+function onEdited(): void {
+  editOpen.value = false;
+  void load();
+}
+
+function bookAllocations(payload: BillingAllocationPayload): void {
   void run(
-    () =>
-      updateBilling(billing.billingUID, {
-        billingNumber: editNumber.value.trim(),
-        billingDate: editDate.value,
-        documentLink: editLink.value.trim() ? editLink.value.trim() : null,
-        forfeitsBonus: editForfeits.value,
-      }),
-    () => (editOpen.value = false),
+    () => saveBillingAllocations(payload),
+    () => (bookOpen.value = false),
   );
 }
 
@@ -416,34 +465,33 @@ function confirmDelete(): void {
       </template>
     </EuDialog>
 
-    <EuDialog :open="editOpen" title="Abrechnung bearbeiten" @close="editOpen = false">
-      <form class="eu-form" @submit.prevent="saveEdit">
-        <EuTextField v-model="editNumber" label="Abrechnungsnummer" />
-        <EuTextField v-model="editDate" label="Abrechnungsdatum" type="date" />
-        <EuTextField v-model="editLink" label="Dokument-Link (optional)" />
-        <div>
-          <EuToggle v-model="editForfeits" label="Diese Abrechnung verwirkt den Bonus" />
-          <p class="eu-billings__hint">
-            Regel der Police: Bonus verfällt {{ BONUS_FORFEIT_RULE_LABEL[forfeitRule] }}.
-          </p>
-        </div>
-        <p v-if="dialogError" class="eu-billings__error" role="alert">{{ dialogError }}</p>
-      </form>
-      <template #footer>
-        <EuButton variant="secondary" @click="editOpen = false">Abbrechen</EuButton>
-        <EuButton :disabled="busy" @click="saveEdit">{{
-          busy ? 'Speichern…' : 'Speichern'
-        }}</EuButton>
-      </template>
-    </EuDialog>
+    <BillingFormDialog
+      v-if="selected"
+      :open="editOpen"
+      :billing="selected"
+      :bonus-forfeit-rule="forfeitRule"
+      @close="editOpen = false"
+      @saved="onEdited"
+    />
 
-    <NewBillingDialog
+    <BillingFormDialog
       :open="newOpen"
-      :contract-u-i-d="contractUID"
-      :account-u-i-d="accountUID"
+      :submission-options="submissionOptions"
       :bonus-forfeit-rule="forfeitRule"
       @close="newOpen = false"
-      @created="load"
+      @saved="onCreated"
+    />
+
+    <BillingDialog
+      :open="bookOpen"
+      :invoices="bookInvoices"
+      :facility-names="facilityNames"
+      :preset-submission="bookBilling?.submissionUID ?? null"
+      :preset-billing="bookBilling?.billingUID ?? null"
+      :submitting="busy"
+      :error="dialogError"
+      @close="bookOpen = false"
+      @submit="bookAllocations"
     />
 
     <EuDialog :open="deleteOpen" title="Abrechnung löschen" @close="deleteOpen = false">

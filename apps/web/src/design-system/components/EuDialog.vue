@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
-import { nextTick, useId, useTemplateRef, watch } from 'vue';
+import { nextTick, onMounted, useId, useTemplateRef, watch } from 'vue';
 
 import EuButton from './EuButton.vue';
 
@@ -17,28 +17,31 @@ const emit = defineEmits<{ close: [] }>();
 const dialogRef = useTemplateRef<HTMLDialogElement>('dialog');
 const titleId = useId();
 
-watch(
-  () => props.open,
-  (isOpen) => {
-    const dialog = dialogRef.value;
-    if (!dialog) return;
-    if (isOpen && !dialog.open) {
-      dialog.showModal();
-      // showModal() focuses the first focusable element, which is the header
-      // close button. Move focus to the first form control in the body instead
-      // (e.g. the prefilled name field), skipping the close button.
-      void nextTick(() => {
-        dialog
-          .querySelector<HTMLElement>(
-            '.eu-dialog__body input, .eu-dialog__body select, .eu-dialog__body textarea',
-          )
-          ?.focus();
-      });
-    }
-    if (!isOpen && dialog.open) dialog.close();
-  },
-  { immediate: true },
-);
+/** Mirrors `open` onto the native element — the only place it is opened or closed. */
+function sync(): void {
+  const dialog = dialogRef.value;
+  if (!dialog) return;
+  if (props.open && !dialog.open) {
+    dialog.showModal();
+    // showModal() focuses the first focusable element, which is the header
+    // close button. Move focus to the first form control in the body instead
+    // (e.g. the prefilled name field), skipping the close button.
+    void nextTick(() => {
+      dialog
+        .querySelector<HTMLElement>(
+          '.eu-dialog__body input, .eu-dialog__body select, .eu-dialog__body textarea',
+        )
+        ?.focus();
+    });
+  }
+  if (!props.open && dialog.open) dialog.close();
+}
+
+watch(() => props.open, sync);
+// Not `immediate`: that runs before the template ref exists. A dialog mounted
+// with open=true — a v-if whose condition and `open` turn true in the same
+// tick — would otherwise never show.
+onMounted(sync);
 </script>
 
 <template>
