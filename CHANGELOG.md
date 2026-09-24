@@ -7,6 +7,25 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.11.0-slice.1 — 2026-09-24
+
+- **System settings.** The admin area's settings page is no longer a placeholder. Values an
+  operator used to set through `.env` now live in the database and can be changed in the browser,
+  in collapsible sections.
+- **Encrypted secrets.** The SMTP password and the GitHub token for the update check are stored
+  with AES-256-GCM under `CONFIG_ENCRYPTION_KEY`, which stays in the environment — a database dump
+  alone does not reveal them, and the API never hands a stored secret back. Without the key
+  everything else still works and the page says why those two fields do not.
+- **Mail.** An SMTP account can be configured and proven with a test mail to the admin's own
+  address. The result of the last send — including the mail server's own words — is shown on the
+  page and survives a restart.
+- **Greppable log events.** Mail and update-check events are written as one line each with a fixed
+  `event=` token, so `docker logs eunomia | grep MAIL_SEND_FAILED` finds a failed send. Passwords
+  never appear in them.
+- **The update check says why it is silent.** It now reports a reason (a private repository needs a
+  token, GitHub unreachable, token rejected, rate limit) instead of showing nothing, the token can
+  be entered on the page, and **Check now** bypasses the six-hour cache.
+
 ## 0.10.0 — 2026-09-24
 
 Everything from the four `0.10.0-slice.N` previews below, as one release:

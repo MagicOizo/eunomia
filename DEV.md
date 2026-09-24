@@ -99,6 +99,45 @@ These read the `DB_*` variables from the environment.
 > **The API integration tests delete all data.** Point them at their own database, never at the
 > dev one: `DB_NAME=eunomia_test npm run test --workspace apps/api` (CI does the same).
 
+## System settings & mail
+
+Everything under **System > Settings** lives in the database, not in `.env`: an admin changes it
+without shell access. Values the database must not hold in the clear — the SMTP password and the
+GitHub token for the update check — are encrypted with `CONFIG_ENCRYPTION_KEY` (AES-256-GCM, see
+`apps/api/src/lib/secret-box.ts`), which stays in the environment. Generate one per instance:
+
+```bash
+openssl rand -base64 32
+```
+
+Without the key the app still starts and everything but those two secrets works; the settings page
+says so rather than failing silently. **Changing the key makes the stored secrets unreadable** —
+they have to be entered again. `npm run dev:up` exports a fixed dev key, so no setup is needed
+locally.
+
+The update check reads the token from the settings first and falls back to `UPDATE_CHECK_TOKEN`.
+A successful answer is cached for six hours (`UPDATE_CHECK_TTL_SECONDS`), a failed one for fifteen
+minutes; **Check now** on the settings page bypasses the cache. The repository is private, so
+without a token GitHub answers 404 and the footer stays silent by design — the settings page names
+that reason.
+
+### Finding mail problems in the log
+
+Mail events are one line each, with a fixed `event=` token (`apps/api/src/lib/log.ts`), so they can
+be filtered instead of read:
+
+```bash
+docker logs eunomia 2>&1 | grep MAIL_SEND_FAILED   # a rejected or unreachable mail server
+docker logs eunomia 2>&1 | grep MAIL_SEND_OK       # successful sends
+docker logs eunomia 2>&1 | grep MAIL_NOT_CONFIGURED        # switched off or incomplete
+docker logs eunomia 2>&1 | grep SETTINGS_SECRET_UNREADABLE # wrong/missing CONFIG_ENCRYPTION_KEY
+docker logs eunomia 2>&1 | grep -E 'eunomia event=' # every event line
+```
+
+A failure line carries the recipient, the host, the mail server's error code and its message — never
+a password. The settings page shows the same message next to the red status, and it survives a
+restart (it is stored with the settings).
+
 ## Production image (build locally / release)
 
 Production hosts pull a pre-built image from GHCR (`ghcr.io/magicoizo/eunomia`, referenced in

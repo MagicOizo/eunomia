@@ -24,3 +24,20 @@ export function germanDate(value: unknown): string {
   const [year, month, day] = value.split('-');
   return `${day}.${month}.${year}`;
 }
+
+/**
+ * Formats a full ISO timestamp as DD.MM.YYYY, HH:MM in local time — for the
+ * moments the app records itself (e.g. the last mail send), where the time of
+ * day is the point. Anything unparsable prints as a dash rather than
+ * "Invalid Date".
+ */
+export function germanDateTime(value: unknown): string {
+  if (typeof value !== 'string' || value === '') return '–';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '–';
+  const pad = (part: number): string => String(part).padStart(2, '0');
+  return (
+    `${pad(parsed.getDate())}.${pad(parsed.getMonth() + 1)}.${parsed.getFullYear()}, ` +
+    `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`
+  );
+}

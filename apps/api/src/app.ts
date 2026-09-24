@@ -26,6 +26,7 @@ import { createSubmissionsRouter } from './domain/submissions.js';
 import { errorHandler } from './lib/error-handler.js';
 import { createUpdateCheckRouter } from './routes/update-check.js';
 import { versionRouter } from './routes/version.js';
+import { createSettingsRouter } from './settings/routes.js';
 
 /** Optional dependencies for the routes that need a database and config. */
 export interface AppDependencies {
@@ -80,6 +81,7 @@ export function createApp(deps?: AppDependencies): Express {
     app.use('/api/v1', createAuthRouter(pool, config));
     app.use('/api/v1', createUserAdminRouter(pool, config));
     app.use('/api/v1', createUpdateCheckRouter(pool, config));
+    app.use('/api/v1', createSettingsRouter(pool, config));
     app.use('/api/v1/accounts', createAccountsRouter(pool, config));
     app.use('/api/v1/accounts', createReimbursementPlanRouter(pool, config));
     app.use('/api/v1/companies', createInsuranceCompaniesRouter(pool, config));

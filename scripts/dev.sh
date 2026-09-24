@@ -20,6 +20,10 @@ export PORT=3000
 # tooling share one IP bucket, and the strict prod default (10/15 min) would
 # otherwise lock you out with a 429.
 export RATE_LIMIT_AUTH_MAX=1000
+# Fixed dev key for the secrets in the system settings (SMTP password, GitHub
+# token). Constant on purpose: a random one per start would make every stored
+# secret unreadable after a restart. Never use it anywhere but here.
+export CONFIG_ENCRYPTION_KEY="ZGV2LW9ubHkta2V5LW5vdC1hLXJlYWwtc2VjcmV0MDA="
 export DEV_ADMIN_EMAIL="${DEV_ADMIN_EMAIL:-admin@example.com}"
 export DEV_ADMIN_PASSWORD="${DEV_ADMIN_PASSWORD:-eunomia}"
 

@@ -176,7 +176,7 @@ Explizit **nicht** Teil der in Abschnitt 3 geplanten Slices, aber beim Datenmode
 - **Mehrmandantenfähigkeit** (mehrere unabhängige Haushalte in einer Instanz).
 - ~~**Aktive Update-Prüfung gegen das Git-Repository**~~ — in Slice 25 umgesetzt (siehe dort).
 
-## 2.6 System-Konfiguration & Verschlüsselung (Vorgaben für spätere Umsetzung)
+## 2.6 System-Konfiguration & Verschlüsselung (~~Vorgaben für spätere Umsetzung~~ — in Slice 30 umgesetzt)
 
 Der E-Mail-Versand bleibt spätere Ausbaustufe (siehe 2.5), aber der Autor legt jetzt schon fest, **wie** er umzusetzen ist, damit die Infrastruktur nicht nachträglich umgebaut werden muss:
 
@@ -185,6 +185,8 @@ Der E-Mail-Versand bleibt spätere Ausbaustufe (siehe 2.5), aber der Autor legt 
 - Nur die `Admin`-Rolle (siehe 2.4) darf System-Einstellungen lesen/ändern.
 - Dieser Mechanismus wird generisch gebaut (nicht E-Mail-spezifisch), damit er später auch für andere Secrets taugt — z.B. für die im alten `todo.md` skizzierte Idee, `JWT_SECRET` aus der `.env` in die DB zu verlagern (siehe `future-dev-environment.md` §8). Das ist aber kein Ziel dieser Iteration, nur eine Randnotiz zur Wiederverwendbarkeit.
 - Wird zusammen mit dem E-Mail-Feature gebaut (siehe "Ausblick" in Abschnitt 3), nicht vorab — vermeidet eine Abstraktion ohne aktuellen Verwendungszweck.
+
+**Umgesetzt in Slice 30** (siehe dort): `SystemSettings`, `CONFIG_ENCRYPTION_KEY`, die Einstellungsseite und als erster Verbraucher der SMTP-Versand. Die Benachrichtigungs-Mails selbst (Zahlungserinnerungen) bleiben Ausblick.
 
 ## 2.7 Navigations-, Design- und Barrierefreiheits-Konzept
 
@@ -743,6 +745,49 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **Startseite mit Inhalt:** Sie ist reine Kachel-Navigation. Offene Rechnungen, fällige Zahlungen und die Empfehlung des Optimierers gehören dorthin — ein Feature, keine Politur.
 - **Tabellen-CSS zusammenführen** (siehe Entscheidungen oben).
 - **Rechnungstabelle unter einer bestimmten Bildschirmbreite auf Karten umstellen** (Festlegung des Autors, 2026-09-24): Statt die neun Spalten weiter zu quetschen oder seitlich zu scrollen, wechselt die Liste unterhalb der Schwelle vom Tabellen- ins **Karten-Layout** — eine Karte je Rechnung, die nur die wichtigsten Daten direkt zeigt und sich für den Rest (weitere Felder, die Aktionsknöpfe) aufklappen lässt. Damit erledigen sich der Überhang bei 1280 px und die gequetschte Tabelle auf dem Telefon in einem Zug. Die Schwelle und die Auswahl der „wichtigsten Daten" gehören in die Planung dieser Scheibe.
+
+## Slice 30 — System-Einstellungen: E-Mail-Versand, Secrets-Verschlüsselung, Version (umgesetzt 2026-09-24)
+
+**Anlass:** `/system/settings` stand seit Slice 6 in der Navigation und zeigte den `PlaceholderView`. Damit fehlte die Infrastruktur aus 2.6, von der mehreres abhängt: die E-Mail-Benachrichtigungen (2.5) brauchen eine gepflegte SMTP-Konfiguration, und deren Passwort darf nicht im Klartext in der DB liegen. Dazu kam eine Beobachtung des Autors: Trotz Release 0.10.0 zeigte die Fußzeile keinen Hinweis. **Kein Fehler, zwei Gründe:** Das Repository ist privat, `releases/latest` antwortet ohne Token mit 404 → `status: unavailable`, und die Fußzeile schweigt bei allem außer `ok` bewusst; außerdem lief die Instanz selbst auf 0.10.0. Die Prüfung ist zudem kein Polling — das Frontend fragt einmal pro Seitenladung, der Server cacht 6 h (Erfolg) bzw. 15 min (Fehlschlag).
+
+**DoD:** Ein Admin richtet den Mailserver im Browser ein, beweist ihn mit einer Testmail, sieht den Stand des letzten Versands, findet einen Fehlschlag mit einem Filter im Docker-Log wieder — und erfährt auf derselben Seite, welche Version läuft und warum die Update-Prüfung gegebenenfalls nichts sagen kann.
+
+**Entscheidungen (Planmodus):**
+
+- **Zwei Secrets** wandern in die verschlüsselten Einstellungen: SMTP-Passwort **und** `UPDATE_CHECK_TOKEN`. Die `.env` bleibt für den Token gültiger Fallback, der DB-Wert gewinnt — so ist er ohne Neustart wechselbar.
+- **Die Testmail geht immer an die Adresse des angemeldeten Admins**, kein Empfängerfeld: eine Instanz mit fremdem Mailserver soll nicht als Versender an Dritte taugen.
+- **XOAUTH2 vorbereitet, nicht gebaut.** Nodemailer beherrscht es; der Aufwand liegt im OAuth-Consent-Flow des Anbieters (App-Registrierung, Callback-Route, Refresh-Token-Haltung) und ist ohne registrierte App nicht verifizierbar. Es gibt deshalb `mail.authMethod` mit heute genau einem Wert (`PASSWORD`) — der Rest kommt später ohne Migration dazu.
+- **Nodemailer** (`^10.0.10`, MIT-0, null Laufzeitabhängigkeiten, eigene Typdefinitionen) statt Eigenbau: SMTP mit STARTTLS und AUTH ist eine Protokoll-Implementierung, kein Textformat wie der EPC-Block aus Slice 28.
+
+**Umgesetzt (2026-09-24).** Entscheidungen beim Bau:
+
+- **Selbstbeschreibendes Chiffrat** `aes-256-gcm$<iv>$<tag>$<ciphertext>` in `lib/secret-box.ts`, nach dem Vorbild der Passwort-Hashes (`scrypt$…`). Ein verschlüsselter Wert ist damit in der Tabelle als solcher erkennbar, und ein späterer Algorithmuswechsel kann alte Werte weiterlesen. Deshalb hat `SystemSettings` **keine** `isSecret`-Spalte: was ein Secret ist, sagt die Registry im Code, ob ein Wert verschlüsselt ist, sagt der Umschlag — eine zweite Quelle könnte abdriften.
+- **`CONFIG_ENCRYPTION_KEY` ist optional.** Fehlt er, startet die App normal und alles außer den beiden Secrets funktioniert; die Seite benennt den Grund. Eine Instanz ohne Mail soll nicht an einem Schlüssel scheitern, den sie nicht braucht. Ein *gesetzter, aber falsch formatierter* Schlüssel ist dagegen ein Startfehler wie bei den übrigen Werten.
+- **Kein Cache für die Einstellungen.** Sie werden beim Öffnen der Seite, beim Versand und bei der Update-Prüfung gelesen — selten genug, dass eine Abfrage billiger ist als eine Invalidierung, die falsch laufen kann („funktioniert erst nach einem Neustart" ist genau die Fehlerklasse, die hier nicht entstehen soll).
+- **Drei unterscheidbare Schreibfälle je Secret**, im Zod-Schema festgehalten: Feld fehlt = unverändert, `null` = löschen, Wert = setzen. Ein leerer String zählt als „löschen" — und genau daran hing ein **beim Bau gefundener Fehler**: Das Token-Formular schickte bei leerem Feld `''`, ein Enter im leeren Feld hätte also das hinterlegte Token gelöscht. Der Komponententest hat es aufgedeckt; `saveToken` bricht jetzt bei leerem Feld ab, Entfernen ist der eigene Knopf daneben.
+- **Der Mailer kennt die Datenbank nicht.** Er spricht mit einem `MailSettingsStore` (`mail/store.ts` ist die DB-Fassung), weshalb seine Tests weder Datenbank noch Socket brauchen — dieselbe Linie wie der eingespritzte `fetch` im Update-Check.
+- **Statuswerte schreibt die Anwendung, nicht der Client:** `mail.lastSend*` sind in der Registry als `readonly` markiert, ein Schreibversuch über die API ist ein 400. Eine unvollständige Konfiguration überschreibt den Status **nicht** — es wurde ja nichts versucht, und ein rot gefärbter Status wäre gelogen.
+- **Ein Zeilenformat fürs Log** (`lib/log.ts`): `eunomia event=MAIL_SEND_FAILED level=error to=… host=… code=EAUTH message="…"`. Fester Präfix, `event=` als Filterschlüssel, mehrzeilige Servermeldungen werden auf eine Zeile gezwungen, Secrets stehen nie in einem Feld. Die vier bisherigen Update-Check-Warnungen sind auf dasselbe Format gezogen.
+- **Die Update-Prüfung nennt jetzt einen Grund** (`no_token_private`, `not_found`, `unauthorized`, `rate_limited`, `network`, `no_release`) und kennt `force` — die Fußzeile schweigt weiter, die Einstellungsseite sagt den Grund, und „Jetzt prüfen" umgeht den 6-Stunden-Cache.
+- **Kein `<details>` für die Abschnitte**, sondern `EuCollapsibleSection` mit `aria-expanded`/`aria-controls`: die Kopfzeile trägt neben dem Titel einen Status (Version, Ampel des letzten Versands), und wie weit sich ein `<summary>` gestalten lässt, ist je Browser verschieden. Der Zustand wird nicht gespeichert.
+- **Fokusring-Kappung wieder aufgetreten und behoben:** `.eu-section` hatte `overflow: hidden`, um die Ecken zu runden. Der Kopfzeilen-Knopf sitzt 1 px innerhalb, sein Ring wird 5 px außerhalb gezeichnet — vom Ring blieb im tastaturfokussierten Screenshot nur die untere Kante übrig. Gemessen (`outlineWidth + outlineOffset` gegen den Abstand zum Abschnittsrand) und durch Entfernen des Clips behoben; kein Kind malt seinen Hintergrund in die Ecken, der Clip war entbehrlich.
+- **Im laufenden System geprüft** (Playwright, Light/Dark, 390 px und 1440 px): kein Überhang und kein abgeschnittener Wert in allen vier Kombinationen, Abschnitte per Tastatur auf- und zuklappbar (`aria-expanded` gemessen), Ring nach der Korrektur rundum vollständig. Der Versand lief gegen einen Wegwerf-SMTP-Server: angenommene Mail (Empfänger, Absender, Betreff am Fänger geprüft, `MAIL_SEND_OK` im Log), abgelehnte Anmeldung (535 → roter Status, **eine** `MAIL_SEND_FAILED`-Zeile mit `code=EAUTH`), und ein Server, der nie antwortet (nach 10,01 s ein sauberer Fehler statt eines hängenden Requests). In der DB steht das Passwort als `aes-256-gcm$…`, die API gibt nur `isSet: true` zurück.
+- **Am Rande behoben:** Die Seite hatte eine eigene `<h1>`, obwohl `AppHeader` den Routentitel schon als `<h1>` rendert — zwei gleichlautende Hauptüberschriften. Die Seite überlässt sie jetzt der Kopfzeile, wie `BillingsView`.
+
+**Backlog aus dieser Scheibe:**
+
+- **Token-Verfahren (XOAUTH2)** für Mailserver, die kein Passwort mehr akzeptieren (Microsoft 365, Gmail): OAuth-Consent-Flow, Callback-Route, Refresh-Token in den verschlüsselten Einstellungen, `mail.authMethod` um den Wert erweitern.
+- **`JWT_SECRET` in die DB** — die Randnotiz aus 2.6 ist mit dem Mechanismus jetzt machbar.
+- **Eigene/selbstsignierte Zertifikate zulassen** (`tls.rejectUnauthorized`) für Mailserver im eigenen Netz.
+- **Ratenbegrenzung für den Testversand** — heute deckt nur das globale Limit den Knopf ab.
+- **Testkonfiguration der Integrationstests zusammenführen:** `testConfig` steht in sechs Testdateien als Kopie; jedes neue Feld in `AppConfig` muss in allen sechs nachgezogen werden (in dieser Scheibe geschehen).
+
+## Backlog aus der Produktionsnutzung
+
+- **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.
+  - **Faktoren-Staffel optional an `InsuranceCompanies`** (leistungsfreie Jahre → Faktor). Eine Police nimmt entweder automatisch die Staffel ihrer Versicherung und rechnet sie mit dem Monatsbeitrag in Euro um, oder man überschreibt einzelne Jahre weiterhin mit eigenen absoluten Werten. Die manuelle Eingabe bleibt also der Rückfallweg, nicht der Normalfall.
+  - **Bezugsgröße ist nur der Hauptbestandteil des Tarifs**, nicht der gesamte Monatsbeitrag. Der Autor schlägt vor, das bestehende Feld dafür **umzuwidmen** statt ein zweites anzulegen: `ContractPremiums.monthlyRate` wird in der Verwaltung ohnehin nur für die Bonusrechnung gebraucht, die Änderung wäre heute eine reine Umbenennung in der UI (etwa „rückerstattungsrelevanter Monatsbeitrag"). Zu prüfen bei der Planung: ob der Beitragsverlauf als Kostenübersicht (Jahreskosten) dann noch stimmt oder ob beide Größen doch getrennt gehören.
+  - **Achtung, das kehrt eine Festlegung aus 2.3 um:** Dort sind die `ContractPremiums` ausdrücklich „rein informativ — **kein** Einfluss auf Selbstbeteiligung oder Bonus". Mit der Faktoren-Staffel wird der Monatsbeitrag zur Rechengröße der Bonusprognose und damit des Erstattungs-Optimierers (Slice 19). Die Scheibe muss deshalb klären, was passiert, wenn für ein Jahr kein Beitragsstand erfasst ist, und wie sich eine Beitragsanpassung mitten im Jahr auf den Faktor auswirkt (der Bonus ist eine Jahresgröße, der Beitrag gilt ab Datum).
 
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.

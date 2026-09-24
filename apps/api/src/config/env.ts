@@ -5,6 +5,8 @@
  * failure deep inside the database layer later.
  */
 
+import { parseEncryptionKey } from '../lib/secret-box.js';
+
 /** Reads a required string variable, throwing a descriptive error if unset/empty. */
 function requireString(name: string): string {
   const value = process.env[name];
@@ -97,6 +99,13 @@ export interface AppConfig {
   auth: AuthConfig;
   rateLimit: RateLimitConfig;
   updateCheck: UpdateCheckConfig;
+  /**
+   * Key for the secrets kept in SystemSettings (CONFIG_ENCRYPTION_KEY, see 2.6),
+   * already decoded. Null when unset: the app still starts and everything but
+   * the secret-valued settings works, because an instance that sends no mail
+   * should not fail to boot over a key it does not use.
+   */
+  configEncryptionKey: Buffer | null;
 }
 
 /** Reads an optional string variable, returning undefined when unset/empty. */
@@ -172,5 +181,26 @@ export function loadConfig(): AppConfig {
       token: optionalString('UPDATE_CHECK_TOKEN'),
       cacheTtlMs: optionalInt('UPDATE_CHECK_TTL_SECONDS', 6 * 60 * 60) * 1000,
     },
+    configEncryptionKey: readEncryptionKey(),
   };
+}
+
+/**
+ * Decodes CONFIG_ENCRYPTION_KEY. A malformed key is a startup error (like every
+ * other malformed value here), because the alternative — discovering it when an
+ * admin first saves an SMTP password — is a worse place to find out.
+ */
+function readEncryptionKey(): Buffer | null {
+  const value = optionalString('CONFIG_ENCRYPTION_KEY');
+  if (value === undefined) return null;
+  try {
+    return parseEncryptionKey(value);
+  } catch (error) {
+    throw new Error(
+      `Environment variable CONFIG_ENCRYPTION_KEY is invalid: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { cause: error },
+    );
+  }
 }

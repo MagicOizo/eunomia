@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
+import SettingsView from '../admin/SettingsView.vue';
 import UsersView from '../admin/UsersView.vue';
 import ResourceView from '../components/resource/ResourceView.vue';
 import BillingPickerView from '../invoices/BillingPickerView.vue';
@@ -33,7 +34,7 @@ const navRoutes = [
   ...mainNav.filter(
     (item) => item.to !== '/' && item.to !== '/invoices' && item.to !== '/billings',
   ),
-  ...systemNav.filter((item) => item.to !== '/system/users'),
+  ...systemNav.filter((item) => item.to !== '/system/users' && item.to !== '/system/settings'),
 ].map((item) => {
   const config = resourceConfigs[item.to];
   return {
@@ -82,6 +83,12 @@ export const router = createRouter({
       name: '/system/users',
       component: UsersView,
       meta: { title: 'Nutzer & Rechte', requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/system/settings',
+      name: '/system/settings',
+      component: SettingsView,
+      meta: { title: 'Einstellungen', requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/billings',

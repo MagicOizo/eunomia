@@ -105,3 +105,26 @@ export const FIELD_FORMATS: Record<string, string> = {
 export function fieldLabel(key: string): string {
   return FIELD_LABELS[key] ?? key;
 }
+
+/**
+ * German labels for the system settings (Slice 30). Kept here with the other
+ * labels, because both the settings page and an error message about a rejected
+ * value need the same words.
+ */
+export const SETTING_LABELS: Record<string, string> = {
+  'mail.enabled': 'E-Mail-Versand aktiv',
+  'mail.host': 'Mailserver',
+  'mail.port': 'Port',
+  'mail.secure': 'Verschlüsselt ab Verbindungsaufbau (TLS)',
+  'mail.authMethod': 'Anmeldeverfahren',
+  'mail.user': 'Benutzer',
+  'mail.password': 'Passwort',
+  'mail.fromAddress': 'Absenderadresse',
+  'mail.fromName': 'Absendername',
+  'updateCheck.token': 'GitHub-Token (nur Lesezugriff)',
+};
+
+/** The German label of a setting key, or the key itself if it has none yet. */
+export function settingLabel(key: string): string {
+  return SETTING_LABELS[key] ?? key;
+}

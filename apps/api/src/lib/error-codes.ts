@@ -55,6 +55,20 @@ export const ERROR_CODES = {
   // User administration
   SELF_ACCOUNT_ACTION: 'SELF_ACCOUNT_ACTION',
   LAST_ADMIN: 'LAST_ADMIN',
+
+  // System settings and mail (see settings/registry.ts, mail/mailer.ts)
+  /** Key is not in the settings registry — a typo, or an outdated client. */
+  SETTING_UNKNOWN: 'SETTING_UNKNOWN',
+  /** Key exists but is written by the application (e.g. the last send status). */
+  SETTING_READONLY: 'SETTING_READONLY',
+  /** Value has the wrong type or is out of range; `details.expected` says what fits. */
+  SETTING_INVALID_VALUE: 'SETTING_INVALID_VALUE',
+  /** A secret cannot be stored or read because CONFIG_ENCRYPTION_KEY is missing. */
+  SETTINGS_ENCRYPTION_UNAVAILABLE: 'SETTINGS_ENCRYPTION_UNAVAILABLE',
+  /** Mail is switched off or incompletely configured; nothing was attempted. */
+  MAIL_NOT_CONFIGURED: 'MAIL_NOT_CONFIGURED',
+  /** The mail server refused or could not be reached; `details.reason` has its words. */
+  MAIL_SEND_FAILED: 'MAIL_SEND_FAILED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

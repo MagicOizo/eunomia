@@ -54,6 +54,8 @@ function testConfig(database: DatabaseConfig): AppConfig {
       token: undefined,
       cacheTtlMs: 0,
     },
+    // No encryption key: these suites store no secrets.
+    configEncryptionKey: null,
   };
 }
 

@@ -1,4 +1,4 @@
-import { FIELD_FORMATS, fieldLabel } from './field-labels';
+import { FIELD_FORMATS, fieldLabel, settingLabel } from './field-labels';
 
 /**
  * German sentences for what the API reports. The API answers in English (its
@@ -180,6 +180,24 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
   // Nutzerverwaltung
   SELF_ACCOUNT_ACTION: () => 'Diese Aktion ist für das eigene Konto nicht möglich.',
   LAST_ADMIN: () => 'Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.',
+
+  // System-Einstellungen und E-Mail-Versand
+  SETTING_UNKNOWN: () =>
+    'Diese Einstellung kennt die Anwendung nicht. Bitte die Seite neu laden und es erneut versuchen.',
+  SETTING_READONLY: () =>
+    'Diese Angabe schreibt die Anwendung selbst, sie kann nicht gesetzt werden.',
+  SETTING_INVALID_VALUE: (d) =>
+    typeof d.key === 'string'
+      ? `Der Wert für ${quoted(settingLabel(d.key))} passt nicht.`
+      : 'Der Wert passt nicht zu dieser Einstellung.',
+  SETTINGS_ENCRYPTION_UNAVAILABLE: () =>
+    'Ohne den Schlüssel CONFIG_ENCRYPTION_KEY in der Server-Umgebung können Passwörter und Token nicht gespeichert werden.',
+  MAIL_NOT_CONFIGURED: () =>
+    'Der E-Mail-Versand ist nicht vollständig eingerichtet. Bitte Aktivierung, Mailserver und Absenderadresse prüfen.',
+  MAIL_SEND_FAILED: (d) =>
+    typeof d.reason === 'string'
+      ? `Der Mailserver hat den Versand abgelehnt: ${d.reason}`
+      : 'Der Versand über den eingetragenen Mailserver ist fehlgeschlagen.',
 };
 
 /** The German sentence for an error code, or null if the code is unknown here. */
