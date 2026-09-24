@@ -18,6 +18,23 @@ services:
       ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
       REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-2592000}
       SETUP_TOKEN: ${SETUP_TOKEN:-}
+      # Everything below is optional and passed through as `${VAR:-}` on
+      # purpose: an empty value counts as "unset" in config/env.ts, so the
+      # application's own default applies and the defaults are not duplicated
+      # here, where they would silently drift out of step.
+      #
+      # A variable only reaches the container if it is listed in this block —
+      # having it in .env is not enough. Anything documented in .env.example
+      # belongs here too.
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-}
+      RATE_LIMIT_AUTH_WINDOW_MS: ${RATE_LIMIT_AUTH_WINDOW_MS:-}
+      RATE_LIMIT_GLOBAL_MAX: ${RATE_LIMIT_GLOBAL_MAX:-}
+      RATE_LIMIT_GLOBAL_WINDOW_MS: ${RATE_LIMIT_GLOBAL_WINDOW_MS:-}
+      UPDATE_CHECK_ENABLED: ${UPDATE_CHECK_ENABLED:-}
+      UPDATE_CHECK_REPO: ${UPDATE_CHECK_REPO:-}
+      UPDATE_CHECK_TOKEN: ${UPDATE_CHECK_TOKEN:-}
+      UPDATE_CHECK_TTL_SECONDS: ${UPDATE_CHECK_TTL_SECONDS:-}
     ports:
       - '${PORT:-3000}:3000'
     depends_on:
