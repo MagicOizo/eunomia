@@ -17,6 +17,7 @@ import EuPopover from '../design-system/components/EuPopover.vue';
 import { euro, germanDate } from '../lib/format';
 import type { InvoiceDto } from './api';
 import { PAYMENT_COLOR_VAR, calcPaymentState } from './payment';
+import PaymentQrPopover from './PaymentQrPopover.vue';
 
 const props = defineProps<{
   invoice: InvoiceDto;
@@ -26,12 +27,23 @@ const props = defineProps<{
 }>();
 
 const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.invoice)]})`);
+
+// Nothing left to transfer, nothing to scan: a paid or cash-settled invoice
+// gets no GiroCode. Reuses the traffic light's rule rather than repeating it.
+const showQr = computed(
+  () =>
+    props.bankAccount !== null &&
+    props.agencyName !== null &&
+    calcPaymentState(props.invoice) !== 'paid',
+);
 </script>
 
 <template>
   <EuPopover title="Zahlungsinformationen">
-    <template #trigger>
-      <slot name="trigger" />
+    <!-- Forwarded so the caller's own trigger button can carry the popover's
+         open state (EuPopover hands it to the slot). -->
+    <template #trigger="triggerProps">
+      <slot name="trigger" v-bind="triggerProps" />
     </template>
 
     <!-- Icon + value only, like the reference: the label lives in the icon's
@@ -68,7 +80,19 @@ const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.
 
       <template v-if="bankAccount">
         <dt><EuIconLabel :icon="faMoneyCheckDollar" label="IBAN" /></dt>
-        <dd class="eu-pay-grid__mono">{{ bankAccount }}</dd>
+        <!-- The GiroCode belongs to the IBAN, so it hangs off that row instead
+             of claiming one of its own (which would also mean a label column
+             entry for something that is not a value). -->
+        <dd class="eu-pay-grid__mono eu-pay-grid__iban">
+          <span>{{ bankAccount }}</span>
+          <PaymentQrPopover
+            v-if="showQr"
+            :recipient="agencyName ?? ''"
+            :iban="bankAccount"
+            :amount="invoice.invoiceAmount"
+            :subject="invoice.transferSubject"
+          />
+        </dd>
       </template>
 
       <template v-if="invoice.transferSubject">
@@ -108,5 +132,18 @@ const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.
 
 .eu-pay-grid__mono {
   font-family: var(--eu-font-data);
+}
+
+/* IBAN and its GiroCode button share the value cell; the IBAN keeps the wrap
+   the grid gives every other value, the button never shrinks. */
+.eu-pay-grid__iban {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.eu-pay-grid__iban > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 </style>

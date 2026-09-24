@@ -555,13 +555,15 @@ function confirmDelete(): void {
                       : null
                   "
                 >
-                  <template #trigger>
+                  <template #trigger="{ expanded, panelId }">
                     <button
                       type="button"
                       class="eu-ws__ampel"
                       :style="{ color: paymentView(invoice).color }"
                       :aria-label="`${paymentView(invoice).label} – Zahlungsinformationen anzeigen`"
                       :title="`${paymentView(invoice).label} – Zahlungsinformationen anzeigen`"
+                      :aria-expanded="expanded"
+                      :aria-controls="panelId"
                     >
                       <FontAwesomeIcon :icon="paymentView(invoice).icon" aria-hidden="true" />
                     </button>

@@ -28,6 +28,7 @@ import BillingDialog from './BillingDialog.vue';
 import { submittableContracts } from './eligibility';
 import ExclusionDialog from './ExclusionDialog.vue';
 import ObjectionDialog from './ObjectionDialog.vue';
+import PaymentQrPopover from './PaymentQrPopover.vue';
 import SubmissionCard from './SubmissionCard.vue';
 import SubmitDialog from './SubmitDialog.vue';
 import { STATUS_DISPLAY } from './status';
@@ -119,6 +120,25 @@ const ibanForSelected = computed(() => {
   const uid = values.agencyUID;
   return typeof uid === 'string' && uid !== '' ? (props.agencyIban[uid] ?? '') : '';
 });
+const agencyNameForSelected = computed(() => {
+  const uid = values.agencyUID;
+  return props.agencies.find((option) => option.value === uid)?.label ?? '';
+});
+// The GiroCode follows the mask, not the saved invoice: it sits next to the
+// IBAN row, which already shows the agency currently picked, and what you scan
+// should be what you see. Gone once there is nothing left to transfer — the
+// payment traffic light's rule, spelled out against the edited values.
+const showQr = computed(
+  () => !directPayment.value && ibanForSelected.value !== '' && !values.transferDate,
+);
+const amountForQr = computed(() =>
+  typeof values.invoiceAmount === 'number' ? values.invoiceAmount : 0,
+);
+const subjectForQr = computed(() =>
+  typeof values.transferSubject === 'string' && values.transferSubject !== ''
+    ? values.transferSubject
+    : null,
+);
 const str = (value: DetailValue): string => (typeof value === 'string' ? value.trim() : '');
 const isSubmitted = computed(() => (props.invoice?.submissions.length ?? 0) > 0);
 
@@ -379,7 +399,20 @@ function submit(): void {
         type="readonly"
         :model-value="ibanForSelected"
         :disabled="directPayment"
-      />
+      >
+        <template #value>
+          <span class="eu-iban">
+            <span>{{ ibanForSelected === '' ? '–' : ibanForSelected }}</span>
+            <PaymentQrPopover
+              v-if="showQr"
+              :recipient="agencyNameForSelected"
+              :iban="ibanForSelected"
+              :amount="amountForQr"
+              :subject="subjectForQr"
+            />
+          </span>
+        </template>
+      </EuDetailField>
       <EuDetailField
         v-model="values.transferSubject"
         :saved-value="saved.transferSubject"
@@ -581,6 +614,29 @@ function submit(): void {
 </template>
 
 <style scoped>
+/* The IBAN row replaces its value cell to carry the GiroCode button next to
+   the number, so it repeats the inset of a plain readonly value below. */
+.eu-iban {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.eu-iban > span {
+  min-width: 0;
+  /* Same inset as EuDetailField's own readonly value, so the IBAN keeps the
+     column's alignment. */
+  padding: 0.2em 0.4em;
+  /* An IBAN has no break opportunity: in the narrow mask of a phone it would
+     otherwise run over the button next to it. Clipped here, in full in the
+     payment popover — and the mask as a whole gets its width in the polish
+     slice (Slice-8 backlog). */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .eu-detail__error {
   margin: 1rem 0 0;
   color: var(--eu-color-error-fg);

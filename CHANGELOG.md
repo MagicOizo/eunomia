@@ -7,6 +7,17 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.10.0-slice.3 — 2026-09-24
+
+- Invoices that are paid through a collection agency now offer a GiroCode next to the IBAN — in the
+  payment popover and in the invoice details. Scanning it hands beneficiary, IBAN, amount and
+  reference to a banking app instead of typing them over. The code is built in the browser, so
+  payment data is never sent anywhere.
+- The code appears only while there is something left to transfer, and says in words why it cannot
+  be shown when the data does not fit the scheme.
+- Fixed: the info popover marked its open state on an element that may not carry it, which screen
+  readers could report wrongly, and its heading added a second banner landmark to the page.
+
 ## 0.10.0-slice.2 — 2026-09-24
 
 - Creating a service billing from a policy's billing list now leads straight into booking its

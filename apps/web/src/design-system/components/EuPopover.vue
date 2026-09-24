@@ -65,14 +65,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <span
-    ref="reference"
-    class="eu-popover-trigger"
-    :aria-expanded="isOpen"
-    :aria-controls="isOpen ? panelId : undefined"
-    @click="toggle"
-  >
-    <slot name="trigger" />
+  <!-- The open state is handed to the trigger slot instead of being set on
+       this wrapper: aria-expanded belongs on the control the user activates,
+       and a plain <span> may not carry it (axe: aria-allowed-attr). -->
+  <span ref="reference" class="eu-popover-trigger" @click="toggle">
+    <slot name="trigger" :expanded="isOpen" :panel-id="isOpen ? panelId : undefined" />
   </span>
   <div
     v-if="isOpen"
@@ -83,10 +80,12 @@ onBeforeUnmount(() => {
     class="eu-popover"
     :style="floatingStyles"
   >
-    <header class="eu-popover__header">
+    <!-- A div, not a <header>: a <header> at this level is a second banner
+         landmark next to the application header (axe: landmark-no-duplicate-banner). -->
+    <div class="eu-popover__header">
       <h3 class="eu-popover__title">{{ props.title }}</h3>
       <EuButton variant="ghost" icon-only :icon="faXmark" aria-label="Schließen" @click="close" />
-    </header>
+    </div>
     <div class="eu-popover__body">
       <slot />
     </div>
