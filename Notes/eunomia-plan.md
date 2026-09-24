@@ -222,6 +222,26 @@ Design-Referenz ist explizit der erste Entwurf: Markenblau `#030088`, Akzentblau
 - **Priorität für ausführlichere Dokumentation:** Business-Logik mit Rechenregeln, die nicht aus dem Code allein ersichtlich sind — insbesondere die Selbstbeteiligungs-/Bonus-Berechnung (Slice 5) und die Rechte-Auflösung global vs. account-scoped (2.4/Slice 3).
 - Gilt für Backend und Frontend gleichermaßen, wird in Slice 0 in die ESLint-Konfiguration (z.B. `eslint-plugin-jsdoc` für öffentliche Funktionen der API- und Service-Schicht) aufgenommen, damit die Konvention nicht nur dokumentiert, sondern auch geprüft wird.
 
+## 2.9 Versionierung (`x.y.z`, beschlossen 2026-09-24)
+
+An semver orientiert, mit einer projektspezifischen Belegung für die Slice-Arbeit:
+
+- **Major `x`** — nur bei einem wirklich bedeutenden Stand: alle Grundfeatures vorhanden und der Ablauf in der Produktion mit Echtdaten verifiziert und als gut genug befunden. Keine automatische Regel, sondern eine Entscheidung des Autors.
+- **Minor `y`** — jedes vollständig abgeschlossene Feature. Git-Tag `vX.Y.0` und ein **volles** GitHub-Release, damit `releases/latest` (Update-Check, Slice 25) und das Docker-`:latest` darauf zeigen.
+- **Patch `z`** — reserviert für Hotfixes auf ein veröffentlichtes Minor, ebenfalls Tag + volles Release + `:latest`. **Nicht** für die Arbeit an einem Feature.
+- **Slices während der Arbeit an einem Feature** — Prerelease-Versionen auf die **kommende** Minor: `0.10.0-slice.1`, `0.10.0-slice.2`, … Tag `v0.10.0-slice.N`, GitHub-**Prerelease**, Docker-Image unter dieser Version, aber **ohne** `:latest`.
+  - Gezählt wird pro gepushtem Commit, der am Produkt etwas ändert. Reine Doku-, Formatierungs- und Build-Commits bekommen keine Nummer (sonst stehen drei Prereleases für einen Prettier-Durchlauf).
+  - Der Versions-Bump gehört in den Slice-Commit selbst, nicht in einen eigenen Commit.
+- **Tag und Release werden nie ohne ausdrückliche Zustimmung erzeugt** — sie sind Veröffentlichung, genau wie der Push (siehe Arbeitsweise pro Slice).
+
+**Warum die Slices nicht einfach `0.9.1`, `0.9.2`, … heißen** (die naheliegende Variante, verworfen):
+
+- Ein `0.9.1` nach dem Release `0.9.0` sieht von außen wie ein Bugfix-Release aus, ist aber eine Vorschau auf `0.10.0`.
+- Es verbraucht genau die Nummern, die ein echter Hotfix auf `0.9.0` bräuchte. Eine laufende Vorschau `0.9.3` hielte das Hotfix-Release `0.9.1` für älter und würde den Update-Hinweis nicht anzeigen.
+- `lib/semver.ts` ordnet Prereleases bereits korrekt (`0.10.0-slice.3 < 0.10.0`), und `releases/latest` filtert Prereleases ohnehin heraus — die Prerelease-Schreibweise braucht also keine neue Logik im Update-Check.
+
+**Mechanik dazu:** in Slice 26 umgesetzt (Bump-Skript `scripts/version.ts`, `latest`-Guard und Release-Job in `.github/workflows/docker.yml`, `CHANGELOG.md` als Quelle der Release-Notes, `npm run version:check` in der CI). Der Alltagsablauf steht in [DEV.md](../DEV.md) unter „Versioning a change".
+
 ---
 
 # 3 Umsetzungsplanung (Slices)
@@ -622,6 +642,23 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **Am Rande festgestellt:** Beim Kaltstart quittiert `/auth/refresh` ohne Cookie mit 401 und schreibt eine Konsolen-Fehlermeldung im Browser — harmlos, aber unschön; kein Teil dieser Scheibe.
 
 **Nachtrag (2026-09-24), Fehler in der ersten Fassung:** Die vier `UPDATE_CHECK_*`-Variablen standen in `.env.example`, im Config-Loader und im README — aber nicht in `docker-compose.yml`. Dort wird **jede** Variable einzeln unter `environment:` durchgereicht; was dort fehlt, erreicht den Container nicht, egal was in der `.env` steht. In Produktion lief der Check deshalb anonym gegen das private Repo und meldete 404. Beim Nachziehen fiel auf, dass `TRUST_PROXY` und die vier `RATE_LIMIT_*` denselben Defekt seit Slice 10 haben — auch sie waren dokumentiert, aber wirkungslos. Alle neun sind jetzt als `${VAR:-}` ergänzt: Ein leerer Wert gilt in `config/env.ts` als „nicht gesetzt", sodass der Anwendungs-Default greift und die Defaults nicht doppelt gepflegt werden. **Regel für künftige Slices: Eine neue Umgebungsvariable ist erst fertig, wenn sie in `.env.example`, im Loader, im README *und* in `docker-compose.yml` steht.** Das Image musste dafür nicht neu gebaut werden — die Compose-Datei liegt auf dem Host, nicht im Image.
+
+## Slice 26 — Versionierungs-Mechanik (umgesetzt 2026-09-24)
+
+**Ziel:** Die Regeln aus 2.9 bekommen den Ablauf, für den sie geschrieben sind: ein Befehl bumpt die Version, ein Tag-Push erzeugt Image **und** passendes (Pre-)Release, und die CI verhindert Drift.
+
+**DoD:** `npm run version:next -- slice` setzt die Version in allen vier `package.json` und im Lockfile; `npm run version:check` ist grün und schlägt bei jeder Abweichung mit Nennung der Datei fehl; ein Tag mit `-slice.N` erzeugt Image + Prerelease und lässt `:latest` unberührt, ein finales Tag bewegt `:latest` und erzeugt ein volles Release aus der `CHANGELOG.md`.
+
+**Entscheidungen (Planmodus):**
+
+- **Release-Notes aus einer handgepflegten `CHANGELOG.md`** statt aus Commit-Subjects oder GitHub-Auto-Notes: der Autor schreibt, was Betreiber lesen sollen. Fehlt der Abschnitt zur Version, schlägt der Release-Job fehl — lieber laut als ein leeres Release. `version:check` fängt das schon beim Push auf main.
+- **Tags legt der Autor an, nicht der Assistent.** Das Bump-Skript gibt den fertigen Tag-Befehl aus; Tag, Release und Push bleiben beim Autor (siehe die Arbeitsweise pro Slice).
+- **Ein Workflow, Release nach dem Image:** der `release`-Job hängt per `needs: image` am Build und läuft nur auf `refs/tags/v*`. Die Release-Seite ist das Ziel des Update-Check-Links im Footer — sie darf nicht existieren, bevor das Image dazu in der GHCR liegt. Der Workflow heißt deshalb jetzt „Image & release", die Datei bleibt `docker.yml`. Rechte: workflow-weit `contents: read` + `packages: write`, nur der Release-Job hebt auf `contents: write`.
+- **`flavor: latest=false` plus explizite `latest`-Regel** (`startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')`). `docker/metadata-action` schließt mit dem Default `latest=auto` Prereleases zwar von sich aus aus — aber die bisherige `type=raw,value=latest,enable=startsWith(…)`-Zeile erzwang `latest` für **jedes** `v*`-Tag. Die Absicht steht jetzt explizit in der Datei, statt vom Verhalten einer fremden Action abzuhängen. Der Kommentar dazu steht **über** dem Step: Zeilen innerhalb des `tags: |`-Blocks sind Werte, keine Kommentare.
+- **`scripts/version.ts` und `scripts/changelog.ts` sind TypeScript ohne Build-Schritt** — Node 24 strippt Typen selbst, und so kann `version.ts` `parseVersion`/`compareVersions` aus `apps/api/src/lib/semver.ts` wiederverwenden statt einen zweiten Versions-Parser im Repo zu haben. Preis: `scripts/` liegt in keinem `tsconfig`-`include`, wird also von `npm run typecheck` nicht erfasst (ESLint und Prettier greifen); der Release-Job pinnt darum `actions/setup-node` auf 24.
+- **Lockfile wird geparst und neu geschrieben**, nicht per Textersatz: `"version": "0.9.0"` kommt auch als Version einer Abhängigkeit vor. Geprüft, dass `JSON.stringify(…, null, 2)` die Datei byte-identisch reproduziert — der Bump ist damit ein Diff von fünf Zeilen.
+- `version:next patch` verweigert den Sprung aus einem Prerelease heraus, und `set` verweigert eine Version, die nicht neuer ist als die laufende (`--force` hebt es auf): beides Fälle, in denen die Nummer sonst leise falsch wird.
+- **Diese Scheibe selbst bekommt `0.10.0-slice.1`**, obwohl 2.9 reine Build-Commits von der Zählung ausnimmt: sie ändert die Veröffentlichung selbst, bringt eine betreiberseitige `CHANGELOG.md` mit, und der erste echte Durchlauf der neuen Mechanik ist ihr eigenes Tag — schlägt er fehl, betrifft es nur ein Prerelease und nicht `:latest`.
 
 ## Ausblick (nicht Teil dieser Slices)
 E-Mail-Benachrichtigungen (inkl. System-Einstellungen-UI und Verschlüsselungs-Infrastruktur aus 2.6), Paperless-Push-API, ggf. weitere Ausbaustufen — siehe 2.5.

@@ -1,8 +1,11 @@
-name: Docker image
+name: Image & release
 
 # Builds the production image on every push/PR (so a broken Dockerfile is caught
-# in CI), and publishes versioned, tagged images to GHCR on release tags.
-#   git tag v0.1.0 && git push origin v0.1.0  ->  ghcr.io/magicoizo/eunomia:0.1.0 + :latest
+# in CI), publishes versioned images to GHCR on version tags, and turns such a
+# tag into a GitHub release once its image is in place. See Notes/eunomia-plan.md
+# §2.9 for the versioning rules:
+#   v0.10.0          -> ghcr.io/magicoizo/eunomia:0.10.0 + :latest, full release
+#   v0.10.0-slice.1  -> ghcr.io/magicoizo/eunomia:0.10.0-slice.1, pre-release
 on:
   push:
     branches: [main]
@@ -30,14 +33,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # `latest` may only point at the newest *final* release: docker-compose.yml
+      # defaults to it (`${EUNOMIA_VERSION:-latest}`), so a slice pre-release that
+      # moved it would hand every production host a preview. `latest=false` turns
+      # off the action's own automation, and the explicit rule below skips any tag
+      # carrying a pre-release part (`-slice.1`).
       - name: Derive image tags
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/magicoizo/eunomia
+          flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
             type=edge,branch=main
 
       - name: Build (and push on non-PR events)
@@ -50,3 +59,40 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The release page is what the in-app update check links to, so it is created
+  # only after the image it announces has been pushed.
+  release:
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # The scripts below are TypeScript run without a build step, which needs a
+      # runtime that strips types on its own.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check the tag against the version in the repo
+        env:
+          TAG: ${{ github.ref_name }}
+        run: node scripts/version.ts check --tag "$TAG"
+
+      - name: Publish the release from CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          node scripts/changelog.ts section "$version" > "$RUNNER_TEMP/notes.md"
+          title="$(node scripts/changelog.ts title "$version")"
+          # A pre-release must not become the release GitHub serves as "latest",
+          # which is where the in-app update check looks.
+          flags=()
+          case "$version" in *-*) flags=(--prerelease) ;; esac
+          gh release create "$TAG" --verify-tag --title "$title" \
+            --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"

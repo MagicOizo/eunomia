@@ -43,6 +43,10 @@ jobs:
 
       - run: npm ci
 
+      # Catches version drift between the workspaces, the lockfile and
+      # CHANGELOG.md on the push that caused it, not at tagging time.
+      - run: npm run version:check
+
       - run: npm run format:check
 
       - run: npm run lint

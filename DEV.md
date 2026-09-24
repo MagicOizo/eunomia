@@ -111,12 +111,35 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
 ```
 
 Publishing is automated ([.github/workflows/docker.yml](.github/workflows/docker.yml)): every
-push/PR builds the image (so a broken `Dockerfile` fails CI), and pushing a release tag publishes
-the versioned image:
+push/PR builds the image (so a broken `Dockerfile` fails CI), a push to `main` publishes `:edge`,
+and pushing a version tag publishes the versioned image and then creates the GitHub release from
+`CHANGELOG.md`.
+
+## Versioning a change
+
+The rules live in `Notes/eunomia-plan.md` §2.9: a **minor** per finished feature, a **patch** only
+for a hotfix on a released version, and `X.Y.Z-slice.N` while a feature is still being built. One
+command moves the number through all four `package.json` files and `package-lock.json`:
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0   # -> ghcr.io/magicoizo/eunomia:0.1.0 + :latest
+npm run version:next -- slice   # 0.9.0 -> 0.10.0-slice.1, then -slice.2, …
+npm run version:next -- minor   # 0.10.0-slice.4 -> 0.10.0 (feature finished)
+npm run version:next -- patch   # 0.10.0 -> 0.10.1 (hotfix on a release)
+npm run version:set -- 1.0.0    # any version, explicitly
+npm run version:check           # workspaces, lockfile and CHANGELOG.md agree (also runs in CI)
 ```
+
+The bump belongs in the commit it describes, together with its `CHANGELOG.md` section — the release
+workflow refuses a tag whose version has no section, and `version:check` fails the build before
+that. Then tag the commit and push:
+
+```bash
+git tag -a v0.10.0-slice.1 -m "v0.10.0-slice.1" && git push --follow-tags
+```
+
+A tag with a pre-release part (`-slice.1`) publishes an image plus a GitHub **pre-release** and
+leaves `:latest` alone; a final tag (`v0.10.0`) moves `:latest` and publishes a full release, which
+is what the in-app update check shows to admins.
 
 ## Software Bill of Materials (SBOM)
 

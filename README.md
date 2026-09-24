@@ -82,6 +82,19 @@ docker compose pull && docker compose up -d
 Migrations run automatically on start, so the schema is brought up to date as part of the restart.
 Take a backup first (see above).
 
+### Which image tag to use
+
+| Tag                | What it is                                                                 |
+| ------------------ | -------------------------------------------------------------------------- |
+| `latest` (default) | the newest finished release — the tag to run in production                 |
+| `X.Y.Z`            | exactly that release, pinned                                               |
+| `X.Y.Z-slice.N`    | a preview published while a feature is being built; never becomes `latest` |
+| `edge`             | the current state of `main`, unreleased and untested as a whole            |
+
+A preview or a pinned version is fetched by setting `EUNOMIA_VERSION` in `.env`, e.g.
+`EUNOMIA_VERSION=0.10.0-slice.1`. Previews are announced as GitHub pre-releases, so the update
+notice in the footer keeps pointing at finished releases only.
+
 ### Knowing when there is something to update
 
 The app asks GitHub every few hours whether a newer release exists and shows admins a link to the
