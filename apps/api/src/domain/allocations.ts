@@ -7,7 +7,15 @@ import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
-import { type CrudTable, type Row, getRow, insertRow, softDeleteRow } from '../crud/repository.js';
+import {
+  type CrudTable,
+  type Queryable,
+  type Row,
+  getRow,
+  insertRow,
+  softDeleteRow,
+  updateRow,
+} from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
@@ -45,6 +53,16 @@ export const allocationEntriesSchema = z.object({
 
 type AllocationEntry = z.infer<typeof allocationEntriesSchema>['entries'][number];
 
+/**
+ * What may be corrected on a booked reimbursement. Which invoice and which
+ * billing it belongs to is not in here on purpose: a booking is corrected,
+ * not moved — moving it stays deleting and booking anew.
+ */
+export const allocationPatchSchema = z.object({
+  receiptNumber: z.string().trim().min(1).max(50).nullish(),
+  reimbursement: z.number().min(0).max(99999999.99).optional(),
+});
+
 interface CandidateInvoice {
   invoiceUID: string;
   invoiceNumber: string;
@@ -53,6 +71,37 @@ interface CandidateInvoice {
   inSubmission: number;
   /** What this invoice was already reimbursed, over every policy. */
   allocated: number;
+}
+
+/**
+ * The invoices a booking may touch, with what they carry already: whether they
+ * belong to the submission at all, and the sum of their reimbursements over
+ * every policy. `ignoreAllocationUID` leaves one booking out of that sum — a
+ * booking that is being changed has to be measured against the others, not
+ * against its own old amount.
+ */
+async function loadCandidates(
+  conn: Queryable,
+  submissionUID: string,
+  invoiceUIDs: string[],
+  ignoreAllocationUID?: string,
+): Promise<CandidateInvoice[]> {
+  const placeholders = invoiceUIDs.map(() => '?').join(', ');
+  const ignore = ignoreAllocationUID ? 'AND a.allocationUID <> ?' : '';
+  return conn.query<CandidateInvoice[]>(
+    `SELECT i.invoiceUID, i.invoiceNumber, i.invoiceAmount,
+            EXISTS (
+              SELECT 1 FROM SubmissionInvoices si
+               WHERE si.submissionUID = ? AND si.invoiceUID = i.invoiceUID
+            ) AS inSubmission,
+            COALESCE((
+              SELECT SUM(a.reimbursement) FROM Allocations a
+               WHERE a.invoiceUID = i.invoiceUID AND a.allocationStatus <> -1 ${ignore}
+            ), 0) AS allocated
+       FROM Invoices i
+      WHERE i.invoiceUID IN (${placeholders}) AND i.invoiceStatus <> -1`,
+    [submissionUID, ...(ignoreAllocationUID ? [ignoreAllocationUID] : []), ...invoiceUIDs],
+  );
 }
 
 /**
@@ -130,20 +179,7 @@ export async function createAllocationsForBilling(
       `SELECT invoiceUID FROM Invoices WHERE invoiceUID IN (${placeholders}) FOR UPDATE`,
       invoiceUIDs,
     );
-    const candidates = await conn.query<CandidateInvoice[]>(
-      `SELECT i.invoiceUID, i.invoiceNumber, i.invoiceAmount,
-              EXISTS (
-                SELECT 1 FROM SubmissionInvoices si
-                 WHERE si.submissionUID = ? AND si.invoiceUID = i.invoiceUID
-              ) AS inSubmission,
-              COALESCE((
-                SELECT SUM(a.reimbursement) FROM Allocations a
-                 WHERE a.invoiceUID = i.invoiceUID AND a.allocationStatus <> -1
-              ), 0) AS allocated
-         FROM Invoices i
-        WHERE i.invoiceUID IN (${placeholders}) AND i.invoiceStatus <> -1`,
-      [billing.submissionUID, ...invoiceUIDs],
-    );
+    const candidates = await loadCandidates(conn, billing.submissionUID, invoiceUIDs);
     assertEntriesBookable(candidates, entries);
 
     const created: Row[] = [];
@@ -151,6 +187,61 @@ export async function createAllocationsForBilling(
       created.push(await insertRow(conn, table, { ...entry, billingUID }));
     }
     return created;
+  });
+}
+
+/**
+ * Corrects one booked reimbursement: its amount and its receipt number. The
+ * rules of assertEntriesBookable keep applying — above all the
+ * "Bereicherungsverbot" — with the invoice locked as it is when booking, and
+ * this booking's own amount left out of the sum it is measured against, so it
+ * does not block itself.
+ */
+export async function updateAllocation(
+  pool: Pool,
+  userId: number,
+  allocationUID: string,
+  patch: z.infer<typeof allocationPatchSchema>,
+): Promise<Row | null> {
+  const [allocation] = await pool.query<
+    Array<{
+      invoiceUID: string;
+      reimbursement: number;
+      submissionUID: string;
+      accountUID: string;
+    }>
+  >(
+    `SELECT a.invoiceUID, a.reimbursement, b.submissionUID, i.accountUID
+       FROM Allocations a
+       JOIN Invoices i ON i.invoiceUID = a.invoiceUID
+       JOIN ServiceBillings b ON b.billingUID = a.billingUID
+      WHERE a.allocationUID = ? AND a.allocationStatus <> -1
+      LIMIT 1`,
+    [allocationUID],
+  );
+  if (!allocation) throw notFound('Allocation');
+
+  await authorizeAccount(pool, userId, PERMISSIONS.MANAGE_INVOICES, allocation.accountUID);
+
+  return withTransaction(pool, async (conn) => {
+    await conn.query('SELECT invoiceUID FROM Invoices WHERE invoiceUID = ? FOR UPDATE', [
+      allocation.invoiceUID,
+    ]);
+    const candidates = await loadCandidates(
+      conn,
+      allocation.submissionUID,
+      [allocation.invoiceUID],
+      allocationUID,
+    );
+    assertEntriesBookable(candidates, [
+      {
+        invoiceUID: allocation.invoiceUID,
+        // A patch that leaves a field out keeps what is booked today.
+        reimbursement: patch.reimbursement ?? Number(allocation.reimbursement),
+        receiptNumber: patch.receiptNumber,
+      },
+    ]);
+    return updateRow(conn, table, allocationUID, patch);
   });
 }
 
@@ -203,6 +294,13 @@ export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
     if (account === null) throw notFound('Allocation');
     await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
     sendData(res, await getRow(pool, table, uid));
+  });
+
+  router.patch('/:uid', requireAuth, async (req, res) => {
+    const user = getAuthUser(res);
+    const uid = pathParam(req, 'uid');
+    const patch = allocationPatchSchema.parse(req.body);
+    sendData(res, await updateAllocation(pool, user.userId, uid, patch));
   });
 
   router.delete('/:uid', requireAuth, async (req, res) => {

@@ -595,6 +595,67 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(inv.remainingAmount, 120);
     });
 
+    // Slice 34: correcting a booked reimbursement instead of unbooking it.
+    await t.test('a booked reimbursement can be corrected', async () => {
+      const inv6 = await makeInvoice(accountA, 200, 'R-6');
+      const submission = (
+        await post('/api/v1/submissions', {
+          contractUID: contractY,
+          submittedDate: '2024-08-07',
+          invoiceUIDs: [inv6],
+        })
+      ).body.data.submissionUID as string;
+      const billing = (
+        await post('/api/v1/billings', {
+          submissionUID: submission,
+          billingDate: '2024-08-26',
+          billingNumber: 'ZV-LA-3',
+        })
+      ).body.data.billingUID as string;
+      const allocationUID = (
+        await post(`/api/v1/billings/${billing}/allocations`, {
+          entries: [{ invoiceUID: inv6, reimbursement: 100, receiptNumber: 'BEL-6' }],
+        })
+      ).body.data[0].allocationUID as string;
+
+      const patch = (body: object, headers: Record<string, string> = admin) =>
+        request(app).patch(`/api/v1/allocations/${allocationUID}`).set(headers).send(body);
+
+      // The full amount although 100 of it is this very booking: the "no
+      // enrichment" rule is measured without it, otherwise it blocks itself.
+      const raised = await patch({ reimbursement: 200, receiptNumber: 'BEL-6a' });
+      assert.equal(raised.status, 200);
+
+      const full = await invoice(inv6);
+      assert.equal(full.workflowStatus, 'abgerechnet');
+      assert.equal(Number(full.reimbursedTotal), 200);
+      assert.equal(full.remainingAmount, 0);
+      assert.equal(full.submissions[0].allocations[0].receiptNumber, 'BEL-6a');
+
+      const tooMuch = await patch({ reimbursement: 200.01 });
+      assert.equal(tooMuch.status, 409);
+      assert.equal(tooMuch.body.error.code, 'REIMBURSEMENT_EXCEEDS_INVOICE');
+      assert.deepEqual(tooMuch.body.error.details, { invoices: ['R-6'] });
+
+      // Lowering it again frees the rest of the invoice, and the receipt
+      // number can be cleared on its own.
+      const lowered = await patch({ reimbursement: 60, receiptNumber: null });
+      assert.equal(lowered.status, 200);
+      const partial = await invoice(inv6);
+      assert.equal(partial.workflowStatus, 'teilabgerechnet');
+      assert.equal(partial.remainingAmount, 140);
+      assert.equal(partial.submissions[0].allocations[0].receiptNumber, null);
+
+      const unknown = await request(app)
+        .patch('/api/v1/allocations/ALLOC-does-not-exist')
+        .set(admin)
+        .send({ reimbursement: 1 });
+      assert.equal(unknown.status, 404);
+
+      const foreign = await scopedNutzer(pool, app, 'scoped-alloc@example.com', accountB);
+      assert.equal((await patch({ reimbursement: 1 }, foreign)).status, 403);
+    });
+
     // Slice 22: booking one Leistungsabrechnung over several invoices, and the
     // filters the "Leistungsabrechnung auswählen" sub-dialog searches with.
     const contractB = (

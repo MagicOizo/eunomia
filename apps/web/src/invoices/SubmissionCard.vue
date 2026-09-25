@@ -2,6 +2,7 @@
 import {
   faArrowRotateLeft,
   faGavel,
+  faPen,
   faPlus,
   faTrash,
   faTriangleExclamation,
@@ -34,6 +35,7 @@ const emit = defineEmits<{
   bill: [submission: InvoiceSubmissionDto];
   objection: [submission: InvoiceSubmissionDto];
   withdraw: [submission: InvoiceSubmissionDto];
+  editAllocation: [allocation: InvoiceAllocationDto];
   removeAllocation: [allocation: InvoiceAllocationDto];
 }>();
 
@@ -85,6 +87,15 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
         </span>
         <span class="eu-card__amount">{{ euro(allocation.reimbursement) }}</span>
+        <EuButton
+          variant="secondary"
+          icon-only
+          :icon="faPen"
+          :aria-label="`Erstattung aus Abrechnung ${allocation.billingNumber} ändern`"
+          :title="`Erstattungsbetrag und Belegnummer ändern (${allocation.billingNumber})`"
+          :disabled="busy"
+          @click="emit('editAllocation', allocation)"
+        />
         <EuButton
           variant="secondary"
           icon-only

@@ -7,6 +7,17 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.3 — 2026-09-25
+
+- **A booked reimbursement can be corrected.** Amount and receipt number used to be settled the
+  moment an invoice was assigned to a Leistungsabrechnung; a typo could only be undone by removing
+  the whole assignment, which threw the invoice back through every status. A pencil next to the
+  booking now opens both fields again. The "no enrichment" rule still holds, measured without the
+  booking's own amount — otherwise a correction would block itself.
+- **The two fields line up again.** "Erstattung" and "Belegnummer" carried the invoice number in
+  their labels; a long number wrapped and left the fields at different heights. The number stands in
+  the card's header, where it names both fields for a screen reader as well.
+
 ## 0.12.0-slice.2 — 2026-09-25
 
 - **A dialog begins at the top.** Entering several invoices in a row, each form worked through from

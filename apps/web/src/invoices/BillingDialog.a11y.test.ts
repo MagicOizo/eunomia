@@ -152,6 +152,21 @@ describe('BillingDialog with several invoices', () => {
     wrapper.unmount();
   });
 
+  it('names the two fields by the card, not by a label carrying the number', async () => {
+    const wrapper = await openDialog();
+    const labels = wrapper.findAll('label').map((l) => l.text());
+    expect(labels).toContain('Erstattung');
+    expect(labels).toContain('Belegnummer');
+    // A long invoice number in the label wrapped and pushed the two fields out
+    // of line with each other; the card's header names them now.
+    expect(labels.filter((l) => l.includes('R-1'))).toEqual([]);
+
+    const group = wrapper.findAll('[role="group"]')[0];
+    const namedBy = group.attributes('aria-labelledby') ?? '';
+    expect(wrapper.get(`[id="${namedBy}"]`).text()).toBe('R-1');
+    wrapper.unmount();
+  });
+
   it('has no automatically detectable accessibility violations', async () => {
     const wrapper = await openDialog();
     const results = await axe.run(wrapper.element, {

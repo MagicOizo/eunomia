@@ -23,9 +23,11 @@ import {
   createSubmission,
   deleteAllocation,
   removeExclusion,
+  updateAllocation,
   withdrawSubmission,
 } from './api';
 import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
+import AllocationDialog from './AllocationDialog.vue';
 import BillingDialog from './BillingDialog.vue';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import { submittableContracts } from './eligibility';
@@ -197,6 +199,8 @@ const objectionOpen = ref(false);
 const pendingWithdraw = ref<InvoiceSubmissionDto | null>(null);
 const pendingRemove = ref<InvoiceExclusionDto | null>(null);
 const pendingAllocation = ref<InvoiceAllocationDto | null>(null);
+const editingAllocation = ref<InvoiceAllocationDto | null>(null);
+const allocationError = ref<string | null>(null);
 
 watch(
   () => [props.open, props.invoice?.invoiceUID] as const,
@@ -292,6 +296,31 @@ async function saveBilling(payload: BillingAllocationPayload): Promise<void> {
     `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${euro(inv.remainingAmount)}).`,
   );
   if (ok) billingOpen.value = false;
+}
+
+function openAllocation(allocation: InvoiceAllocationDto): void {
+  allocationError.value = null;
+  editingAllocation.value = allocation;
+}
+
+async function saveAllocation(payload: {
+  allocationUID: string;
+  reimbursement: number;
+  receiptNumber: string | null;
+}): Promise<void> {
+  const inv = props.invoice;
+  if (!inv) return;
+  allocationError.value = null;
+  const ok = await runBlock(
+    () =>
+      updateAllocation(payload.allocationUID, {
+        reimbursement: payload.reimbursement,
+        receiptNumber: payload.receiptNumber,
+      }),
+    (m) => (allocationError.value = m),
+    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (Rechnungsbetrag: ${euro(inv.invoiceAmount)}).`,
+  );
+  if (ok) editingAllocation.value = null;
 }
 
 async function confirmRemoveAllocation(): Promise<void> {
@@ -546,6 +575,7 @@ function submit(): void {
             @bill="openBilling"
             @objection="objectionOpen = true"
             @withdraw="pendingWithdraw = $event"
+            @edit-allocation="openAllocation"
             @remove-allocation="pendingAllocation = $event"
           />
           <article
@@ -612,6 +642,15 @@ function submit(): void {
     :error="billingError"
     @close="billingOpen = false"
     @submit="saveBilling"
+  />
+  <AllocationDialog
+    :open="editingAllocation !== null"
+    :allocation="editingAllocation"
+    :invoice="invoice"
+    :submitting="blockBusy"
+    :error="allocationError"
+    @close="editingAllocation = null"
+    @submit="saveAllocation"
   />
   <ObjectionDialog
     :open="objectionOpen"

@@ -322,6 +322,18 @@ export async function createAllocations(
   await apiFetch(`/billings/${billingUID}/allocations`, { method: 'POST', body: { entries } });
 }
 
+/**
+ * Corrects a booked reimbursement without unbooking it: its amount, its
+ * receipt number, or both. Which invoice and which billing it belongs to
+ * cannot be changed here.
+ */
+export async function updateAllocation(
+  uid: string,
+  body: { reimbursement?: number; receiptNumber?: string | null },
+): Promise<void> {
+  await apiFetch(`/allocations/${uid}`, { method: 'PATCH', body });
+}
+
 /** Removes a booked reimbursement; the billing itself stays. */
 export async function deleteAllocation(uid: string): Promise<void> {
   await apiFetch(`/allocations/${uid}`, { method: 'DELETE' });

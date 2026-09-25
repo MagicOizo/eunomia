@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, useId, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -67,6 +67,15 @@ const billings = ref<BillingListDto[]>([]);
 const selectedBilling = ref('');
 const accountInvoices = ref<InvoiceDto[]>([]);
 const localError = ref<string | null>(null);
+
+/**
+ * The invoice number in a card's header names that card's two fields (see the
+ * group below), instead of being repeated in both labels: a long number broke
+ * into a second line there and pushed "Erstattung" and "Belegnummer" out of
+ * line with each other.
+ */
+const cardId = useId();
+const numberId = (invoiceUID: string): string => `${cardId}-${invoiceUID}`;
 
 const searchOpen = ref(false);
 const createOpen = ref(false);
@@ -311,7 +320,9 @@ function submit(): void {
       <ul class="eu-bill__cards">
         <li v-for="invoice in rows" :key="invoice.invoiceUID" class="eu-bill__card">
           <div class="eu-bill__head">
-            <span class="eu-bill__number">{{ invoice.invoiceNumber }}</span>
+            <span :id="numberId(invoice.invoiceUID)" class="eu-bill__number">
+              {{ invoice.invoiceNumber }}
+            </span>
             <span class="eu-bill__meta">
               {{
                 (invoice.facilityUID && facilityNames[invoice.facilityUID]) ||
@@ -330,15 +341,12 @@ function submit(): void {
               @click="removeInvoice(invoice.invoiceUID)"
             />
           </div>
-          <div class="eu-bill__fields">
+          <div class="eu-bill__fields" role="group" :aria-labelledby="numberId(invoice.invoiceUID)">
             <EuCurrencyField
               v-model="entries[invoice.invoiceUID].reimbursement"
-              :label="`Erstattung (${invoice.invoiceNumber})`"
+              label="Erstattung"
             />
-            <EuTextField
-              v-model="entries[invoice.invoiceUID].receiptNumber"
-              :label="`Belegnummer (${invoice.invoiceNumber})`"
-            />
+            <EuTextField v-model="entries[invoice.invoiceUID].receiptNumber" label="Belegnummer" />
           </div>
         </li>
       </ul>

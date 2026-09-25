@@ -37,10 +37,10 @@
 	- In allen Fällen kann es vorkommen, dass für eine Bearbeitung ein Einspruch erhoben wird und es zur selben Rechnung und zur selben Einreichung eine zweite
 	  Leistungsabrechnung gibt
 	- In allen Fällen kann es vorkommen, dass eine Rechnung ein zweites mal bei einer Zusatzversicherung eingereicht und erst dann abschließend behandelt wird
-8.  Label für Erstattung und Belegnummer
+8.  Label für Erstattung und Belegnummer — Umgesetzt mit v0.12.0-slice.3
 	Siehe Screenshot (Screenshot 2026-09-24 203348.png): Im Label wird die Rechnungsnummer mit abgebildet, das führt unter umständen zu zu langem Text und einem Umbruch, wodurch die Felder für Erstattung 
 	und Belegnummer vertikal nicht ausgerichtet sind. Dabei muss im Label die Rechnungsnummer gar nicht stehen, es reicht, wenn sie einmal in der Karte steht.
-9.  Ändern einmal zugewiesener Rechnungen
+9.  Ändern einmal zugewiesener Rechnungen — Umgesetzt mit v0.12.0-slice.3
 	Wenn eine Rechnung einer Leistungsabrechnung zugeordnet wird, legt man Erstattungsbetrag und Belegnummer fest. Danach sind diese Werte in der UI nicht mehr änderbar.
 	Es muss eine Möglichkeit geben, die Werte nachträglich anzupassen. Der einzige Weg ist heute, dass man die Zuordnung für die Rechnung löscht.
 10. Es fehlt die Ansicht für den "Papierkorb"

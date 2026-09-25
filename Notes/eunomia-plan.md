@@ -989,7 +989,7 @@ eine Regel für alle Dialoge der App ist.
   Formular darunter nicht verschieben darf. Die Testrechnungen aus der Messung sind mit
   `npm run dev:reset` wieder aus der Dev-Datenbank verschwunden.
 
-## Slice 34 — Erstattung und Belegnummer nachträglich ändern
+## Slice 34 — Erstattung und Belegnummer nachträglich ändern (umgesetzt 2026-09-25)
 **Ziel:** Eine gebuchte Zuordnung ist korrigierbar, ohne sie zu löschen (issues.md 9 und 8).
 - **PATCH auf `/allocations/:uid`** (issues.md 9): heute gibt es nur GET und DELETE. Der einzige Weg
   zu einer korrigierten Belegnummer ist, die Zuordnung zu löschen und neu zu buchen.
@@ -1004,6 +1004,32 @@ eine Regel für alle Dialoge der App ist.
 
 **DoD:** Erstattungsbetrag und Belegnummer sind an einer gebuchten Zuordnung änderbar; die beiden
 Felder fluchten auch bei langer Rechnungsnummer.
+
+**Umgesetzt (2026-09-25).** Entscheidungen beim Bau:
+
+- **Korrigieren, nicht verschieben:** `PATCH /allocations/:uid` nimmt nur `reimbursement` und
+  `receiptNumber`. Rechnung und Leistungsabrechnung sind die Zuordnung selbst; sie umzuhängen bleibt
+  Löschen und neu Buchen. Damit braucht der Patch auch keine Einreichungsprüfung von vorn.
+- **Das Bereicherungsverbot gegen die anderen, nicht gegen sich selbst.** Die Kandidatenabfrage aus
+  `createAllocationsForBilling` ist zu `loadCandidates` herausgezogen und lässt beim Ändern über
+  `ignoreAllocationUID` die eigene Buchung aus der Summe. Ohne das blockiert sich jede Zuordnung
+  selbst: 100 € von 200 € auf 150 € zu heben wäre „übersteigt den Rechnungsbetrag". Gegengeprüft —
+  ohne den Ausschluss antwortet genau dieser Fall im Integrationstest mit 409 statt 200.
+- **Geprüft wird mit demselben `assertEntriesBookable`** wie beim Buchen, mit einer einzigen Position
+  und der Rechnung unter `FOR UPDATE`. Gleiche Regeln, gleiche Fehlercodes, gleiche Übersetzung in
+  der Oberfläche — kein zweiter Prüfpfad, der auseinanderlaufen kann.
+- **Ein eigener kleiner Dialog** (`AllocationDialog`) statt des Zuordnen-Dialogs: der bucht neu, für
+  mehrere Rechnungen, mit Policen- und Abrechnungswahl. Zum Korrigieren zweier Felder wäre das der
+  falsche Hebel. Die Obergrenze im Dialog ist „noch offen + der eigene bisherige Betrag", also
+  dieselbe Rechnung wie auf dem Server.
+- **Die Nummer bezeichnet die Gruppe, nicht jedes Label.** Der Feldblock jeder Karte ist eine
+  `role="group"` mit `aria-labelledby` auf die Rechnungsnummer in der Kopfzeile. Ein abweichendes
+  `aria-label` hätte vorgelesen, was nicht dasteht.
+- **Im laufenden System geprüft** (Playwright, hell/dunkel, 1440 px und 390 px): Erstattung von
+  120 € auf 500 € gehoben (die Rechnung folgt von „Teilabgerechnet" auf „Abgerechnet"), 500,01 €
+  abgewiesen, Belegnummer geändert, der Stift über die Tastatur erreichbar, und der Zuordnen-Dialog
+  mit der langen Nummer aus dem Screenshot (`33611/201806/00164`): beide Beschriftungen einzeilig
+  und auf gleicher Höhe. Die Dev-Daten stehen danach wieder auf den Seed-Werten.
 
 ## Slice 35 — Police-Auswahl im Versicherungszeitraum
 **Ziel:** Beim Einreichen stehen die Policen oben, die zum Behandlungszeitraum passen (issues.md 12).

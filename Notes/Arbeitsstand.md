@@ -19,7 +19,7 @@ in [eunomia-plan.md](eunomia-plan.md). 0.11.0 ist davor als volles Release abges
 | --- | --- | --- | --- | --- |
 | ☑ | 33 | Eingabe-Politur: Tab im Picker, Datum einfügen | 1, 11 | 0.12.0-slice.1 |
 | ☑ | 33a | Dialoge öffnen oben, nicht im alten Scrollzustand | 13 | 0.12.0-slice.2 |
-| ☐ | 34 | Erstattung und Belegnummer nachträglich ändern | 9, 8 | |
+| ☑ | 34 | Erstattung und Belegnummer nachträglich ändern | 9, 8 | 0.12.0-slice.3 |
 | ☐ | 35 | Police-Auswahl im Versicherungszeitraum | 12 | |
 | ☐ | 36 | Suchen und Finden | 2, 3, 6 | |
 | ☐ | 37a | Abrechnung über mehrere Einreichungen — Modell + API | 7 | |
