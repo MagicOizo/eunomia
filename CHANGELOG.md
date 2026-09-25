@@ -7,6 +7,18 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.11.0-slice.4 — 2026-09-25
+
+- **A facility created on the side no longer disappears.** Adding a facility or a collection agency
+  from the invoice form left the rest of the page unaware of it: the invoice list showed an empty
+  provider column and the invoice's own mask showed an empty field until the page was reloaded. The
+  workspace now reloads those two lists as soon as a dialog creates an entry, so the table, the mask
+  and the agency's IBAN are right immediately.
+- **The invoice mask can create them too.** The view/edit mask offers the same ad-hoc create as the
+  create form — as a **+** in the row's action column and as the "add ‹typed name›" row of the
+  typeahead, prefilled with what was typed. As everywhere else in the mask, the picked value reaches
+  the invoice when you save, and the reset arrow takes it back to the stored one.
+
 ## 0.11.0-slice.3 — 2026-09-24
 
 - **Payment reminders.** Eunomia now speaks up on its own when an invoice's payment falls due or is

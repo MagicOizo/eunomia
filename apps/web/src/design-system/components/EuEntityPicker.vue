@@ -46,6 +46,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | null];
+  /** The typed text, for a parent that renders the add action itself (the display mask). */
+  'update:query': [value: string];
   create: [query: string];
   search: [query: string];
 }>();
@@ -58,6 +60,12 @@ const inputRef = useTemplateRef<HTMLInputElement>('input');
 const open = ref(false);
 const query = ref('');
 const highlight = ref(0);
+
+/** Single writer for the typed text, so the parent hears every change of it. */
+function setQuery(value: string): void {
+  query.value = value;
+  emit('update:query', value);
+}
 
 const selected = computed(() => props.options.find((o) => o.value === props.modelValue) ?? null);
 
@@ -101,7 +109,7 @@ const displayValue = computed(() => (open.value ? query.value : (selected.value?
 
 function select(option: PickerOption): void {
   emit('update:modelValue', option.value);
-  query.value = '';
+  setQuery('');
   open.value = false;
   inputRef.value?.blur();
 }
@@ -109,7 +117,7 @@ function select(option: PickerOption): void {
 function clear(): void {
   if (props.required) return;
   emit('update:modelValue', null);
-  query.value = '';
+  setQuery('');
   inputRef.value?.focus();
 }
 
@@ -124,7 +132,7 @@ function triggerSearch(): void {
 }
 
 function onInput(event: Event): void {
-  query.value = (event.target as HTMLInputElement).value;
+  setQuery((event.target as HTMLInputElement).value);
   open.value = true;
   highlight.value = 0;
 }

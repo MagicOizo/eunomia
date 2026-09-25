@@ -1,9 +1,18 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import axe from 'axe-core';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import EuDetailField from '../design-system/components/EuDetailField.vue';
+import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import type { InvoiceDto, InvoiceSubmissionDto, PlanInvoiceDto } from './api';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
+
+const { createResource } = vi.hoisted(() => ({ createResource: vi.fn() }));
+
+vi.mock('../lib/resource', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/resource')>()),
+  createResource,
+}));
 
 function submission(overrides: Partial<InvoiceSubmissionDto> = {}): InvoiceSubmissionDto {
   return {
@@ -103,6 +112,42 @@ describe('InvoiceDetailDialog assignment block', () => {
       rules: { 'color-contrast': { enabled: false } },
     });
     expect(results.violations).toEqual([]);
+    wrapper.unmount();
+  });
+});
+
+describe('InvoiceDetailDialog ad-hoc create', () => {
+  beforeEach(() => createResource.mockReset());
+
+  /** The row of the mask carrying `label`. */
+  const row = (wrapper: ReturnType<typeof mount>, label: string) =>
+    wrapper.findAllComponents(EuDetailField).find((c) => c.props('label') === label);
+
+  const addAction = (wrapper: ReturnType<typeof mount>, noun: string) =>
+    wrapper.findAll('button').find((b) => b.attributes('aria-label') === `${noun} hinzufügen`);
+
+  it('creates the facility typed into the mask and selects it right away', async () => {
+    createResource.mockResolvedValue({ facilityUID: 'f-9', facilityName: 'Praxis Süd' });
+    const wrapper = mount(InvoiceDetailDialog, { props, attachTo: document.body });
+
+    await wrapper.find('input[aria-label="Leistungserbringer"]').setValue('Praxis Süd');
+    await addAction(wrapper, 'Leistungserbringer')?.trigger('click');
+
+    const form = wrapper.findComponent(ResourceFormDialog);
+    expect(form.props('open')).toBe(true);
+    expect(form.props('prefill')).toEqual({ facilityName: 'Praxis Süd' });
+
+    form.vm.$emit('submit', { facilityName: 'Praxis Süd' });
+    await flushPromises();
+
+    expect(createResource).toHaveBeenCalledWith('/facilities', { facilityName: 'Praxis Süd' });
+    const facility = row(wrapper, 'Leistungserbringer');
+    expect(facility?.props('modelValue')).toBe('f-9');
+    expect(facility?.props('options')).toContainEqual({ value: 'f-9', label: 'Praxis Süd' });
+    // The parent's lookup lists are stale now — without this the new name would
+    // be missing from the invoice table until the page is reloaded.
+    expect(wrapper.emitted('entityCreated')).toHaveLength(1);
+    expect(form.props('open')).toBe(false);
     wrapper.unmount();
   });
 });

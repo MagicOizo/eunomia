@@ -8,7 +8,9 @@ import type { DetailValue } from '../design-system/components/EuDetailField.vue'
 import EuDetailField from '../design-system/components/EuDetailField.vue';
 import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import type { PickerOption } from '../design-system/components/EuEntityPicker.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
+import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { describeError } from '../lib/errors';
 import { euro } from '../lib/format';
 import {
@@ -25,6 +27,7 @@ import {
 } from './api';
 import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
 import BillingDialog from './BillingDialog.vue';
+import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import { submittableContracts } from './eligibility';
 import ExclusionDialog from './ExclusionDialog.vue';
 import ObjectionDialog from './ObjectionDialog.vue';
@@ -67,11 +70,49 @@ const emit = defineEmits<{
   submit: [payload: Record<string, unknown>];
   /** A submission or exclusion changed: the parent reloads and passes the fresh invoice. */
   changed: [];
+  /** An entity was created on the side: the parent's lookup lists are stale. */
+  entityCreated: [];
 }>();
 
 const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
 const localError = ref<string | null>(null);
+
+// Local option copies so an ad-hoc-created entity can be appended and selected
+// immediately, without waiting for the parent to reload its lists.
+const localFacilities = ref<PickerOption[]>([]);
+const localAgencies = ref<PickerOption[]>([]);
+watch(
+  () => props.facilities,
+  (list) => (localFacilities.value = list.map((o) => ({ value: o.value, label: o.label }))),
+  { immediate: true },
+);
+watch(
+  () => props.agencies,
+  (list) => (localAgencies.value = list.map((o) => ({ value: o.value, label: o.label }))),
+  { immediate: true },
+);
+
+// Ad-hoc create from the two pickers of the mask — same sub-dialog as the
+// create form uses. The picked value is only written to the invoice on Save.
+const {
+  open: createOpen,
+  kind: createKind,
+  prefill: createPrefill,
+  busy: createBusy,
+  error: createError,
+  start: openCreate,
+  submit: onCreateSubmit,
+} = useEntityCreate((kind, option) => {
+  if (kind === 'facility') {
+    localFacilities.value = [...localFacilities.value, option];
+    values.facilityUID = option.value;
+  } else {
+    localAgencies.value = [...localAgencies.value, option];
+    values.agencyUID = option.value;
+  }
+  emit('entityCreated');
+});
 
 // Seeded per opened invoice only: a reload after a block action passes a
 // fresh invoice object and must not discard unsaved edits in the mask.
@@ -122,7 +163,7 @@ const ibanForSelected = computed(() => {
 });
 const agencyNameForSelected = computed(() => {
   const uid = values.agencyUID;
-  return props.agencies.find((option) => option.value === uid)?.label ?? '';
+  return localAgencies.value.find((option) => option.value === uid)?.label ?? '';
 });
 // The GiroCode follows the mask, not the saved invoice: it sits next to the
 // IBAN row, which already shows the agency currently picked, and what you scan
@@ -167,7 +208,7 @@ const policyLabel = (p: { contractNumber: string; companyName: string }): string
 
 /** facilityUID → name, for the invoice lists of the sub-dialogs. */
 const facilityNames = computed(() =>
-  Object.fromEntries(props.facilities.map((f) => [f.value, f.label])),
+  Object.fromEntries(localFacilities.value.map((f) => [f.value, f.label])),
 );
 
 /** Policies that can still be marked: not submitted there and not marked yet. */
@@ -356,7 +397,10 @@ function submit(): void {
         :saved-value="saved.facilityUID"
         label="Leistungserbringer"
         type="select"
-        :options="facilities"
+        :options="localFacilities"
+        allow-create
+        create-noun="Leistungserbringer"
+        @create="openCreate('facility', $event)"
       />
       <EuDetailField label="Versicherter" type="readonly" :model-value="accountName" />
 
@@ -391,8 +435,11 @@ function submit(): void {
         :saved-value="saved.agencyUID"
         label="Abrechnungsdienstleister"
         type="select"
-        :options="agencies"
+        :options="localAgencies"
         :disabled="directPayment"
+        allow-create
+        create-noun="Abrechnungsdienstleister"
+        @create="openCreate('agency', $event)"
       />
       <EuDetailField
         label="IBAN"
@@ -534,6 +581,18 @@ function submit(): void {
     </template>
   </EuDialog>
 
+  <!-- Ad-hoc create for the entity picked in the mask, prefilled with the typed name. -->
+  <ResourceFormDialog
+    :open="createOpen"
+    :title="`${CREATE_KINDS[createKind].config.singular} anlegen`"
+    :fields="CREATE_KINDS[createKind].config.fields"
+    :options="{}"
+    :prefill="createPrefill"
+    :submitting="createBusy"
+    :error="createError"
+    @close="createOpen = false"
+    @submit="onCreateSubmit"
+  />
   <SubmitDialog
     :open="submitOpen"
     :invoices="invoice ? [invoice] : []"

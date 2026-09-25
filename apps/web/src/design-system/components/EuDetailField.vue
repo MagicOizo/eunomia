@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { faArrowRotateLeft, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faArrowRotateLeft, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import EuCurrencyField from './EuCurrencyField.vue';
 import EuEntityPicker, { type PickerOption } from './EuEntityPicker.vue';
@@ -30,6 +30,10 @@ const props = withDefaults(
     options?: PickerOption[];
     /** For `number`: the input's granularity, e.g. '1' for whole kilometres. */
     step?: string;
+    /** For `select`: offers ad-hoc create — the parent answers `create` with a create dialog. */
+    allowCreate?: boolean;
+    /** Noun of the created entity, e.g. "Leistungserbringer". */
+    createNoun?: string;
   }>(),
   {
     type: 'text',
@@ -39,10 +43,20 @@ const props = withDefaults(
     disabled: false,
     options: () => [],
     step: undefined,
+    allowCreate: false,
+    createNoun: 'Eintrag',
   },
 );
 
-const emit = defineEmits<{ 'update:modelValue': [value: DetailValue] }>();
+const emit = defineEmits<{
+  'update:modelValue': [value: DetailValue];
+  /** Ad-hoc create asked for, with the text typed into the picker so far. */
+  create: [query: string];
+}>();
+
+// What the picker currently has typed in it: the add action sits outside the
+// field (the mask puts actions in their own column), so it needs to be told.
+const query = ref('');
 
 const isEmpty = computed(
   () => props.modelValue === null || props.modelValue === undefined || props.modelValue === '',
@@ -128,7 +142,11 @@ function reset(): void {
           :disabled="disabled"
           :options="options"
           :model-value="stringValue"
+          :allow-create="allowCreate"
+          :create-noun="createNoun"
           @update:model-value="emit('update:modelValue', $event)"
+          @update:query="query = $event"
+          @create="emit('create', $event)"
         />
         <EuToggle
           v-else-if="type === 'toggle'"
@@ -141,6 +159,19 @@ function reset(): void {
 
     <div class="eu-detail__actions">
       <template v-if="type !== 'readonly'">
+        <!-- Add, clear, reset — the icon order dialog-design.md fixes. In the
+             mask the actions live in this column, not inside the field. -->
+        <button
+          v-if="type === 'select' && allowCreate"
+          type="button"
+          class="eu-detail__action"
+          :disabled="disabled"
+          :aria-label="`${createNoun} hinzufügen`"
+          :title="`${createNoun} hinzufügen`"
+          @click="emit('create', query.trim())"
+        >
+          <FontAwesomeIcon :icon="faPlus" aria-hidden="true" />
+        </button>
         <button
           v-if="clearable"
           type="button"

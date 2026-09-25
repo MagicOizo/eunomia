@@ -180,6 +180,16 @@ async function loadStatic(): Promise<void> {
       companyName: c.companyName,
     }));
 
+  await loadLookups();
+}
+
+/**
+ * The two lists the invoice dialogs pick from. Separate from the rest of
+ * loadStatic() because a dialog can create a facility or an agency on the side
+ * — without this reload the new entry would stay unknown to the table, the
+ * mask and the IBAN map until the page is reloaded.
+ */
+async function loadLookups(): Promise<void> {
   const facilities = await listResource<{ facilityUID: string; facilityName: string }>(
     '/facilities',
   );
@@ -645,6 +655,7 @@ function confirmDelete(): void {
       @close="detailOpen = false"
       @submit="submitDetail"
       @changed="detailChanged"
+      @entity-created="loadLookups"
     />
     <InvoiceFormDialog
       :open="formOpen"
@@ -656,6 +667,7 @@ function confirmDelete(): void {
       :error="dialogError"
       @close="formOpen = false"
       @submit="submitInvoiceForm"
+      @entity-created="loadLookups"
     />
     <SubmitDialog
       :open="submitOpen"

@@ -9,12 +9,8 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
-import { describeError } from '../lib/errors';
-import { HttpError } from '../lib/http';
-import { createResource } from '../lib/resource';
-import type { ResourceConfig } from '../resources/config';
-import { resourceConfigs } from '../resources/definitions';
 import type { InvoiceDto } from './api';
+import { CREATE_KINDS, useEntityCreate } from './entity-create';
 
 const props = defineProps<{
   open: boolean;
@@ -27,7 +23,12 @@ const props = defineProps<{
   error: string | null;
 }>();
 
-const emit = defineEmits<{ close: []; submit: [payload: Record<string, unknown>] }>();
+const emit = defineEmits<{
+  close: [];
+  submit: [payload: Record<string, unknown>];
+  /** An entity was created on the side: the parent's lookup lists are stale. */
+  entityCreated: [];
+}>();
 
 const form = ref({
   invoiceNumber: '',
@@ -61,56 +62,24 @@ watch(
 );
 
 // Ad-hoc create ("‹typed name› hinzufügen") — reuses the resource create form.
-type CreateKind = 'facility' | 'agency';
-const kinds: Record<CreateKind, { path: string; config: ResourceConfig; noun: string }> = {
-  facility: {
-    path: '/facilities',
-    config: resourceConfigs['/facilities'],
-    noun: 'Leistungserbringer',
-  },
-  agency: {
-    path: '/agencies',
-    config: resourceConfigs['/agencies'],
-    noun: 'Abrechnungsdienstleister',
-  },
-};
-const createOpen = ref(false);
-const createKind = ref<CreateKind>('facility');
-const createPrefill = ref<Record<string, string>>({});
-const createBusy = ref(false);
-const createError = ref<string | null>(null);
-
-function openCreate(kind: CreateKind, query: string): void {
-  createKind.value = kind;
-  createPrefill.value = { [kinds[kind].config.columns[0].key]: query };
-  createError.value = null;
-  createOpen.value = true;
-}
-
-async function onCreateSubmit(payload: Record<string, unknown>): Promise<void> {
-  const kind = kinds[createKind.value];
-  createBusy.value = true;
-  createError.value = null;
-  try {
-    const row = await createResource(kind.path, payload);
-    const option: PickerOption = {
-      value: String(row[kind.config.idKey]),
-      label: String(row[kind.config.columns[0].key]),
-    };
-    if (createKind.value === 'facility') {
-      localFacilities.value = [...localFacilities.value, option];
-      form.value.facilityUID = option.value;
-    } else {
-      localAgencies.value = [...localAgencies.value, option];
-      form.value.agencyUID = option.value;
-    }
-    createOpen.value = false;
-  } catch (err) {
-    createError.value = err instanceof HttpError ? describeError(err) : 'Anlegen fehlgeschlagen.';
-  } finally {
-    createBusy.value = false;
+const {
+  open: createOpen,
+  kind: createKind,
+  prefill: createPrefill,
+  busy: createBusy,
+  error: createError,
+  start: openCreate,
+  submit: onCreateSubmit,
+} = useEntityCreate((kind, option) => {
+  if (kind === 'facility') {
+    localFacilities.value = [...localFacilities.value, option];
+    form.value.facilityUID = option.value;
+  } else {
+    localAgencies.value = [...localAgencies.value, option];
+    form.value.agencyUID = option.value;
   }
-}
+  emit('entityCreated');
+});
 
 watch(
   () => [props.open, props.editing] as const,
@@ -218,8 +187,8 @@ function submit(): void {
   <!-- Ad-hoc create for the entity picked above, prefilled with the typed name. -->
   <ResourceFormDialog
     :open="createOpen"
-    :title="`${kinds[createKind].config.singular} anlegen`"
-    :fields="kinds[createKind].config.fields"
+    :title="`${CREATE_KINDS[createKind].config.singular} anlegen`"
+    :fields="CREATE_KINDS[createKind].config.fields"
     :options="{}"
     :prefill="createPrefill"
     :submitting="createBusy"

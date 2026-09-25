@@ -818,6 +818,39 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **HTML-Teil der Mail** — heute reiner Text, was für eine Liste genügt, aber in manchen Clients spröde aussieht.
 - **Eigene Ratenbegrenzung für „Jetzt ausführen"** — heute deckt nur das globale Limit den Knopf ab (wie beim Testversand).
 
+## Slice 32 — Ad-hoc-Anlegen in der Rechnungsmaske, frische Auswahllisten (umgesetzt 2026-09-25)
+
+**Anlass:** Zwei Rückmeldungen des Autors aus der Produktion (2026-09-24), beide beim Erfassen echter Rechnungen. (1) Legt man beim Anlegen einer Rechnung einen Leistungserbringer oder Abrechnungsdienstleister ad hoc mit an, bleibt die Spalte „Leistungserbringer" in der Liste leer und die gerade angelegte Rechnung zeigt das Feld in der Maske leer — erst `F5` bringt beides. (2) In der Änderungsansicht einer Rechnung fehlt das „+" ganz, dort lässt sich nichts ad hoc anlegen.
+
+**Befund:** Zwei getrennte Ursachen.
+
+- `InvoiceWorkspaceView.loadStatic()` lud Leistungserbringer und Dienstleister **einmal** beim Öffnen; `afterMutation()` holte nur Jahre und Rechnungen nach. Der ad hoc angelegte Eintrag lebte deshalb nur in der lokalen Optionskopie des Anlegen-Dialogs und war der Tabelle, der Maske und der IBAN-Karte unbekannt. Gespeichert war die Rechnung korrekt — es war reine Anzeige.
+- Die Maske rendert ihre Picker über `EuDetailField type="select"`. Das kannte `allowCreate` gar nicht, und `EuEntityPicker` blendet im `bare`-Modus alle **eingebetteten** Feld-Aktionen aus. Damit fehlten dort beide Wege: der Knopf und die Listenzeile „‚X' als … hinzufügen".
+
+**DoD:** Leistungserbringer und Abrechnungsdienstleister lassen sich aus beiden Dialogen heraus anlegen, und Tabelle, Maske und IBAN stimmen sofort — ohne Neuladen der Seite.
+
+**Entscheidungen (Planmodus):**
+
+- **Umfang nach Rückfrage:** Ad-hoc-Anlegen überall, wo Leistungserbringer, Abrechnungsdienstleister, Rechnungen oder Leistungsabrechnungen ausgewählt werden — **nicht** bei Versicherung und Versichertem („da hängt zu viel dran", deckt sich mit `dialog-design.md`). Die Bestandsaufnahme ergab genau eine Lücke, die Rechnungsmaske: der Anlegen-Dialog und der Abrechnungs-Dialog (Leistungsabrechnung, Slice 22/27) konnten es bereits.
+- **Ausnahme „Weitere Rechnung dieser Einreichung"** (`BillingDialog`): Dort bekommt das Rechnungsfeld **kein** Ad-hoc-Anlegen. Buchbar sind nur Rechnungen, die dieser Einreichung bereits angehören; eine frisch angelegte gehört keiner an und wäre sofort wieder unbuchbar.
+- **Das „+" der Maske steht in der Aktionsspalte, nicht im Feld** — `dialog-design.md` legt genau das für den View/Edit-Modus fest (im Feld eingebettet ist die Lösung des Create-Modus). Reihenfolge Add → Clear → Reset, wie die Icon-Liste dort.
+- **Ein Ereignis statt eines Dauer-Nachladens:** Beide Dialoge melden `entityCreated`, die Ansicht lädt daraufhin ihre Auswahllisten neu. `afterMutation()` bei jedem Speichern mitzuladen wäre zwei Requests pro Aktion und würde den Abbruch-Fall („angelegt, dann Rechnung verworfen") trotzdem nicht erwischen.
+
+**Umgesetzt (2026-09-25).** Entscheidungen beim Bau:
+
+- **Die Ad-hoc-Logik liegt jetzt einmal** in `invoices/entity-create.ts` (`CREATE_KINDS`, `useEntityCreate`) statt zweimal in den Dialogen; der Anlegen-Dialog benutzt dieselbe Composable wie die Maske. Das Nomen für Knopf und Titel kommt aus `ResourceConfig.singular` — das frühere zusätzliche `noun` war eine wortgleiche Zweitschrift.
+- **`loadLookups()` ist aus `loadStatic()` herausgelöst** und die einzige Stelle, die die beiden Listen füllt (inklusive `facilityNameById` und `agencyById`, also auch der IBAN-Karte).
+- **Der „+"-Knopf braucht den getippten Text:** Er steht außerhalb des Pickers, deshalb meldet `EuEntityPicker` seine Eingabe jetzt als `update:query` nach außen, und `EuDetailField` gibt sie beim Anlegen als Vorbelegung weiter — die Maske verhält sich damit wie die Listenzeile im Formular.
+- **Der Wert wird wie jede Maskenänderung erst mit „Speichern" geschrieben.** Der Eintrag selbst existiert sofort (eigener Request), der Zurücksetzen-Pfeil führt bis zum Speichern auf den gespeicherten Wert zurück.
+- **Verworfen: die Sucheingabe nach dem Anlegen leeren.** Naheliegend, weil der Picker den alten Suchtext beim nächsten Fokus wieder zeigt — aber dann klappt beim Fokus-Rücksprung aus dem Subdialog die **ungefilterte** Liste auf und legt sich über die Dialog-Fußzeile (im Browser gemessen: der Speichern-Knopf war nicht mehr klickbar). Das ist eine Entscheidung über die Fokus-/Öffnen-Regel des Pickers, keine Beifang-Änderung. → Backlog.
+- **Tests:** `EuDetailField.test.ts` (Knopf nur mit `allowCreate`, trägt den getippten Text, aus mit der Zeile), `entity-create.spec.ts` (Vorbelegung, zurückgegebene Option, deutsche Fehlermeldung), Maskentest (Subdialog vorbelegt, Wert sofort gesetzt, `entityCreated`) und `InvoiceWorkspaceView.test.ts` (auf `entityCreated` werden beide Listen neu geladen — ohne die Verdrahtung schlägt er fehl, gegengeprüft).
+- **Im laufenden System geprüft** (Playwright, hell/dunkel, 390 px und 1440 px): Rechnung mit ad hoc angelegtem Leistungserbringer **und** Dienstleister — Tabellenspalte, Maske und IBAN des neuen Dienstleisters stimmen ohne Neuladen; in der Maske beide Wege (Knopf mit übernommenem Text, Listenzeile), Abbrechen lässt das Feld unverändert, nach Speichern und Wiederöffnen stehen beide Werte; bei Barzahlung ist die Dienstleister-Zeile samt „+" deaktiviert; Fokusring am tastaturfokussierten „+" im Screenshot rundum vollständig. Die Testzeilen sind danach wieder aus der Dev-Datenbank entfernt.
+
+**Backlog aus dieser Scheibe:**
+
+- **Alter Suchtext im Picker:** Nach Auswahl oder Anlegen bleibt die getippte Suche erhalten und erscheint beim nächsten Fokus wieder. Zusammen mit der Regel „Fokus öffnet die Liste" gehört das als Ganzes entschieden (siehe oben).
+- **Der Schalter „Direkt-/Barzahlung" in der Maske hat keinen zugänglichen Namen:** `EuDetailField` reicht `label=""` an `EuToggle` durch, weil die Beschriftung in der linken Spalte steht — für die Maus richtig, für den Screenreader ein namenloses Kontrollkästchen. `EuToggle` bräuchte dafür einen `aria-label`-Weg.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.
