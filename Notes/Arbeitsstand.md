@@ -12,12 +12,13 @@ Nach jeder umgesetzten Scheibe wandern drei Dinge zusammen: der Haken hier, der 
 
 ## Paket: Findings aus der Produktion 0.9.0 → 0.12.0
 
-Zwölf Punkte aus der Produktionsnutzung, erfasst in [issues.md](issues.md), geplant als Slices 33–39
+Dreizehn Punkte aus der Produktionsnutzung, erfasst in [issues.md](issues.md), geplant als Slices 33–39
 in [eunomia-plan.md](eunomia-plan.md). 0.11.0 ist davor als volles Release abgeschlossen.
 
 | ✓ | Slice | Inhalt | issues.md | Version |
 | --- | --- | --- | --- | --- |
 | ☑ | 33 | Eingabe-Politur: Tab im Picker, Datum einfügen | 1, 11 | 0.12.0-slice.1 |
+| ☐ | 33a | Dialoge öffnen oben, nicht im alten Scrollzustand | 13 | |
 | ☐ | 34 | Erstattung und Belegnummer nachträglich ändern | 9, 8 | |
 | ☐ | 35 | Police-Auswahl im Versicherungszeitraum | 12 | |
 | ☐ | 36 | Suchen und Finden | 2, 3, 6 | |

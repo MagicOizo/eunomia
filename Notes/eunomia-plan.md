@@ -943,6 +943,21 @@ Ein aus Excel kopiertes `24.09.2026` landet in jedem Datumsfeld der App.
   des Schalters, Fokusring am tastaturfokussierten Picker rundum vollständig. Nichts gespeichert,
   also keine Testzeilen in der Dev-Datenbank.
 
+## Slice 33a — Dialoge öffnen oben, nicht im alten Scrollzustand
+**Anlass:** issues.md 13, aus der Produktionsnutzung (2026-09-25). Wird mehrmals hintereinander eine
+Rechnung angelegt und das Formular dabei von oben nach unten durchgearbeitet, steht der nächste
+Dialog gleich unten: Der Scrollzustand des Dialogkörpers bleibt erhalten, während der Fokus wieder
+oben im ersten Feld liegt. Man tippt also in ein Feld, das man nicht sieht.
+
+**Ziel:** Ein Dialog beginnt immer oben. Zu klären ist dabei, ob das für jedes Öffnen gilt oder nur
+für einen frisch gefüllten Dialog, und wo es hingehört: `EuDialog` öffnet als einziger Ort
+(`showModal()`, Fokus ins erste Feld) und ist damit der naheliegende Platz — der scrollende Bereich
+ist der Dialogkörper aus Slice 12.
+
+**DoD:** Zweimal hintereinander „Neue Rechnung" öffnen zeigt beim zweiten Mal denselben Anblick wie
+beim ersten; Fokus und sichtbarer Ausschnitt gehören wieder zusammen. Eine eigene Scheibe, weil es
+eine Regel für alle Dialoge der App ist.
+
 ## Slice 34 — Erstattung und Belegnummer nachträglich ändern
 **Ziel:** Eine gebuchte Zuordnung ist korrigierbar, ohne sie zu löschen (issues.md 9 und 8).
 - **PATCH auf `/allocations/:uid`** (issues.md 9): heute gibt es nur GET und DELETE. Der einzige Weg
