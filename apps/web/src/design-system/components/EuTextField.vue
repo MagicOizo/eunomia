@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue';
 
+import { pastedIsoDate } from '../../lib/date-input';
+
 const props = withDefaults(
   defineProps<{
     modelValue: string;
@@ -20,6 +22,15 @@ const hasError = computed(() => Boolean(props.error));
 function onInput(event: Event): void {
   emit('update:modelValue', (event.target as HTMLInputElement).value);
 }
+
+/** A German date pasted into a date field (see lib/date-input.ts). */
+function onPaste(event: ClipboardEvent): void {
+  if (props.type !== 'date') return;
+  const iso = pastedIsoDate(event);
+  if (iso === null) return;
+  event.preventDefault();
+  emit('update:modelValue', iso);
+}
 </script>
 
 <template>
@@ -33,6 +44,7 @@ function onInput(event: Event): void {
       :aria-invalid="hasError || undefined"
       :aria-describedby="hasError ? errorId : undefined"
       @input="onInput"
+      @paste="onPaste"
     />
     <p v-if="hasError" :id="errorId" class="eu-text-field__error">{{ error }}</p>
   </div>

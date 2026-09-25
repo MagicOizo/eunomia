@@ -871,7 +871,7 @@ Produktion, geht das über sein Prerelease-Image (§2.9), ohne am Releaseplan zu
 (33–36), dann der eigentliche Umbau (37), dann die beiden größeren Ausbauten (38–39). 37 steht vor
 38/39, weil er einen Arbeitsablauf blockiert, den es heute gar nicht gibt.
 
-## Slice 33 — Eingabe-Politur: Tab im Picker, Datum einfügen
+## Slice 33 — Eingabe-Politur: Tab im Picker, Datum einfügen (umgesetzt 2026-09-25)
 **Ziel:** Die beiden Fehler, die bei jeder einzelnen Erfassung stören, sind weg (issues.md 1 und 11).
 - **Tab übernimmt die Auswahl** (issues.md 1): `EuEntityPicker.onKeydown` kennt nur ↑↓/Enter/Escape;
   Tab löst `@blur` → `open = false` aus und die Markierung verfällt, der Fokus wandert weiter zum
@@ -890,6 +890,58 @@ Produktion, geht das über sein Prerelease-Image (§2.9), ohne am Releaseplan zu
 
 **DoD:** Im Picker gewählt + Tab → der Wert steht im Feld; ein durchtabbter Picker ändert nichts.
 Ein aus Excel kopiertes `24.09.2026` landet in jedem Datumsfeld der App.
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Tab verhält sich wie Enter:** Die Markierung zählt, egal ob sie durchs Tippen (erster Treffer)
+  oder mit den Pfeiltasten entstanden ist. Ein Picker mit geschlossener Liste ändert nichts.
+- **Auf der Zeile „‚X' als … hinzufügen" löst Tab nichts aus** — ein Subdialog, der beim Weitertabben
+  aufspringt, wäre eine Überraschung. Praktische Folge in den Feldern mit Ad-hoc-Anlegen: nach dem
+  bloßen Tippen steht die Anlegen-Zeile oben, der Eintrag wird also mit ↓ gewählt (oder der Name
+  ausgeschrieben, dann verschwindet die Zeile) — genau der Ablauf aus issues.md 1.
+- **Fokus öffnet die Liste nicht mehr**, nur Klick, Tippen und ↓. Damit sind beide Hälften des
+  Slice-32-Backlogs erledigt: kein alter Suchtext beim nächsten Fokus (er wird dort zurückgesetzt)
+  und keine volle Liste über der Dialog-Fußzeile beim Rücksprung aus einem Subdialog.
+- **Datum nur mit vierstelligem Jahr.** `24.09.26` wird abgelehnt: beim Geburtsdatum (`15.03.57`)
+  wäre das Jahrhundert geraten.
+
+**Umgesetzt (2026-09-25).** Entscheidungen beim Bau:
+
+- **Der Picker hat jetzt zwei Zustände statt einem:** `focused` („zeigt seinen Suchtext") neben
+  `open` („zeigt seine Liste"), und `highlight` ist `number | null` — `null` heißt „der Nutzer hat
+  nichts gewählt". Ohne diese Unterscheidung übernähme ein nur durchtabbter Picker die erste Option,
+  weil die Markierung bei 0 startete.
+- **`select()` ist in `commit()` + `blur()` zerlegt.** Tab benutzt nur `commit()`: Der Fokus muss
+  regulär weiterwandern, ein `blur()` im Keydown würde ihn stattdessen verlieren.
+- **Der Suchtext wird beim Fokus zurückgesetzt, nicht beim Verlassen.** Andersherum stünde das „+"
+  der Anzeigemaske ohne Text da — es liegt außerhalb des Pickers und wird erst angeklickt, wenn der
+  Fokus das Feld schon verlassen hat (Slice 32).
+- **Escape gehörte dem Dialog, nicht dem Picker** (im Browser gefunden): Ein natives `<dialog>`
+  schließt auf die Taste selbst, also nahm das Wegklicken der Vorschlagsliste das ganze Formular mit.
+  Escape wird jetzt bei offener Liste mit `preventDefault()` abgefangen und schließt nur sie; bei
+  geschlossener Liste bleibt es die Schließen-Geste des Dialogs. Nicht geplant, aber dieselbe
+  Tastenbehandlung und derselbe Fehlertyp.
+- **`aria-activedescendant` und Options-IDs** sind mitgekommen, weil genau diese Stelle umgebaut
+  wurde: Die Markierung war für Screenreader bisher unsichtbar.
+- **Das Datum liegt in `lib/date-input.ts`** (`isoFromGerman`, `pastedIsoDate`) — reine Funktionen
+  neben `germanDate()`, das die Gegenrichtung macht. Angeschlossen an `EuTextField` (Formulare und
+  die generische Stammdaten-Maske) und `EuDetailField` (Anzeigemasken); das sind alle Datumsfelder
+  der App.
+- **Vorher im Browser nachgemessen**, ob der Weg überhaupt trägt: Das native `<input type="date">`
+  feuert `paste` mit lesbarem Text und verwirft die deutsche Schreibweise — ein eigenes Textfeld
+  wäre also unnötig gewesen.
+- **`EuToggle` bekommt `bare`** wie Picker und Währungsfeld: sichtbare Beschriftung weg, `aria-label`
+  gesetzt. `EuDetailField` reicht statt `label=""` jetzt `bare :label` durch.
+- **Tests:** `EuEntityPicker.test.ts` (neu: Öffnen-Regel, Tab in allen vier Lagen, Escape, Enter),
+  `date-input.spec.ts` (auch `31.02.2026` und zweistellige Jahre), Paste-Tests an beiden Feldern und
+  der zugängliche Name des Schalters. Die beiden Tab-Tests wurden gegengeprüft — ohne die neue
+  Tastenbehandlung schlagen sie fehl.
+- **Im laufenden System geprüft** (Playwright, hell/dunkel, 390 px und 1440 px): Tippen + Tab, ↓ +
+  Tab, durchtabbt ohne Liste, Tab auf der Anlegen-Zeile, Einfügen von `24.09.2026` und `4.9.2026` im
+  Formular und in der Maske, unpassender Text ändert nichts, Zurücksetzen-Pfeil, „+" mit getipptem
+  Text samt Abbruch des Subdialogs (Liste bleibt zu, „Speichern" bleibt klickbar), zugänglicher Name
+  des Schalters, Fokusring am tastaturfokussierten Picker rundum vollständig. Nichts gespeichert,
+  also keine Testzeilen in der Dev-Datenbank.
 
 ## Slice 34 — Erstattung und Belegnummer nachträglich ändern
 **Ziel:** Eine gebuchte Zuordnung ist korrigierbar, ohne sie zu löschen (issues.md 9 und 8).

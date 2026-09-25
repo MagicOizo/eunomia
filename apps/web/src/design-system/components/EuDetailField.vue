@@ -3,6 +3,7 @@ import { faArrowRotateLeft, faPlus, faXmark } from '@fortawesome/free-solid-svg-
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, ref } from 'vue';
 
+import { pastedIsoDate } from '../../lib/date-input';
 import EuCurrencyField from './EuCurrencyField.vue';
 import EuEntityPicker, { type PickerOption } from './EuEntityPicker.vue';
 import EuToggle from './EuToggle.vue';
@@ -82,6 +83,16 @@ function onText(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
   emit('update:modelValue', value === '' ? '' : value);
 }
+
+/** A German date pasted into a date row (see lib/date-input.ts). */
+function onPaste(event: ClipboardEvent): void {
+  if (props.type !== 'date') return;
+  const iso = pastedIsoDate(event);
+  if (iso === null) return;
+  event.preventDefault();
+  emit('update:modelValue', iso);
+}
+
 function onNumber(event: Event): void {
   // A number input reports invalid content as an empty string, so anything
   // that is not empty parses cleanly here.
@@ -114,6 +125,7 @@ function reset(): void {
           :disabled="disabled"
           placeholder="–"
           @input="onText"
+          @paste="onPaste"
         />
         <input
           v-else-if="type === 'number'"
@@ -150,7 +162,8 @@ function reset(): void {
         />
         <EuToggle
           v-else-if="type === 'toggle'"
-          label=""
+          bare
+          :label="label"
           :model-value="booleanValue"
           @update:model-value="emit('update:modelValue', $event)"
         />

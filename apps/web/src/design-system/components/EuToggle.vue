@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { useId } from 'vue';
 
-/** A slider-style boolean toggle (nicer than a bare checkbox for on/off flags). */
-defineProps<{ modelValue: boolean; label: string }>();
+/**
+ * A slider-style boolean toggle (nicer than a bare checkbox for on/off flags).
+ * `bare` is for the display mask, which prints the label in its own column: the
+ * text is dropped here but stays as the accessible name, so the screen reader
+ * does not meet a nameless checkbox.
+ */
+withDefaults(defineProps<{ modelValue: boolean; label: string; bare?: boolean }>(), {
+  bare: false,
+});
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const inputId = useId();
@@ -15,10 +22,11 @@ const inputId = useId();
       type="checkbox"
       class="eu-toggle__input"
       :checked="modelValue"
+      :aria-label="bare ? label : undefined"
       @change="emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
     />
     <span class="eu-toggle__track" aria-hidden="true"><span class="eu-toggle__thumb" /></span>
-    <span class="eu-toggle__label">{{ label }}</span>
+    <span v-if="!bare" class="eu-toggle__label">{{ label }}</span>
   </label>
 </template>
 

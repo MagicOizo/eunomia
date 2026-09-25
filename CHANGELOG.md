@@ -7,6 +7,22 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.1 — 2026-09-25
+
+- **Tab takes the picked entry along.** Choosing an entry in a typeahead field and pressing Tab used
+  to move the focus on and drop the choice; the entry is now taken into the field first. A picker
+  merely tabbed through still changes nothing, and Tab never springs the "add ‹name›" dialog open.
+- **The suggestion list no longer opens on focus alone.** It opens on a click, on typing and with the
+  down arrow. That keeps a stale search text from coming back on the next visit and stops a
+  full-height list from covering the dialog's Save button on the way back from a subdialog.
+- **Escape closes the list, not the whole dialog.** Dismissing a suggestion list used to close the
+  form around it and lose everything typed into it.
+- **A date can be pasted in German notation.** `24.09.2026` (or `4.9.2026`) copied from a
+  spreadsheet now lands in every date field of the app, which the browser had refused. A two-digit
+  year is deliberately not accepted — for a birth date the century would be a guess.
+- **The switch in the view/edit mask has a name.** Screen readers announced "Direkt-/Barzahlung" as a
+  nameless checkbox, because the mask prints the label in its own column.
+
 ## 0.11.0 — 2026-09-25
 
 Everything from the four `0.11.0-slice.N` previews below, as one release:

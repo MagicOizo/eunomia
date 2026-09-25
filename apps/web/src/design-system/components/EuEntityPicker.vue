@@ -18,6 +18,13 @@ export interface PickerOption {
  * (Notes/dialog-design.md): search, add, clear. Filtering is client-side over
  * `options`; `allowSearch` is for lists that outgrow that — the parent opens a
  * filter dialog and sets the value it finds.
+ *
+ * The list opens on a click, on typing and on ArrowDown — **not** on focus
+ * alone: a picker that is merely tabbed through, or focused again on the way
+ * back from a subdialog, would otherwise drop a full-height list over the
+ * dialog footer. `focused` therefore tracks "shows its search text" separately
+ * from `open` ("shows its list"), and a `null` highlight means the user has
+ * not chosen anything yet, so Tab and Enter know to leave the value alone.
  */
 const props = withDefaults(
   defineProps<{
@@ -57,9 +64,13 @@ const referenceRef = useTemplateRef<HTMLElement>('reference');
 const floatingRef = useTemplateRef<HTMLElement>('floating');
 const inputRef = useTemplateRef<HTMLInputElement>('input');
 
+const listId = useId();
 const open = ref(false);
+/** Focused: the input shows the (editable) search text instead of the label. */
+const focused = ref(false);
 const query = ref('');
-const highlight = ref(0);
+/** Index of the active item, `null` while the user has not chosen one. */
+const highlight = ref<number | null>(null);
 
 /** Single writer for the typed text, so the parent hears every change of it. */
 function setQuery(value: string): void {
@@ -105,12 +116,29 @@ const showCreate = computed(
 );
 
 const itemCount = computed(() => (showCreate.value ? 1 : 0) + filtered.value.length);
-const displayValue = computed(() => (open.value ? query.value : (selected.value?.label ?? '')));
+const displayValue = computed(() => (focused.value ? query.value : (selected.value?.label ?? '')));
 
-function select(option: PickerOption): void {
+/** The option under the highlight, or null on the create row / no highlight. */
+const activeOption = computed(() => {
+  if (!open.value || highlight.value === null) return null;
+  if (showCreate.value && highlight.value === 0) return null;
+  return filtered.value[showCreate.value ? highlight.value - 1 : highlight.value] ?? null;
+});
+
+const activeId = computed(() => {
+  if (!open.value || highlight.value === null) return undefined;
+  return `${listId}-${highlight.value}`;
+});
+
+/** Takes the value without touching the focus — Tab needs to move on itself. */
+function commit(option: PickerOption): void {
   emit('update:modelValue', option.value);
   setQuery('');
   open.value = false;
+}
+
+function select(option: PickerOption): void {
+  commit(option);
   inputRef.value?.blur();
 }
 
@@ -131,6 +159,21 @@ function triggerSearch(): void {
   open.value = false;
 }
 
+function onFocus(): void {
+  focused.value = true;
+  // A fresh search every time the field is entered: the text typed last time
+  // would otherwise come back as a filter nobody asked for.
+  setQuery('');
+  highlight.value = null;
+}
+
+function onBlur(): void {
+  focused.value = false;
+  open.value = false;
+  // `query` survives on purpose — the mask renders its add action outside the
+  // picker, so it is read after the click has taken the focus away.
+}
+
 function onInput(event: Event): void {
   setQuery((event.target as HTMLInputElement).value);
   open.value = true;
@@ -140,23 +183,40 @@ function onInput(event: Event): void {
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'ArrowDown') {
     event.preventDefault();
-    open.value = true;
-    highlight.value = Math.min(highlight.value + 1, itemCount.value - 1);
+    if (!open.value) {
+      open.value = true;
+      highlight.value = 0;
+      return;
+    }
+    highlight.value = Math.min((highlight.value ?? -1) + 1, itemCount.value - 1);
   } else if (event.key === 'ArrowUp') {
+    if (!open.value || highlight.value === null) return;
     event.preventDefault();
     highlight.value = Math.max(highlight.value - 1, 0);
   } else if (event.key === 'Enter') {
-    if (!open.value) return;
+    if (!open.value || highlight.value === null) return;
     event.preventDefault();
     if (showCreate.value && highlight.value === 0) {
       triggerCreate();
       return;
     }
-    const option = filtered.value[showCreate.value ? highlight.value - 1 : highlight.value];
-    if (option) select(option);
-  } else if (event.key === 'Escape') {
+    if (activeOption.value) select(activeOption.value);
+  } else if (event.key === 'Tab') {
+    // Takes the choice along instead of losing it, and lets the browser move
+    // the focus on as usual. The create row is deliberately not triggered: a
+    // subdialog springing open while tabbing past would be a surprise.
+    if (activeOption.value) commit(activeOption.value);
     open.value = false;
-    inputRef.value?.blur();
+  } else if (event.key === 'Escape') {
+    // Only ours while the list is open. Otherwise Escape belongs to the dialog
+    // as its close request — and while the list is open it does not, or
+    // dismissing a suggestion list would throw the whole form away (the native
+    // <dialog> closes on the key itself, so stopping it takes preventDefault).
+    if (!open.value) return;
+    event.preventDefault();
+    event.stopPropagation();
+    open.value = false;
+    setQuery('');
   }
 }
 </script>
@@ -173,16 +233,19 @@ function onKeydown(event: KeyboardEvent): void {
         ref="input"
         class="eu-picker__input"
         :value="displayValue"
-        :placeholder="open && selected ? selected.label : bare ? '–' : ''"
+        :placeholder="focused && selected ? selected.label : bare ? '–' : ''"
         :disabled="disabled"
         :aria-label="bare ? label : undefined"
         autocomplete="off"
         role="combobox"
         aria-autocomplete="list"
         :aria-expanded="open"
+        :aria-controls="open ? listId : undefined"
+        :aria-activedescendant="activeId"
         @input="onInput"
-        @focus="open = true"
-        @blur="open = false"
+        @focus="onFocus"
+        @blur="onBlur"
+        @click="open = true"
         @keydown="onKeydown"
       />
       <!-- @mousedown.prevent on every action: without it the input's @blur
@@ -221,11 +284,21 @@ function onKeydown(event: KeyboardEvent): void {
       </button>
     </div>
 
-    <ul v-if="open" ref="floating" class="eu-picker__list" :style="floatingStyles" role="listbox">
+    <ul
+      v-if="open"
+      :id="listId"
+      ref="floating"
+      class="eu-picker__list"
+      :style="floatingStyles"
+      role="listbox"
+    >
       <li
         v-if="showCreate"
+        :id="`${listId}-0`"
         class="eu-picker__option eu-picker__option--create"
         :class="{ 'is-active': highlight === 0 }"
+        role="option"
+        :aria-selected="highlight === 0"
         @mousedown.prevent
         @click="triggerCreate"
       >
@@ -234,16 +307,27 @@ function onKeydown(event: KeyboardEvent): void {
       </li>
       <li
         v-for="(option, i) in filtered"
+        :id="`${listId}-${showCreate ? i + 1 : i}`"
         :key="option.value"
         class="eu-picker__option"
         :class="{ 'is-active': highlight === (showCreate ? i + 1 : i) }"
+        role="option"
+        :aria-selected="highlight === (showCreate ? i + 1 : i)"
         @mousedown.prevent
         @click="select(option)"
       >
         <span class="eu-picker__opt-label">{{ option.label }}</span>
         <span v-if="option.hint" class="eu-picker__opt-hint">{{ option.hint }}</span>
       </li>
-      <li v-if="filtered.length === 0 && !showCreate" class="eu-picker__empty">Keine Treffer</li>
+      <li
+        v-if="filtered.length === 0 && !showCreate"
+        class="eu-picker__empty"
+        role="option"
+        aria-disabled="true"
+        :aria-selected="false"
+      >
+        Keine Treffer
+      </li>
     </ul>
   </div>
 </template>

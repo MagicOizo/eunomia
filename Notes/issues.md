@@ -1,7 +1,7 @@
 # Issue Documentation
 ## Version 0.9.0
 ### Date 20260925
-1.  Tab im Auswahlfeld
+1.  Tab im Auswahlfeld — Umgesetzt mit v0.12.0-slice.1
 	Wenn man in einem Auswahlfeld (eu-picker__control) einen Eintrag wählt und anschließend TAB drück, dann wird der gewählte Eintrag nicht in das Feld übernommen
 	sondern nur der Focus wächselt auf das +-Icon. Beim Shift+TAB wird wieder zurück in die Auswahl gewechselt und der ausgewählte Eintrag ist immer noch gewählt
 	und kann mit ENTER übernommen werden. Erwartung wäre, dass der Eintrag erst ins Ffeld übernommen (bestätigt) wird und dann auf das +-Icon geweselt wird.
@@ -46,7 +46,7 @@
 10. Es fehlt die Ansicht für den "Papierkorb"
 	Die App nutzt heute ein Prinzip des Soft-Delete. Es gibt aber noch keine Möglichkeit in der UI zum Zurückholen der gelöschten Items oder auch zum Hard-Delete, wenn sie
 	wirklich nicht mehr benötigt werden (mit einfacher Bestätigungs-Abfrage).
-11. Copy&Paste eines Datums
+11. Copy&Paste eines Datums — Umgesetzt mit v0.12.0-slice.1
 	Wenn ich in einer Externen Quelle (z.B. Excel) ein Datum im Format DD.MM.YYYY ins Clipboard kopiere und in ein Datumsfeld der App einfügen möchte, funktioniert das nicht.
 12. Police Auswahl beim Einreichen
 	Es werden beim Einreichen Krankenversicherungen/Policen zur auswahl angeboten, die zum Behandlungszeitraum der ausgewählten Rechnungen noch nicht oder nicht mehr Aktiv sind.
