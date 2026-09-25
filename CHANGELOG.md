@@ -7,6 +7,30 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.11.0 — 2026-09-25
+
+Everything from the four `0.11.0-slice.N` previews below, as one release:
+
+- **System settings in the browser.** Values an operator used to set through `.env` now live in the
+  database and are changed on the admin settings page, in collapsible sections.
+- **Encrypted secrets.** The SMTP password and the GitHub token are stored with AES-256-GCM under
+  `CONFIG_ENCRYPTION_KEY`, which stays in the environment; the API never hands a stored secret back.
+- **Mail, and payment reminders that use it.** An SMTP account is configured and proven with a test
+  mail. From there Eunomia speaks up on its own: each user gets one mail about exactly the invoices
+  they may see, a due invoice is announced once, an overdue one repeats until it is paid, and a run
+  missed while the machine was off is caught up. The settings page previews a run without sending
+  it.
+- **The update check says why it is silent.** It reports a reason — private repository, GitHub
+  unreachable, token rejected, rate limit — instead of showing nothing, and **Check now** bypasses
+  the six-hour cache.
+- **The browser tab names the environment.** A non-production instance titles itself `Eunomia-DEV`,
+  so an open tab shows which instance it belongs to.
+- **Ad-hoc create that sticks.** A facility or collection agency created from an invoice dialog now
+  reaches the table, the mask and the agency's IBAN immediately instead of after a reload, and the
+  view/edit mask offers the same ad-hoc create as the create form.
+- **Greppable log events.** Mail and update-check events are one line each with a fixed `event=`
+  token; passwords never appear in them.
+
 ## 0.11.0-slice.4 — 2026-09-25
 
 - **A facility created on the side no longer disappears.** Adding a facility or a collection agency
