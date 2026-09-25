@@ -1135,7 +1135,7 @@ jede Stammdatenliste hat ein Filterfeld.
   Dev-Datenbestand blieb unverändert.
 
 ## Slice 37 — Leistungsabrechnung über mehrere Einreichungen
-**37a (Modell + API) umgesetzt 2026-09-25, 37b (UI) steht noch aus.**
+**Umgesetzt 2026-09-25 (37a Modell + API, 37b UI).**
 
 **Ziel:** Rechnungen aus verschiedenen Einreichungen derselben Police lassen sich auf einer
 Leistungsabrechnung zusammenfassen (issues.md 7). Der größte Punkt der Liste und der einzige echte
@@ -1213,12 +1213,48 @@ Abrechnung anlegen (ohne Einreichungs-Rückfrage), doppelte Nummer → „Die Le
 LA-2024-500 gibt es bei dieser Police schon.", Erstattung gebucht — die Karte der Rechnung zeigt
 danach **zwei** Abrechnungen, darunter eine, die ohne diesen Umbau gar nicht hätte buchen können.
 
-### 37b — UI (offen)
+### 37b — UI (umgesetzt 2026-09-25)
 
-Der eigentliche Gewinn: `eligibility.commonSubmissions` auf „gemeinsame Police" umstellen, damit
-`BillingDialog` Rechnungen aus verschiedenen Einreichungen in einem Zug annimmt, und die Auswahl der
-mitzunehmenden Rechnungen entsprechend öffnen. Der Hinweis „Diese Rechnungen haben keine gemeinsame
-Einreichung" fällt damit weg.
+Der eigentliche Gewinn: `eligibility.commonSubmissions` ist `commonPolicies` geworden, damit
+`BillingDialog` Rechnungen aus verschiedenen Einreichungen in einem Zug annimmt. Der Hinweis „keine
+gemeinsame Einreichung" heißt jetzt „keine gemeinsame Police" und ist keine Einschränkung mehr,
+sondern die Regel.
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Jede Karte nennt ihren Einreichungstag.** Eine Buchung mischt jetzt Einreichungen, also muss
+  sichtbar sein, was da zusammengefasst wird; der Police-Picker sagt „an mehreren Tagen eingereicht",
+  wo die Tage auseinanderfallen.
+- **Der Buchungsdialog startet leer, wenn er von der Leistungsabrechnungen-Seite kommt.** Vorher kam
+  je offener Rechnung der Police eine Karte, die einzeln wieder herausgeworfen werden musste — und
+  seit 37a blockierte dieser Weg ganz, sobald die offenen Rechnungen aus zwei Einreichungen kamen.
+  Die Police kommt in diesem Fall über ein eigenes Prop, nicht aus den Rechnungen; die letzte Karte
+  lässt sich nur dann entfernen, weil der Dialog sonst die Police verlöre, aus der er seine
+  Kandidaten zieht.
+
+**Befunde beim Bauen:**
+
+- **Ein Prop aus 37a war verwaist.** `InvoiceDetailDialog` übergab weiter `:preset-submission`, das
+  es seit der Umbenennung in `presetContract` nicht mehr gibt. Vue meldet das nicht, weil unbekannte
+  Attribute als Fallthrough durchgehen, und Typecheck sieht es deshalb auch nicht — die Vorauswahl
+  aus der Einreichungskarte fiel still auf die Rückfallregel zurück. Im Browser nachgewiesen und
+  behoben: die PKV-Karte öffnet auf PKV, die Zusatz-Karte auf der Zusatzpolice.
+- **Der Prod-Bestand enthält genau einen Dublettenfall** — und zwar den, für den die Scheibe gebaut
+  ist: ein Brief vom 25.10.2018, zweimal erfasst, weil er zwei Einreichungen beantwortete. Migration
+  011 würde daran abbrechen. Der Ablauf zum Zusammenführen steht jetzt in der README.
+- **Welcher der beiden Briefe bleibt, entscheidet `forfeitsBonus`, nicht das Datum.** Der Bonus wird
+  je Behandlungsjahr gebildet und jeder verwirkende Posten verwirkt das Jahr
+  (`bonus-timeline.ts`) — bliebe der Brief mit `forfeitsBonus = 0`, hörte 2018 still auf zu
+  verwirken. Das ist als Regel in der README festgehalten, samt des Falls, dass die Rechnungen der
+  beiden Briefe in verschiedenen Jahren liegen.
+
+**Nachgeprüft (2026-09-25):** 218 API-Tests, 196 Web-Tests, Lint, Typecheck, Prettier. Im Browser
+gegen den Dev-Bestand: eine Abrechnung über zwei Rechnungen aus den Einreichungen vom 17.07. und
+11.08.2026 derselben Police gebucht (in der Datenbank nachgesehen — vor diesem Umbau nicht möglich);
+der Leerstart bietet die Rechnungen aller drei Einreichungen der Police an und weist das Speichern
+ohne Karte ab; eine nicht eingereichte Rechnung dazugewählt sperrt „Abrechnung zuordnen"; die
+Police-Vorauswahl je Einreichungskarte stimmt wieder. Fokusring im Dialog per Tastatur-Screenshot
+geprüft, an keiner Kante beschnitten.
 
 ## Slice 38 — Kontoverbindungen mit Gültigkeitsdatum, BIC und Empfänger
 **Ziel:** Ein Abrechnungsdienstleister behält seine Identität, wenn er die Bankverbindung wechselt

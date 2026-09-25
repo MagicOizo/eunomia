@@ -7,6 +7,27 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.7 — 2026-09-25
+
+- **One Leistungsabrechnung books invoices from several submissions at once.** The model already
+  allowed it since the last version, but the dialog still insisted on a shared submission and turned
+  a mixed selection away. It now asks for a shared _policy_, which is what a billing belongs to — so
+  the invoices an insurer answers in one letter are booked in one go, however many days apart they
+  were handed in. Each card says which day its invoice went in, so it is clear what is being put
+  together.
+- **Booking from the Leistungsabrechnungen page starts empty.** Creating a letter used to fill the
+  dialog with every open invoice of the policy, leaving the ones it does not answer to be thrown out
+  one by one — and it refused outright when those invoices came from different submissions. The
+  dialog now opens with no card, and the invoices the letter names are picked from the policy's own,
+  across submissions.
+- **Booking from an invoice's submission card picks the right policy again.** For an invoice held by
+  two policies, the card's button silently lost its preselection in the last version and the dialog
+  fell back to guessing.
+- **Preparing the database for the billing-per-policy migration is documented.** README now carries
+  the read-only check for billing numbers used twice under one policy, what to look at before
+  merging such a pair, and the merge itself — including the rule that decides which of the two
+  letters survives, because the wrong choice quietly stops a year from forfeiting the bonus.
+
 ## 0.12.0-slice.6 — 2026-09-25
 
 - **A Leistungsabrechnung now belongs to the policy, not to one submission.** Insurers routinely

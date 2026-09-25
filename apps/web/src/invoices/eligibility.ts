@@ -42,25 +42,41 @@ export function unbilledSubmissions(
   return invoice.submissions.filter((s) => s.status === 'eingereicht');
 }
 
+/** A policy as the booking dialog needs it: what it is called and its bonus rule. */
+export type CommonPolicy = Pick<
+  InvoiceSubmissionDto,
+  'contractUID' | 'contractNumber' | 'companyName' | 'bonusForfeitRule'
+>;
+
+/** How a policy is named wherever one is shown or chosen. */
+export function policyLabel(policy: Pick<CommonPolicy, 'contractNumber' | 'companyName'>): string {
+  return `${policy.contractNumber} · ${policy.companyName}`;
+}
+
 /**
- * Submissions every one of the invoices belongs to — the choice for booking
- * one Leistungsabrechnung over several invoices at once. A billing can only
- * reimburse invoices of its own submission, so a mixed selection has nothing
- * in common and nothing to offer. An invoice marked as billed is out: its
- * reimbursement is closed. Mirrors the server-side checks of
- * `POST /billings/:uid/allocations`.
+ * Policies every one of the invoices is submitted to — the choice for booking
+ * one Leistungsabrechnung over several invoices at once. The policy is what
+ * decides, not the submission: a billing belongs to the policy, and one letter
+ * of the insurer regularly answers invoices handed in on different days (Slice
+ * 37). A selection spread over different policies has nothing in common and
+ * nothing to offer. An invoice marked as billed is out: its reimbursement is
+ * closed. Mirrors the server-side checks of `POST /billings/:uid/allocations`.
  */
-export function commonSubmissions(
+export function commonPolicies(
   invoices: Pick<InvoiceDto, 'submissions' | 'reimbursementClosed'>[],
-): InvoiceSubmissionDto[] {
+): CommonPolicy[] {
   if (invoices.length === 0) return [];
   if (invoices.some((invoice) => invoice.reimbursementClosed)) return [];
   const [first, ...rest] = invoices;
-  return first.submissions.filter((submission) =>
-    rest.every((invoice) =>
-      invoice.submissions.some((s) => s.submissionUID === submission.submissionUID),
-    ),
-  );
+  const policies: CommonPolicy[] = [];
+  for (const { contractUID, contractNumber, companyName, bonusForfeitRule } of first.submissions) {
+    if (policies.some((p) => p.contractUID === contractUID)) continue;
+    const everywhere = rest.every((invoice) =>
+      invoice.submissions.some((s) => s.contractUID === contractUID),
+    );
+    if (everywhere) policies.push({ contractUID, contractNumber, companyName, bonusForfeitRule });
+  }
+  return policies;
 }
 
 /** The stretch of time a policy was in force; an open end is `null`. */

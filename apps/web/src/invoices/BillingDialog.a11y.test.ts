@@ -81,6 +81,15 @@ const billing: BillingListDto = {
 /** Two invoices of the same submission — the bulk case. */
 const invoices = [invoice('R-1'), invoice('R-2')];
 
+/** The policy as BillingsView hands it over, where no invoice implies it. */
+const policy = {
+  contractUID: 'c-1',
+  contractNumber: 'X-1',
+  companyName: 'PKV',
+  bonusForfeitRule: 'ON_REIMBURSEMENT' as const,
+  accountUID: 'a-1',
+};
+
 async function openDialog(props: Partial<InstanceType<typeof BillingDialog>['$props']> = {}) {
   const wrapper = mount(BillingDialog, {
     props: {
@@ -127,14 +136,67 @@ describe('BillingDialog with several invoices', () => {
     wrapper.unmount();
   });
 
-  it('refuses a booking without a shared submission', async () => {
+  it('refuses a booking without a shared policy', async () => {
     const wrapper = await openDialog({
       invoices: [
         invoice('R-1'),
-        invoice('R-3', { submissions: [submission({ submissionUID: 'e-2' })] }),
+        invoice('R-3', {
+          submissions: [submission({ submissionUID: 'e-2', contractUID: 'c-2' })],
+        }),
       ],
     });
-    expect(wrapper.text()).toContain('keine gemeinsame Einreichung');
+    expect(wrapper.text()).toContain('keine gemeinsame Police');
+    expect(
+      wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Speichern')
+        ?.attributes('disabled'),
+    ).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it('books invoices handed in on different days at the same policy', async () => {
+    // What Slice 37 opened up: one letter answers both submissions, so the
+    // dialog takes them in one go and each card says which day it came in.
+    const wrapper = await openDialog({
+      invoices: [
+        invoice('R-1'),
+        invoice('R-9', {
+          submissions: [submission({ submissionUID: 'e-2', submittedDate: '2025-06-19' })],
+        }),
+      ],
+    });
+    const text = wrapper.text().replace(/\u00a0/g, ' ');
+
+    expect(text).not.toContain('keine gemeinsame Police');
+    expect(wrapper.findAll('.eu-bill__card')).toHaveLength(2);
+    expect(text).toContain('eingereicht am 04.03.2025');
+    expect(text).toContain('eingereicht am 19.06.2025');
+    wrapper.unmount();
+  });
+
+  it('starts without a card when it is opened for a policy', async () => {
+    const wrapper = await openDialog({ invoices: [], policy });
+    const text = wrapper.text().replace(/\u00a0/g, ' ');
+
+    expect(wrapper.findAll('.eu-bill__card')).toHaveLength(0);
+    expect(text).toContain('Noch keine Rechnung gewählt');
+    // The policy's invoices are offered instead of being filled in beforehand.
+    expect(wrapper.findAll('label').map((l) => l.text())).toContain('Rechnung dieser Police');
+
+    const save = wrapper.findAll('button').find((b) => b.text() === 'Speichern');
+    await save?.trigger('click');
+    expect(wrapper.emitted('submit')).toBeUndefined();
+    expect(wrapper.text()).toContain('Bitte mindestens eine Rechnung wählen.');
+    wrapper.unmount();
+  });
+
+  it('has no accessibility violations without a card either', async () => {
+    const wrapper = await openDialog({ invoices: [], policy });
+    const results = await axe.run(wrapper.element, {
+      rules: { 'color-contrast': { enabled: false } },
+    });
+    expect(results.violations).toEqual([]);
     wrapper.unmount();
   });
 

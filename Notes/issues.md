@@ -19,7 +19,7 @@
 	selbem Dienstleister bleibt.
 6.  Suche einer Rechnungsnummer — Umgesetzt mit v0.12.0-slice.5
 	Wenn man eine Rechnung hat und nicht mehr weiß in welchem Jahr sie liegt, wäre eine Rechnungsnummersuche gut.
-7.  Rechnung aus unterschiedlichen Einreichungen in einer Leistungsabrechnung
+7.  Rechnung aus unterschiedlichen Einreichungen in einer Leistungsabrechnung — Umgesetzt mit v0.12.0-slice.7
 	Die Konvention besagt, dass Rechnung unterschiedlicher Versicherter nicht in einer Einreichung liegen dürfen, und dass Einreichungen unterschiedlicher Versicherter
 	in einem Leistungsabrechnungsbrief in der App auf zwei Leistungsabrechnungen aufgeteilt werden, da sie sich auf unterschiedliche Verträge beziehen. Aber was
 	funktionieren muss ist, dass Rechnungen, die zu unterschiedlichen Daten eingereicht wurden zusammen auf eine Leistungsabrechnung zusammengefasst werden können,
@@ -59,3 +59,5 @@
 	Eine Rechnung kann mehr als ein Behandlungsdatum haben. Wir sollten uns auf lange sicht überlegen, wie wir das auch in der Oberfläche berücksichtigen können. Idealerweise soll je Behandlung die Kosten angegeben werden. Derzeit würde ich als Workarround nur eine der Behandlungsdaten angeben. Nur wenn die Daten in unterschiedlichen Jahren liegen, würde ich eine eigene Rechnung daraus extrahieren. Wir müssen das unterstützen und für den Nutzer so einfach wie möglich machen.
 2.	Browservorschlag in Eingabefeldern unterdrücken
 	Es kommt immer wieder vor, dass der Browser einen Vorschlag über seine eigene Vorschlagfunktion für felder macht. Das ist tatsächlich störend und passt nicht recht ins Design. Kann man siede automatischen Vorschläge oder Vorbelegungen unterdrücken?
+3.	Instanzadresse in Einstellungen>Zahlungserinnerungen
+	Das Feld Label "Adresse dieser Instanz (für den Link in der Mail)" ist zu lang, so dass es umbricht und somid das imput Feld vertikal ggü. des Zeitzone-Feld nach unten drückt. Kürzen z.B. auf "URL dieser Instanz (für den Link in der Mail)"

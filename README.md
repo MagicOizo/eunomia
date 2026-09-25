@@ -120,6 +120,79 @@ sh export-legacy-contracts.sh ./altdaten     # writes altdaten/policen.csv + alt
 docker compose pull && docker compose up -d
 ```
 
+### Updating to a billing per policy (migration 011)
+
+Migration 011 moves a Leistungsabrechnung from the submission to the policy and adds
+`UNIQUE (contractUID, billingNumber)`. It **refuses to run** while one policy carries the same
+billing number twice, naming the policy, the number and the count, rather than failing in the middle
+of an `ALTER TABLE` or silently merging your data. Such pairs are likely: before this version, the
+only way to record one insurer letter answering two submissions was to enter the letter twice.
+
+Check first — this is read-only, and an empty result means the migration will pass:
+
+```bash
+docker compose exec -T api sh -c 'MYSQL_PWD="$DB_PASSWORD" mariadb -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" "$DB_NAME" --table' <<'SQL'
+SELECT s.contractUID, b.billingNumber, COUNT(*) AS n
+  FROM ServiceBillings b
+  JOIN Submissions s ON s.submissionUID = b.submissionUID
+ WHERE b.billingStatus <> -1
+ GROUP BY s.contractUID, b.billingNumber
+HAVING n > 1
+ ORDER BY s.contractUID, b.billingNumber;
+SQL
+```
+
+If it returns rows, look at what those billings carry before deciding which one survives — the two
+are one and the same letter, so the survivor takes over the other's reimbursements:
+
+```bash
+docker compose exec -T api sh -c 'MYSQL_PWD="$DB_PASSWORD" mariadb -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" "$DB_NAME" --table' <<'SQL'
+SELECT b.billingUID, b.billingNumber, b.billingDate, b.documentLink, b.forfeitsBonus,
+       b.objectionDate, b.objectionResolvedDate, s.submissionUID, s.submittedDate
+  FROM ServiceBillings b
+  JOIN Submissions s ON s.submissionUID = b.submissionUID
+ WHERE b.billingStatus <> -1 AND s.contractUID = '<contractUID>' AND b.billingNumber = '<number>';
+
+SELECT a.billingUID, i.invoiceNumber, i.treatmentDate, a.reimbursement, a.receiptNumber
+  FROM Allocations a
+  JOIN Invoices i ON i.invoiceUID = a.invoiceUID
+ WHERE a.billingUID IN ('<uid-a>', '<uid-b>') AND a.allocationStatus <> -1
+ ORDER BY a.billingUID, i.treatmentDate;
+SQL
+```
+
+**Which one to keep is decided by `forfeitsBonus`.** The bonus is judged per treatment year, and any
+one claim that forfeits forfeits the whole year — so keeping the billing with `forfeitsBonus = 0`
+would quietly stop that year from forfeiting. Keep the one with `1` where they differ. Watch the
+treatment years while you are at it: if the invoices of the two billings fall into _different_ years,
+the surviving flag now reaches a year it did not before, and that year needs a `ContractYears`
+override (`bonusForfeited`) to keep its old outcome.
+
+Then merge, in one transaction: move the reimbursements over and soft-delete the emptied billing,
+which hands its number back (the unique key rides on a generated column that turns NULL for a
+deleted billing). Nothing can collide — an invoice reaches each policy at most once, so the two
+billings never share one.
+
+```bash
+docker compose exec -T api sh -c 'MYSQL_PWD="$DB_PASSWORD" mariadb -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" "$DB_NAME"' <<'SQL'
+START TRANSACTION;
+UPDATE Allocations     SET billingUID = '<keeper>'
+ WHERE billingUID = '<loser>' AND allocationStatus <> -1;
+UPDATE ServiceBillings SET billingStatus = -1 WHERE billingUID = '<loser>';
+COMMIT;
+SQL
+```
+
+Run the check again — it must come back empty — and then update. Do the merge **immediately** before
+the update: in between, the surviving billing reimburses an invoice outside "its own" submission,
+which the still-running old version cannot represent.
+
+```bash
+docker compose exec -T api /app/scripts/backup.sh > eunomia-$(date +%F).sql.gz
+# check, inspect, merge, check again — then:
+docker compose pull && docker compose up -d
+```
+
 ## Environment Variables
 
 All variables are read from `.env` (see `.env.example` for the template — never commit the real

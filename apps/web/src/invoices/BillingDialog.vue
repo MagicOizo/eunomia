@@ -19,22 +19,29 @@ import {
 } from './api';
 import BillingFormDialog from './BillingFormDialog.vue';
 import BillingSearchDialog from './BillingSearchDialog.vue';
-import { commonSubmissions } from './eligibility';
+import { type CommonPolicy, commonPolicies, policyLabel } from './eligibility';
 import { usePresetToggle } from './forfeit-toggle';
 
 /**
  * "Abrechnung zuordnen": books the reimbursements of one Leistungsabrechnung
  * onto invoices — one or several in one go. The billing is picked by number
  * (with search and ad-hoc create beside the field), every invoice gets its own
- * card with the amount it was reimbursed, and further invoices of the same
- * submission can be taken along. The candidates come from the policy, which is
- * what a billing belongs to; picking the invoices still runs per submission
- * (Slice 37b opens that up).
+ * card with the amount it was reimbursed, and further invoices can be taken
+ * along. Everything runs per policy, which is what a billing belongs to: one
+ * letter of the insurer regularly answers invoices handed in on different days,
+ * so a booking may mix submissions (Slice 37). Each card therefore names the day
+ * its invoice was handed in.
  */
 const props = defineProps<{
   open: boolean;
-  /** The invoices to book; they must share a submission (see eligibility.ts). */
+  /** The invoices to book; they must share a policy (see eligibility.ts). */
   invoices: InvoiceDto[];
+  /**
+   * The policy when it does not follow from the invoices — opened from the
+   * Leistungsabrechnungen page, the dialog starts with no card at all and the
+   * invoices are picked here. Fixes the policy, so the picker offers no other.
+   */
+  policy?: (CommonPolicy & { accountUID: string }) | null;
   /** facilityUID → name, for the provider on each invoice card. */
   facilityNames: Record<string, string>;
   /** Preselected policy when opened from one card or from a billing. */
@@ -64,7 +71,7 @@ interface EntryInput {
 
 const rows = ref<InvoiceDto[]>([]);
 const entries = reactive<Record<string, EntryInput>>({});
-const submissionUID = ref('');
+const contractUID = ref('');
 const billings = ref<BillingListDto[]>([]);
 const selectedBilling = ref('');
 const accountInvoices = ref<InvoiceDto[]>([]);
@@ -83,17 +90,46 @@ const searchOpen = ref(false);
 const createOpen = ref(false);
 const createPrefill = ref('');
 
-/** Every policy all the invoices went to; the billing belongs to one of them. */
-const submissionOptions = computed(() =>
-  commonSubmissions(rows.value).map((s) => ({
-    value: s.submissionUID,
-    label: `${s.contractNumber} · ${s.companyName}`,
-    hint: `eingereicht am ${germanDate(s.submittedDate)}`,
+/**
+ * The policies to choose from: every one all the invoices went to. A caller
+ * that names the policy fixes it — the billing belongs to that one, whatever
+ * else the invoices added along the way have in common.
+ */
+const availablePolicies = computed<CommonPolicy[]>(() =>
+  props.policy ? [props.policy] : commonPolicies(rows.value),
+);
+
+/** The day this invoice was handed in at that policy; each reaches it once. */
+function submittedAt(invoice: InvoiceDto, contract: string): string | undefined {
+  return invoice.submissions.find((s) => s.contractUID === contract)?.submittedDate;
+}
+
+/**
+ * When the invoices on the cards were handed in at a policy. A booking may span
+ * submissions, so this names the day only where there is a single one.
+ */
+function submittedHint(contract: string): string | undefined {
+  const days = [
+    ...new Set(
+      rows.value.map((invoice) => submittedAt(invoice, contract)).filter((d) => d !== undefined),
+    ),
+  ];
+  if (days.length === 0) return undefined;
+  return days.length === 1
+    ? `eingereicht am ${germanDate(days[0])}`
+    : 'an mehreren Tagen eingereicht';
+}
+
+const policyOptions = computed(() =>
+  availablePolicies.value.map((policy) => ({
+    value: policy.contractUID,
+    label: policyLabel(policy),
+    hint: submittedHint(policy.contractUID),
   })),
 );
 
-const selectedSubmission = computed(() =>
-  commonSubmissions(rows.value).find((s) => s.submissionUID === submissionUID.value),
+const selectedPolicy = computed(() =>
+  availablePolicies.value.find((policy) => policy.contractUID === contractUID.value),
 );
 
 const billingOptions = computed(() =>
@@ -108,23 +144,31 @@ const chosenBilling = computed(() =>
   billings.value.find((b) => b.billingUID === selectedBilling.value),
 );
 
-/** Invoices of the chosen submission that are not on a card yet. */
+/**
+ * Invoices submitted at the chosen policy that are not on a card yet — from any
+ * of its submissions, which is what makes one letter bookable in one go.
+ */
 const addableInvoices = computed(() => {
   const taken = new Set(rows.value.map((i) => i.invoiceUID));
   return accountInvoices.value.filter(
     (invoice) =>
       !taken.has(invoice.invoiceUID) &&
       !invoice.reimbursementClosed &&
-      invoice.submissions.some((s) => s.submissionUID === submissionUID.value),
+      invoice.submissions.some((s) => s.contractUID === contractUID.value),
   );
 });
 
 const addOptions = computed(() =>
-  addableInvoices.value.map((invoice) => ({
-    value: invoice.invoiceUID,
-    label: invoice.invoiceNumber,
-    hint: `${germanDate(invoice.invoiceDate)} · offen ${euro(invoice.remainingAmount)}`,
-  })),
+  addableInvoices.value.map((invoice) => {
+    const day = submittedAt(invoice, contractUID.value);
+    return {
+      value: invoice.invoiceUID,
+      label: invoice.invoiceNumber,
+      hint:
+        `${germanDate(invoice.invoiceDate)} · offen ${euro(invoice.remainingAmount)}` +
+        (day ? ` · eingereicht am ${germanDate(day)}` : ''),
+    };
+  }),
 );
 
 const enteredTotal = computed(() =>
@@ -139,7 +183,7 @@ const storedForfeit = computed(() => chosenBilling.value?.forfeitsBonus ?? null)
  * into a suggested "yes" — that "no" usually just came from a 0 € first entry.
  */
 const forfeit = usePresetToggle(() => {
-  const rule = selectedSubmission.value?.bonusForfeitRule ?? 'ON_REIMBURSEMENT';
+  const rule = selectedPolicy.value?.bonusForfeitRule ?? 'ON_REIMBURSEMENT';
   // What the billing already reimbursed counts as much as the new amounts.
   const total = (chosenBilling.value?.reimbursedTotal ?? 0) + enteredTotal.value;
   const byRule = forfeitsByRule(rule, total);
@@ -149,7 +193,7 @@ const forfeit = usePresetToggle(() => {
 });
 
 // Another billing or policy means another stored choice: drop the user's flip.
-watch([selectedBilling, submissionUID], () => forfeit.reset());
+watch([selectedBilling, contractUID], () => forfeit.reset());
 
 function resetEntries(): void {
   for (const key of Object.keys(entries)) delete entries[key];
@@ -162,8 +206,8 @@ async function loadBillings(): Promise<void> {
   // A billing belongs to the policy, not to one submission (Slice 37), so the
   // candidates are the policy's — including ones already answering another
   // submission of it.
-  billings.value = selectedSubmission.value
-    ? await searchBillings({ contractUID: selectedSubmission.value.contractUID })
+  billings.value = selectedPolicy.value
+    ? await searchBillings({ contractUID: selectedPolicy.value.contractUID })
     : [];
   // One candidate needs no choosing; more than one is the user's call.
   selectedBilling.value = billings.value.length === 1 ? billings.value[0].billingUID : '';
@@ -172,42 +216,57 @@ async function loadBillings(): Promise<void> {
 watch(
   () => props.open,
   async (open) => {
-    if (!open || props.invoices.length === 0) return;
+    if (!open) return;
     localError.value = null;
     rows.value = [...props.invoices];
     resetEntries();
-    const shared = commonSubmissions(rows.value);
-    // The card the dialog was opened from wins; otherwise default to the
-    // policy still waiting for its answer.
-    submissionUID.value =
-      shared.find((s) => s.contractUID === props.presetContract)?.submissionUID ??
-      shared.find((s) => s.status === 'eingereicht')?.submissionUID ??
-      shared[0]?.submissionUID ??
+    const shared = availablePolicies.value;
+    // The card the dialog was opened from wins; otherwise default to the policy
+    // still waiting for an answer for one of these invoices.
+    contractUID.value =
+      shared.find((policy) => policy.contractUID === props.presetContract)?.contractUID ??
+      shared.find((policy) =>
+        rows.value.some((invoice) =>
+          invoice.submissions.some(
+            (s) => s.contractUID === policy.contractUID && s.status === 'eingereicht',
+          ),
+        ),
+      )?.contractUID ??
+      shared[0]?.contractUID ??
       '';
     await loadBillings();
     // Only here, not in loadBillings(): switching the policy afterwards must
     // not bring the preselection back.
     if (props.presetBilling) selectedBilling.value = props.presetBilling;
     forfeit.reset();
-    accountInvoices.value = await listAccountInvoices(rows.value[0].accountUID);
+    // Without a card the account comes from the policy the dialog was opened
+    // for — that is where the invoices to pick from live.
+    const accountUID = rows.value[0]?.accountUID ?? props.policy?.accountUID;
+    accountInvoices.value = accountUID ? await listAccountInvoices(accountUID) : [];
   },
   { immediate: true },
 );
 
-function selectSubmission(uid: string | null): void {
-  submissionUID.value = uid ?? '';
+function selectPolicy(uid: string | null): void {
+  contractUID.value = uid ?? '';
   void loadBillings();
 }
 
 function addInvoice(uid: string | null): void {
   const invoice = addableInvoices.value.find((i) => i.invoiceUID === uid);
   if (!invoice) return;
+  // Every complaint so far named the cards, so changing them clears it instead
+  // of leaving "please pick an invoice" standing over the invoice just picked.
+  localError.value = null;
   rows.value = [...rows.value, invoice];
   entries[invoice.invoiceUID] = { reimbursement: null, receiptNumber: '' };
 }
 
 function removeInvoice(uid: string): void {
-  if (rows.value.length <= 1) return;
+  // The last card may only go when the caller named the policy: otherwise the
+  // dialog would lose the policy it draws its candidates from, with no way back.
+  if (rows.value.length <= 1 && !props.policy) return;
+  localError.value = null;
   rows.value = rows.value.filter((i) => i.invoiceUID !== uid);
   delete entries[uid];
 }
@@ -231,12 +290,16 @@ function onBillingFound(billing: BillingListDto): void {
 
 function submit(): void {
   localError.value = null;
-  if (!submissionUID.value) {
+  if (!contractUID.value) {
     localError.value = 'Bitte die Police wählen.';
     return;
   }
   if (!selectedBilling.value) {
     localError.value = 'Bitte eine Leistungsabrechnung wählen, suchen oder anlegen.';
+    return;
+  }
+  if (rows.value.length === 0) {
+    localError.value = 'Bitte mindestens eine Rechnung wählen.';
     return;
   }
   const missing = rows.value.filter((i) => entries[i.invoiceUID]?.reimbursement === null);
@@ -280,22 +343,27 @@ function submit(): void {
   <EuDialog :open="open" title="Abrechnung zuordnen" wide @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <p class="eu-form__note">
-        {{ plural(rows.length, 'Rechnung wird', 'Rechnungen werden') }} über diese
-        Leistungsabrechnung erstattet.
+        <template v-if="rows.length === 0">
+          Noch keine Rechnung gewählt — unten die Rechnungen dieser Leistungsabrechnung hinzufügen.
+        </template>
+        <template v-else>
+          {{ plural(rows.length, 'Rechnung wird', 'Rechnungen werden') }} über diese
+          Leistungsabrechnung erstattet.
+        </template>
       </p>
 
-      <p v-if="submissionOptions.length === 0" class="eu-form__note" role="status">
-        Diese Rechnungen haben keine gemeinsame Einreichung — sie lassen sich hier zurzeit nicht in
-        einem Zug buchen.
+      <p v-if="policyOptions.length === 0" class="eu-form__note" role="status">
+        Diese Rechnungen haben keine gemeinsame Police — sie lassen sich nicht über eine
+        Leistungsabrechnung erstatten.
       </p>
 
       <EuEntityPicker
-        v-else-if="submissionOptions.length > 1"
-        :model-value="submissionUID || null"
+        v-else-if="policyOptions.length > 1"
+        :model-value="contractUID || null"
         label="Police"
         required
-        :options="submissionOptions"
-        @update:model-value="selectSubmission"
+        :options="policyOptions"
+        @update:model-value="selectPolicy"
       />
 
       <EuEntityPicker
@@ -305,7 +373,7 @@ function submit(): void {
         allow-search
         allow-create
         create-noun="Leistungsabrechnung"
-        :disabled="!submissionUID"
+        :disabled="!contractUID"
         :options="billingOptions"
         @update:model-value="selectedBilling = $event ?? ''"
         @search="
@@ -335,9 +403,12 @@ function submit(): void {
               }}
               · {{ germanDate(invoice.invoiceDate) }} · {{ euro(invoice.invoiceAmount) }} · noch
               offen {{ euro(invoice.remainingAmount) }}
+              <template v-if="submittedAt(invoice, contractUID)">
+                · eingereicht am {{ germanDate(submittedAt(invoice, contractUID)!) }}
+              </template>
             </span>
             <EuButton
-              v-if="rows.length > 1"
+              v-if="rows.length > 1 || policy"
               variant="ghost"
               icon-only
               :icon="faTrash"
@@ -359,7 +430,7 @@ function submit(): void {
       <EuEntityPicker
         v-if="addOptions.length > 0"
         :model-value="null"
-        label="Weitere Rechnung dieser Einreichung"
+        :label="rows.length === 0 ? 'Rechnung dieser Police' : 'Weitere Rechnung dieser Police'"
         :options="addOptions"
         @update:model-value="addInvoice"
       />
@@ -370,9 +441,9 @@ function submit(): void {
           label="Diese Abrechnung verwirkt den Bonus"
           @update:model-value="forfeit.set"
         />
-        <p v-if="selectedSubmission" class="eu-form__hint">
+        <p v-if="selectedPolicy" class="eu-form__hint">
           Regel der Police: Bonus verfällt
-          {{ BONUS_FORFEIT_RULE_LABEL[selectedSubmission.bonusForfeitRule] }}.
+          {{ BONUS_FORFEIT_RULE_LABEL[selectedPolicy.bonusForfeitRule] }}.
         </p>
       </div>
       <p v-if="error ?? localError" class="eu-form__error" role="alert">
@@ -382,27 +453,27 @@ function submit(): void {
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
-      <EuButton :disabled="submitting || submissionOptions.length === 0" @click="submit">
+      <EuButton :disabled="submitting || policyOptions.length === 0" @click="submit">
         {{ submitting ? 'Speichern…' : 'Speichern' }}
       </EuButton>
     </template>
   </EuDialog>
 
   <BillingSearchDialog
-    v-if="selectedSubmission"
+    v-if="selectedPolicy"
     :open="searchOpen"
-    :contract-u-i-d="selectedSubmission.contractUID"
-    :policy-label="`${selectedSubmission.contractNumber} · ${selectedSubmission.companyName}`"
+    :contract-u-i-d="selectedPolicy.contractUID"
+    :policy-label="policyLabel(selectedPolicy)"
     :initial-query="createPrefill"
     @close="searchOpen = false"
     @select="onBillingFound"
   />
 
   <BillingFormDialog
-    v-if="selectedSubmission"
+    v-if="selectedPolicy"
     :open="createOpen"
-    :contract-u-i-d="selectedSubmission.contractUID"
-    :bonus-forfeit-rule="selectedSubmission.bonusForfeitRule"
+    :contract-u-i-d="selectedPolicy.contractUID"
+    :bonus-forfeit-rule="selectedPolicy.bonusForfeitRule"
     :preset-number="createPrefill"
     @close="createOpen = false"
     @saved="onBillingSaved"

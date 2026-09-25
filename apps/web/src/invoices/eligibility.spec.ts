@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { InvoiceDto, InvoiceSubmissionDto } from './api';
 import {
-  commonSubmissions,
+  commonPolicies,
   commonSubmittableContracts,
   contractsCoveringPeriod,
+  policyLabel,
   submittableContracts,
   treatmentPeriod,
   unbilledSubmissions,
@@ -19,9 +20,10 @@ const contracts = [
 function submission(
   contractUID: string,
   status: 'eingereicht' | 'abgerechnet',
+  submissionUID = `e-${contractUID}`,
 ): InvoiceSubmissionDto {
   return {
-    submissionUID: `e-${contractUID}`,
+    submissionUID,
     contractUID,
     contractNumber: contractUID,
     companyName: 'AG',
@@ -88,20 +90,43 @@ describe('commonSubmittableContracts', () => {
   });
 });
 
-describe('commonSubmissions', () => {
+describe('commonPolicies', () => {
   const atX = submission('pX', 'eingereicht');
   const atY = submission('pY', 'eingereicht');
+  const policies = (list: Array<{ contractUID: string }>) => list.map((p) => p.contractUID);
 
-  it('keeps the submissions all invoices are part of', () => {
+  it('keeps the policies all invoices are submitted to', () => {
     const a = invoice({ workflowStatus: 'eingereicht', submissions: [atX, atY] });
     const b = invoice({ workflowStatus: 'eingereicht', submissions: [atY] });
-    expect(commonSubmissions([a, b]).map((s) => s.submissionUID)).toEqual([atY.submissionUID]);
+    expect(policies(commonPolicies([a, b]))).toEqual(['pY']);
   });
 
-  it('offers nothing for invoices without a shared submission', () => {
+  it('takes invoices handed in on different days at the same policy', () => {
+    // The point of Slice 37: one letter of the insurer answers both, so the
+    // policy counts, not the submission.
+    const march = invoice({
+      workflowStatus: 'eingereicht',
+      submissions: [submission('pX', 'eingereicht', 'e-march')],
+    });
+    const june = invoice({
+      workflowStatus: 'eingereicht',
+      submissions: [submission('pX', 'abgerechnet', 'e-june')],
+    });
+    expect(policies(commonPolicies([march, june]))).toEqual(['pX']);
+  });
+
+  it('names a policy once, however many submissions lead to it', () => {
+    const twice = invoice({
+      workflowStatus: 'eingereicht',
+      submissions: [submission('pX', 'eingereicht', 'e-1'), submission('pX', 'eingereicht', 'e-2')],
+    });
+    expect(policies(commonPolicies([twice]))).toEqual(['pX']);
+  });
+
+  it('offers nothing for invoices without a shared policy', () => {
     const a = invoice({ workflowStatus: 'eingereicht', submissions: [atX] });
     const b = invoice({ workflowStatus: 'eingereicht', submissions: [atY] });
-    expect(commonSubmissions([a, b])).toEqual([]);
+    expect(commonPolicies([a, b])).toEqual([]);
   });
 
   it('offers nothing when an invoice is closed by hand, or none is selected', () => {
@@ -111,8 +136,12 @@ describe('commonSubmissions', () => {
       reimbursementClosed: true,
       submissions: [atX],
     });
-    expect(commonSubmissions([open, closed])).toEqual([]);
-    expect(commonSubmissions([])).toEqual([]);
+    expect(commonPolicies([open, closed])).toEqual([]);
+    expect(commonPolicies([])).toEqual([]);
+  });
+
+  it('names a policy by its number and insurer', () => {
+    expect(policyLabel(atX)).toBe('pX · AG');
   });
 });
 

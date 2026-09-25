@@ -39,7 +39,7 @@ import BillingDialog from './BillingDialog.vue';
 import {
   type ContractOption,
   type ContractPeriod,
-  commonSubmissions,
+  commonPolicies,
   commonSubmittableContracts,
   submittableContracts,
 } from './eligibility';
@@ -155,11 +155,12 @@ const selectedInvoices = computed(() =>
   invoices.value.filter((i) => selected.value.has(i.invoiceUID)),
 );
 /**
- * One Leistungsabrechnung only reimburses invoices of its own submission, so
- * booking several at once needs a submission they all belong to.
+ * A Leistungsabrechnung belongs to a policy and may answer invoices handed in on
+ * different days, so booking several at once needs a policy they were all
+ * submitted to — not one shared submission (Slice 37).
  */
 const selectedBookable = computed(() =>
-  commonSubmissions(selectedInvoices.value).length > 0 ? selectedInvoices.value : [],
+  commonPolicies(selectedInvoices.value).length > 0 ? selectedInvoices.value : [],
 );
 const allSelected = computed(
   () => invoices.value.length > 0 && selected.value.size === invoices.value.length,

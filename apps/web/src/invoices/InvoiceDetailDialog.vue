@@ -30,7 +30,7 @@ import { type BillingAllocationPayload, saveBillingAllocations } from './billing
 import AllocationDialog from './AllocationDialog.vue';
 import BillingDialog from './BillingDialog.vue';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
-import { type ContractOption, submittableContracts } from './eligibility';
+import { type ContractOption, policyLabel, submittableContracts } from './eligibility';
 import ExclusionDialog from './ExclusionDialog.vue';
 import ObjectionDialog from './ObjectionDialog.vue';
 import PaymentQrPopover from './PaymentQrPopover.vue';
@@ -206,9 +206,6 @@ watch(
   () => [props.open, props.invoice?.invoiceUID] as const,
   () => (blockError.value = null),
 );
-
-const policyLabel = (p: { contractNumber: string; companyName: string }): string =>
-  `${p.contractNumber} · ${p.companyName}`;
 
 /** facilityUID → name, for the invoice lists of the sub-dialogs. */
 const facilityNames = computed(() =>
@@ -637,7 +634,7 @@ function submit(): void {
     :open="billingOpen"
     :invoices="invoice ? [invoice] : []"
     :facility-names="facilityNames"
-    :preset-submission="billingSubmission?.submissionUID ?? null"
+    :preset-contract="billingSubmission?.contractUID ?? null"
     :submitting="blockBusy"
     :error="billingError"
     @close="billingOpen = false"

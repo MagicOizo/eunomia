@@ -23,7 +23,7 @@ in [eunomia-plan.md](eunomia-plan.md). 0.11.0 ist davor als volles Release abges
 | ☑ | 35 | Police-Auswahl im Versicherungszeitraum | 12 | 0.12.0-slice.4 |
 | ☑ | 36 | Suchen und Finden | 2, 3, 6 | 0.12.0-slice.5 |
 | ☑ | 37a | Abrechnung über mehrere Einreichungen — Modell + API | 7 | 0.12.0-slice.6 |
-| ☐ | 37b | Abrechnung über mehrere Einreichungen — UI | 7 | |
+| ☑ | 37b | Abrechnung über mehrere Einreichungen — UI | 7 | 0.12.0-slice.7 |
 | ☐ | 38 | Kontoverbindungen mit Gültigkeitsdatum, BIC und Empfänger | 5, 4 | |
 | ☐ | 39 | Papierkorb | 10 | |
 

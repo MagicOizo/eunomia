@@ -28,14 +28,13 @@ import { useTableSort } from '../lib/useTableSort';
 import {
   type BillingDto,
   type BillingListDto,
-  type InvoiceDto,
   deleteBilling,
-  listAccountInvoices,
   searchBillings,
   updateBilling,
 } from './api';
 import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
 import BillingDialog from './BillingDialog.vue';
+import type { CommonPolicy } from './eligibility';
 import BillingFormDialog from './BillingFormDialog.vue';
 
 const props = defineProps<{ contractUID: string }>();
@@ -43,7 +42,8 @@ const props = defineProps<{ contractUID: string }>();
 const billings = ref<BillingListDto[]>([]);
 const heading = ref('');
 const forfeitRule = ref<BonusForfeitRule>('ON_REIMBURSEMENT');
-const accountInvoices = ref<InvoiceDto[]>([]);
+/** This page's policy, as the booking dialog needs it (it has no invoices to derive it from). */
+const policy = ref<(CommonPolicy & { accountUID: string }) | null>(null);
 const facilityNames = ref<Record<string, string>>({});
 const newOpen = ref(false);
 const loading = ref(true);
@@ -97,7 +97,6 @@ const formDate = ref('');
 const formNote = ref('');
 const bookOpen = ref(false);
 const bookBilling = ref<BillingDto | null>(null);
-const bookInvoices = ref<InvoiceDto[]>([]);
 
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -126,7 +125,12 @@ async function load(): Promise<void> {
   loadError.value = null;
   try {
     const contract = await apiFetch<{
-      data: { contractNumber: string; accountUID: string; bonusForfeitRule: BonusForfeitRule };
+      data: {
+        contractNumber: string;
+        companyName: string;
+        accountUID: string;
+        bonusForfeitRule: BonusForfeitRule;
+      };
     }>(`/contracts/${props.contractUID}`);
     const account = await apiFetch<{ data: { firstname: string; surname: string | null } }>(
       `/accounts/${contract.data.accountUID}`,
@@ -134,14 +138,18 @@ async function load(): Promise<void> {
     const person = [account.data.firstname, account.data.surname].filter(Boolean).join(' ');
     heading.value = `${contract.data.contractNumber} · ${person}`;
     forfeitRule.value = contract.data.bonusForfeitRule;
-    // The invoices and the provider names are what the booking dialog needs
-    // after a billing has been created; reloaded here so its cards never show
-    // an amount that a booking in between has already used up.
-    const [invoices, facilities] = await Promise.all([
-      listAccountInvoices(contract.data.accountUID),
-      listResource<{ facilityUID: string; facilityName: string }>('/facilities'),
-    ]);
-    accountInvoices.value = invoices;
+    policy.value = {
+      contractUID: props.contractUID,
+      contractNumber: contract.data.contractNumber,
+      companyName: contract.data.companyName,
+      bonusForfeitRule: contract.data.bonusForfeitRule,
+      accountUID: contract.data.accountUID,
+    };
+    // The provider names are what the booking dialog needs for its cards; the
+    // invoices it looks up itself, so their open amounts are never stale.
+    const facilities = await listResource<{ facilityUID: string; facilityName: string }>(
+      '/facilities',
+    );
     facilityNames.value = Object.fromEntries(
       facilities.map((f) => [f.facilityUID, f.facilityName]),
     );
@@ -221,22 +229,15 @@ function openEdit(b: BillingListDto): void {
 /**
  * A new billing goes straight on to booking its amounts: the letter and the
  * reimbursements it pays out arrive together, so the two dialogs are one flow.
- * A policy without an open invoice ends after the letter — there is nothing
- * to book.
+ * It starts with no card — the letter names which of the policy's invoices it
+ * answers, across submissions, and they are picked in the dialog (Slice 37).
  */
 async function onCreated(billing: BillingDto): Promise<void> {
   newOpen.value = false;
   await load();
   if (loadError.value) return;
-  const open = accountInvoices.value.filter(
-    (invoice) =>
-      !invoice.reimbursementClosed &&
-      invoice.submissions.some((s) => s.contractUID === billing.contractUID),
-  );
-  if (open.length === 0) return;
   dialogError.value = null;
   bookBilling.value = billing;
-  bookInvoices.value = open;
   bookOpen.value = true;
 }
 
@@ -467,9 +468,9 @@ function confirmDelete(): void {
 
     <BillingDialog
       :open="bookOpen"
-      :invoices="bookInvoices"
+      :invoices="[]"
+      :policy="policy"
       :facility-names="facilityNames"
-      :preset-contract="bookBilling?.contractUID ?? null"
       :preset-billing="bookBilling?.billingUID ?? null"
       :submitting="busy"
       :error="dialogError"
