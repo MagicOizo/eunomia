@@ -1,3 +1,4 @@
+import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import type { InvoiceDto, InvoiceSubmissionDto } from './api';
 
 /** The invoice fields that decide where it can still go. */
@@ -59,5 +60,55 @@ export function commonSubmissions(
     rest.every((invoice) =>
       invoice.submissions.some((s) => s.submissionUID === submission.submissionUID),
     ),
+  );
+}
+
+/** The stretch of time a policy was in force; an open end is `null`. */
+export interface ContractPeriod {
+  contractBegin: string;
+  contractEnd: string | null;
+}
+
+/** A policy as the pickers take it: the option plus the dates it ran between. */
+export type ContractOption = SelectOption & ContractPeriod;
+
+/** The span a selection of invoices covers, earliest to latest treatment. */
+export interface TreatmentPeriod {
+  from: string;
+  to: string;
+}
+
+/**
+ * The treatment span of a selection — what a policy has to cover to be the
+ * right one. Null for an empty selection, which rules nothing out.
+ */
+export function treatmentPeriod(
+  invoices: Pick<InvoiceDto, 'treatmentDate'>[],
+): TreatmentPeriod | null {
+  if (invoices.length === 0) return null;
+  const dates = invoices.map((invoice) => invoice.treatmentDate);
+  return {
+    from: dates.reduce((a, b) => (a < b ? a : b)),
+    to: dates.reduce((a, b) => (a > b ? a : b)),
+  };
+}
+
+/**
+ * Policies that ran over the whole treatment span. ISO dates compare as
+ * strings, the same way the server's history checks do. Covering the *whole*
+ * span is deliberate: a selection straddling a change of policy has no single
+ * right answer, and the dialog's switch is there to say so.
+ *
+ * Unlike `submittableContracts` this is a suggestion, not a rule — the API
+ * accepts a submission outside the policy's term, because an insurer does take
+ * a treatment from before the contract began.
+ */
+export function contractsCoveringPeriod<C extends ContractPeriod>(
+  contracts: C[],
+  period: TreatmentPeriod | null,
+): C[] {
+  if (period === null) return contracts;
+  return contracts.filter(
+    (c) => c.contractBegin <= period.from && (c.contractEnd === null || c.contractEnd >= period.to),
   );
 }

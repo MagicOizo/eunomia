@@ -30,7 +30,7 @@ import { type BillingAllocationPayload, saveBillingAllocations } from './billing
 import AllocationDialog from './AllocationDialog.vue';
 import BillingDialog from './BillingDialog.vue';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
-import { submittableContracts } from './eligibility';
+import { type ContractOption, submittableContracts } from './eligibility';
 import ExclusionDialog from './ExclusionDialog.vue';
 import ObjectionDialog from './ObjectionDialog.vue';
 import PaymentQrPopover from './PaymentQrPopover.vue';
@@ -60,7 +60,7 @@ const props = defineProps<{
   /** agencyUID → IBAN, to show the read-only IBAN of the picked agency. */
   agencyIban: Record<string, string>;
   /** All policies of the insured person, for the submit and exclusion pickers. */
-  contracts: SelectOption[];
+  contracts: ContractOption[];
   /** The optimizer's advice for this invoice, shown per policy card. */
   planInvoice: PlanInvoiceDto | null;
   submitting: boolean;

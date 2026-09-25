@@ -36,7 +36,13 @@ import {
 } from './api';
 import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
 import BillingDialog from './BillingDialog.vue';
-import { commonSubmissions, commonSubmittableContracts, submittableContracts } from './eligibility';
+import {
+  type ContractOption,
+  type ContractPeriod,
+  commonSubmissions,
+  commonSubmittableContracts,
+  submittableContracts,
+} from './eligibility';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 import InvoiceBriefList from './InvoiceBriefList.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
@@ -51,7 +57,7 @@ import { STATUS_DISPLAY, STATUS_ORDER } from './status';
 
 const props = defineProps<{ accountUID: string }>();
 
-interface ContractRef {
+interface ContractRef extends ContractPeriod {
   contractUID: string;
   contractNumber: string;
   companyName: string;
@@ -106,8 +112,15 @@ const dialogBusy = ref(false);
 const dialogError = ref<string | null>(null);
 const deleteTargets = ref<string[]>([]);
 
-const contractOptions = computed<SelectOption[]>(() =>
-  contracts.value.map((c) => ({ value: c.contractUID, label: contractLabel(c) })),
+// The policy's term travels with the option: the submit dialog offers the
+// policies that ran over the treatment period first (see eligibility.ts).
+const contractOptions = computed<ContractOption[]>(() =>
+  contracts.value.map((c) => ({
+    value: c.contractUID,
+    label: contractLabel(c),
+    contractBegin: c.contractBegin,
+    contractEnd: c.contractEnd,
+  })),
 );
 /** Policies all invoices of the submit dialog can still go to. */
 const submitContractOptions = computed(() =>
@@ -178,6 +191,8 @@ async function loadStatic(): Promise<void> {
       contractUID: c.contractUID,
       contractNumber: c.contractNumber,
       companyName: c.companyName,
+      contractBegin: c.contractBegin,
+      contractEnd: c.contractEnd,
     }));
 
   await loadLookups();

@@ -83,9 +83,9 @@ const props = {
   agencies: [],
   agencyIban: {},
   contracts: [
-    { value: 'x', label: 'X-1 · PKV' },
-    { value: 'y', label: 'Y-1 · Zusatz' },
-    { value: 'z', label: 'Z-1 · Zusatz' },
+    { value: 'x', label: 'X-1 · PKV', contractBegin: '2020-01-01', contractEnd: null },
+    { value: 'y', label: 'Y-1 · Zusatz', contractBegin: '2020-01-01', contractEnd: null },
+    { value: 'z', label: 'Z-1 · Zusatz', contractBegin: '2020-01-01', contractEnd: null },
   ],
   planInvoice,
   submitting: false,

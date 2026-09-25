@@ -48,7 +48,7 @@
 	wirklich nicht mehr benötigt werden (mit einfacher Bestätigungs-Abfrage).
 11. Copy&Paste eines Datums — Umgesetzt mit v0.12.0-slice.1
 	Wenn ich in einer Externen Quelle (z.B. Excel) ein Datum im Format DD.MM.YYYY ins Clipboard kopiere und in ein Datumsfeld der App einfügen möchte, funktioniert das nicht.
-12. Police Auswahl beim Einreichen
+12. Police Auswahl beim Einreichen — Umgesetzt mit v0.12.0-slice.4
 	Es werden beim Einreichen Krankenversicherungen/Policen zur auswahl angeboten, die zum Behandlungszeitraum der ausgewählten Rechnungen noch nicht oder nicht mehr Aktiv sind.
 13. Default bei geöffenten Dialogen — Umgesetzt mit v0.12.0-slice.2
 	Wenn ein Dialog geöffnet wurde, bleibt der letzte Scollzustand bestehen.

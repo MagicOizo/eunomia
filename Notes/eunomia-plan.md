@@ -1031,7 +1031,7 @@ Felder fluchten auch bei langer Rechnungsnummer.
   mit der langen Nummer aus dem Screenshot (`33611/201806/00164`): beide Beschriftungen einzeilig
   und auf gleicher Höhe. Die Dev-Daten stehen danach wieder auf den Seed-Werten.
 
-## Slice 35 — Police-Auswahl im Versicherungszeitraum
+## Slice 35 — Police-Auswahl im Versicherungszeitraum (umgesetzt 2026-09-25)
 **Ziel:** Beim Einreichen stehen die Policen oben, die zum Behandlungszeitraum passen (issues.md 12).
 - Heute vergleicht weder `eligibility.ts` noch `assertInvoicesSubmittable` das `treatmentDate` mit
   `contractBegin`/`contractEnd` — der Dialog bietet Policen an, die damals noch nicht oder nicht mehr
@@ -1046,6 +1046,33 @@ Felder fluchten auch bei langer Rechnungsnummer.
 
 **DoD:** Der Einreichen-Dialog zeigt ohne Schalter nur Policen, die den Behandlungszeitraum abdecken;
 mit Schalter alle, die auch heute schon angeboten würden.
+
+**Umgesetzt (2026-09-25).** Entscheidungen beim Bau:
+
+- **Eine Regel neben den Regeln, nicht in ihnen.** `contractsCoveringPeriod` und `treatmentPeriod`
+  stehen in `eligibility.ts` neben `submittableContracts`, werden aber nacheinander angewandt und
+  nicht vermischt: die alten Funktionen bilden ab, was die API *ablehnen würde*, die neue nur, was
+  die Oberfläche *vorschlägt*. Wer beides in einen Filter zöge, verlöre genau die Unterscheidung,
+  auf der der Schalter beruht.
+- **Die Vertragsdaten waren schon da.** `GET /contracts` liefert `contractBegin`/`contractEnd`
+  (`LIST_SELECT`); die Rechnungs-Arbeitsfläche hat sie beim Bauen der Picker-Optionen nur
+  weggeworfen. Statt einer zweiten Abfrage tragen die Optionen die beiden Felder jetzt mit
+  (`ContractOption = SelectOption & ContractPeriod`) — die vorhandene Generik von
+  `commonSubmittableContracts` reicht sie unverändert durch.
+- **Deckt keine Police die Spanne ab, bleibt die Liste leer** (Festlegung des Autors): der Hinweis
+  nennt den Zeitraum, der Schalter bleibt bedienbar, der Einreichen-Knopf ist inaktiv. Automatisch
+  alle einzublenden würde die Aussage „hier passt nichts" gerade wieder verwischen.
+- **Bei mehreren Rechnungen muss die Police die ganze Spanne decken**, nicht nur überlappen
+  (Festlegung des Autors). Eine Auswahl über einen Policenwechsel hinweg hat keine richtige
+  Antwort — sie soll das sagen, statt eine der beiden Policen plausibel aussehen zu lassen.
+- **Jede Police nennt ihren Vertragszeitraum** als Zusatzzeile im Picker („ab 01.07.2024" bzw.
+  „01.01.2018 – 30.06.2024"); `EuEntityPicker` hat das `hint`-Feld schon und durchsucht es mit.
+- **Der Schalter steht über dem Feld, nicht darunter.** Darunter platziert verdeckte ihn die
+  geöffnete Vorschlagsliste — derselbe Effekt, der in Slice 33 schon den Speichern-Knopf getroffen
+  hat. Beim Bau in der laufenden App aufgefallen, nicht in den Unit-Tests.
+- **Serverseitig unverändert:** keine Migration, kein neuer Endpunkt, keine Prüfung in
+  `assertInvoicesSubmittable`. Eine Versicherung nimmt eine Behandlung von außerhalb des
+  Vertragszeitraums durchaus an; das bleibt erlaubt.
 
 ## Slice 36 — Suchen und Finden
 **Ziel:** Wachsende Listen bleiben durchsuchbar (issues.md 2, 3 und 6).

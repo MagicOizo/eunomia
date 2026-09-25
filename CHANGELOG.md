@@ -7,6 +7,16 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.4 — 2026-09-25
+
+- **The submit dialog offers the policy that was running.** Choosing where an invoice goes listed
+  every policy of the insured person, including ones that had not started yet or had already ended
+  at the time of the treatment. The list now holds the policies that covered the treatment period,
+  each with the term it ran; a switch brings the others back, because an insurer does accept a
+  treatment from outside the term and the API deliberately does not forbid it. For several invoices
+  at once, the period runs from the earliest treatment to the latest — a selection that straddles a
+  change of policy says so instead of guessing.
+
 ## 0.12.0-slice.3 — 2026-09-25
 
 - **A booked reimbursement can be corrected.** Amount and receipt number used to be settled the

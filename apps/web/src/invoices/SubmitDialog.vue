@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import { type SelectOption } from '../components/resource/EuSelectField.vue';
-import { plural } from '../lib/format';
+import EuToggle from '../design-system/components/EuToggle.vue';
+import { germanDate, plural } from '../lib/format';
 import type { InvoiceDto } from './api';
+import { type ContractOption, contractsCoveringPeriod, treatmentPeriod } from './eligibility';
 import InvoiceBriefList from './InvoiceBriefList.vue';
 
 const props = defineProps<{
@@ -17,7 +18,7 @@ const props = defineProps<{
   /** facilityUID → name, for the list's provider column. */
   facilityNames: Record<string, string>;
   /** Only the policies every selected invoice can still go to (see eligibility.ts). */
-  contracts: SelectOption[];
+  contracts: ContractOption[];
   submitting: boolean;
   error: string | null;
 }>();
@@ -30,17 +31,62 @@ const emit = defineEmits<{
 const contractUID = ref('');
 const submittedDate = ref('');
 const localError = ref<string | null>(null);
+/**
+ * Shows the policies that did not run over the treatment period. Off by
+ * default — the usual case is one policy and one obvious answer — but never
+ * gone: an insurer does accept a treatment from before the contract began, so
+ * the API does not forbid it and neither does this dialog.
+ */
+const showAll = ref(false);
+
+/** The span the selection covers; what a policy has to cover to be offered. */
+const period = computed(() => treatmentPeriod(props.invoices));
+const inPeriod = computed(() => contractsCoveringPeriod(props.contracts, period.value));
+const hiddenCount = computed(() => props.contracts.length - inPeriod.value.length);
+
+/** The policies in the picker, each with the term it ran as a second line. */
+const offered = computed(() =>
+  (showAll.value ? props.contracts : inPeriod.value).map((c) => ({
+    value: c.value,
+    label: c.label,
+    hint: contractTerm(c),
+  })),
+);
+
+const periodLabel = computed(() => {
+  const span = period.value;
+  if (!span) return '';
+  return span.from === span.to
+    ? germanDate(span.from)
+    : `${germanDate(span.from)} – ${germanDate(span.to)}`;
+});
+
+/** "01.01.2020 – 31.12.2023", or "ab 01.01.2020" while the policy still runs. */
+function contractTerm(contract: ContractOption): string {
+  return contract.contractEnd === null
+    ? `ab ${germanDate(contract.contractBegin)}`
+    : `${germanDate(contract.contractBegin)} – ${germanDate(contract.contractEnd)}`;
+}
 
 watch(
   () => props.open,
   (open) => {
     if (!open) return;
     localError.value = null;
-    contractUID.value = props.contracts.length === 1 ? props.contracts[0].value : '';
+    showAll.value = false;
     submittedDate.value = new Date().toISOString().slice(0, 10);
+    contractUID.value = offered.value.length === 1 ? offered.value[0].value : '';
   },
   { immediate: true },
 );
+
+// Keeps the choice and the list in step while the switch is thrown: one policy
+// left means it is the answer, and a policy the switch takes back out of the
+// list must not stay picked behind it.
+watch(offered, (options) => {
+  if (options.length === 1) contractUID.value = options[0].value;
+  else if (!options.some((o) => o.value === contractUID.value)) contractUID.value = '';
+});
 
 function submit(): void {
   localError.value = null;
@@ -68,11 +114,24 @@ function submit(): void {
         nicht erstattungsfähig markiert.
       </p>
       <template v-else>
+        <p v-if="offered.length === 0" class="eu-form__note" role="status">
+          Keine Police lief im Behandlungszeitraum ({{ periodLabel }}). Mit dem Schalter sind alle
+          Policen wählbar.
+        </p>
+        <p v-else-if="!showAll && hiddenCount > 0" class="eu-form__note" role="status">
+          {{ plural(hiddenCount, 'Police', 'Policen') }} außerhalb des Behandlungszeitraums
+          {{ hiddenCount === 1 ? 'ist' : 'sind' }} ausgeblendet.
+        </p>
+        <EuToggle
+          v-if="hiddenCount > 0"
+          v-model="showAll"
+          label="Auch Policen außerhalb des Behandlungszeitraums"
+        />
         <EuEntityPicker
           :model-value="contractUID || null"
           label="Police"
           required
-          :options="contracts"
+          :options="offered"
           @update:model-value="contractUID = $event ?? ''"
         />
         <EuTextField v-model="submittedDate" label="Einreichungsdatum" type="date" />
@@ -84,7 +143,7 @@ function submit(): void {
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
-      <EuButton :disabled="submitting || contracts.length === 0" @click="submit">
+      <EuButton :disabled="submitting || offered.length === 0" @click="submit">
         {{ submitting ? 'Einreichen…' : 'Einreichen' }}
       </EuButton>
     </template>

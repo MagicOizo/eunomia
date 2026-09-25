@@ -4,7 +4,9 @@ import type { InvoiceDto, InvoiceSubmissionDto } from './api';
 import {
   commonSubmissions,
   commonSubmittableContracts,
+  contractsCoveringPeriod,
   submittableContracts,
+  treatmentPeriod,
   unbilledSubmissions,
 } from './eligibility';
 
@@ -118,5 +120,57 @@ describe('unbilledSubmissions', () => {
   it('keeps the submissions still waiting for a reimbursement', () => {
     const inv = { submissions: [submission('pX', 'abgerechnet'), submission('pY', 'eingereicht')] };
     expect(unbilledSubmissions(inv).map((s) => s.contractUID)).toEqual(['pY']);
+  });
+});
+
+describe('treatmentPeriod', () => {
+  const treated = (treatmentDate: string) => ({ treatmentDate });
+
+  it('is the one date for a single invoice', () => {
+    expect(treatmentPeriod([treated('2024-03-12')])).toEqual({
+      from: '2024-03-12',
+      to: '2024-03-12',
+    });
+  });
+
+  it('spans the earliest and the latest treatment of a selection', () => {
+    const span = treatmentPeriod([
+      treated('2024-06-30'),
+      treated('2023-02-01'),
+      treated('2024-01-05'),
+    ]);
+    expect(span).toEqual({ from: '2023-02-01', to: '2024-06-30' });
+  });
+
+  it('is null without invoices', () => {
+    expect(treatmentPeriod([])).toBeNull();
+  });
+});
+
+describe('contractsCoveringPeriod', () => {
+  const policies = [
+    { value: 'past', label: 'beendet', contractBegin: '2018-01-01', contractEnd: '2023-12-31' },
+    { value: 'now', label: 'laufend', contractBegin: '2024-01-01', contractEnd: null },
+    { value: 'all', label: 'durchgehend', contractBegin: '2015-01-01', contractEnd: null },
+  ];
+  const covering = (from: string, to = from) =>
+    contractsCoveringPeriod(policies, { from, to }).map((c) => c.value);
+
+  it('drops policies that had ended and those that had not started', () => {
+    expect(covering('2023-06-01')).toEqual(['past', 'all']);
+    expect(covering('2025-06-01')).toEqual(['now', 'all']);
+  });
+
+  it('counts the last day of a policy as covered', () => {
+    expect(covering('2023-12-31')).toEqual(['past', 'all']);
+    expect(covering('2024-01-01')).toEqual(['now', 'all']);
+  });
+
+  it('needs the whole span, not an overlap of it', () => {
+    expect(covering('2023-11-01', '2024-02-01')).toEqual(['all']);
+  });
+
+  it('rules nothing out without a treatment period', () => {
+    expect(contractsCoveringPeriod(policies, null)).toEqual(policies);
   });
 });
