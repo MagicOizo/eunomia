@@ -157,7 +157,7 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
     }
 
     // One row per invoice and policy it was submitted to; the reimbursement sum
-    // is NULL until a billing of that submission answered it.
+    // is NULL until a billing of that policy answered it.
     const submissions = await pool.query<
       Array<{ invoiceUID: string; contractUID: string; reimbursed: number | null }>
     >(
@@ -169,7 +169,7 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
                     JOIN ServiceBillings b
                       ON b.billingUID = a.billingUID AND b.billingStatus <> -1)
            ON a.invoiceUID = si.invoiceUID AND a.allocationStatus <> -1
-          AND b.submissionUID = si.submissionUID
+          AND b.contractUID = si.contractUID
         WHERE i.accountUID = ? AND YEAR(i.treatmentDate) = ?
         GROUP BY si.invoiceUID, si.contractUID`,
       [accountUID, year],

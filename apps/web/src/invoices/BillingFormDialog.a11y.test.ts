@@ -18,7 +18,7 @@ vi.mock('./api', async (importOriginal) => ({
 
 const billing: BillingListDto = {
   billingUID: 'b-1',
-  submissionUID: 'e-1',
+  contractUID: 'c-1',
   billingDate: '2025-04-01',
   billingNumber: 'LA-42',
   documentLink: null,
@@ -27,7 +27,6 @@ const billing: BillingListDto = {
   objectionResolvedDate: null,
   objectionNote: null,
   accountUID: 'a-1',
-  contractUID: 'c-1',
   personName: 'Clara Beispiel',
   contractNumber: 'X-1',
   bonusForfeitRule: 'ON_REIMBURSEMENT',
@@ -35,11 +34,6 @@ const billing: BillingListDto = {
   invoiceCount: 1,
   invoiceNumbers: 'R-1',
 };
-
-const submissionOptions = [
-  { value: 'e-1', label: 'Einreichung vom 04.03.2025', hint: '2 Rechnungen' },
-  { value: 'e-2', label: 'Einreichung vom 01.02.2025', hint: '1 Rechnung' },
-];
 
 async function openDialog(props: Partial<InstanceType<typeof BillingFormDialog>['$props']> = {}) {
   const wrapper = mount(BillingFormDialog, {
@@ -81,8 +75,8 @@ beforeEach(() => {
 });
 
 describe('BillingFormDialog creating a billing', () => {
-  it('lets the submission be chosen and creates the billing under it', async () => {
-    const wrapper = await openDialog({ submissionOptions });
+  it('creates the billing under the policy it was opened for', async () => {
+    const wrapper = await openDialog({ contractUID: 'c-1' });
     expect(wrapper.text()).toContain('Neue Leistungsabrechnung');
 
     await fill(wrapper, 'Abrechnungsnummer', 'LA-99');
@@ -90,7 +84,7 @@ describe('BillingFormDialog creating a billing', () => {
     await flushPromises();
 
     expect(createBilling).toHaveBeenCalledWith(
-      expect.objectContaining({ submissionUID: 'e-1', billingNumber: 'LA-99' }),
+      expect.objectContaining({ contractUID: 'c-1', billingNumber: 'LA-99' }),
     );
     expect(wrapper.emitted('saved')?.[0]).toEqual([
       expect.objectContaining({ billingUID: 'b-new' }),
@@ -98,21 +92,23 @@ describe('BillingFormDialog creating a billing', () => {
     wrapper.unmount();
   });
 
-  it('keeps the known submission instead of asking for one', async () => {
-    const wrapper = await openDialog({ submissionUID: 'e-7', presetNumber: 'LA-7' });
+  // A billing belongs to the policy, which every caller of this dialog knows,
+  // so there is nothing left to ask for (Slice 37).
+  it('never asks which submission the billing belongs to', async () => {
+    const wrapper = await openDialog({ contractUID: 'c-7', presetNumber: 'LA-7' });
     expect(wrapper.findAll('label').map((l) => l.text())).not.toContain('Einreichung');
 
     await clickFooter(wrapper, 'Anlegen');
     await flushPromises();
 
     expect(createBilling).toHaveBeenCalledWith(
-      expect.objectContaining({ submissionUID: 'e-7', billingNumber: 'LA-7' }),
+      expect.objectContaining({ contractUID: 'c-7', billingNumber: 'LA-7' }),
     );
     wrapper.unmount();
   });
 
   it('asks for the number instead of sending an incomplete billing', async () => {
-    const wrapper = await openDialog({ submissionUID: 'e-1' });
+    const wrapper = await openDialog({ contractUID: 'c-1' });
     await fill(wrapper, 'Abrechnungsnummer', '  ');
     await clickFooter(wrapper, 'Anlegen');
     await flushPromises();
@@ -126,11 +122,9 @@ describe('BillingFormDialog creating a billing', () => {
 
 describe('BillingFormDialog editing a billing', () => {
   it('shows the stored values and patches what changed', async () => {
-    const wrapper = await openDialog({ billing, submissionOptions });
+    const wrapper = await openDialog({ billing });
 
     expect(wrapper.text()).toContain('Abrechnung bearbeiten');
-    // The submission of an existing billing is not moved, so it is not offered.
-    expect(wrapper.findAll('label').map((l) => l.text())).not.toContain('Einreichung');
     expect(wrapper.find<HTMLInputElement>('input[type="date"]').element.value).toBe('2025-04-01');
 
     await fill(wrapper, 'Abrechnungsnummer', 'LA-43');
@@ -148,7 +142,7 @@ describe('BillingFormDialog editing a billing', () => {
 
 describe('BillingFormDialog accessibility', () => {
   it('has no automatically detectable violations when creating', async () => {
-    const wrapper = await openDialog({ submissionOptions });
+    const wrapper = await openDialog({ contractUID: 'c-1' });
     const results = await axe.run(wrapper.element, {
       // jsdom cannot render colors; contrast is covered analytically
       // (design-system/CONTRAST.md).

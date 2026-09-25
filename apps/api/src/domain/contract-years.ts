@@ -27,8 +27,8 @@ const toFlag = (value: unknown): boolean | null => (value === null ? null : Bool
 /**
  * Loads everything the bonus timeline needs for one policy and runs the pure
  * calculation (see bonus-timeline.ts). A claim row is one allocation from an
- * active billing of the submission, or — while the submission has none for
- * the invoice — one pending row with a NULL reimbursement.
+ * active billing of this policy, or — while nothing has answered the invoice
+ * here yet — one pending row with a NULL reimbursement.
  */
 export async function loadBonusTimeline(
   db: Queryable,
@@ -45,7 +45,7 @@ export async function loadBonusTimeline(
        LEFT JOIN (Allocations a
                   JOIN ServiceBillings b ON b.billingUID = a.billingUID AND b.billingStatus <> -1)
          ON a.invoiceUID = si.invoiceUID AND a.allocationStatus <> -1
-        AND b.submissionUID = si.submissionUID
+        AND b.contractUID = si.contractUID
       WHERE si.contractUID = ?`,
     [contract.contractUID],
   );

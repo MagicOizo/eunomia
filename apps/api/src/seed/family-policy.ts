@@ -8,11 +8,13 @@ import { daysFromToday, seedId, seedRow, seedYear } from './helpers.js';
  *
  * It exists to pin down what the data model does with one insurer letter that
  * settles both policies at once. A ServiceBilling hangs off exactly one
- * submission, and a submission off exactly one contract — so that single
- * letter becomes TWO ServiceBillings rows, same number, same date, one per
- * policy. Nothing stops that: `billingNumber` carries no unique key, only
- * `billingUID` does. It is also the right shape, because deductible, cap and
- * bonus are per policy, so the amounts have to be tracked per policy anyway.
+ * policy — so that single letter becomes TWO ServiceBillings rows, same
+ * number, same date, one per policy. The UNIQUE from Slice 37 is on
+ * (contractUID, billingNumber) and parent and child hold different
+ * `Contracts` rows, so the shared number is allowed here and only a repeat
+ * *within* one policy is not. It is also the right shape, because deductible,
+ * cap and bonus are per policy, so the amounts have to be tracked per policy
+ * anyway.
  *
  * What the seeded state shows:
  * - both submissions are independent (different dates, different contracts),
@@ -159,14 +161,14 @@ export async function seedFamilyPolicy(pool: Pool, refs: FamilyPolicyRefs): Prom
   // search finds both, and each row carries its own policy's bonus verdict.
   await seedRow(pool, 'ServiceBillings', {
     billingUID: ids.billingParent,
-    submissionUID: ids.submissionParent,
+    contractUID: refs.parentContractUID,
     billingDate: LETTER_DATE,
     billingNumber: LETTER_NUMBER,
     forfeitsBonus: 1,
   });
   await seedRow(pool, 'ServiceBillings', {
     billingUID: ids.billingChild,
-    submissionUID: ids.submissionChild,
+    contractUID: ids.contractChild,
     billingDate: LETTER_DATE,
     billingNumber: LETTER_NUMBER,
     forfeitsBonus: null,

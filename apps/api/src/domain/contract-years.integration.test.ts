@@ -224,13 +224,11 @@ test('bonus scale and claim-free years', async (t) => {
       ).body.data.invoiceUID as string;
     const inv2023 = await makeInvoice('R-2023', '2023-03-01');
     const inv2024 = await makeInvoice('R-2024', '2024-03-01');
-    const submissionUID = (
-      await send('post', '/api/v1/submissions', {
-        contractUID,
-        submittedDate: '2024-04-01',
-        invoiceUIDs: [inv2023, inv2024],
-      })
-    ).body.data.submissionUID as string;
+    await send('post', '/api/v1/submissions', {
+      contractUID,
+      submittedDate: '2024-04-01',
+      invoiceUIDs: [inv2023, inv2024],
+    });
 
     let billingUID = '';
     await t.test('a pending claim only puts the year at risk', async () => {
@@ -242,7 +240,7 @@ test('bonus scale and claim-free years', async (t) => {
 
     await t.test('a reimbursement forfeits its treatment year and resets the streak', async () => {
       const billing = await send('post', '/api/v1/billings', {
-        submissionUID,
+        contractUID,
         billingDate: '2024-05-01',
         billingNumber: 'LA-1',
       });

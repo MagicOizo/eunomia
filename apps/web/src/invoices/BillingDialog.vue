@@ -24,10 +24,12 @@ import { usePresetToggle } from './forfeit-toggle';
 
 /**
  * "Abrechnung zuordnen": books the reimbursements of one Leistungsabrechnung
- * onto the invoices of a submission — one invoice or several in one go. The
- * billing is picked by number (with search and ad-hoc create beside the field),
- * every invoice gets its own card with the amount it was reimbursed, and
- * further invoices of the same submission can be taken along.
+ * onto invoices — one or several in one go. The billing is picked by number
+ * (with search and ad-hoc create beside the field), every invoice gets its own
+ * card with the amount it was reimbursed, and further invoices of the same
+ * submission can be taken along. The candidates come from the policy, which is
+ * what a billing belongs to; picking the invoices still runs per submission
+ * (Slice 37b opens that up).
  */
 const props = defineProps<{
   open: boolean;
@@ -35,8 +37,8 @@ const props = defineProps<{
   invoices: InvoiceDto[];
   /** facilityUID → name, for the provider on each invoice card. */
   facilityNames: Record<string, string>;
-  /** Preselected submission (policy) when opened from one card. */
-  presetSubmission?: string | null;
+  /** Preselected policy when opened from one card or from a billing. */
+  presetContract?: string | null;
   /** Billing to preselect — the one just created from the contract side. */
   presetBilling?: string | null;
   submitting: boolean;
@@ -157,8 +159,11 @@ function resetEntries(): void {
 }
 
 async function loadBillings(): Promise<void> {
-  billings.value = submissionUID.value
-    ? await searchBillings({ submissionUID: submissionUID.value })
+  // A billing belongs to the policy, not to one submission (Slice 37), so the
+  // candidates are the policy's — including ones already answering another
+  // submission of it.
+  billings.value = selectedSubmission.value
+    ? await searchBillings({ contractUID: selectedSubmission.value.contractUID })
     : [];
   // One candidate needs no choosing; more than one is the user's call.
   selectedBilling.value = billings.value.length === 1 ? billings.value[0].billingUID : '';
@@ -175,7 +180,7 @@ watch(
     // The card the dialog was opened from wins; otherwise default to the
     // policy still waiting for its answer.
     submissionUID.value =
-      props.presetSubmission ??
+      shared.find((s) => s.contractUID === props.presetContract)?.submissionUID ??
       shared.find((s) => s.status === 'eingereicht')?.submissionUID ??
       shared[0]?.submissionUID ??
       '';
@@ -280,8 +285,8 @@ function submit(): void {
       </p>
 
       <p v-if="submissionOptions.length === 0" class="eu-form__note" role="status">
-        Diese Rechnungen haben keine gemeinsame Einreichung — eine Leistungsabrechnung kann nur
-        Rechnungen ihrer eigenen Einreichung erstatten.
+        Diese Rechnungen haben keine gemeinsame Einreichung — sie lassen sich hier zurzeit nicht in
+        einem Zug buchen.
       </p>
 
       <EuEntityPicker
@@ -386,7 +391,7 @@ function submit(): void {
   <BillingSearchDialog
     v-if="selectedSubmission"
     :open="searchOpen"
-    :submission-u-i-d="submissionUID"
+    :contract-u-i-d="selectedSubmission.contractUID"
     :policy-label="`${selectedSubmission.contractNumber} · ${selectedSubmission.companyName}`"
     :initial-query="createPrefill"
     @close="searchOpen = false"
@@ -396,7 +401,7 @@ function submit(): void {
   <BillingFormDialog
     v-if="selectedSubmission"
     :open="createOpen"
-    :submission-u-i-d="submissionUID"
+    :contract-u-i-d="selectedSubmission.contractUID"
     :bonus-forfeit-rule="selectedSubmission.bonusForfeitRule"
     :preset-number="createPrefill"
     @close="createOpen = false"

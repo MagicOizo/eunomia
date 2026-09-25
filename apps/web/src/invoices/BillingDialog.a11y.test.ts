@@ -61,7 +61,7 @@ function invoice(number: string, overrides: Partial<InvoiceDto> = {}): InvoiceDt
 
 const billing: BillingListDto = {
   billingUID: 'b-1',
-  submissionUID: 'e-1',
+  contractUID: 'c-1',
   billingDate: '2025-04-01',
   billingNumber: 'LA-42',
   documentLink: null,
@@ -70,7 +70,6 @@ const billing: BillingListDto = {
   objectionResolvedDate: null,
   objectionNote: null,
   accountUID: 'a-1',
-  contractUID: 'c-1',
   personName: 'Clara Beispiel',
   contractNumber: 'X-1',
   bonusForfeitRule: 'ON_REIMBURSEMENT',

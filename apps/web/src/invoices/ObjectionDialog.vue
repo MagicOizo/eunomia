@@ -33,11 +33,9 @@ function isOpen(billing: BillingDto): boolean {
   return billing.objectionDate !== null && billing.objectionResolvedDate === null;
 }
 
-/** "Policy · company" of the submission a billing belongs to. */
+/** "Policy · company" of the policy a billing belongs to. */
 function policyOf(billing: BillingDto): string {
-  const submission = props.invoice?.submissions.find(
-    (s) => s.submissionUID === billing.submissionUID,
-  );
+  const submission = props.invoice?.submissions.find((s) => s.contractUID === billing.contractUID);
   return submission ? `${submission.contractNumber} · ${submission.companyName}` : '';
 }
 
@@ -47,14 +45,19 @@ async function load(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    // An invoice can be billed by several policies: gather the billings of
-    // every submission that has any.
+    // An invoice can be billed by several policies. A billing belongs to the
+    // policy and may answer other invoices too, so the policy's list is
+    // narrowed to the billings that reimbursed *this* invoice — those are the
+    // ones an objection is about.
+    const booked = new Set(
+      invoice.submissions.flatMap((s) => s.allocations.map((a) => a.billingUID)),
+    );
     const lists = await Promise.all(
       invoice.submissions
         .filter((s) => s.billingCount > 0)
-        .map((s) => searchBillings({ submissionUID: s.submissionUID })),
+        .map((s) => searchBillings({ contractUID: s.contractUID })),
     );
-    billings.value = lists.flat();
+    billings.value = lists.flat().filter((b) => booked.has(b.billingUID));
     for (const b of billings.value) {
       forms[b.billingUID] ??= { date: today(), note: '' };
     }

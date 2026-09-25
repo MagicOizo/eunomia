@@ -8,15 +8,11 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';
 import { type CrudTable, type Row, getRow, insertRow, updateRow } from '../crud/repository.js';
-import { notFound } from '../lib/api-error.js';
+import { conflict, notFound } from '../lib/api-error.js';
+import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { allocationEntriesSchema, createAllocationsForBilling } from './allocations.js';
-import {
-  accountForBilling,
-  accountForContract,
-  accountForSubmission,
-  authorizeAccount,
-} from './workflow-access.js';
+import { accountForBilling, accountForContract, authorizeAccount } from './workflow-access.js';
 
 const table: CrudTable = {
   table: 'ServiceBillings',
@@ -24,7 +20,7 @@ const table: CrudTable = {
   statusColumn: 'billingStatus',
   entity: 'serviceBilling',
   columns: [
-    'submissionUID',
+    'contractUID',
     'billingDate',
     'billingNumber',
     'documentLink',
@@ -36,7 +32,7 @@ const table: CrudTable = {
 };
 
 const base = z.object({
-  submissionUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.submission)),
+  contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
   billingDate: z.string().date(),
   billingNumber: z.string().trim().min(1).max(50),
   documentLink: z.string().trim().url().max(255).nullish(),
@@ -56,18 +52,16 @@ const objection = z.object({
   objectionNote: z.string().trim().max(500).nullish(),
 });
 
-// A billing stays with its submission; its own fields plus the objection state
+// A billing stays with its policy; its own fields plus the objection state
 // are editable.
-const updateSchema = base.omit({ submissionUID: true }).extend(objection.shape).partial();
+const updateSchema = base.omit({ contractUID: true }).extend(objection.shape).partial();
 
 /**
  * Filters for the billings list, used by the "Leistungsabrechnung auswählen"
- * sub-dialog and the filter bar of the billings list. `submissionUID` and
- * `contractUID` scope the result to one entity (and are mutually exclusive);
- * the rest narrow it down further.
+ * sub-dialog and the filter bar of the billings list. `contractUID` scopes the
+ * result to one policy; the rest narrow it down further.
  */
 const listQuery = z.object({
-  submissionUID: z.string().trim().min(1).optional(),
   contractUID: z.string().trim().min(1).optional(),
   /** Free text over billing number, policy number, insured person and invoice numbers. */
   q: z.string().trim().min(1).optional(),
@@ -80,13 +74,44 @@ const listQuery = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
 
+/**
+ * Guards UNIQUE (contractUID, billingNumber) before the database does. The
+ * index is the real rule — this only turns it into a sentence that names the
+ * number, instead of the generic "duplicate value" the driver's 1062 maps to.
+ * `exceptUID` leaves the billing being edited out of its own check.
+ */
+async function assertBillingNumberFree(
+  pool: Pool,
+  contractUID: string,
+  billingNumber: string,
+  exceptUID?: string,
+): Promise<void> {
+  const [taken] = await pool.query<Array<{ billingUID: string }>>(
+    `SELECT billingUID FROM ServiceBillings
+      WHERE contractUID = ? AND billingNumber = ? AND billingStatus <> -1
+        AND billingUID <> ?
+      LIMIT 1`,
+    [contractUID, billingNumber, exceptUID ?? ''],
+  );
+  if (taken) {
+    throw conflict(`The policy already has a service billing numbered ${billingNumber}`, {
+      code: ERROR_CODES.BILLING_NUMBER_TAKEN,
+      details: { billingNumber },
+    });
+  }
+}
+
 /** Exposes the TINYINT(1) forfeit flag as boolean | null. */
 function toBillingDto(row: Row | null): Row | null {
   if (row === null) return null;
   return { ...row, forfeitsBonus: row.forfeitsBonus === null ? null : Boolean(row.forfeitsBonus) };
 }
 
-/** Router for service billings (Leistungsabrechnungen), attached to a submission. */
+/**
+ * Router for service billings (Leistungsabrechnungen), attached to a policy.
+ * Which submissions one answers follows from its allocations — the insurer
+ * regularly settles invoices submitted on different days in one letter.
+ */
 export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Router {
   const router = Router();
   const requireAuth = createRequireAuth(pool, config);
@@ -99,14 +124,8 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const params: unknown[] = [];
     const havingParams: unknown[] = [];
 
-    const { submissionUID, contractUID } = filters;
-    if (submissionUID !== undefined) {
-      const account = await accountForSubmission(pool, submissionUID);
-      if (account === null) throw notFound('Submission');
-      await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
-      where.push('b.submissionUID = ?');
-      params.push(submissionUID);
-    } else if (contractUID !== undefined) {
+    const { contractUID } = filters;
+    if (contractUID !== undefined) {
       const account = await accountForContract(pool, contractUID);
       if (account === null) throw notFound('Contract');
       await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
@@ -164,16 +183,16 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const limit = filters.limit === undefined ? '' : ` LIMIT ${filters.limit}`;
 
     const rows = await pool.query<Row[]>(
-      `SELECT b.billingUID, b.submissionUID, b.billingDate, b.billingNumber, b.documentLink,
-              b.forfeitsBonus, b.objectionDate, b.objectionResolvedDate, b.objectionNote, b.billingStatus,
-              c.accountUID, c.contractUID, c.contractNumber, c.bonusForfeitRule,
+      `SELECT b.billingUID, b.billingDate, b.billingNumber, b.documentLink,
+              b.contractUID, b.forfeitsBonus, b.objectionDate, b.objectionResolvedDate,
+              b.objectionNote, b.billingStatus,
+              c.accountUID, c.contractNumber, c.bonusForfeitRule,
               CONCAT_WS(' ', acc.firstname, acc.surname) AS personName,
               COALESCE(SUM(al.reimbursement), 0) AS reimbursedTotal,
               COUNT(al.allocationID) AS invoiceCount,
               GROUP_CONCAT(inv.invoiceNumber ORDER BY inv.invoiceNumber SEPARATOR ', ') AS invoiceNumbers
          FROM ServiceBillings b
-         JOIN Submissions s ON s.submissionUID = b.submissionUID
-         JOIN Contracts c ON c.contractUID = s.contractUID
+         JOIN Contracts c ON c.contractUID = b.contractUID
          JOIN Accounts acc ON acc.accountUID = c.accountUID
          LEFT JOIN Allocations al ON al.billingUID = b.billingUID AND al.allocationStatus <> -1
          LEFT JOIN Invoices inv ON inv.invoiceUID = al.invoiceUID AND inv.invoiceStatus <> -1
@@ -198,15 +217,16 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
   router.post('/', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const data = base.parse(req.body);
-    const account = await accountForSubmission(pool, data.submissionUID);
-    if (account === null) throw notFound('Submission');
+    const account = await accountForContract(pool, data.contractUID);
+    if (account === null) throw notFound('Contract');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await assertBillingNumberFree(pool, data.contractUID, data.billingNumber);
     sendData(res, toBillingDto(await insertRow(pool, table, data)), 201);
   });
 
-  // Booking reimbursements is billing-scoped: the submission — and with it the
-  // set of invoices that may be booked at all — follows from the billing, so
-  // the client never has to repeat it per entry.
+  // Booking reimbursements is billing-scoped: the policy — and with it the set
+  // of invoices that may be booked at all — follows from the billing, so the
+  // client never has to repeat it per entry.
   router.post('/:uid/allocations', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
@@ -220,7 +240,13 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const account = await accountForBilling(pool, uid);
     if (account === null) throw notFound('Service billing');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
-    const updated = await updateRow(pool, table, uid, updateSchema.parse(req.body));
+    const patch = updateSchema.parse(req.body);
+    if (patch.billingNumber !== undefined) {
+      const current = (await getRow(pool, table, uid)) as { contractUID: string } | null;
+      if (current === null) throw notFound('Service billing');
+      await assertBillingNumberFree(pool, current.contractUID, patch.billingNumber, uid);
+    }
+    const updated = await updateRow(pool, table, uid, patch);
     sendData(res, toBillingDto(updated));
   });
 

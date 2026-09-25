@@ -43,8 +43,7 @@ export async function accountForBilling(db: Queryable, billingUID: string): Prom
   const rows = await db.query<Array<{ accountUID: string }>>(
     `SELECT c.accountUID
        FROM ServiceBillings b
-       JOIN Submissions s ON s.submissionUID = b.submissionUID
-       JOIN Contracts c ON c.contractUID = s.contractUID
+       JOIN Contracts c ON c.contractUID = b.contractUID
       WHERE b.billingUID = ? AND b.billingStatus <> -1
       LIMIT 1`,
     [billingUID],

@@ -13,14 +13,14 @@ import { type BillingListDto, searchBillings } from './api';
 
 /**
  * "Leistungsabrechnung auswählen": finds the billing to book a reimbursement
- * from. Scoped to one submission, because only that submission's billings may
- * reimburse its invoices — the filters narrow it down from there. The search
- * runs server-side so it stays usable once a policy has years of billings.
+ * from. Scoped to one policy, because only its billings may reimburse invoices
+ * submitted there — the filters narrow it down from there. The search runs
+ * server-side so it stays usable once a policy has years of billings.
  */
 const props = defineProps<{
   open: boolean;
-  submissionUID: string;
-  /** The policy the submission belongs to, shown as fixed context. */
+  contractUID: string;
+  /** The policy, shown as fixed context. */
   policyLabel: string;
   /** Prefills the free text with whatever was typed into the picker. */
   initialQuery?: string;
@@ -51,7 +51,7 @@ async function search(): Promise<void> {
   error.value = null;
   try {
     results.value = await searchBillings({
-      submissionUID: props.submissionUID,
+      contractUID: props.contractUID,
       q: filters.q.trim() || undefined,
       from: filters.from || undefined,
       to: filters.to || undefined,

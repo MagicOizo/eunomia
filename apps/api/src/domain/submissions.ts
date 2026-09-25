@@ -215,8 +215,17 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
       'SELECT invoiceUID FROM SubmissionInvoices WHERE submissionUID = ? ORDER BY invoiceUID',
       [uid],
     );
+    // A billing hangs on the policy now, so the ones "of this submission" are
+    // those that booked a reimbursement on one of its invoices.
     const billings = await pool.query<Array<{ billingUID: string }>>(
-      'SELECT billingUID FROM ServiceBillings WHERE submissionUID = ? AND billingStatus <> -1 ORDER BY billingUID',
+      `SELECT DISTINCT b.billingUID
+         FROM SubmissionInvoices si
+         JOIN Allocations a ON a.invoiceUID = si.invoiceUID AND a.allocationStatus <> -1
+         JOIN ServiceBillings b
+           ON b.billingUID = a.billingUID AND b.billingStatus <> -1
+          AND b.contractUID = si.contractUID
+        WHERE si.submissionUID = ?
+        ORDER BY b.billingUID`,
       [uid],
     );
     sendData(res, {
@@ -228,10 +237,13 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
   });
 
   // Withdraws an invoice from a submission (e.g. submitted to the wrong
-  // policy). Only while the insurer has not answered: once a service billing
-  // exists, the submission is history. A submission left without invoices is
-  // deleted with it; an invoice left without any submission loses its
-  // "billed" mark, which only applies to submitted invoices.
+  // policy). Only while the insurer has not answered *this invoice*: a booked
+  // reimbursement at this policy is history and stays. The rule is per invoice
+  // since Slice 37 — a billing spans submissions, so "the submission has a
+  // billing" would needlessly lock invoices nobody has answered yet. A
+  // submission left without invoices is deleted with it; an invoice left
+  // without any submission loses its "billed" mark, which only applies to
+  // submitted invoices.
   router.delete('/:uid/invoices/:invoiceUID', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
@@ -244,13 +256,19 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
       await conn.query('SELECT submissionUID FROM Submissions WHERE submissionUID = ? FOR UPDATE', [
         uid,
       ]);
-      const [billings] = await conn.query<Array<{ n: number }>>(
-        'SELECT COUNT(*) AS n FROM ServiceBillings WHERE submissionUID = ? AND billingStatus <> -1',
-        [uid],
+      const [booked] = await conn.query<Array<{ n: number }>>(
+        `SELECT COUNT(*) AS n
+           FROM SubmissionInvoices si
+           JOIN Allocations a ON a.invoiceUID = si.invoiceUID AND a.allocationStatus <> -1
+           JOIN ServiceBillings b
+             ON b.billingUID = a.billingUID AND b.billingStatus <> -1
+            AND b.contractUID = si.contractUID
+          WHERE si.submissionUID = ? AND si.invoiceUID = ?`,
+        [uid, invoiceUID],
       );
-      if (Number(billings?.n ?? 0) > 0) {
-        throw conflict('A submission with service billings cannot be withdrawn', {
-          code: ERROR_CODES.SUBMISSION_HAS_BILLINGS,
+      if (Number(booked?.n ?? 0) > 0) {
+        throw conflict('An invoice already reimbursed under this policy cannot be withdrawn', {
+          code: ERROR_CODES.INVOICE_HAS_REIMBURSEMENT,
         });
       }
       const removed = (await conn.query(

@@ -15,7 +15,7 @@ vi.mock('./api', async (importOriginal) => ({
 function billing(overrides: Partial<BillingListDto> = {}): BillingListDto {
   return {
     billingUID: 'b-1',
-    submissionUID: 'e-1',
+    contractUID: 'c-1',
     billingDate: '2025-04-01',
     billingNumber: 'LA-42',
     documentLink: null,
@@ -24,7 +24,6 @@ function billing(overrides: Partial<BillingListDto> = {}): BillingListDto {
     objectionResolvedDate: null,
     objectionNote: null,
     accountUID: 'a-1',
-    contractUID: 'c-1',
     personName: 'Clara Beispiel',
     contractNumber: 'X-1',
     bonusForfeitRule: 'ON_REIMBURSEMENT',
@@ -37,7 +36,7 @@ function billing(overrides: Partial<BillingListDto> = {}): BillingListDto {
 
 const props = {
   open: true,
-  submissionUID: 'e-1',
+  contractUID: 'c-1',
   policyLabel: 'X-1 · PKV',
   initialQuery: 'LA',
 };
@@ -58,7 +57,7 @@ describe('BillingSearchDialog', () => {
     const wrapper = await openDialog();
 
     expect(searchBillings).toHaveBeenCalledWith(
-      expect.objectContaining({ submissionUID: 'e-1', q: 'LA', limit: 50 }),
+      expect.objectContaining({ contractUID: 'c-1', q: 'LA', limit: 50 }),
     );
     const text = wrapper.text().replace(/\u00a0/g, ' ');
     expect(text).toContain('X-1 · PKV');

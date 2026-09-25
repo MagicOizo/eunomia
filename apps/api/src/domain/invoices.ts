@@ -147,7 +147,7 @@ interface InvoiceExclusionRow {
 
 interface InvoiceAllocationRow {
   invoiceUID: string;
-  submissionUID: string;
+  contractUID: string;
   allocationUID: string;
   billingUID: string;
   billingNumber: string;
@@ -200,13 +200,19 @@ function byInvoice<T extends { invoiceUID: string }>(rows: T[]): Map<string, T[]
 }
 
 /**
- * Groups allocation rows per invoice *and* submission: a submission can bundle
- * several invoices, so the submission alone is not a unique bucket here.
+ * Groups allocation rows per invoice *and* policy: a policy holds many
+ * invoices, so the policy alone is not a unique bucket here.
+ *
+ * Since Slice 37 a billing belongs to the policy, not to one submission — yet
+ * the cards are still drawn per submission. That keeps working because an
+ * invoice reaches each policy at most once (UNIQUE (invoiceUID, contractUID),
+ * migration 007): invoice + policy and invoice + submission name the same
+ * bucket.
  */
-function byInvoiceSubmission(rows: InvoiceAllocationRow[]): Map<string, InvoiceAllocationRow[]> {
+function byInvoicePolicy(rows: InvoiceAllocationRow[]): Map<string, InvoiceAllocationRow[]> {
   const map = new Map<string, InvoiceAllocationRow[]>();
   for (const row of rows) {
-    const key = `${row.invoiceUID}\u0000${row.submissionUID}`;
+    const key = `${row.invoiceUID}\u0000${row.contractUID}`;
     const list = map.get(key) ?? [];
     list.push(row);
     map.set(key, list);
@@ -235,10 +241,11 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
          JOIN Submissions s ON s.submissionUID = si.submissionUID AND s.submissionStatus <> -1
          JOIN Contracts c ON c.contractUID = s.contractUID
          JOIN InsuranceCompanies v ON v.companyUID = c.companyUID
-         LEFT JOIN ServiceBillings b ON b.submissionUID = s.submissionUID AND b.billingStatus <> -1
-         LEFT JOIN Allocations a
-                ON a.billingUID = b.billingUID AND a.invoiceUID = si.invoiceUID
-               AND a.allocationStatus <> -1
+         LEFT JOIN (Allocations a
+                    JOIN ServiceBillings b
+                      ON b.billingUID = a.billingUID AND b.billingStatus <> -1)
+                ON a.invoiceUID = si.invoiceUID AND a.allocationStatus <> -1
+               AND b.contractUID = si.contractUID
         WHERE si.invoiceUID IN (${placeholders})
         GROUP BY si.invoiceUID, s.submissionUID
         ORDER BY s.submittedDate, s.submissionUID`,
@@ -247,9 +254,9 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
   );
   // The invoice's share of each service billing, for the cards of the detail
   // dialog: which billing paid what, and whether it is under objection.
-  const allocations = byInvoiceSubmission(
+  const allocations = byInvoicePolicy(
     await db.query<InvoiceAllocationRow[]>(
-      `SELECT a.invoiceUID, b.submissionUID, a.allocationUID, a.billingUID,
+      `SELECT a.invoiceUID, b.contractUID, a.allocationUID, a.billingUID,
               b.billingNumber, b.billingDate, a.receiptNumber, a.reimbursement,
               CASE WHEN b.objectionDate IS NOT NULL AND b.objectionResolvedDate IS NULL
                    THEN 1 ELSE 0 END AS objectionOpen
@@ -297,7 +304,7 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
         billingCount: s.billingCount,
         reimbursed: s.reimbursed,
         status: deriveSubmissionStatus(s.allocationCount),
-        allocations: (allocations.get(`${row.invoiceUID}\u0000${s.submissionUID}`) ?? []).map(
+        allocations: (allocations.get(`${row.invoiceUID}\u0000${s.contractUID}`) ?? []).map(
           (a) => ({
             allocationUID: a.allocationUID,
             billingUID: a.billingUID,

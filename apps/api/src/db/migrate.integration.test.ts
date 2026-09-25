@@ -320,3 +320,128 @@ test('migration 008 adds the bonus scale, the year records and the billing flag,
     await pool.end();
   }
 });
+
+test('migration 011 moves a billing onto its policy and guards the number, and back', async (t) => {
+  const config = databaseConfigFromEnv();
+  if (!config) {
+    t.skip('no database configured (DB_* env vars unset)');
+    return;
+  }
+  const pool = createPool(config);
+  try {
+    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
+  } catch {
+    await pool.end();
+    t.skip('database not reachable');
+    return;
+  }
+
+  const cleanup = async (): Promise<void> => {
+    for (const sql of [
+      "DELETE FROM Allocations WHERE allocationUID LIKE 'oMIGRATIO11%'",
+      "DELETE FROM ServiceBillings WHERE billingUID LIKE 'sMIGRATIO11%'",
+      "DELETE FROM SubmissionInvoices WHERE invoiceUID LIKE 'iMIGRATION11%'",
+      "DELETE FROM Invoices WHERE invoiceUID LIKE 'iMIGRATION11%'",
+      "DELETE FROM Submissions WHERE submissionUID LIKE 'eMIGRATIO11%'",
+      "DELETE FROM Contracts WHERE contractUID LIKE 'pMIGRATIO11%'",
+      "DELETE FROM InsuranceCompanies WHERE companyUID = 'vMIGRATION11'",
+      "DELETE FROM Accounts WHERE accountUID = 'aMIGRATION11'",
+    ]) {
+      await pool.query(sql);
+    }
+  };
+
+  try {
+    await runMigrations(pool);
+    const migrator = createMigrator(pool);
+    const name011 = (await migrator.executed())
+      .map((m) => m.name)
+      .find((n) => n.startsWith('011-'));
+    assert.ok(name011, 'migration 011 should be recorded');
+
+    await cleanup();
+    // Back to the old shape: a billing hangs off one submission.
+    await migrator.down({ to: name011 });
+    await pool.query(
+      "INSERT INTO Accounts (accountUID, firstname, birthDate) VALUES ('aMIGRATION11', 'Mig', '1990-01-01')",
+    );
+    await pool.query(
+      "INSERT INTO InsuranceCompanies (companyUID, companyName) VALUES ('vMIGRATION11', 'Mig AG')",
+    );
+    for (const contract of ['pMIGRATIO11A', 'pMIGRATIO11B']) {
+      await pool.query(
+        `INSERT INTO Contracts (contractUID, contractNumber, companyUID, accountUID, contractBegin)
+         VALUES (?, ?, 'vMIGRATION11', 'aMIGRATION11', '2020-01-01')`,
+        [contract, contract],
+      );
+    }
+    await pool.query(
+      `INSERT INTO Submissions (submissionUID, contractUID, submittedDate)
+       VALUES ('eMIGRATIO11A', 'pMIGRATIO11A', '2024-03-01'),
+              ('eMIGRATIO11B', 'pMIGRATIO11B', '2024-04-01')`,
+    );
+    await pool.query(
+      `INSERT INTO Invoices (invoiceUID, invoiceNumber, invoiceDate, treatmentDate, accountUID, invoiceAmount)
+       VALUES ('iMIGRATION11', 'R-11', '2024-02-01', '2024-02-01', 'aMIGRATION11', 100)`,
+    );
+    await pool.query(
+      "INSERT INTO SubmissionInvoices VALUES ('eMIGRATIO11A', 'iMIGRATION11', 'pMIGRATIO11A')",
+    );
+    await pool.query(
+      `INSERT INTO ServiceBillings (billingUID, submissionUID, billingDate, billingNumber)
+       VALUES ('sMIGRATIO11A', 'eMIGRATIO11A', '2024-05-01', 'LA-11'),
+              ('sMIGRATIO11B', 'eMIGRATIO11B', '2024-05-01', 'LA-11')`,
+    );
+    await pool.query(
+      `INSERT INTO Allocations (allocationUID, invoiceUID, billingUID, reimbursement)
+       VALUES ('oMIGRATIO11A', 'iMIGRATION11', 'sMIGRATIO11A', 40)`,
+    );
+
+    await migrator.up();
+
+    // The billing now names the policy its submission belonged to; the same
+    // number under two different policies is untouched (the family case).
+    const billings = await pool.query<Array<{ billingUID: string; contractUID: string }>>(
+      `SELECT billingUID, contractUID FROM ServiceBillings
+        WHERE billingUID LIKE 'sMIGRATIO11%' ORDER BY billingUID`,
+    );
+    assert.deepEqual(billings, [
+      { billingUID: 'sMIGRATIO11A', contractUID: 'pMIGRATIO11A' },
+      { billingUID: 'sMIGRATIO11B', contractUID: 'pMIGRATIO11B' },
+    ]);
+
+    // UNIQUE (contractUID, billingNumber) holds for active billings...
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO ServiceBillings (billingUID, contractUID, billingDate, billingNumber)
+         VALUES ('sMIGRATIO11C', 'pMIGRATIO11A', '2024-06-01', 'LA-11')`,
+      ),
+      'a policy must not carry the same billing number twice',
+    );
+    // ...and a soft-deleted one gives its number back, because the generated
+    // column turns NULL and NULL never collides.
+    await pool.query(
+      "UPDATE ServiceBillings SET billingStatus = -1 WHERE billingUID = 'sMIGRATIO11A'",
+    );
+    await pool.query(
+      `INSERT INTO ServiceBillings (billingUID, contractUID, billingDate, billingNumber)
+       VALUES ('sMIGRATIO11C', 'pMIGRATIO11A', '2024-06-01', 'LA-11')`,
+    );
+    await pool.query("DELETE FROM ServiceBillings WHERE billingUID = 'sMIGRATIO11C'");
+    await pool.query(
+      "UPDATE ServiceBillings SET billingStatus = 1 WHERE billingUID = 'sMIGRATIO11A'",
+    );
+
+    // down puts the billing back on the submission of the invoice it booked.
+    await migrator.down({ to: name011 });
+    const [restored] = await pool.query<Array<{ submissionUID: string }>>(
+      "SELECT submissionUID FROM ServiceBillings WHERE billingUID = 'sMIGRATIO11A'",
+    );
+    assert.equal(restored?.submissionUID, 'eMIGRATIO11A');
+
+    await migrator.up();
+  } finally {
+    await cleanup().catch(() => undefined);
+    await pool.end();
+  }
+});

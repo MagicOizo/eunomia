@@ -151,8 +151,8 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     `Diese Rechnungen sind bei dieser Police als nicht erstattungsfähig markiert: ${list(d.invoices)}.`,
   INVOICES_ALREADY_BILLED: (d) =>
     `Diese Rechnungen sind bereits als abgerechnet markiert: ${list(d.invoices)}.`,
-  INVOICES_NOT_IN_SUBMISSION: (d) =>
-    `Diese Rechnungen gehören nicht zur Einreichung dieser Leistungsabrechnung: ${list(d.invoices)}.`,
+  INVOICES_NOT_SUBMITTED_HERE: (d) =>
+    `Diese Rechnungen sind bei der Police dieser Leistungsabrechnung nicht eingereicht: ${list(d.invoices)}.`,
   REIMBURSEMENT_EXCEEDS_INVOICE: (d) =>
     `Die Erstattungen würden den Rechnungsbetrag übersteigen: ${list(d.invoices)}.`,
   INVOICE_AMOUNT_BELOW_REIMBURSED: () =>
@@ -164,8 +164,10 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     'Die Rechnung ist bei dieser Police bereits als nicht erstattungsfähig markiert.',
   CONTRACT_ACCOUNT_MISMATCH: () =>
     'Die Police gehört zu einem anderen Versicherten als die Rechnung.',
-  SUBMISSION_HAS_BILLINGS: () =>
-    'Zu dieser Einreichung gibt es bereits eine Leistungsabrechnung, sie kann nicht mehr zurückgezogen werden.',
+  INVOICE_HAS_REIMBURSEMENT: () =>
+    'Für diese Rechnung wurde bei dieser Police bereits eine Erstattung gebucht, sie kann nicht mehr zurückgezogen werden.',
+  BILLING_NUMBER_TAKEN: (d) =>
+    `Die Leistungsabrechnung ${d.billingNumber} gibt es bei dieser Police schon.`,
 
   // Policen
   HISTORY_BEFORE_CONTRACT: (d) => `${historyClause(d)} nicht vor dem Vertragsbeginn starten.`,

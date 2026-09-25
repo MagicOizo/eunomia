@@ -22,7 +22,7 @@ in [eunomia-plan.md](eunomia-plan.md). 0.11.0 ist davor als volles Release abges
 | ☑ | 34 | Erstattung und Belegnummer nachträglich ändern | 9, 8 | 0.12.0-slice.3 |
 | ☑ | 35 | Police-Auswahl im Versicherungszeitraum | 12 | 0.12.0-slice.4 |
 | ☑ | 36 | Suchen und Finden | 2, 3, 6 | 0.12.0-slice.5 |
-| ☐ | 37a | Abrechnung über mehrere Einreichungen — Modell + API | 7 | |
+| ☑ | 37a | Abrechnung über mehrere Einreichungen — Modell + API | 7 | 0.12.0-slice.6 |
 | ☐ | 37b | Abrechnung über mehrere Einreichungen — UI | 7 | |
 | ☐ | 38 | Kontoverbindungen mit Gültigkeitsdatum, BIC und Empfänger | 5, 4 | |
 | ☐ | 39 | Papierkorb | 10 | |

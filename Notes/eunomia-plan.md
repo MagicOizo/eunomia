@@ -95,7 +95,7 @@ Contracts ──1:n──→ Submissions ──1:n──→ Invoices
                         └──1:n──→ ServiceBillings ──1:n──→ Allocations ──n:1──→ Invoices
 ```
 
-> **Revidiert durch Datenmodell v3 (siehe unten):** Die Regel "nur einmal einreichen" gilt jetzt **pro Police**, `Invoices.submissionUID` wird durch die Tabelle `SubmissionInvoices` ersetzt.
+> **Revidiert durch Datenmodell v3 (siehe unten):** Die Regel "nur einmal einreichen" gilt jetzt **pro Police**, `Invoices.submissionUID` wird durch die Tabelle `SubmissionInvoices` ersetzt. **Mit Slice 37a hängt auch die `ServiceBilling` an der Police, nicht mehr an der Einreichung** — die beiden folgenden Punkte dazu gelten nicht mehr, siehe unten.
 
 - Eine `Invoice` bekommt beim Einreichen eine `submissionUID` (statt bisher `submittedDate` + `contractUID` direkt auf der Rechnung). Einmal gesetzt, ist sie **unveränderlich** — das erzwingt "eine Rechnung kann nicht mehrfach eingereicht werden" strukturell, nicht nur per Anwendungslogik.
 - Eine `Submission` kann mehrere `Invoices` enthalten (Sammeleinreichung) und trägt darüber `contractUID` und `submittedDate`.
@@ -123,8 +123,8 @@ Accounts ─1:n→ Contracts (Police, stabil)
                  ├─1:n→ ContractTerms      (Konditionen, gültig ab Kalenderjahr)
                  │         └─1:n→ ContractBonusTiers (Staffel: leistungsfreie Jahre → absoluter Bonusbetrag)
                  ├─1:n→ ContractYears      (Jahresstatus: Bonus verwirkt?, tatsächliche Rückerstattung)
-                 └─1:n→ Submissions ─n:m→ Invoices   (über SubmissionInvoices)
-                            └─1:n→ ServiceBillings ─1:n→ Allocations ─n:1→ Invoices
+                 ├─1:n→ Submissions ─n:m→ Invoices   (über SubmissionInvoices)
+                 └─1:n→ ServiceBillings ─1:n→ Allocations ─n:1→ Invoices
 Invoices ─n:m→ Contracts über InvoiceExclusions ("nicht erstattungsfähig bei dieser Police")
 ```
 
@@ -135,6 +135,7 @@ Invoices ─n:m→ Contracts über InvoiceExclusions ("nicht erstattungsfähig b
 - **Leistungsfreiheit wird gezählt, nicht gepflegt:** Ein Jahr ist für eine Police leistungsfrei, wenn der Bonus darin nicht verwirkt ist. Verwirkt ist er — je nach `bonusForfeitRule` — durch eine Einreichung bzw. eine Erstattung > 0 bei dieser Police in dem Behandlungsjahr; übersteuerbar pro Leistungsabrechnung (`ServiceBillings.forfeitsBonus`, nullable = Regel der Police folgen; wird bei Erfassung der Erstattung abgefragt) und pro Jahr (`ContractYears`). Die Serie leistungsfreier Jahre = `claimFreeYearsAtStart` + ununterbrochen leistungsfreie Jahre ab `claimFreeCountingFromYear`; ein verwirktes Jahr setzt sie auf 0.
 - **`ContractYears`** (optional pro Police und Jahr): tatsächlich erhaltene Beitragsrückerstattung laut Schreiben der Versicherung (überschreibt die Prognose) und manueller Override "Bonus verwirkt ja/nein".
 - **`SubmissionInvoices`** (`submissionUID`, `invoiceUID`, `contractUID` denormalisiert) ersetzt `Invoices.submissionUID`. `UNIQUE (invoiceUID, contractUID)`: **eine Rechnung höchstens einmal pro Police** — die Doppel-Einreichung bei derselben Versicherung bleibt strukturell ausgeschlossen, bei verschiedenen Policen ist sie erlaubt.
+- **`ServiceBillings` hängen an der Police** (`contractUID`, seit Slice 37a; vorher an der Einreichung). Welche Einreichungen eine Leistungsabrechnung beantwortet, ergibt sich aus ihren `Allocations` — ein Brief der Versicherung erstattet regelmäßig Rechnungen, die an verschiedenen Tagen eingereicht wurden. Buchbar ist, was **bei dieser Police eingereicht** ist (über `SubmissionInvoices`); "ein Versicherter je Abrechnung" trägt der Vertrag. `UNIQUE (contractUID, billingNumber)` über die Generated Column `activeBillingNumber` (NULL bei `billingStatus = -1`, damit eine gelöschte Abrechnung ihre Nummer wieder freigibt — MariaDB kennt keinen partiellen Index). Dieselbe Nummer bei **zwei** Policen bleibt erlaubt: ein Brief kann zwei Policen abrechnen (Familienfall, `seed/family-policy.ts`).
 - **Bereicherungsverbot:** Summe aller `Allocations` einer Rechnung (über alle Policen) ≤ Rechnungsbetrag — Validierung im Anwendungslayer.
 - **`InvoiceExclusions`** (`invoiceUID`, `contractUID`, Notiz): manuelle Markierung "nicht erstattungsfähig bei dieser Police" (z. B. stationäre Leistung bei einer ambulanten Zusatzversicherung). Eine Einteilung in Leistungsbereiche ist bewusst (noch) nicht vorgesehen.
 - **Abgeleiteter Status:** Der Workflow-Status (`eingereicht`/`abgerechnet`) wird je Einreichung bestimmt; die Rechnung erhält einen Gesamtstatus plus den **nicht erstatteten Restbetrag** als Kandidat für die nächste Police. Gesamtstatus (festgelegt in Slice 17): `offen` = nirgends eingereicht; `eingereicht` = bei ≥ 1 Police eingereicht, noch keine Erstattung zugeordnet; `teilabgerechnet` = Erstattungen < Rechnungsbetrag (Zahlung egal); `abgerechnet` = Erstattungen decken den Betrag **oder** die Rechnung ist von Hand „als abgerechnet markiert“ (`Invoices.reimbursementClosed`, z. B. der Rest ist Selbstbeteiligung), noch nicht bezahlt; `erledigt` = wie `abgerechnet` und bezahlt.
@@ -1134,6 +1135,8 @@ jede Stammdatenliste hat ein Filterfeld.
   Dev-Datenbestand blieb unverändert.
 
 ## Slice 37 — Leistungsabrechnung über mehrere Einreichungen
+**37a (Modell + API) umgesetzt 2026-09-25, 37b (UI) steht noch aus.**
+
 **Ziel:** Rechnungen aus verschiedenen Einreichungen derselben Police lassen sich auf einer
 Leistungsabrechnung zusammenfassen (issues.md 7). Der größte Punkt der Liste und der einzige echte
 Umbau; sinnvoll in zwei Scheiben, Modell + API und danach UI.
@@ -1164,6 +1167,58 @@ Umbau; sinnvoll in zwei Scheiben, Modell + API und danach UI.
 **DoD:** Rechnungen, die zu verschiedenen Zeitpunkten bei derselben Police eingereicht wurden, lassen
 sich auf einer Leistungsabrechnung buchen; dieselbe Abrechnungsnummer ein zweites Mal im selben
 Vertrag weist die Datenbank ab, eine gelöschte gibt ihre Nummer wieder frei.
+
+### 37a — Modell + API (umgesetzt 2026-09-25)
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Zurückziehen sperrt je Rechnung, nicht je Einreichung.** Die alte Regel („die Einreichung hat
+  eine Leistungsabrechnung") gibt es nach dem Umbau gar nicht mehr, weil eine Abrechnung über
+  Einreichungen hinweggeht. An ihre Stelle tritt die genauere: gesperrt ist, was für **diese
+  Rechnung bei dieser Police** schon erstattet wurde. Eine noch unbeantwortete Schwesterrechnung
+  derselben Einreichung lässt sich damit zurückziehen, was vorher verboten war.
+- **37a hält die App lauffähig.** Die Oberfläche wird mechanisch nachgezogen (Abrechnung an der
+  Police), kann aber noch genau so viel wie vorher; das Buchen über mehrere Einreichungen in einem
+  Zug ist 37b. Kein Commit, der nichts Lauffähiges hinterlässt.
+- **Altdaten werden nicht automatisch zusammengeführt.** Der Autor prüft vor dem Produktions-Update
+  mit einem lesenden SQL-Befehl, ob es doppelte Abrechnungsnummern je Police überhaupt gibt (im
+  Dev-Bestand gibt es keine). Die Migration zählt sie zuerst selbst und **bricht mit Vertrag, Nummer
+  und Anzahl ab**, statt am `ALTER TABLE` mit einem SQL-Fehler zu scheitern oder stillschweigend
+  Daten des Autors umzuschreiben.
+
+**Befunde beim Bauen:**
+
+- **Der Unique-Index trägt auf einer `VIRTUAL`-Spalte** — vor dem Schreiben der Migration gegen
+  MariaDB 11 / InnoDB nachgemessen (Einfügen, Soft-Delete, erneutes Einfügen, Kollision mit 1062).
+  `PERSISTENT` war also nicht nötig. Die offene Frage aus der Planung ist damit beantwortet.
+- **„Je Einreichung" und „je Police" sind derselbe Eimer.** Durch `UNIQUE (invoiceUID, contractUID)`
+  aus Migration 007 erreicht eine Rechnung jede Police höchstens einmal. Die Karten im
+  Rechnungsdialog bleiben deshalb unverändert richtig, obwohl die Erstattungen jetzt über den
+  Vertrag gruppiert werden — im Code als Kommentar festgehalten, weil daran einiges hängt.
+- **Zwei Fehlercodes waren nach dem Umbau gelogen** und heißen jetzt nach der Regel, die wirklich
+  gilt: `INVOICES_NOT_IN_SUBMISSION` → `INVOICES_NOT_SUBMITTED_HERE`, `SUBMISSION_HAS_BILLINGS` →
+  `INVOICE_HAS_REIMBURSEMENT`. Neu dazu `BILLING_NUMBER_TAKEN`: eine Vorprüfung vor dem Insert
+  liefert den brauchbaren deutschen Satz, den das allgemeine `DUPLICATE_VALUE` nicht hergibt; der
+  Unique-Index bleibt der Rückhalt.
+- **Die Leistungsabrechnungen-Seite fragt nicht mehr nach der Einreichung.** Sie ist ohnehin
+  vertragsbezogen, also entfällt beim Anlegen die Rückfrage ersatzlos — und mit ihr das Laden der
+  Einreichungen auf dieser Seite.
+
+**Nachgeprüft (2026-09-25):** 218 API-Tests, 190 Web-Tests, Lint, Typecheck, Prettier. Neue
+Integrationsfälle: eine Abrechnung erstattet Rechnungen aus zwei getrennten Einreichungen derselben
+Police; eine bei einer anderen Police eingereichte Rechnung wird abgewiesen; dieselbe Nummer im
+selben Vertrag 409, in einem anderen Vertrag 201; eine gelöschte Abrechnung gibt ihre Nummer frei;
+Zurückziehen je Rechnung. Migration 011 up **und** down mit eigenem Fall. Im Browser durchgeklickt:
+Abrechnung anlegen (ohne Einreichungs-Rückfrage), doppelte Nummer → „Die Leistungsabrechnung
+LA-2024-500 gibt es bei dieser Police schon.", Erstattung gebucht — die Karte der Rechnung zeigt
+danach **zwei** Abrechnungen, darunter eine, die ohne diesen Umbau gar nicht hätte buchen können.
+
+### 37b — UI (offen)
+
+Der eigentliche Gewinn: `eligibility.commonSubmissions` auf „gemeinsame Police" umstellen, damit
+`BillingDialog` Rechnungen aus verschiedenen Einreichungen in einem Zug annimmt, und die Auswahl der
+mitzunehmenden Rechnungen entsprechend öffnen. Der Hinweis „Diese Rechnungen haben keine gemeinsame
+Einreichung" fällt damit weg.
 
 ## Slice 38 — Kontoverbindungen mit Gültigkeitsdatum, BIC und Empfänger
 **Ziel:** Ein Abrechnungsdienstleister behält seine Identität, wenn er die Bankverbindung wechselt

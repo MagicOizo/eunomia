@@ -223,7 +223,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     await t.test('a partial reimbursement moves the invoice to teilabgerechnet', async () => {
       billingUID = (
         await post('/api/v1/billings', {
-          submissionUID,
+          contractUID: contractA,
           billingDate: '2024-07-01',
           billingNumber: 'LA-1',
         })
@@ -292,7 +292,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     await t.test('deleting a billing cascades: its invoice reverts to eingereicht', async () => {
       const delBilling = (
         await post('/api/v1/billings', {
-          submissionUID,
+          contractUID: contractA,
           billingDate: '2024-07-05',
           billingNumber: 'LA-DEL',
         })
@@ -387,7 +387,6 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     const invoice = async (uid: string) =>
       (await request(app).get(`/api/v1/invoices/${uid}`).set(admin)).body.data;
 
-    let submissionY = '';
     await t.test('the remainder can be submitted to a second policy, once', async () => {
       const res = await post('/api/v1/submissions', {
         contractUID: contractY,
@@ -395,7 +394,6 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         invoiceUIDs: [inv1],
       });
       assert.equal(res.status, 201);
-      submissionY = res.body.data.submissionUID;
 
       const inv = await invoice(inv1);
       assert.equal(inv.workflowStatus, 'teilabgerechnet');
@@ -421,7 +419,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     await t.test('reimbursements over all policies never exceed the invoice amount', async () => {
       const billingY = (
         await post('/api/v1/billings', {
-          submissionUID: submissionY,
+          contractUID: contractY,
           billingDate: '2024-08-20',
           billingNumber: 'ZV-LA-1',
         })
@@ -509,11 +507,46 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.deepEqual((await invoice(inv2)).exclusions, []);
     });
 
-    await t.test('a submission can be withdrawn only while it has no billing', async () => {
-      const withBilling = await request(app)
-        .delete(`/api/v1/submissions/${submissionUID}/invoices/${inv2}`)
+    // Slice 37: the lock sits on the invoice, not on the submission — a
+    // billing spans submissions now, so a sibling nobody answered stays free.
+    await t.test('an invoice is withdrawn only while nothing was reimbursed here', async () => {
+      const reimbursed = await request(app)
+        .delete(`/api/v1/submissions/${submissionUID}/invoices/${inv1}`)
         .set(admin);
-      assert.equal(withBilling.status, 409);
+      assert.equal(reimbursed.status, 409);
+      assert.equal(reimbursed.body.error.code, 'INVOICE_HAS_REIMBURSEMENT');
+
+      const sibA = await makeInvoice(accountA, 90, 'R-SIB-A');
+      const sibB = await makeInvoice(accountA, 90, 'R-SIB-B');
+      const together = (
+        await post('/api/v1/submissions', {
+          contractUID: contractY,
+          submittedDate: '2024-08-04',
+          invoiceUIDs: [sibA, sibB],
+        })
+      ).body.data.submissionUID as string;
+      const sibBilling = (
+        await post('/api/v1/billings', {
+          contractUID: contractY,
+          billingDate: '2024-08-21',
+          billingNumber: 'ZV-LA-SIB',
+        })
+      ).body.data.billingUID as string;
+      await post(`/api/v1/billings/${sibBilling}/allocations`, {
+        entries: [{ invoiceUID: sibA, reimbursement: 40 }],
+      });
+
+      const answered = await request(app)
+        .delete(`/api/v1/submissions/${together}/invoices/${sibA}`)
+        .set(admin);
+      assert.equal(answered.status, 409);
+
+      // The sibling comes back although their submission has been billed.
+      const untouched = await request(app)
+        .delete(`/api/v1/submissions/${together}/invoices/${sibB}`)
+        .set(admin);
+      assert.equal(untouched.status, 204);
+      assert.equal((await invoice(sibB)).workflowStatus, 'offen');
 
       const inv4 = await makeInvoice(accountA, 80, 'R-4');
       const wrong = (
@@ -565,16 +598,14 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
 
     await t.test('removing an allocation frees the invoice again', async () => {
       const inv5 = await makeInvoice(accountA, 120, 'R-5');
-      const submission = (
-        await post('/api/v1/submissions', {
-          contractUID: contractY,
-          submittedDate: '2024-08-06',
-          invoiceUIDs: [inv5],
-        })
-      ).body.data.submissionUID as string;
+      await post('/api/v1/submissions', {
+        contractUID: contractY,
+        submittedDate: '2024-08-06',
+        invoiceUIDs: [inv5],
+      });
       const billing = (
         await post('/api/v1/billings', {
-          submissionUID: submission,
+          contractUID: contractY,
           billingDate: '2024-08-25',
           billingNumber: 'ZV-LA-2',
         })
@@ -598,16 +629,14 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     // Slice 34: correcting a booked reimbursement instead of unbooking it.
     await t.test('a booked reimbursement can be corrected', async () => {
       const inv6 = await makeInvoice(accountA, 200, 'R-6');
-      const submission = (
-        await post('/api/v1/submissions', {
-          contractUID: contractY,
-          submittedDate: '2024-08-07',
-          invoiceUIDs: [inv6],
-        })
-      ).body.data.submissionUID as string;
+      await post('/api/v1/submissions', {
+        contractUID: contractY,
+        submittedDate: '2024-08-07',
+        invoiceUIDs: [inv6],
+      });
       const billing = (
         await post('/api/v1/billings', {
-          submissionUID: submission,
+          contractUID: contractY,
           billingDate: '2024-08-26',
           billingNumber: 'ZV-LA-3',
         })
@@ -669,16 +698,14 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     ).body.data.contractUID as string;
     const invB1 = await makeInvoice(accountB, 200, 'R-B1');
     const invB2 = await makeInvoice(accountB, 300, 'R-B2');
-    const submissionB = (
-      await post('/api/v1/submissions', {
-        contractUID: contractB,
-        submittedDate: '2024-08-01',
-        invoiceUIDs: [invB1, invB2],
-      })
-    ).body.data.submissionUID as string;
+    await post('/api/v1/submissions', {
+      contractUID: contractB,
+      submittedDate: '2024-08-01',
+      invoiceUIDs: [invB1, invB2],
+    });
     const billingB = (
       await post('/api/v1/billings', {
-        submissionUID: submissionB,
+        contractUID: contractB,
         billingDate: '2024-08-10',
         billingNumber: 'LA-B1',
       })
@@ -707,7 +734,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(res.status, 400);
       assert.match(res.body.error.message, /R-B-loose/);
       // The UI translates the code and names the invoices from the details.
-      assert.equal(res.body.error.code, 'INVOICES_NOT_IN_SUBMISSION');
+      assert.equal(res.body.error.code, 'INVOICES_NOT_SUBMITTED_HERE');
       assert.deepEqual(res.body.error.details, { invoices: ['R-B-loose'] });
 
       const inv = await request(app).get(`/api/v1/invoices/${invB1}`).set(admin);
@@ -892,6 +919,128 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       // A query parameter that makes no sense is named, not ignored.
       const bad = await request(app).get('/api/v1/invoices?year=abc').set(admin);
       assert.equal(bad.status, 400);
+    });
+
+    // Slice 37: a Leistungsabrechnung belongs to the policy, so one letter of
+    // the insurer settles invoices that were handed in on different days —
+    // and the same number never appears twice under one policy.
+    const contractC = (
+      await post('/api/v1/contracts', {
+        contractNumber: 'PKV-C',
+        companyUID,
+        accountUID: accountB,
+        contractBegin: '2020-01-01',
+        initialDeductible: 0,
+      })
+    ).body.data.contractUID as string;
+
+    await t.test('one billing settles invoices from two separate submissions', async () => {
+      const early = await makeInvoice(accountB, 100, 'R-C-EARLY');
+      const late = await makeInvoice(accountB, 100, 'R-C-LATE');
+      await post('/api/v1/submissions', {
+        contractUID: contractC,
+        submittedDate: '2024-03-01',
+        invoiceUIDs: [early],
+      });
+      await post('/api/v1/submissions', {
+        contractUID: contractC,
+        submittedDate: '2024-09-01',
+        invoiceUIDs: [late],
+      });
+
+      const billing = (
+        await post('/api/v1/billings', {
+          contractUID: contractC,
+          billingDate: '2024-10-01',
+          billingNumber: 'LA-C-1',
+        })
+      ).body.data.billingUID as string;
+
+      const res = await post(`/api/v1/billings/${billing}/allocations`, {
+        entries: [
+          { invoiceUID: early, reimbursement: 60 },
+          { invoiceUID: late, reimbursement: 70 },
+        ],
+      });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.data.length, 2);
+
+      for (const uid of [early, late]) {
+        const inv = await request(app).get(`/api/v1/invoices/${uid}`).set(admin);
+        assert.equal(inv.body.data.workflowStatus, 'teilabgerechnet');
+        assert.equal(inv.body.data.submissions[0].status, 'abgerechnet');
+        assert.equal(inv.body.data.submissions[0].allocations[0].billingNumber, 'LA-C-1');
+        assert.equal(inv.body.data.submissions[0].billingCount, 1);
+      }
+    });
+
+    await t.test('an invoice submitted to another policy cannot be booked here', async () => {
+      const elsewhere = await makeInvoice(accountB, 100, 'R-C-ELSE');
+      await post('/api/v1/submissions', {
+        contractUID: contractB,
+        submittedDate: '2024-10-02',
+        invoiceUIDs: [elsewhere],
+      });
+      const billing = (
+        await post('/api/v1/billings', {
+          contractUID: contractC,
+          billingDate: '2024-10-03',
+          billingNumber: 'LA-C-2',
+        })
+      ).body.data.billingUID as string;
+
+      const res = await post(`/api/v1/billings/${billing}/allocations`, {
+        entries: [{ invoiceUID: elsewhere, reimbursement: 10 }],
+      });
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error.code, 'INVOICES_NOT_SUBMITTED_HERE');
+      assert.deepEqual(res.body.error.details, { invoices: ['R-C-ELSE'] });
+    });
+
+    await t.test('a billing number is used once per policy, and freed by deleting', async () => {
+      const again = await post('/api/v1/billings', {
+        contractUID: contractC,
+        billingDate: '2024-10-04',
+        billingNumber: 'LA-C-1',
+      });
+      assert.equal(again.status, 409);
+      assert.equal(again.body.error.code, 'BILLING_NUMBER_TAKEN');
+      assert.deepEqual(again.body.error.details, { billingNumber: 'LA-C-1' });
+
+      // Another policy may carry the same number: one letter of the insurer
+      // can settle two policies (see seed/family-policy.ts).
+      const elsewhere = await post('/api/v1/billings', {
+        contractUID: contractB,
+        billingDate: '2024-10-04',
+        billingNumber: 'LA-C-1',
+      });
+      assert.equal(elsewhere.status, 201);
+
+      // Renaming onto a taken number is refused the same way.
+      const rename = await request(app)
+        .patch(`/api/v1/billings/${elsewhere.body.data.billingUID}`)
+        .set(admin)
+        .send({ billingNumber: 'LA-B1' });
+      assert.equal(rename.status, 409);
+      assert.equal(rename.body.error.code, 'BILLING_NUMBER_TAKEN');
+
+      // A deleted billing gives its number back.
+      const spare = await post('/api/v1/billings', {
+        contractUID: contractC,
+        billingDate: '2024-10-05',
+        billingNumber: 'LA-C-SPARE',
+      });
+      assert.equal(spare.status, 201);
+      const dropped = await request(app)
+        .delete(`/api/v1/billings/${spare.body.data.billingUID}`)
+        .set(admin);
+      assert.equal(dropped.status, 204);
+      const reused = await post('/api/v1/billings', {
+        contractUID: contractC,
+        billingDate: '2024-10-06',
+        billingNumber: 'LA-C-SPARE',
+      });
+      assert.equal(reused.status, 201);
     });
   } finally {
     await pool.end();

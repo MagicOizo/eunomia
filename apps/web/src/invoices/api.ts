@@ -23,7 +23,7 @@ export interface InvoiceSubmissionDto {
   /** The policy's rule; presets the "Verwirkt den Bonus" toggle when billing. */
   bonusForfeitRule: BonusForfeitRule;
   submittedDate: string;
-  /** Active service billings of the submission; withdrawing is only possible at 0. */
+  /** Billings that reimbursed this invoice here; withdrawing is only possible at 0. */
   billingCount: number;
   /** What this policy reimbursed for the invoice. */
   reimbursed: number;
@@ -69,7 +69,8 @@ export interface InvoiceDto {
 
 export interface BillingDto {
   billingUID: string;
-  submissionUID: string;
+  /** A billing belongs to the policy; which submissions it answers follows from its allocations. */
+  contractUID: string;
   billingDate: string;
   billingNumber: string;
   documentLink: string | null;
@@ -84,7 +85,6 @@ export interface BillingDto {
 /** A billing enriched for the standalone Leistungsabrechnungen list. */
 export interface BillingListDto extends BillingDto {
   accountUID: string;
-  contractUID: string;
   personName: string;
   contractNumber: string;
   bonusForfeitRule: BonusForfeitRule;
@@ -257,7 +257,6 @@ export async function removeExclusion(invoiceUID: string, contractUID: string): 
 
 /** The filters of the billings search; every one of them is optional. */
 export interface BillingSearchParams {
-  submissionUID?: string;
   contractUID?: string;
   /** Free text over billing number, policy number, person and invoice numbers. */
   q?: string;
@@ -281,7 +280,7 @@ export async function searchBillings(params: BillingSearchParams): Promise<Billi
 }
 
 export async function createBilling(body: {
-  submissionUID: string;
+  contractUID: string;
   billingDate: string;
   billingNumber: string;
   documentLink?: string | null;

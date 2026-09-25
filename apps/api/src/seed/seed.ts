@@ -430,7 +430,7 @@ async function seedWorkflow(pool: Pool): Promise<void> {
 
   await seedRow(pool, 'ServiceBillings', {
     billingUID: ids.billing,
-    submissionUID: ids.submission,
+    contractUID: ids.contractAnna,
     billingDate: seedDate(-1, '04-01'),
     billingNumber: 'LA-2024-500',
     forfeitsBonus: 1,
@@ -459,7 +459,7 @@ async function seedWorkflow(pool: Pool): Promise<void> {
 
   await seedRow(pool, 'ServiceBillings', {
     billingUID: ids.billingSupplementary,
-    submissionUID: ids.submissionSupplementary,
+    contractUID: ids.contractAnnaSupplementary,
     billingDate: seedDate(-1, '05-10'),
     billingNumber: 'ZV-LA-2024-17',
   });
@@ -473,7 +473,7 @@ async function seedWorkflow(pool: Pool): Promise<void> {
   // An objection filed and still unresolved: 120 € of 500 € reimbursed.
   await seedRow(pool, 'ServiceBillings', {
     billingUID: ids.billingObjection,
-    submissionUID: ids.submissionCurrent,
+    contractUID: ids.contractAnna,
     billingDate: daysFromToday(-30),
     billingNumber: `LA-${seedYear(0)}-610`,
     forfeitsBonus: 1,
@@ -498,7 +498,7 @@ async function seedWorkflow(pool: Pool): Promise<void> {
   });
   await seedRow(pool, 'ServiceBillings', {
     billingUID: ids.billingCorrection,
-    submissionUID: ids.submissionCurrent,
+    contractUID: ids.contractAnna,
     billingDate: daysFromToday(-5),
     billingNumber: `LA-${seedYear(0)}-611`,
     forfeitsBonus: 0,

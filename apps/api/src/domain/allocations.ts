@@ -32,8 +32,8 @@ const table: CrudTable = {
 
 /**
  * One reimbursement to book. Several of them are created in one request, so a
- * Leistungsabrechnung that answers a submission of five invoices is entered in
- * a single step (see createAllocationsForBilling).
+ * Leistungsabrechnung that answers five invoices is entered in a single step
+ * (see createAllocationsForBilling).
  */
 export const allocationEntriesSchema = z.object({
   entries: z
@@ -67,22 +67,25 @@ interface CandidateInvoice {
   invoiceUID: string;
   invoiceNumber: string;
   invoiceAmount: number;
-  /** Whether the invoice is part of the billing's submission. */
-  inSubmission: number;
+  /** Whether the invoice was submitted to the billing's policy at all. */
+  submittedHere: number;
   /** What this invoice was already reimbursed, over every policy. */
   allocated: number;
 }
 
 /**
  * The invoices a booking may touch, with what they carry already: whether they
- * belong to the submission at all, and the sum of their reimbursements over
- * every policy. `ignoreAllocationUID` leaves one booking out of that sum — a
- * booking that is being changed has to be measured against the others, not
+ * are submitted at the billing's policy, and the sum of their reimbursements
+ * over every policy. `ignoreAllocationUID` leaves one booking out of that sum
+ * — a booking that is being changed has to be measured against the others, not
  * against its own old amount.
+ *
+ * The policy, not the submission, is what decides: one letter of the insurer
+ * regularly answers invoices submitted on different days (see Slice 37).
  */
 async function loadCandidates(
   conn: Queryable,
-  submissionUID: string,
+  contractUID: string,
   invoiceUIDs: string[],
   ignoreAllocationUID?: string,
 ): Promise<CandidateInvoice[]> {
@@ -92,20 +95,22 @@ async function loadCandidates(
     `SELECT i.invoiceUID, i.invoiceNumber, i.invoiceAmount,
             EXISTS (
               SELECT 1 FROM SubmissionInvoices si
-               WHERE si.submissionUID = ? AND si.invoiceUID = i.invoiceUID
-            ) AS inSubmission,
+                JOIN Submissions s
+                  ON s.submissionUID = si.submissionUID AND s.submissionStatus <> -1
+               WHERE si.contractUID = ? AND si.invoiceUID = i.invoiceUID
+            ) AS submittedHere,
             COALESCE((
               SELECT SUM(a.reimbursement) FROM Allocations a
                WHERE a.invoiceUID = i.invoiceUID AND a.allocationStatus <> -1 ${ignore}
             ), 0) AS allocated
        FROM Invoices i
       WHERE i.invoiceUID IN (${placeholders}) AND i.invoiceStatus <> -1`,
-    [submissionUID, ...(ignoreAllocationUID ? [ignoreAllocationUID] : []), ...invoiceUIDs],
+    [contractUID, ...(ignoreAllocationUID ? [ignoreAllocationUID] : []), ...invoiceUIDs],
   );
 }
 
 /**
- * Validates every requested reimbursement against the billing's submission.
+ * Validates every requested reimbursement against the billing's policy.
  * Like assertInvoicesSubmittable in submissions.ts, each rule reports all the
  * invoices that fail it, so a bulk entry does not have to be fixed one
  * rejection at a time. Invoices are named by their number where known — that
@@ -122,12 +127,12 @@ function assertEntriesBookable(candidates: CandidateInvoice[], entries: Allocati
     });
   }
   const foreign = entries
-    .filter((e) => !Number(byUid.get(e.invoiceUID)?.inSubmission))
+    .filter((e) => !Number(byUid.get(e.invoiceUID)?.submittedHere))
     .map((e) => byUid.get(e.invoiceUID)?.invoiceNumber);
   if (foreign.length > 0) {
     throw badRequest(
-      `Invoices do not belong to the service billing's submission: ${foreign.join(', ')}`,
-      { code: ERROR_CODES.INVOICES_NOT_IN_SUBMISSION, details: { invoices: foreign } },
+      `Invoices are not submitted to the service billing's policy: ${foreign.join(', ')}`,
+      { code: ERROR_CODES.INVOICES_NOT_SUBMITTED_HERE, details: { invoices: foreign } },
     );
   }
   // No enrichment ("Bereicherungsverbot"): all reimbursements of an invoice,
@@ -149,9 +154,10 @@ function assertEntriesBookable(candidates: CandidateInvoice[], entries: Allocati
 }
 
 /**
- * Books the reimbursements of one service billing onto its submission's
- * invoices, all or nothing. The invoices are locked first so concurrent
- * bookings (and amount edits) are checked against the same totals.
+ * Books the reimbursements of one service billing onto invoices submitted at
+ * its policy, all or nothing — they may come from several submissions. The
+ * invoices are locked first so concurrent bookings (and amount edits) are
+ * checked against the same totals.
  */
 export async function createAllocationsForBilling(
   pool: Pool,
@@ -159,11 +165,10 @@ export async function createAllocationsForBilling(
   billingUID: string,
   entries: AllocationEntry[],
 ): Promise<Row[]> {
-  const [billing] = await pool.query<Array<{ submissionUID: string; accountUID: string }>>(
-    `SELECT b.submissionUID, c.accountUID
+  const [billing] = await pool.query<Array<{ contractUID: string; accountUID: string }>>(
+    `SELECT b.contractUID, c.accountUID
        FROM ServiceBillings b
-       JOIN Submissions s ON s.submissionUID = b.submissionUID
-       JOIN Contracts c ON c.contractUID = s.contractUID
+       JOIN Contracts c ON c.contractUID = b.contractUID
       WHERE b.billingUID = ? AND b.billingStatus <> -1
       LIMIT 1`,
     [billingUID],
@@ -179,7 +184,7 @@ export async function createAllocationsForBilling(
       `SELECT invoiceUID FROM Invoices WHERE invoiceUID IN (${placeholders}) FOR UPDATE`,
       invoiceUIDs,
     );
-    const candidates = await loadCandidates(conn, billing.submissionUID, invoiceUIDs);
+    const candidates = await loadCandidates(conn, billing.contractUID, invoiceUIDs);
     assertEntriesBookable(candidates, entries);
 
     const created: Row[] = [];
@@ -207,11 +212,11 @@ export async function updateAllocation(
     Array<{
       invoiceUID: string;
       reimbursement: number;
-      submissionUID: string;
+      contractUID: string;
       accountUID: string;
     }>
   >(
-    `SELECT a.invoiceUID, a.reimbursement, b.submissionUID, i.accountUID
+    `SELECT a.invoiceUID, a.reimbursement, b.contractUID, i.accountUID
        FROM Allocations a
        JOIN Invoices i ON i.invoiceUID = a.invoiceUID
        JOIN ServiceBillings b ON b.billingUID = a.billingUID
@@ -229,7 +234,7 @@ export async function updateAllocation(
     ]);
     const candidates = await loadCandidates(
       conn,
-      allocation.submissionUID,
+      allocation.contractUID,
       [allocation.invoiceUID],
       allocationUID,
     );

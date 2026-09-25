@@ -17,7 +17,6 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
-import type { PickerOption } from '../design-system/components/EuEntityPicker.vue';
 import { type BonusForfeitRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
 import { useDebouncedCallback } from '../lib/debounce';
@@ -30,10 +29,8 @@ import {
   type BillingDto,
   type BillingListDto,
   type InvoiceDto,
-  type SubmissionDto,
   deleteBilling,
   listAccountInvoices,
-  listSubmissions,
   searchBillings,
   updateBilling,
 } from './api';
@@ -46,7 +43,6 @@ const props = defineProps<{ contractUID: string }>();
 const billings = ref<BillingListDto[]>([]);
 const heading = ref('');
 const forfeitRule = ref<BonusForfeitRule>('ON_REIMBURSEMENT');
-const submissions = ref<SubmissionDto[]>([]);
 const accountInvoices = ref<InvoiceDto[]>([]);
 const facilityNames = ref<Record<string, string>>({});
 const newOpen = ref(false);
@@ -103,15 +99,6 @@ const bookOpen = ref(false);
 const bookBilling = ref<BillingDto | null>(null);
 const bookInvoices = ref<InvoiceDto[]>([]);
 
-/** The submissions a new billing can belong to — newest first. */
-const submissionOptions = computed<PickerOption[]>(() =>
-  submissions.value.map((s) => ({
-    value: s.submissionUID,
-    label: `Einreichung vom ${germanDate(s.submittedDate)}`,
-    hint: plural(s.invoiceUIDs.length, 'Rechnung', 'Rechnungen'),
-  })),
-);
-
 const today = (): string => new Date().toISOString().slice(0, 10);
 
 function isOpenObjection(b: BillingListDto): boolean {
@@ -150,14 +137,10 @@ async function load(): Promise<void> {
     // The invoices and the provider names are what the booking dialog needs
     // after a billing has been created; reloaded here so its cards never show
     // an amount that a booking in between has already used up.
-    const [subs, invoices, facilities] = await Promise.all([
-      listSubmissions(),
+    const [invoices, facilities] = await Promise.all([
       listAccountInvoices(contract.data.accountUID),
       listResource<{ facilityUID: string; facilityName: string }>('/facilities'),
     ]);
-    submissions.value = subs
-      .filter((s) => s.contractUID === props.contractUID)
-      .sort((a, b) => b.submittedDate.localeCompare(a.submittedDate));
     accountInvoices.value = invoices;
     facilityNames.value = Object.fromEntries(
       facilities.map((f) => [f.facilityUID, f.facilityName]),
@@ -238,8 +221,8 @@ function openEdit(b: BillingListDto): void {
 /**
  * A new billing goes straight on to booking its amounts: the letter and the
  * reimbursements it pays out arrive together, so the two dialogs are one flow.
- * A submission without an open invoice ends after the letter — there is
- * nothing to book.
+ * A policy without an open invoice ends after the letter — there is nothing
+ * to book.
  */
 async function onCreated(billing: BillingDto): Promise<void> {
   newOpen.value = false;
@@ -248,7 +231,7 @@ async function onCreated(billing: BillingDto): Promise<void> {
   const open = accountInvoices.value.filter(
     (invoice) =>
       !invoice.reimbursementClosed &&
-      invoice.submissions.some((s) => s.submissionUID === billing.submissionUID),
+      invoice.submissions.some((s) => s.contractUID === billing.contractUID),
   );
   if (open.length === 0) return;
   dialogError.value = null;
@@ -476,7 +459,7 @@ function confirmDelete(): void {
 
     <BillingFormDialog
       :open="newOpen"
-      :submission-options="submissionOptions"
+      :contract-u-i-d="contractUID"
       :bonus-forfeit-rule="forfeitRule"
       @close="newOpen = false"
       @saved="onCreated"
@@ -486,7 +469,7 @@ function confirmDelete(): void {
       :open="bookOpen"
       :invoices="bookInvoices"
       :facility-names="facilityNames"
-      :preset-submission="bookBilling?.submissionUID ?? null"
+      :preset-contract="bookBilling?.contractUID ?? null"
       :preset-billing="bookBilling?.billingUID ?? null"
       :submitting="busy"
       :error="dialogError"

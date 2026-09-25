@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
-import EuEntityPicker, { type PickerOption } from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from '../contracts/api';
@@ -21,10 +20,8 @@ const props = defineProps<{
   open: boolean;
   /** The billing to edit; omitted for a new one. */
   billing?: BillingListDto | null;
-  /** The submission a new billing belongs to, when it is already known. */
-  submissionUID?: string;
-  /** Choices when it is not — the contract-side "Neu". */
-  submissionOptions?: PickerOption[];
+  /** The policy a new billing belongs to. */
+  contractUID?: string;
   bonusForfeitRule: BonusForfeitRule;
   /** Prefills the number with what was typed into the picker. */
   presetNumber?: string;
@@ -35,17 +32,8 @@ const emit = defineEmits<{ close: []; saved: [billing: BillingDto] }>();
 const billingNumber = ref('');
 const billingDate = ref('');
 const documentLink = ref('');
-const chosenSubmission = ref('');
 const busy = ref(false);
 const error = ref<string | null>(null);
-
-/** An existing billing keeps its submission; a new one needs one chosen or given. */
-const picksSubmission = computed(
-  () => !props.billing && (props.submissionOptions?.length ?? 0) > 0,
-);
-const targetSubmission = computed(() =>
-  picksSubmission.value ? chosenSubmission.value : (props.submissionUID ?? ''),
-);
 
 /**
  * Preset of the toggle. A new billing has reimbursed nothing yet, so the rule
@@ -67,7 +55,6 @@ watch(
     billingNumber.value = billing?.billingNumber ?? props.presetNumber ?? '';
     billingDate.value = billing?.billingDate ?? new Date().toISOString().slice(0, 10);
     documentLink.value = billing?.documentLink ?? '';
-    chosenSubmission.value = props.submissionOptions?.[0]?.value ?? '';
     forfeit.reset();
   },
   { immediate: true },
@@ -79,8 +66,8 @@ function save(): void {
     error.value = 'Bitte Abrechnungsnummer und -datum angeben.';
     return;
   }
-  if (!props.billing && !targetSubmission.value) {
-    error.value = 'Bitte eine Einreichung wählen.';
+  if (!props.billing && !props.contractUID) {
+    error.value = 'Zu dieser Leistungsabrechnung fehlt die Police.';
     return;
   }
   const fields = {
@@ -94,7 +81,7 @@ function save(): void {
     try {
       const billing = props.billing
         ? await updateBilling(props.billing.billingUID, fields)
-        : await createBilling({ submissionUID: targetSubmission.value, ...fields });
+        : await createBilling({ contractUID: props.contractUID as string, ...fields });
       emit('saved', billing);
     } catch (err) {
       error.value = describeError(err);
@@ -112,14 +99,6 @@ function save(): void {
     @close="emit('close')"
   >
     <form class="eu-form" @submit.prevent="save">
-      <EuEntityPicker
-        v-if="picksSubmission"
-        :model-value="chosenSubmission || null"
-        label="Einreichung"
-        required
-        :options="submissionOptions ?? []"
-        @update:model-value="chosenSubmission = $event ?? ''"
-      />
       <EuTextField v-model="billingNumber" label="Abrechnungsnummer" />
       <EuTextField v-model="billingDate" label="Abrechnungsdatum" type="date" />
       <EuTextField v-model="documentLink" label="Dokument-Link (optional)" />

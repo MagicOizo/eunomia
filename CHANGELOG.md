@@ -7,6 +7,28 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.6 — 2026-09-25
+
+- **A Leistungsabrechnung now belongs to the policy, not to one submission.** Insurers routinely
+  answer invoices handed in on different days in a single letter, and the data model forbade
+  recording that: a billing was tied to exactly one submission, so the only way out was to enter the
+  same letter twice. A billing now hangs off the policy, and which submissions it answers follows
+  from the reimbursements booked on it. The rule for booking changed accordingly, from "the invoice
+  belongs to this billing's submission" to "the invoice is submitted at this billing's policy"; the
+  "no enrichment" rule is untouched.
+- **A billing number is used once per policy.** The database enforces it, and deleting a billing
+  gives its number back. One letter settling two policies — a parent's contract and a child's own
+  member policy — still carries the same number on both, because those are two policies.
+- **Withdrawing an invoice from a submission is judged per invoice.** It used to be blocked as soon
+  as the submission had any billing at all, which now makes no sense and was always coarser than
+  needed: an invoice nobody has answered yet comes back, even when the invoices beside it have long
+  been settled. Only a reimbursement booked for that invoice at that policy keeps it in place.
+- **Creating a billing no longer asks which submission it belongs to.** The Leistungsabrechnungen
+  page is about one policy, so there is nothing left to ask.
+
+The dialog for booking a reimbursement still works one submission at a time; opening that up is the
+next step.
+
 ## 0.12.0-slice.5 — 2026-09-25
 
 - **Every master-data list can be searched.** The lists of providers, agencies, insured persons,
