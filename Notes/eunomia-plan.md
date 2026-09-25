@@ -851,6 +851,163 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 - **Alter Suchtext im Picker:** Nach Auswahl oder Anlegen bleibt die getippte Suche erhalten und erscheint beim nächsten Fokus wieder. Zusammen mit der Regel „Fokus öffnet die Liste" gehört das als Ganzes entschieden (siehe oben).
 - **Der Schalter „Direkt-/Barzahlung" in der Maske hat keinen zugänglichen Namen:** `EuDetailField` reicht `label=""` an `EuToggle` durch, weil die Beschriftung in der linken Spalte steht — für die Maus richtig, für den Screenreader ein namenloses Kontrollkästchen. `EuToggle` bräuchte dafür einen `aria-label`-Weg.
 
+# Findings aus der Produktion 0.9.0 (Slices 33–39, Weg zu 0.12.0)
+
+Der Autor hat am 2026-09-24/25 mit dem in der Produktion laufenden Stand 0.9.0 weiter Echtdaten
+erfasst und dabei zwölf Punkte gesammelt, strukturiert erfasst in [Notes/issues.md](issues.md).
+Alle zwölf wurden gegen den Entwicklungsstand `0.11.0-slice.4` nachgeprüft — keiner hatte sich
+zwischenzeitlich erledigt.
+
+**Festlegung zur Version (2026-09-25):** Diese Punkte gehen **nicht** mehr in 0.11.0, sondern auf
+den Weg zu 0.12.0. 0.11.0 (System-Einstellungen, Secrets, Mail, Zahlungserinnerungen, Ad-hoc-Anlegen)
+ist thematisch abgeschlossen und wird als volles Release veröffentlicht, bevor hier gebaut wird.
+Gründe: §2.9 bindet einen Minor an *ein* abgeschlossenes Feature; die Produktion hängt sonst weiter
+auf 0.9.0 und damit zwei Minors zurück; die Patch-Spur (`0.11.1`) bleibt für einen Hotfix auf das
+frei, was tatsächlich läuft; und die Migrationen kommen in kleinen, prüfbaren Schritten in der
+Produktion an statt als ein Sprung samt Datenmodell-Umbau. Soll ein fertiger Slice vor 0.12.0 in die
+Produktion, geht das über sein Prerelease-Image (§2.9), ohne am Releaseplan zu drehen.
+
+**Reihenfolge:** erst die Punkte, die jede einzelne Eingabe behindern oder falsche Daten zulassen
+(33–36), dann der eigentliche Umbau (37), dann die beiden größeren Ausbauten (38–39). 37 steht vor
+38/39, weil er einen Arbeitsablauf blockiert, den es heute gar nicht gibt.
+
+## Slice 33 — Eingabe-Politur: Tab im Picker, Datum einfügen
+**Ziel:** Die beiden Fehler, die bei jeder einzelnen Erfassung stören, sind weg (issues.md 1 und 11).
+- **Tab übernimmt die Auswahl** (issues.md 1): `EuEntityPicker.onKeydown` kennt nur ↑↓/Enter/Escape;
+  Tab löst `@blur` → `open = false` aus und die Markierung verfällt, der Fokus wandert weiter zum
+  „+". Tab soll erst übernehmen, dann weiterwandern (ohne den Fokus zusätzlich zu verlieren, wie es
+  `select()` über `inputRef.blur()` tut).
+- **Achtung, `highlight` startet bei 0:** Ein nur durchtabbter Picker darf nicht die erste Option
+  übernehmen. Es braucht eine Unterscheidung „der Nutzer hat wirklich gewählt" (getippt oder mit den
+  Pfeiltasten bewegt) gegenüber „die Liste stand nur offen".
+- **Datum einfügen** (issues.md 11): Datumsfelder sind überall nativ (`EuDetailField type="date"`,
+  `EuTextField type="date"`); ein `DD.MM.YYYY` aus der Zwischenablage nehmen die nicht an. Ein
+  eigenes Feld fängt `paste` ab und wandelt die deutsche Schreibweise nach ISO. Rollout überall, wo
+  Daten erfasst werden, nicht nur an einer Stelle.
+- **Mit erledigt, weil es dieselbe Entscheidung ist — der Backlog aus Slice 32:** der im Picker
+  stehenbleibende Suchtext gehört mit der Regel „Fokus öffnet die Liste" zusammen entschieden, und
+  `EuToggle` braucht einen `aria-label`-Weg für die Maske.
+
+**DoD:** Im Picker gewählt + Tab → der Wert steht im Feld; ein durchtabbter Picker ändert nichts.
+Ein aus Excel kopiertes `24.09.2026` landet in jedem Datumsfeld der App.
+
+## Slice 34 — Erstattung und Belegnummer nachträglich ändern
+**Ziel:** Eine gebuchte Zuordnung ist korrigierbar, ohne sie zu löschen (issues.md 9 und 8).
+- **PATCH auf `/allocations/:uid`** (issues.md 9): heute gibt es nur GET und DELETE. Der einzige Weg
+  zu einer korrigierten Belegnummer ist, die Zuordnung zu löschen und neu zu buchen.
+- Die Prüfung aus `assertEntriesBookable` gilt weiter, insbesondere das **Bereicherungsverbot** —
+  beim Ändern gegen die Summe *ohne* die eigene Zuordnung gerechnet, sonst blockiert sie sich selbst.
+- **Label ohne Rechnungsnummer** (issues.md 8, Screenshot `Screenshot 2026-09-24 203348.png`):
+  `BillingDialog` baut die Nummer in beide Labels („Erstattung (33611/201806/00164)"), das bricht um
+  und „Erstattung" und „Belegnummer" stehen nicht mehr auf einer Höhe. Die Nummer steht ohnehin schon
+  in der Kopfzeile der Karte.
+- **Zu entscheiden:** Wie die beiden Felder ohne die Nummer im Label zugänglich bleiben — je Karte
+  eine Gruppe mit der Rechnungsnummer als Bezeichnung ist sauberer als ein abweichendes `aria-label`.
+
+**DoD:** Erstattungsbetrag und Belegnummer sind an einer gebuchten Zuordnung änderbar; die beiden
+Felder fluchten auch bei langer Rechnungsnummer.
+
+## Slice 35 — Police-Auswahl im Versicherungszeitraum
+**Ziel:** Beim Einreichen stehen die Policen oben, die zum Behandlungszeitraum passen (issues.md 12).
+- Heute vergleicht weder `eligibility.ts` noch `assertInvoicesSubmittable` das `treatmentDate` mit
+  `contractBegin`/`contractEnd` — der Dialog bietet Policen an, die damals noch nicht oder nicht mehr
+  liefen.
+- **Festlegung des Autors (2026-09-25): gefiltert wird in der UI, nicht serverseitig gesperrt.** Ein
+  Schalter blendet die übrigen Policen wieder ein. Damit bleibt die Liste im Normalfall kurz und
+  eindeutig, ohne den Sonderfall auszusperren (eine Versicherung nimmt eine Behandlung vor
+  Vertragsbeginn durchaus an). Serverseitig bleibt es deshalb bewusst ungeprüft.
+- Der Schalter wirkt **symmetrisch**: er zeigt auch bereits beendete Policen, nicht nur später
+  beginnende — derselbe Sonderfall in die andere Richtung.
+- **Bulk:** Maßgeblich ist die Spanne vom frühesten bis zum spätesten Behandlungsdatum der Auswahl.
+
+**DoD:** Der Einreichen-Dialog zeigt ohne Schalter nur Policen, die den Behandlungszeitraum abdecken;
+mit Schalter alle, die auch heute schon angeboten würden.
+
+## Slice 36 — Suchen und Finden
+**Ziel:** Wachsende Listen bleiben durchsuchbar (issues.md 2, 3 und 6).
+- **Filterfeld in `ResourceView`** (issues.md 2 und 3): die Ansicht kann sortieren, aber nicht
+  filtern. Eine Änderung dort wirkt für alle fünf Stammdatenlisten, nicht nur für Leistungserbringer
+  und Abrechnungsdienstleister. Client-seitig über die geladenen Zeilen genügt in dieser Größe.
+- **Rechnungsnummer-Suche** (issues.md 6): `GET /invoices` filtert nur nach `accountUID` und `year`,
+  die Arbeitsfläche ist damit auf Versicherten **und** Behandlungsjahr eingeschnürt. Kennt man nur
+  die Nummer, findet man die Rechnung nicht.
+- Vorbild für den Server-Endpunkt ist `searchBillings` (`service-billings.ts`) samt seiner
+  Rechte-Einschränkung; Einstieg in der UI über die Rechnungs-Auswahlseite, von dort direkt in die
+  richtige Arbeitsfläche und die gefundene Rechnung.
+
+**DoD:** Eine Rechnung ist allein über ihre Nummer auffindbar, ohne Versicherten und Jahr zu wissen;
+jede Stammdatenliste hat ein Filterfeld.
+
+## Slice 37 — Leistungsabrechnung über mehrere Einreichungen
+**Ziel:** Rechnungen aus verschiedenen Einreichungen derselben Police lassen sich auf einer
+Leistungsabrechnung zusammenfassen (issues.md 7). Der größte Punkt der Liste und der einzige echte
+Umbau; sinnvoll in zwei Scheiben, Modell + API und danach UI.
+
+**Befund:** `ServiceBillings.submissionUID` ist ein harter 1:n-Schlüssel auf die Einreichung, und
+`assertEntriesBookable` prüft „die Rechnung gehört zur Einreichung dieser Abrechnung"
+(`allocations.ts`). Damit ist genau der Fall ausgeschlossen, den die Versicherung laufend erzeugt.
+`submissionUID` kommt an 189 Stellen in 29 Dateien vor.
+
+- **Kern:** Eine `ServiceBilling` hängt künftig am **Vertrag**, nicht an der Einreichung. Welche
+  Einreichungen sie berührt, ergibt sich aus ihren `Allocations`. Damit fallen alle sechs in
+  issues.md 7 aufgezählten Fälle von selbst heraus, einschließlich mehrerer Behandlungsjahre auf
+  einer Abrechnung; die Regel „ein Versicherter je Abrechnung" bleibt über den Vertrag erhalten.
+- Die Buchungsregel wandert von „gehört zur Einreichung" auf „ist bei dieser Police eingereicht"
+  (über `SubmissionInvoices`). Das Bereicherungsverbot bleibt unverändert.
+- **UNIQUE auf der Abrechnungsnummer** (ausdrücklicher Wunsch des Autors): `UNIQUE (contractUID,
+  billingNumber)` verträgt sich nicht mit dem Soft-Delete — eine gelöschte Abrechnung würde ihre
+  Nummer für immer blockieren, und MariaDB kennt keinen partiellen Index. **Lösung aus dem
+  Parallelprojekt Hyperion (Festlegung des Autors, 2026-09-25):** eine Generated Column, die bei
+  `billingStatus = -1` NULL liefert; NULL greift bei UNIQUE nie. Das Projekt nutzt Generated Columns
+  bereits (`002-auth-schema.ts`, Textform der UUIDs), allerdings nirgends indiziert — im Slice ist zu
+  prüfen, ob der Unique-Index unter InnoDB auf einer VIRTUAL-Spalte trägt oder sie PERSISTENT sein
+  muss.
+- **UI-Folgen:** `BillingDialog`, `SubmissionCard`, `BillingSearchDialog` (heute auf eine Einreichung
+  eingeschnürt) und `eligibility.commonSubmissions` bilden alle die alte Regel ab und werden
+  nachgezogen.
+
+**DoD:** Rechnungen, die zu verschiedenen Zeitpunkten bei derselben Police eingereicht wurden, lassen
+sich auf einer Leistungsabrechnung buchen; dieselbe Abrechnungsnummer ein zweites Mal im selben
+Vertrag weist die Datenbank ab, eine gelöschte gibt ihre Nummer wieder frei.
+
+## Slice 38 — Kontoverbindungen mit Gültigkeitsdatum, BIC und Empfänger
+**Ziel:** Ein Abrechnungsdienstleister behält seine Identität, wenn er die Bankverbindung wechselt
+(issues.md 5), und der GiroCode bekommt die Felder, die ihm fehlen (issues.md 4).
+- **Zusammengelegt (Festlegung des Autors, 2026-09-25):** issues.md 4 war als eigene, frühere Scheibe
+  vorgeschlagen. Der Autor hat es hierher gezogen, weil beides Komfort ist und nichts blockiert —
+  Version 002 lässt die BIC im EWR weg, deutsche IBANs erzeugen auch ohne sie gültige GiroCodes.
+  Getrennt gebaut kämen `bic` und `recipientName` erst auf `CollectionAgencies` und wanderten hier
+  gleich wieder in die Historientabelle.
+- `CollectionAgencies` hat heute nur `agencyName` und `bankAccount`. Künftig eine Historientabelle je
+  Dienstleister mit `validFrom`, IBAN, BIC, Empfänger und Notiz — Muster und UI-Vorbild sind
+  `ContractPremiums` und die Historienblöcke im Policen-Dialog.
+- **Empfänger** überschreibt, wo gesetzt, den Namen des Dienstleisters im GiroCode und in den
+  Zahlungsdetails; es gibt Fälle, in denen beide auseinanderfallen. Betrifft auch die
+  Zahlungserinnerung, die heute `agencyName` als Zahlungsempfänger nimmt (`reminders/store.ts`).
+- **Auflösungsdatum (Festlegung des Autors, 2026-09-25): maßgeblich ist der Zeitpunkt der Zahlung.**
+  Ist `transferDate` gesetzt, wird das zu diesem Datum gültige Konto gezeigt (einschließlich
+  GiroCode, der dann fachlich nicht mehr gebraucht wird); ohne `transferDate` gilt heute, also das
+  aktuell gültige Konto. Damit erzählt eine bezahlte Rechnung weiter, wohin sie tatsächlich ging.
+- `girocode.ts` vermerkt im Kommentar noch „this application has no BIC to offer" — der fällt weg.
+
+**DoD:** Ein Dienstleister mit gewechseltem Konto bleibt ein Eintrag; eine bezahlte Rechnung zeigt das
+Konto von damals, eine offene das heutige; BIC und Empfänger stehen im GiroCode.
+
+## Slice 39 — Papierkorb
+**Ziel:** Gelöschtes ist sichtbar, wiederherstellbar und endgültig entfernbar (issues.md 10).
+- `softDeleteRow` setzt nur `status = -1`; es gibt weder eine Liste der gelöschten Einträge noch
+  Wiederherstellen noch endgültiges Löschen. Gelöschtes ist damit unsichtbar, aber für immer da.
+- **Es fehlt ein `deletedAt`:** ohne Zeitstempel lässt sich der Papierkorb weder nach Löschzeitpunkt
+  sortieren noch je eine Aufräumfrist bilden. Gehört in dieselbe Migration.
+- **Endgültiges Löschen scheitert am Fremdschlüssel** (überall `ON DELETE RESTRICT`) — das braucht
+  eine verständliche deutsche Meldung, die sagt, *was* noch daran hängt, statt eines SQL-Fehlers.
+- **Zu entscheiden:** was beim Wiederherstellen eines Eintrags gilt, dessen übergeordneter Eintrag
+  gelöscht ist, und ob der Papierkorb eine Ansicht über alle Entitäten ist oder je Liste eine.
+- Bestätigungsabfrage vor dem endgültigen Löschen, wie vom Autor gewünscht.
+
+**DoD:** Ein gelöschter Eintrag ist im Papierkorb zu finden, kommt zurück oder verschwindet
+endgültig; ein noch referenzierter Eintrag erklärt, warum er nicht endgültig gelöscht werden kann.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.
