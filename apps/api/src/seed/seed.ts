@@ -34,6 +34,7 @@ const ids = {
   companySupplementary: seedId('company', 1),
   contractAnna: seedId('contract', 0),
   contractAnnaSupplementary: seedId('contract', 1),
+  contractAnnaExpired: seedId('contract', 2),
   facilityDoctor: seedId('facility', 0),
   facilityRadiology: seedId('facility', 1),
   agency: seedId('agency', 0),
@@ -112,7 +113,9 @@ async function seedPeople(pool: Pool): Promise<void> {
 /**
  * Anna's policies: a full PKV with an intra-year premium adjustment and a
  * deductible change, plus a supplementary policy — the case that used to force
- * duplicate contracts (see Notes/eunomia-plan.md, 1.3.7).
+ * duplicate contracts (see Notes/eunomia-plan.md, 1.3.7) — and a second,
+ * expired supplementary policy for the treatment-period check of the submit
+ * dialog (Slice 35).
  */
 async function seedContracts(pool: Pool): Promise<void> {
   await seedRow(pool, 'Contracts', {
@@ -221,6 +224,36 @@ async function seedContracts(pool: Pool): Promise<void> {
     validFromYear: 2022,
     deductible: 0,
     reimbursementCap: 200.0,
+  });
+
+  // A dental policy Anna has since cancelled — the only seeded contract with
+  // an end date, and the one the submit dialog hides behind its switch for a
+  // treatment from after it ran (Slice 35). The end is relative to today, not
+  // a fixed date, so invoices always fall on both sides of it: last year's
+  // open invoice still reaches this policy, the open ones of the current year
+  // do not.
+  await seedRow(pool, 'Contracts', {
+    contractUID: ids.contractAnnaExpired,
+    contractNumber: 'ZV-2019-0007',
+    companyUID: ids.companySupplementary,
+    accountUID: ids.accountAnna,
+    contractKind: 'SUPPLEMENTARY',
+    contractBegin: '2019-01-01',
+    contractEnd: daysFromToday(-45),
+  });
+  await seedRow(pool, 'ContractPremiums', {
+    premiumUID: seedId('premium', 4),
+    contractUID: ids.contractAnnaExpired,
+    validFrom: '2019-01-01',
+    monthlyPremium: 12.5,
+    note: 'Zahnzusatz, zum Vertragsende gekündigt',
+  });
+  await seedRow(pool, 'ContractTerms', {
+    termsUID: seedId('contractTerms', 3),
+    contractUID: ids.contractAnnaExpired,
+    validFromYear: 2019,
+    deductible: 0,
+    reimbursementCap: 150.0,
   });
 }
 

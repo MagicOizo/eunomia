@@ -69,11 +69,12 @@ commit, whose hash goes into `.git-blame-ignore-revs`. To have local `git blame`
 
 The seed fills the database with a dataset built for clicking through the app: every workflow
 status, both payment traffic lights, an invoice at two policies, an open objection, a correction
-booked from a second billing, a policy whose bonus scale was not updated, an insured person
-without a policy, a parent/child family policy settled by one insurer letter — and, as `Clara Beispiel`, the author's three example years from
-`Notes/eunomia-plan.md` (2.3), so the reimbursement optimizer can be checked against its
-reference table in the running app. Treatment years are relative to today, so the current year
-always carries data.
+booked from a second billing, a policy whose bonus scale was not updated, a cancelled policy that
+expired during the current year (so the submit dialog has an expired one to hide behind its switch),
+an insured person without a policy, a parent/child family policy settled by one insurer letter —
+and, as `Clara Beispiel`, the author's three example years from `Notes/eunomia-plan.md` (2.3), so
+the reimbursement optimizer can be checked against its reference table in the running app.
+Treatment years are relative to today, so the current year always carries data.
 
 ```bash
 npm run dev:seed    # add the seed rows to the dev database
