@@ -7,7 +7,7 @@ import { PERMISSIONS, getAccessibleAccounts, hasPermission } from '../auth/permi
 import { forbidden } from '../auth/errors.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
-import { pathParam } from '../crud/params.js';
+import { parseQuery, pathParam } from '../crud/params.js';
 import {
   type CrudTable,
   type Queryable,
@@ -74,6 +74,20 @@ const updateSchema = base
   .omit({ accountUID: true })
   .extend({ reimbursementClosed: flag })
   .partial();
+
+/**
+ * Filters for the invoice list. `accountUID` and `year` scope the workspace to
+ * one insured person and one treatment year; `q` is the invoice-number search
+ * that works without either of them (issues.md 6), so an invoice can be found
+ * when only its number is known.
+ */
+const listQuery = z.object({
+  accountUID: z.string().trim().min(1).optional(),
+  year: z.coerce.number().int().min(1900).max(2999).optional(),
+  /** Substring of the invoice number; deliberately nothing else. */
+  q: z.string().trim().min(1).max(50).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
 
 const exclusionSchema = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
@@ -151,6 +165,7 @@ async function queryInvoices(
   db: Queryable,
   where: string,
   params: unknown[],
+  limit?: number,
 ): Promise<InvoiceRow[]> {
   return db.query<InvoiceRow[]>(
     `SELECT ${INVOICE_COLUMNS},
@@ -165,7 +180,10 @@ async function queryInvoices(
        LEFT JOIN ServiceBillings b ON b.billingUID = a.billingUID AND b.billingStatus <> -1
       WHERE ${where}
       GROUP BY i.invoiceID
-      ORDER BY i.invoiceDate DESC, i.invoiceUID`,
+      ORDER BY i.invoiceDate DESC, i.invoiceUID${
+        // Safe to inline: zod has narrowed it to an integer within range.
+        limit === undefined ? '' : ` LIMIT ${limit}`
+      }`,
     params,
   );
 }
@@ -329,11 +347,11 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
 
   router.get('/', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
+    const filters = parseQuery(req, listQuery);
     const where: string[] = ['i.invoiceStatus <> -1'];
     const params: unknown[] = [];
 
-    const requestedAccount =
-      typeof req.query.accountUID === 'string' ? req.query.accountUID : undefined;
+    const requestedAccount = filters.accountUID;
     if (requestedAccount !== undefined) {
       if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_INVOICES, requestedAccount))) {
         throw forbidden();
@@ -341,6 +359,8 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       where.push('i.accountUID = ?');
       params.push(requestedAccount);
     } else {
+      // Without an account the search runs over everything the user may see —
+      // the same scoping the billings search uses (service-billings.ts).
       const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_INVOICES);
       if (!scope.all) {
         if (scope.accountUIDs.length === 0) {
@@ -352,13 +372,17 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       }
     }
 
-    const year = typeof req.query.year === 'string' ? Number(req.query.year) : undefined;
-    if (year !== undefined && Number.isInteger(year)) {
+    if (filters.year !== undefined) {
       where.push('YEAR(i.treatmentDate) = ?');
-      params.push(year);
+      params.push(filters.year);
     }
 
-    const rows = await queryInvoices(pool, where.join(' AND '), params);
+    if (filters.q !== undefined) {
+      where.push('i.invoiceNumber LIKE ?');
+      params.push(`%${filters.q}%`);
+    }
+
+    const rows = await queryInvoices(pool, where.join(' AND '), params, filters.limit);
     sendData(res, await present(pool, rows));
   });
 

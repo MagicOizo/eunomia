@@ -16,3 +16,13 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.dispatchEvent(new Event('close'));
   };
 }
+
+/**
+ * jsdom has no layout, so it implements no scrolling either — scrollIntoView()
+ * is simply absent. Components that bring a row or a field into view would
+ * throw in a test; here it is a no-op, and what such a component *marks* is
+ * asserted instead of where it scrolled.
+ */
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
+}

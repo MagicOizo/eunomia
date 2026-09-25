@@ -72,3 +72,92 @@ describe('InvoiceWorkspaceView lookup lists', () => {
     wrapper.unmount();
   });
 });
+
+/** Minimal invoice row: only what the table and the status badge need. */
+function invoice(uid: string, number: string, treatmentDate: string) {
+  return {
+    invoiceUID: uid,
+    invoiceNumber: number,
+    invoiceDate: treatmentDate,
+    treatmentDate,
+    accountUID: 'a-1',
+    facilityUID: null,
+    invoiceAmount: 100,
+    transferUntilDate: null,
+    transferDate: null,
+    transferSubject: null,
+    documentLink: null,
+    agencyUID: null,
+    directPayment: 0,
+    reimbursementClosed: false,
+    reimbursedTotal: 0,
+    allocationCount: 0,
+    remainingAmount: 100,
+    workflowStatus: 'offen',
+    submissions: [],
+    exclusions: [],
+    hasOpenObjection: false,
+  };
+}
+
+describe('InvoiceWorkspaceView arriving from the invoice-number search', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiFetch.mockResolvedValue({ data: { firstname: 'Anna', surname: 'Muster' } });
+    listResource.mockResolvedValue([]);
+    listInvoiceYears.mockResolvedValue([2026, 2024]);
+    listInvoices.mockImplementation((_account: string, year: number) =>
+      Promise.resolve(
+        year === 2024
+          ? [
+              invoice('inv-1', 'R-2024-100', '2024-03-14'),
+              invoice('inv-2', 'R-2024-101', '2024-04-01'),
+            ]
+          : [invoice('inv-9', 'R-2026-1', '2026-01-05')],
+      ),
+    );
+    reimbursementPlan.mockResolvedValue(null);
+  });
+
+  it('opens on the searched year and marks the searched invoice', async () => {
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1', focusYear: '2024', focusInvoiceUID: 'inv-2' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+
+    expect(listInvoices).toHaveBeenCalledWith('a-1', 2024);
+    const marked = wrapper.findAll('tbody tr').filter((row) => row.classes('is-found'));
+    expect(marked).toHaveLength(1);
+    expect(marked[0].text()).toContain('R-2024-101');
+    expect(marked[0].attributes('aria-current')).toBe('true');
+    wrapper.unmount();
+  });
+
+  it('marks nothing without a search, and stays on the newest year', async () => {
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+
+    expect(listInvoices).toHaveBeenCalledWith('a-1', 2026);
+    expect(wrapper.findAll('tbody tr.is-found')).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it('drops the mark when another year is chosen', async () => {
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1', focusYear: '2024', focusInvoiceUID: 'inv-2' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+    expect(wrapper.findAll('tbody tr.is-found')).toHaveLength(1);
+
+    await wrapper.findAll('.eu-ws__year')[0].trigger('click');
+    await flushPromises();
+
+    expect(wrapper.findAll('tbody tr.is-found')).toHaveLength(0);
+    wrapper.unmount();
+  });
+});

@@ -839,6 +839,60 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       );
       assert.equal(foreign.status, 403);
     });
+
+    // Slice 36: finding an invoice by its number alone (issues.md 6).
+    await t.test('an invoice is found by its number, without account or year', async () => {
+      const old = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-2019-XYZ',
+        invoiceDate: '2019-03-01',
+        treatmentDate: '2019-03-01',
+        accountUID: accountA,
+        invoiceAmount: 75,
+      });
+      assert.equal(old.status, 201);
+
+      const hits = await request(app).get('/api/v1/invoices?q=2019-XYZ').set(admin);
+      assert.equal(hits.status, 200);
+      assert.deepEqual(
+        hits.body.data.map((i: { invoiceUID: string }) => i.invoiceUID),
+        [old.body.data.invoiceUID],
+      );
+
+      // The search is over the number only, and it is a substring match.
+      assert.equal(
+        (await request(app).get('/api/v1/invoices?q=R-2019').set(admin)).body.data.length,
+        1,
+      );
+      assert.equal(
+        (await request(app).get('/api/v1/invoices?q=Bea').set(admin)).body.data.length,
+        0,
+      );
+
+      // An account still narrows it, and so does the year.
+      const forB = (
+        await request(app).get(`/api/v1/invoices?q=R-&accountUID=${accountB}`).set(admin)
+      ).body.data as Array<{ accountUID: string; invoiceNumber: string }>;
+      assert.ok(forB.every((i) => i.accountUID === accountB));
+      assert.ok(forB.some((i) => i.invoiceNumber === 'R-B1'));
+      assert.equal(
+        (await request(app).get('/api/v1/invoices?q=R-2019-XYZ&year=2024').set(admin)).body.data
+          .length,
+        0,
+      );
+
+      const limited = await request(app).get('/api/v1/invoices?q=R-&limit=2').set(admin);
+      assert.equal(limited.body.data.length, 2);
+
+      // The search stays inside what the user may see.
+      const scoped = await scopedNutzer(pool, app, 'search-scope@example.com', accountB);
+      const denied = await request(app).get('/api/v1/invoices?q=R-2019-XYZ').set(scoped);
+      assert.equal(denied.status, 200);
+      assert.deepEqual(denied.body.data, []);
+
+      // A query parameter that makes no sense is named, not ignored.
+      const bad = await request(app).get('/api/v1/invoices?year=abc').set(admin);
+      assert.equal(bad.status, 400);
+    });
   } finally {
     await pool.end();
   }

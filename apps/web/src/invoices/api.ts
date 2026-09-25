@@ -174,6 +174,16 @@ export async function listInvoices(accountUID: string, year: number): Promise<In
   );
 }
 
+/**
+ * Invoices whose number contains `q`, over every insured person the user may
+ * see and every treatment year (issues.md 6): the way back to an invoice when
+ * only its number is at hand. The API scopes the result to the user's accounts.
+ */
+export async function searchInvoicesByNumber(q: string, limit = 25): Promise<InvoiceDto[]> {
+  const query = new URLSearchParams({ q, limit: String(limit) });
+  return unwrap(await apiFetch<{ data: InvoiceDto[] }>(`/invoices?${query.toString()}`));
+}
+
 /** All invoices of an account (every year) — used to pick allocation targets. */
 export async function listAccountInvoices(accountUID: string): Promise<InvoiceDto[]> {
   return unwrap(await apiFetch<{ data: InvoiceDto[] }>(`/invoices?accountUID=${accountUID}`));

@@ -7,6 +7,18 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.5 — 2026-09-25
+
+- **Every master-data list can be searched.** The lists of providers, agencies, insured persons,
+  insurers and policies grow quickly, and all they could do was sort. A search field above each list
+  now narrows it as you type, matching what the table actually shows — so a policy is found by the
+  name of the insured person it belongs to, not only by its number.
+- **An invoice is found by its number alone.** The workspace is entered through an insured person
+  and a treatment year; with an invoice in hand and no memory of the year, there was no way in. The
+  invoice page now carries a search over invoice numbers across everyone and every year the user may
+  see. A hit leads straight to its workspace, on the right year, with the row marked, scrolled into
+  view and under the keyboard's cursor.
+
 ## 0.12.0-slice.4 — 2026-09-25
 
 - **The submit dialog offers the policy that was running.** Choosing where an invoice goes listed

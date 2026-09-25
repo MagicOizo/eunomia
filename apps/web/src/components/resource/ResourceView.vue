@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue';
 import EuButton from '../../design-system/components/EuButton.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuSortableTh from '../../design-system/components/EuSortableTh.vue';
+import EuTextField from '../../design-system/components/EuTextField.vue';
 import { describeError } from '../../lib/errors';
 import { useTableSort } from '../../lib/useTableSort';
 import {
@@ -27,6 +28,8 @@ interface LookupData {
 }
 
 const rows = ref<ResourceRow[]>([]);
+/** Free text over the rendered cells of the list (see visibleRows). */
+const filter = ref('');
 const lookups = ref<Record<string, LookupData>>({});
 const loading = ref(false);
 const loadError = ref<string | null>(null);
@@ -87,7 +90,16 @@ async function reload(): Promise<void> {
   }
 }
 
-watch(() => props.config.path, reload, { immediate: true });
+watch(
+  () => props.config.path,
+  async () => {
+    // A filter belongs to the list it was typed for; a reload after creating
+    // or deleting a row deliberately keeps it.
+    filter.value = '';
+    await reload();
+  },
+  { immediate: true },
+);
 
 function cell(row: ResourceRow, column: ColumnConfig): string {
   const raw = row[column.key];
@@ -109,7 +121,22 @@ function sortValue(row: ResourceRow, key: string): string | number | null | unde
   return typeof raw === 'number' || typeof raw === 'string' || raw == null ? raw : String(raw);
 }
 
-const sort = useTableSort(rows, sortValue);
+/**
+ * The rows left by the search field. Matched against the *rendered* cells, so
+ * a looked-up name ("Versicherter") and a formatted date or amount are found
+ * as they stand in the table, not as the raw UID or ISO value behind them.
+ */
+const visibleRows = computed<ResourceRow[]>(() => {
+  const needle = filter.value.trim().toLocaleLowerCase('de');
+  if (needle === '') return rows.value;
+  return rows.value.filter((row) =>
+    props.config.columns.some((column) =>
+      cell(row, column).toLocaleLowerCase('de').includes(needle),
+    ),
+  );
+});
+// Filter first, sort second: the sort works on what the search left over.
+const sort = useTableSort(visibleRows, sortValue);
 
 function openCreate(): void {
   editing.value = null;
@@ -162,6 +189,12 @@ async function confirmDelete(): Promise<void> {
 <template>
   <section>
     <div class="eu-resource__head">
+      <EuTextField
+        v-if="!loading && !loadError && rows.length > 0"
+        v-model="filter"
+        class="eu-resource__search"
+        label="Suchen"
+      />
       <EuButton :icon="faPlus" @click="openCreate">Neu</EuButton>
     </div>
 
@@ -169,6 +202,9 @@ async function confirmDelete(): Promise<void> {
     <p v-else-if="loadError" class="eu-resource__error" role="alert">{{ loadError }}</p>
     <p v-else-if="rows.length === 0" class="eu-resource__hint">
       Noch keine {{ config.plural }} erfasst.
+    </p>
+    <p v-else-if="visibleRows.length === 0" class="eu-resource__hint" role="status">
+      Kein Eintrag passt zu dieser Suche.
     </p>
 
     <div v-else class="eu-resource__table-wrap">
@@ -270,10 +306,19 @@ async function confirmDelete(): Promise<void> {
 <style scoped>
 .eu-resource__head {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: flex-end;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+/* Pushes the "Neu" button to the right edge and caps the field, so the search
+   does not stretch across a wide table. */
+.eu-resource__search {
+  margin-right: auto;
+  flex: 1 1 12rem;
+  max-width: 20rem;
 }
 
 .eu-resource__hint {

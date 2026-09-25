@@ -5,9 +5,9 @@
 	Wenn man in einem Auswahlfeld (eu-picker__control) einen Eintrag wählt und anschließend TAB drück, dann wird der gewählte Eintrag nicht in das Feld übernommen
 	sondern nur der Focus wächselt auf das +-Icon. Beim Shift+TAB wird wieder zurück in die Auswahl gewechselt und der ausgewählte Eintrag ist immer noch gewählt
 	und kann mit ENTER übernommen werden. Erwartung wäre, dass der Eintrag erst ins Ffeld übernommen (bestätigt) wird und dann auf das +-Icon geweselt wird.
-2.  Suche bei Leistungserbringer
+2.  Suche bei Leistungserbringer — Umgesetzt mit v0.12.0-slice.5
 	Es fehlt eine Möglichkeit auf der Seite "Leistungserbringer" nach solchen per Name zu suchen. Es werden schnell mehr und man verliert leicht den Überblick.
-3.  Suche bei Abrechnungsdienstleister
+3.  Suche bei Abrechnungsdienstleister — Umgesetzt mit v0.12.0-slice.5
 	Gleiches wie bei Leistungserbringern (20260925-2) nur für die Seite "Abrechnungsdienstleister"
 4.  Zusatzfelder beim Abrechnungsdienstleister
 	Es fehlt ein "BIC" Feld sowie ein "Empfänger" Feld. Beide sollen optional sein. Beide sind ggf. wichtig zur GiroCode generierung. Wenn Empfänger gesetzt ist, 
@@ -17,7 +17,7 @@
 	Es kommt vor, dass ein Abrechnungsdienstleister seine Kontoinformationen wechselt. Es ist unschön dann einen anderen Dienstleister anzugelegen, da es bei der Auswahl nicht
 	naheliegend ist, welcher ausgewählt werden müsste. Schöner wäre, wenn man die neue Information mit einem Gültigkeitsdatum Eintragen könnte und es immer beim
 	selbem Dienstleister bleibt.
-6.  Suche einer Rechnungsnummer
+6.  Suche einer Rechnungsnummer — Umgesetzt mit v0.12.0-slice.5
 	Wenn man eine Rechnung hat und nicht mehr weiß in welchem Jahr sie liegt, wäre eine Rechnungsnummersuche gut.
 7.  Rechnung aus unterschiedlichen Einreichungen in einer Leistungsabrechnung
 	Die Konvention besagt, dass Rechnung unterschiedlicher Versicherter nicht in einer Einreichung liegen dürfen, und dass Einreichungen unterschiedlicher Versicherter

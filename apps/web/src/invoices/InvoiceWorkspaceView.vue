@@ -11,7 +11,7 @@ import {
   faUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { computed, ref, watch, watchEffect } from 'vue';
+import { computed, nextTick, ref, watch, watchEffect } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -55,7 +55,16 @@ import SubmitDialog from './SubmitDialog.vue';
 import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, calcPaymentState } from './payment';
 import { STATUS_DISPLAY, STATUS_ORDER } from './status';
 
-const props = defineProps<{ accountUID: string }>();
+const props = withDefaults(
+  defineProps<{
+    accountUID: string;
+    /** Treatment year to open on — set by the invoice-number search (issues.md 6). */
+    focusYear?: string;
+    /** Invoice to mark and scroll to once its year is loaded. */
+    focusInvoiceUID?: string;
+  }>(),
+  { focusYear: undefined, focusInvoiceUID: undefined },
+);
 
 interface ContractRef extends ContractPeriod {
   contractUID: string;
@@ -95,6 +104,13 @@ const recommendationBadges = computed(() => {
   return badges;
 });
 const selected = ref<Set<string>>(new Set());
+/**
+ * The invoice a search led here (props.focusInvoiceUID), while it is still
+ * worth pointing at. It answers one search — the year tabs and every change to
+ * the list drop it again.
+ */
+const foundUID = ref<string | null>(null);
+const foundRow = ref<HTMLTableRowElement | null>(null);
 
 const loading = ref(false);
 const loadError = ref<string | null>(null);
@@ -244,21 +260,61 @@ async function refreshYears(): Promise<void> {
   if (!years.value.includes(activeYear.value)) activeYear.value = years.value[0];
 }
 
+/**
+ * Brings the invoice a search found into view and onto the keyboard: the row
+ * carries aria-current, so a screen reader names it as the one meant here.
+ */
+/** Holds on to the DOM row of the found invoice, so markFound() can reach it. */
+function keepFoundRow(uid: string, el: unknown): void {
+  if (uid === foundUID.value) foundRow.value = (el as HTMLTableRowElement | null) ?? null;
+}
+
+async function markFound(): Promise<void> {
+  const wanted = props.focusInvoiceUID;
+  if (wanted === undefined || !invoices.value.some((i) => i.invoiceUID === wanted)) {
+    foundUID.value = null;
+    return;
+  }
+  foundUID.value = wanted;
+  await nextTick();
+  const row = foundRow.value;
+  if (row === null) return;
+  // Only the vertical move is wanted: a row wider than the table's scroll
+  // container makes both focus() and scrollIntoView() scroll sideways too, and
+  // the row then sits flush against the container's edge — exactly where its
+  // focus ring gets clipped (the space .eu-scroll-focus-safe reserves).
+  const wrap = row.closest('.eu-ws__table-wrap');
+  const keepLeft = wrap?.scrollLeft ?? 0;
+  row.focus({ preventScroll: true });
+  row.scrollIntoView({ block: 'center' });
+  if (wrap) wrap.scrollLeft = keepLeft;
+}
+
 async function init(): Promise<void> {
   loading.value = true;
   loadError.value = null;
   try {
     await loadStatic();
     await refreshYears();
+    // The search hands the treatment year along; without it the current year
+    // (or the newest one with invoices) stays selected.
+    const wantedYear = Number(props.focusYear);
+    if (Number.isInteger(wantedYear) && years.value.includes(wantedYear)) {
+      activeYear.value = wantedYear;
+    }
     await loadYearData();
   } catch (error) {
     loadError.value = describeError(error);
   } finally {
     loading.value = false;
   }
+  // Only now does the table exist — while `loading` was true the view showed
+  // its placeholder, and there was no row to mark.
+  await markFound();
 }
 
 async function afterMutation(): Promise<void> {
+  foundUID.value = null;
   await refreshYears();
   await loadYearData();
 }
@@ -267,6 +323,7 @@ watch(() => props.accountUID, init, { immediate: true });
 
 async function selectYear(year: number): Promise<void> {
   activeYear.value = year;
+  foundUID.value = null;
   loading.value = true;
   try {
     await loadYearData();
@@ -530,7 +587,14 @@ function confirmDelete(): void {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="invoice in sort.sorted" :key="invoice.invoiceUID">
+          <tr
+            v-for="invoice in sort.sorted"
+            :key="invoice.invoiceUID"
+            :ref="(el) => keepFoundRow(invoice.invoiceUID, el)"
+            :class="{ 'is-found': invoice.invoiceUID === foundUID }"
+            :aria-current="invoice.invoiceUID === foundUID ? 'true' : undefined"
+            :tabindex="invoice.invoiceUID === foundUID ? -1 : undefined"
+          >
             <td>
               <input
                 type="checkbox"
@@ -846,6 +910,16 @@ function confirmDelete(): void {
   justify-content: flex-end;
   gap: 0.5rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* The row an invoice-number search led to: a tinted row with an accent bar,
+   both from the accent token, so light and dark need no separate rule. */
+.eu-ws__table tbody tr.is-found > td {
+  background-color: color-mix(in srgb, var(--eu-color-accent) 12%, transparent);
+}
+
+.eu-ws__table tbody tr.is-found > td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--eu-color-accent);
 }
 
 .eu-ws__table .eu-ws__num {

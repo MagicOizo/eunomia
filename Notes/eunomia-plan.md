@@ -1074,7 +1074,7 @@ mit Schalter alle, die auch heute schon angeboten würden.
   `assertInvoicesSubmittable`. Eine Versicherung nimmt eine Behandlung von außerhalb des
   Vertragszeitraums durchaus an; das bleibt erlaubt.
 
-## Slice 36 — Suchen und Finden
+## Slice 36 — Suchen und Finden (umgesetzt 2026-09-25)
 **Ziel:** Wachsende Listen bleiben durchsuchbar (issues.md 2, 3 und 6).
 - **Filterfeld in `ResourceView`** (issues.md 2 und 3): die Ansicht kann sortieren, aber nicht
   filtern. Eine Änderung dort wirkt für alle fünf Stammdatenlisten, nicht nur für Leistungserbringer
@@ -1088,6 +1088,50 @@ mit Schalter alle, die auch heute schon angeboten würden.
 
 **DoD:** Eine Rechnung ist allein über ihre Nummer auffindbar, ohne Versicherten und Jahr zu wissen;
 jede Stammdatenliste hat ein Filterfeld.
+
+**Umgesetzt (2026-09-25).** Entscheidungen beim Bau:
+
+- **Gesucht wird, was dasteht.** Das Filterfeld in `ResourceView` vergleicht den Suchtext mit dem
+  *gerenderten* Zellinhalt (`cell()`), nicht mit den Rohwerten. Damit findet „Muster" eine Police
+  über den Namen des Versicherten, obwohl in der Spalte eine UID steht, und ein Datum lässt sich so
+  suchen, wie es in der Tabelle geschrieben ist. Gefiltert wird vor dem Sortieren; `useTableSort`
+  bekommt die gefilterte Liste und bleibt unverändert.
+- **Zwei Leermeldungen, nicht eine.** „Noch keine … erfasst." und „Kein Eintrag passt zu dieser
+  Suche." sagen Verschiedenes; die zweite ist eine `role="status"`, damit ein Screenreader das
+  Schrumpfen der Liste mitbekommt. Der Filter wird beim Wechsel der Liste geleert, überlebt aber das
+  Neuladen nach Anlegen und Löschen — sonst verliert man beim Pflegen einer gefundenen Zeile jedes
+  Mal den Filter.
+- **Kein neuer Endpunkt für die Rechnungssuche** (Festlegung beim Bau): `GET /invoices` kennt
+  `accountUID` und `year` schon und hat die richtige Rechte-Einschränkung
+  (`getAccessibleAccounts`) bereits im Handler — die Suche ist dort ein `q` mehr. Die Query-Parameter
+  des Handlers wandern dabei geschlossen in ein zod-Schema (`parseQuery`, Vorbild `searchBillings`):
+  `?year=abc` beantwortet die API jetzt mit einer benannten 400 statt den Filter stillschweigend zu
+  verwerfen.
+- **Nur die Rechnungsnummer** (Festlegung des Autors): `q` trifft `invoiceNumber` und sonst nichts.
+  Das ist genau issues.md 6 — die Nummer in der Hand, das Jahr vergessen. Eine Freitextsuche über
+  Person und Verwendungszweck hätte die Trefferliste unscharf gemacht, ohne die Frage zu beantworten.
+- **Der Treffer springt hin und markiert** (Festlegung des Autors), er öffnet keinen Dialog. `year`
+  und `invoice` reisen als Query-Parameter mit und werden vom Router als Props übergeben — die
+  Arbeitsfläche bleibt damit ohne `useRoute()` testbar. Die markierte Zeile trägt `aria-current`,
+  bekommt `tabindex="-1"` und den Fokus: die Tastatur landet dort, wo das Auge hinschaut. Die
+  Markierung erlischt beim Jahrwechsel und nach jeder Änderung — sie beantwortet eine Suche, sie ist
+  kein Zustand.
+- **`scrollIntoView` hat den Fokusring gefressen.** Bei 390 px ist eine Tabellenzeile breiter als
+  ihr Scrollcontainer; `scrollIntoView` schiebt dann auch seitwärts, die Zeile liegt bündig an der
+  Kante — genau in dem Raum, den `.eu-scroll-focus-safe` für den Ring reserviert. `markFound` merkt
+  sich deshalb `scrollLeft`, fokussiert mit `preventScroll` und stellt die waagerechte Position
+  danach wieder her. Gemessen (`scrollLeft` 5 → 0) und im tastaturfokussierten Screenshot geprüft.
+- **Erst rendern, dann markieren:** solange `loading` läuft, zeigt die Ansicht ihren Platzhalter und
+  es gibt keine Zeile — `markFound()` steht deshalb hinter dem `finally`, nicht darin. Im ersten
+  Durchlauf lief es davor und traf ins Leere; im Browser zu sehen, im Unit-Test nicht.
+- **Im laufenden System geprüft** (Playwright, hell/dunkel, 1440 px und 390 px): Leistungserbringer
+  und Abrechnungsdienstleister gefiltert (Sortierung bleibt, Leermeldung stimmt, Wechsel der Liste
+  setzt zurück, Kopfzeile ohne Überhang und bei 390 px umbrechend); „2024-100" auf der
+  Rechnungs-Auswahlseite ohne Person und Jahr getippt → ein Treffer mit Person, Behandlungsdatum,
+  Betrag und Status → per Tab und Enter geöffnet → Jahr 2025 aktiv (die Nummer trägt „2024", das
+  Behandlungsjahr ist ein anderes — genau der Fall aus issues.md 6), Zeile markiert, im Bild, mit
+  vollständigem Fokusring; axe-core ohne Verstöße auf allen drei Seiten. Nur lesend, der
+  Dev-Datenbestand blieb unverändert.
 
 ## Slice 37 — Leistungsabrechnung über mehrere Einreichungen
 **Ziel:** Rechnungen aus verschiedenen Einreichungen derselben Police lassen sich auf einer

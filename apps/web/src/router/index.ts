@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { type LocationQueryValue, createRouter, createWebHistory } from 'vue-router';
 
 import SettingsView from '../admin/SettingsView.vue';
 import UsersView from '../admin/UsersView.vue';
@@ -13,6 +13,12 @@ import DashboardView from '../views/DashboardView.vue';
 import LoginView from '../views/LoginView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 import { mainNav, systemNav } from './nav';
+
+/** One query value as a plain string; a repeated parameter yields an array. */
+function queryString(value: LocationQueryValue | LocationQueryValue[]): string | undefined {
+  const first = Array.isArray(value) ? value[0] : value;
+  return typeof first === 'string' ? first : undefined;
+}
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -72,10 +78,17 @@ export const router = createRouter({
       meta: { title: 'Rechnungen', requiresAuth: true },
     },
     {
+      // `year` and `invoice` come from the invoice-number search on /invoices:
+      // handed in as props, so the workspace stays prop-driven and testable
+      // without a router.
       path: '/invoices/:accountUID',
       name: 'invoices-account',
       component: InvoiceWorkspaceView,
-      props: true,
+      props: (route) => ({
+        accountUID: route.params.accountUID,
+        focusYear: queryString(route.query.year),
+        focusInvoiceUID: queryString(route.query.invoice),
+      }),
       meta: { title: 'Rechnungen', requiresAuth: true },
     },
     {
