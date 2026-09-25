@@ -958,6 +958,37 @@ ist der Dialogkörper aus Slice 12.
 beim ersten; Fokus und sichtbarer Ausschnitt gehören wieder zusammen. Eine eigene Scheibe, weil es
 eine Regel für alle Dialoge der App ist.
 
+**Umgesetzt (2026-09-25).** Entscheidungen beim Bau:
+
+- **Zuerst nachgemessen, und der Fund war ein anderer als erwartet:** In Chromium lässt sich der
+  Fehler nicht herstellen. Vier Wege probiert — Formular zweimal öffnen, mit Tab bis unten
+  durchgearbeitet und mit Escape geschlossen, zwei Rechnungen hintereinander wirklich gespeichert,
+  Anzeigemaske auf und zu — der Körper stand jedes Mal wieder auf 0. Der geschlossene `<dialog>` ist
+  `display: none`, und Chromium wirft den Scrolloffset dabei weg.
+- **Also ist es eine Frage der Engine.** Gecko stellt den Offset eines wieder eingeblendeten
+  Scrollbereichs zurück, Chromium nicht. Der Fund stammt demnach aus einem anderen Browser als dem,
+  in dem hier geprüft wird — was die Scheibe nicht ändert, sondern begründet: Dass ein Dialog oben
+  beginnt, darf keine Eigenschaft sein, die eine Engine zufällig mitbringt.
+- **Der Fokus ist kein Ersatz.** Er zieht nur das erste Eingabefeld in den Blick, nicht die
+  Beschriftung darüber — und die Löschen-Bestätigung hat überhaupt kein Eingabefeld im Körper, dort
+  wird nie fokussiert. Nachgemessen: Bei ihr bleibt der Fokus auf dem Schließen-Knopf der Kopfzeile.
+- **Zweimal zurückgesetzt, mit Absicht:** einmal direkt nach `showModal()` (vorher hat das Element
+  als `display: none` keine Layout-Box, der Schreibvorgang verpufft), und einmal im vorhandenen
+  `nextTick` vor dem Fokussieren — die Eltern füllen ihr Formular in derselben Runde, die Höhe des
+  Körpers ändert sich also noch.
+- **Der Rücksprung aus einem Subdialog bleibt unberührt**, weil der Reset an den Öffnen-Übergang
+  gebunden ist: Der darunterliegende Dialog wird nicht neu geöffnet, sein Ausschnitt bleibt stehen
+  (im Browser gegengeprüft: 325 px vor und nach dem Subdialog).
+- **Nicht angefasst:** die Trefferliste in `BillingSearchDialog`. Die Regel gilt dem Dialogkörper aus
+  Slice 12; ein pauschales Zurücksetzen aller Scrollbereiche wäre über das Ziel hinaus.
+- **Test:** `EuDialog.test.ts` — geöffnet montieren, Körper scrollen, zu und wieder auf. jsdom hält
+  `scrollTop` über das Schließen hinweg, verhält sich hier also wie Gecko und bildet genau den Fall
+  ab, den Chromium verbirgt. Gegengeprüft: ohne die Änderung schlägt er fehl (240 statt 0).
+- **Im laufenden System geprüft** (Playwright, hell/dunkel, 1440 px und 390 px): Anlegen-Formular
+  zweimal hintereinander, Anzeigemaske auf und zu, Löschen-Bestätigung, und der Subdialog, der das
+  Formular darunter nicht verschieben darf. Die Testrechnungen aus der Messung sind mit
+  `npm run dev:reset` wieder aus der Dev-Datenbank verschwunden.
+
 ## Slice 34 — Erstattung und Belegnummer nachträglich ändern
 **Ziel:** Eine gebuchte Zuordnung ist korrigierbar, ohne sie zu löschen (issues.md 9 und 8).
 - **PATCH auf `/allocations/:uid`** (issues.md 9): heute gibt es nur GET und DELETE. Der einzige Weg

@@ -50,6 +50,12 @@
 	Wenn ich in einer Externen Quelle (z.B. Excel) ein Datum im Format DD.MM.YYYY ins Clipboard kopiere und in ein Datumsfeld der App einfügen möchte, funktioniert das nicht.
 12. Police Auswahl beim Einreichen
 	Es werden beim Einreichen Krankenversicherungen/Policen zur auswahl angeboten, die zum Behandlungszeitraum der ausgewählten Rechnungen noch nicht oder nicht mehr Aktiv sind.
-13. Default bei geöffenten Dialogen
+13. Default bei geöffenten Dialogen — Umgesetzt mit v0.12.0-slice.2
 	Wenn ein Dialog geöffnet wurde, bleibt der letzte Scollzustand bestehen.
 	Wenn also mehrmals hintereinander eine neue Rechnung angelegt wird, die von oben bis unten durchgearbeitet wird, dann ist beim nächsten Dialog die Scroll-Position unten, obwohl oben wieder das erste Feld "Rechnungsnummer" im Focus ist.
+## Version 0.11.0
+### Date 20260925
+1.	Rechnung mit mehreren Behandlungstagen
+	Eine Rechnung kann mehr als ein Behandlungsdatum haben. Wir sollten uns auf lange sicht überlegen, wie wir das auch in der Oberfläche berücksichtigen können. Idealerweise soll je Behandlung die Kosten angegeben werden. Derzeit würde ich als Workarround nur eine der Behandlungsdaten angeben. Nur wenn die Daten in unterschiedlichen Jahren liegen, würde ich eine eigene Rechnung daraus extrahieren. Wir müssen das unterstützen und für den Nutzer so einfach wie möglich machen.
+2.	Browservorschlag in Eingabefeldern unterdrücken
+	Es kommt immer wieder vor, dass der Browser einen Vorschlag über seine eigene Vorschlagfunktion für felder macht. Das ist tatsächlich störend und passt nicht recht ins Design. Kann man siede automatischen Vorschläge oder Vorbelegungen unterdrücken?

@@ -23,10 +23,23 @@ function sync(): void {
   if (!dialog) return;
   if (props.open && !dialog.open) {
     dialog.showModal();
+    // A dialog always begins at the top (issues.md 13). The element stays
+    // mounted between opens — parents toggle `open`, they do not v-if — so the
+    // body would otherwise keep the offset it was left with. Whether it does is
+    // up to the engine: Chromium drops the offset when the closed dialog turns
+    // display:none, Gecko restores it, and the focus below is no safety net
+    // (it pulls the first field into view, not the label above it, and a body
+    // without a form control is never focused at all). Not before showModal():
+    // with display:none there is no layout box and the write is ignored.
+    const body = dialog.querySelector<HTMLElement>('.eu-dialog__body');
+    if (body) body.scrollTop = 0;
     // showModal() focuses the first focusable element, which is the header
     // close button. Move focus to the first form control in the body instead
     // (e.g. the prefilled name field), skipping the close button.
     void nextTick(() => {
+      // Again here: the parents fill their form in this same flush, so the
+      // body's height — and with it a restored offset — can still change.
+      if (body) body.scrollTop = 0;
       dialog
         .querySelector<HTMLElement>(
           '.eu-dialog__body input, .eu-dialog__body select, .eu-dialog__body textarea',

@@ -7,6 +7,13 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.2 — 2026-09-25
+
+- **A dialog begins at the top.** Entering several invoices in a row, each form worked through from
+  top to bottom, opened the next one already scrolled down while the cursor sat in the first field —
+  so you typed into a field you could not see. Every dialog now starts at the top of its body, no
+  matter how the one before it was left.
+
 ## 0.12.0-slice.1 — 2026-09-25
 
 - **Tab takes the picked entry along.** Choosing an entry in a typeahead field and pressing Tab used
