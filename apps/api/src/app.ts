@@ -9,6 +9,7 @@ import { createUserAdminRouter } from './auth/admin-routes.js';
 import { createAuthRouter } from './auth/routes.js';
 import type { AppConfig } from './config/env.js';
 import { createAccountsRouter } from './domain/accounts.js';
+import { createAgencyAccountsRouter } from './domain/agency-accounts.js';
 import { createAllocationsRouter } from './domain/allocations.js';
 import { createCollectionAgenciesRouter } from './domain/collection-agencies.js';
 import {
@@ -91,6 +92,7 @@ export function createApp(deps?: AppDependencies): Express {
     app.use('/api/v1/contracts', createContractYearsRouter(pool, config));
     app.use('/api/v1/facilities', createFacilitiesRouter(pool, config));
     app.use('/api/v1/agencies', createCollectionAgenciesRouter(pool, config));
+    app.use('/api/v1/agencies', createAgencyAccountsRouter(pool, config));
     app.use('/api/v1/invoices', createInvoicesRouter(pool, config));
     app.use('/api/v1/submissions', createSubmissionsRouter(pool, config));
     app.use('/api/v1/billings', createServiceBillingsRouter(pool, config));

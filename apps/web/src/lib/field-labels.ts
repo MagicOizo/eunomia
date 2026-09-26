@@ -31,6 +31,8 @@ export const FIELD_LABELS: Record<string, string> = {
   agencyName: 'Name',
   agencyUID: 'Abrechnungsdienstleister',
   bankAccount: 'IBAN',
+  bic: 'BIC',
+  recipientName: 'Empfänger',
 
   // Policen
   contractNumber: 'Vertragsnummer',
@@ -99,6 +101,7 @@ export const FIELD_LABELS: Record<string, string> = {
 export const FIELD_FORMATS: Record<string, string> = {
   addressPostalCode: 'fünfstellig, z. B. 12345',
   bankAccount: 'nur Großbuchstaben und Ziffern, z. B. DE02120300000000202051',
+  bic: '8 oder 11 Zeichen in Großbuchstaben, z. B. COBADEFFXXX',
 };
 
 /** The German label of a payload key, or the key itself if it has none yet. */

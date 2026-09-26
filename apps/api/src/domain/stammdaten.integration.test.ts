@@ -61,6 +61,7 @@ async function resetData(pool: Pool): Promise<void> {
   await pool.query('DELETE FROM ContractYears');
   await pool.query('DELETE FROM ContractTerms');
   await pool.query('DELETE FROM Contracts');
+  await pool.query('DELETE FROM AgencyBankAccounts');
   await pool.query('DELETE FROM CollectionAgencies');
   await pool.query('DELETE FROM InsuranceCompanies');
   await pool.query('DELETE FROM Facilities');
@@ -179,6 +180,115 @@ test('master-data CRUD and account scoping', async (t) => {
         .set(admin)
         .send({ agencyName: 'Inkasso Test', bankAccount: 'DE02120300000000202051' });
       assert.equal(agency.status, 201);
+      // Creating an agency creates its first bank account, undated.
+      assert.equal(agency.body.data.bankAccount, 'DE02120300000000202051');
+      assert.deepEqual(
+        agency.body.data.accounts.map((a: { validFrom: string | null; validTo: string | null }) => [
+          a.validFrom,
+          a.validTo,
+        ]),
+        [[null, null]],
+      );
+
+      const badBic = await request(app)
+        .post('/api/v1/agencies')
+        .set(admin)
+        .send({ agencyName: 'Bad BIC', bankAccount: 'DE02120300000000202051', bic: 'nope' });
+      assert.equal(badBic.status, 400);
+      assert.equal(badBic.body.error.code, 'VALIDATION_ERROR');
+    });
+
+    await t.test('an agency keeps its identity when its bank account changes', async () => {
+      const created = await request(app)
+        .post('/api/v1/agencies')
+        .set(admin)
+        .send({ agencyName: 'Inkasso Wechsel', bankAccount: 'DE02120300000000202051' });
+      assert.equal(created.status, 201);
+      const uid = created.body.data.agencyUID as string;
+      const undatedUID = created.body.data.accounts[0].agencyAccountUID as string;
+
+      const changed = await request(app).post(`/api/v1/agencies/${uid}/accounts`).set(admin).send({
+        validFrom: '2026-03-01',
+        bankAccount: 'DE89370400440532013000',
+        bic: 'COBADEFFXXX',
+        recipientName: 'Zahlstelle Wechsel',
+        note: 'Bankwechsel',
+      });
+      assert.equal(changed.status, 201);
+
+      // The read shows the whole history plus the account in force today,
+      // flattened — and the older entry now ends the day before the change.
+      const detail = await request(app).get(`/api/v1/agencies/${uid}`).set(admin);
+      assert.equal(detail.status, 200);
+      assert.equal(detail.body.data.bankAccount, 'DE89370400440532013000');
+      assert.equal(detail.body.data.recipientName, 'Zahlstelle Wechsel');
+      assert.deepEqual(
+        detail.body.data.accounts.map((a: { validFrom: string | null; validTo: string | null }) => [
+          a.validFrom,
+          a.validTo,
+        ]),
+        [
+          [null, '2026-02-28'],
+          ['2026-03-01', null],
+        ],
+      );
+
+      // A second entry starting on the same day, and a second undated one, are
+      // both refused: the resolution would be ambiguous.
+      const sameDay = await request(app)
+        .post(`/api/v1/agencies/${uid}/accounts`)
+        .set(admin)
+        .send({ validFrom: '2026-03-01', bankAccount: 'DE02500105170137075030' });
+      assert.equal(sameDay.status, 409);
+      assert.equal(sameDay.body.error.code, 'HISTORY_START_EXISTS');
+      assert.equal(sameDay.body.error.details.undated, false);
+
+      const secondUndated = await request(app)
+        .post(`/api/v1/agencies/${uid}/accounts`)
+        .set(admin)
+        .send({ bankAccount: 'DE02500105170137075030' });
+      assert.equal(secondUndated.status, 409);
+      assert.equal(secondUndated.body.error.details.undated, true);
+
+      // Renaming the agency leaves its accounts alone.
+      const renamed = await request(app)
+        .patch(`/api/v1/agencies/${uid}`)
+        .set(admin)
+        .send({ agencyName: 'Inkasso Umbenannt' });
+      assert.equal(renamed.status, 200);
+      assert.equal(renamed.body.data.agencyName, 'Inkasso Umbenannt');
+      assert.equal(renamed.body.data.accounts.length, 2);
+
+      // Moving the change to another day, then dropping it again: the agency
+      // falls back to the account it started with.
+      const moved = await request(app)
+        .patch(`/api/v1/agencies/${uid}/accounts/${changed.body.data.agencyAccountUID}`)
+        .set(admin)
+        .send({ validFrom: '2026-04-01' });
+      assert.equal(moved.status, 200);
+      assert.equal(moved.body.data.validFrom, '2026-04-01');
+
+      const removed = await request(app)
+        .delete(`/api/v1/agencies/${uid}/accounts/${changed.body.data.agencyAccountUID}`)
+        .set(admin);
+      assert.equal(removed.status, 204);
+
+      const afterDelete = await request(app).get(`/api/v1/agencies/${uid}`).set(admin);
+      assert.equal(afterDelete.body.data.bankAccount, 'DE02120300000000202051');
+      assert.equal(afterDelete.body.data.accounts.length, 1);
+      assert.equal(afterDelete.body.data.accounts[0].agencyAccountUID, undatedUID);
+
+      // An account of another agency cannot be reached through this one.
+      const otherAgency = await request(app)
+        .post('/api/v1/agencies')
+        .set(admin)
+        .send({ agencyName: 'Inkasso Fremd', bankAccount: 'DE02500105170137075030' });
+      const foreign = await request(app)
+        .delete(
+          `/api/v1/agencies/${uid}/accounts/${otherAgency.body.data.accounts[0].agencyAccountUID}`,
+        )
+        .set(admin);
+      assert.equal(foreign.status, 404);
     });
 
     // Two accounts; a scoped user granted access to only the first.

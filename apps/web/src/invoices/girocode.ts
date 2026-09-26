@@ -28,9 +28,14 @@ export type GirocodeResult =
   | { ok: false; reason: string };
 
 export interface GirocodeInput {
-  /** Beneficiary — the collection agency the invoice is paid to. */
+  /**
+   * Beneficiary — the name the transfer is addressed to: the agency's own, or
+   * the one its bank account names instead (see agencies/accounts.ts).
+   */
   recipient: string;
   iban: string;
+  /** Optional inside the EEA, and often not recorded; then the line stays empty. */
+  bic?: string | null;
   amount: number;
   /** Verwendungszweck; may be missing, the scheme allows an empty reference. */
   subject: string | null;
@@ -47,9 +52,9 @@ function utf8Length(value: string): number {
 
 /**
  * Assembles the payload, or explains why it cannot be built. Version `002`
- * leaves the BIC optional inside the EEA, and this application has no BIC to
- * offer, so that line stays empty. Line 12 (beneficiary-to-originator
- * information) is optional and omitted entirely.
+ * leaves the BIC optional inside the EEA, so an account without one still
+ * yields a valid code — the line simply stays empty. Line 12
+ * (beneficiary-to-originator information) is optional and omitted entirely.
  */
 export function buildGirocode(input: GirocodeInput): GirocodeResult {
   const iban = input.iban.replace(/\s+/g, '').toUpperCase();
@@ -67,13 +72,14 @@ export function buildGirocode(input: GirocodeInput): GirocodeResult {
   }
 
   const subject = (input.subject ?? '').trim().slice(0, MAX_SUBJECT);
+  const bic = (input.bic ?? '').replace(/\s+/g, '').toUpperCase();
 
   const payload = [
     'BCD', // service tag
     '002', // version
     '1', // character set: UTF-8
     'SCT', // SEPA Credit Transfer
-    '', // BIC — optional in version 002 within the EEA
+    bic, // optional in version 002 within the EEA
     recipient,
     iban,
     epcAmount(input.amount),

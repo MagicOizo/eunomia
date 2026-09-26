@@ -20,9 +20,11 @@ import { buildGirocode } from './girocode';
  * nobody looks at.
  */
 const props = defineProps<{
-  /** Beneficiary — the collection agency the invoice is paid to. */
+  /** Beneficiary — the name the transfer is addressed to (see agencies/accounts.ts). */
   recipient: string;
   iban: string;
+  /** Optional in the scheme; an account without one still yields a valid code. */
+  bic?: string | null;
   amount: number;
   subject: string | null;
 }>();
@@ -36,6 +38,7 @@ async function generate(): Promise<void> {
   const result = buildGirocode({
     recipient: props.recipient,
     iban: props.iban,
+    bic: props.bic,
     amount: props.amount,
     subject: props.subject,
   });
@@ -72,7 +75,7 @@ function onOpen(): void {
 // Picking a different agency in the detail mask changes the beneficiary; only
 // refresh a code that has already been asked for.
 watch(
-  () => [props.recipient, props.iban, props.amount, props.subject],
+  () => [props.recipient, props.iban, props.bic, props.amount, props.subject],
   () => {
     if (requested.value) void generate();
   },

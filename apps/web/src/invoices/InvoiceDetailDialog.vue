@@ -2,6 +2,8 @@
 import { faBan, faPaperPlane, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, reactive, ref, watch } from 'vue';
 
+import { accountInForce } from '../agencies/accounts';
+import type { AgencyAccountDto } from '../agencies/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import type { DetailValue } from '../design-system/components/EuDetailField.vue';
@@ -57,8 +59,8 @@ const props = defineProps<{
   accountName: string;
   facilities: SelectOption[];
   agencies: SelectOption[];
-  /** agencyUID → IBAN, to show the read-only IBAN of the picked agency. */
-  agencyIban: Record<string, string>;
+  /** agencyUID → its bank accounts, to show the IBAN of the picked agency. */
+  agencyAccounts: Record<string, AgencyAccountDto[]>;
   /** All policies of the insured person, for the submit and exclusion pickers. */
   contracts: ContractOption[];
   /** The optimizer's advice for this invoice, shown per policy card. */
@@ -159,13 +161,27 @@ const statusDisplay = computed(() =>
   props.invoice ? STATUS_DISPLAY[props.invoice.workflowStatus] : null,
 );
 const directPayment = computed(() => values.directPayment === true);
-const ibanForSelected = computed(() => {
+/**
+ * The account of the picked agency that applies — resolved against the mask's
+ * own Überweisungsdatum, not the saved one: entering the day it was paid shows
+ * the account the money went to, right away.
+ */
+const accountForSelected = computed(() => {
   const uid = values.agencyUID;
-  return typeof uid === 'string' && uid !== '' ? (props.agencyIban[uid] ?? '') : '';
+  if (typeof uid !== 'string' || uid === '') return null;
+  const paidOn =
+    typeof values.transferDate === 'string' && values.transferDate !== ''
+      ? values.transferDate
+      : null;
+  return accountInForce(props.agencyAccounts[uid] ?? [], paidOn);
 });
+const ibanForSelected = computed(() => accountForSelected.value?.bankAccount ?? '');
 const agencyNameForSelected = computed(() => {
   const uid = values.agencyUID;
-  return localAgencies.value.find((option) => option.value === uid)?.label ?? '';
+  const agency = localAgencies.value.find((option) => option.value === uid)?.label ?? '';
+  // Where the account names a beneficiary of its own, the transfer is addressed
+  // to that name — that is what belongs in the GiroCode.
+  return accountForSelected.value?.recipientName ?? agency;
 });
 // The GiroCode follows the mask, not the saved invoice: it sits next to the
 // IBAN row, which already shows the agency currently picked, and what you scan
@@ -480,6 +496,7 @@ function submit(): void {
               v-if="showQr"
               :recipient="agencyNameForSelected"
               :iban="ibanForSelected"
+              :bic="accountForSelected?.bic"
               :amount="amountForQr"
               :subject="subjectForQr"
             />

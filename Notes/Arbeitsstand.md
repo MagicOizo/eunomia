@@ -24,7 +24,7 @@ in [eunomia-plan.md](eunomia-plan.md). 0.11.0 ist davor als volles Release abges
 | ☑ | 36 | Suchen und Finden | 2, 3, 6 | 0.12.0-slice.5 |
 | ☑ | 37a | Abrechnung über mehrere Einreichungen — Modell + API | 7 | 0.12.0-slice.6 |
 | ☑ | 37b | Abrechnung über mehrere Einreichungen — UI | 7 | 0.12.0-slice.7 |
-| ☐ | 38 | Kontoverbindungen mit Gültigkeitsdatum, BIC und Empfänger | 5, 4 | |
+| ☑ | 38 | Kontoverbindungen mit Gültigkeitsdatum, BIC und Empfänger | 5, 4 | 0.12.0-slice.8 |
 | ☐ | 39 | Papierkorb | 10 | |
 
 Mitgenommen in Slice 33, weil es dieselbe Entscheidung ist — der Backlog aus Slice 32: der im Picker

@@ -25,6 +25,7 @@ export async function clearData(pool: Pool): Promise<void> {
     'Contracts',
     'InsuranceCompanies',
     'Facilities',
+    'AgencyBankAccounts',
     'CollectionAgencies',
     'RefreshTokens',
     'UserAccountRoles',

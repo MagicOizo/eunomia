@@ -241,6 +241,18 @@ token is set as an httpOnly cookie scoped to `/api/v1/auth`); use `POST /api/v1/
 
 Each supports `GET /`, `GET /:uid`, `POST /`, `PATCH /:uid`, `DELETE /:uid`.
 
+A collection agency's **bank account is a history**, so that an agency which changes bank stays one
+entry and every invoice keeps naming the account its money went to. The accounts live under
+`/api/v1/agencies/:uid/accounts` (`POST`, `PATCH /:entryUID`, `DELETE /:entryUID`, all
+`MANAGE_AGENCIES`); reading happens through the agency, which carries them in `accounts` along with
+the account in force today, flattened as `bankAccount`, `bic` and `recipientName`. `POST /agencies`
+therefore takes the first account's fields as well, and `PATCH /agencies/:uid` changes only
+`agencyName`. An account's `validFrom` may be **null**, meaning "applies from the beginning" — the
+first one carries no date, only a change does, and at most one undated entry per agency is allowed.
+Which account applies to an invoice follows from the day it was paid (`transferDate`), today's for
+an unpaid one. `recipientName`, where set, is the beneficiary the GiroCode and the payment reminders
+name instead of the agency.
+
 **Invoice workflow** (account-scoped via `VIEW_INVOICES` / `MANAGE_INVOICES`)
 
 | Step                          | Endpoint                                                              |

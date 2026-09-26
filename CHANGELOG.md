@@ -7,6 +7,30 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.8 — 2026-09-26
+
+- **A collection agency that changes bank stays one entry.** Its account used to be a single field,
+  so recording a new IBAN meant creating the agency a second time — and at the picker, nothing said
+  which of the two was meant. An agency now carries a history of bank accounts, edited in its own
+  mask like a policy's premiums, and an account can be corrected or removed without touching the
+  agency.
+- **An invoice names the account its money actually went to.** Which account applies follows from
+  the day of payment: a paid invoice keeps showing the account that was valid back then (and says
+  so, so the difference to the agency's page is not a puzzle), an unpaid one shows today's. Entering
+  a payment date in the invoice mask switches the IBAN and the GiroCode right away, before saving.
+- **The GiroCode carries the BIC and the right beneficiary.** Both fields were missing: the code
+  left the BIC line empty, and it always used the agency's own name — which is wrong wherever the
+  money is addressed to someone else. A bank account can now name a beneficiary, and that name is
+  what the GiroCode, the payment details and the reminder mails use.
+- **The first bank account of an agency needs no date.** "Valid from" is empty for the account an
+  agency started with and means "applies from the beginning"; only a change carries a date. So
+  neither creating an agency nor migrating the existing ones has to invent a day nobody knows,
+  and an invoice paid years ago still resolves to an account.
+- **The migration rebuilds the agency table instead of dropping a column in place.** MariaDB's
+  default "instant" DROP COLUMN keeps the removed column's row space reserved for ever; on a
+  database that has seen enough schema changes, that reserve alone breaks InnoDB's row limit and
+  the migration would fail halfway, leaving the new table behind and blocking every later start.
+
 ## 0.12.0-slice.7 — 2026-09-25
 
 - **One Leistungsabrechnung books invoices from several submissions at once.** The model already

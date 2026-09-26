@@ -28,17 +28,39 @@ const invoice: InvoiceDto = {
   hasOpenObjection: false,
 };
 
+/** The agency moved bank at the turn of the year; the older entry is undated. */
+const accounts = [
+  {
+    agencyAccountUID: 'g-1',
+    validFrom: null,
+    validTo: '2025-12-31',
+    bankAccount: 'DE02120300000000202051',
+    bic: null,
+    recipientName: null,
+    note: null,
+  },
+  {
+    agencyAccountUID: 'g-2',
+    validFrom: '2026-01-01',
+    validTo: null,
+    bankAccount: 'DE89370400440532013000',
+    bic: 'COBADEFFXXX',
+    recipientName: 'Zahlstelle Beispiel Inkasso',
+    note: null,
+  },
+];
+
 const props = {
   invoice,
   facilityName: 'Hausarztpraxis Dr. Beispiel',
   agencyName: 'Beispiel Inkasso GmbH',
-  bankAccount: 'DE02120300000000202051',
+  accounts,
 };
 
 /** Mounts with a trigger and clicks it, so the bubble's content is rendered. */
-async function openPopover() {
+async function openPopover(overrides: Partial<typeof props> = {}) {
   const wrapper = mount(PaymentInfoPopover, {
-    props,
+    props: { ...props, ...overrides },
     attachTo: document.body,
     slots: { trigger: '<button type="button">Info</button>' },
   });
@@ -62,6 +84,7 @@ describe('PaymentInfoPopover labels', () => {
       'Rechnungssumme',
       'Abrechnungsdienstleister / Empfänger',
       'IBAN',
+      'BIC',
       'Verwendungszweck',
       'Barzahlung',
     ]);
@@ -74,6 +97,45 @@ describe('PaymentInfoPopover labels', () => {
     await wrapper.findAll('dt')[1].find('.eu-tooltip-trigger').trigger('mouseenter');
     const tooltip = document.body.querySelector('[role="tooltip"]');
     expect(tooltip?.textContent).toBe('Zahlungsziel');
+    wrapper.unmount();
+  });
+});
+
+/**
+ * Which account applies is the day the money moved, not the day the page is
+ * looked at (see agencies/accounts.ts).
+ */
+describe('PaymentInfoPopover account resolution', () => {
+  it('names the beneficiary of the account in force, not the agency', async () => {
+    const wrapper = await openPopover();
+
+    const values = wrapper.findAll('dd').map((dd) => dd.text());
+    expect(values).toContain('Zahlstelle Beispiel Inkasso');
+    expect(values.some((value) => value.includes('DE89370400440532013000'))).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('shows the account of the time for a paid invoice, and says so', async () => {
+    const wrapper = await openPopover({
+      invoice: { ...invoice, transferDate: '2025-06-01' },
+    });
+
+    const values = wrapper.findAll('dd').map((dd) => dd.text());
+    expect(values.some((value) => value.includes('DE02120300000000202051'))).toBe(true);
+    expect(values.some((value) => value.includes('Kontoverbindung zum Überweisungsdatum'))).toBe(
+      true,
+    );
+    // The undated account names no beneficiary, so the agency carries the line.
+    expect(values).toContain('Beispiel Inkasso GmbH');
+    wrapper.unmount();
+  });
+
+  it('leaves out IBAN and BIC for an agency without any account', async () => {
+    const wrapper = await openPopover({ accounts: [] });
+
+    const labels = wrapper.findAll('dt').map((dt) => dt.text());
+    expect(labels).not.toContain('IBAN');
+    expect(labels).not.toContain('BIC');
     wrapper.unmount();
   });
 });

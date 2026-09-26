@@ -9,11 +9,11 @@
 	Es fehlt eine Möglichkeit auf der Seite "Leistungserbringer" nach solchen per Name zu suchen. Es werden schnell mehr und man verliert leicht den Überblick.
 3.  Suche bei Abrechnungsdienstleister — Umgesetzt mit v0.12.0-slice.5
 	Gleiches wie bei Leistungserbringern (20260925-2) nur für die Seite "Abrechnungsdienstleister"
-4.  Zusatzfelder beim Abrechnungsdienstleister
+4.  Zusatzfelder beim Abrechnungsdienstleister — Umgesetzt mit v0.12.0-slice.8
 	Es fehlt ein "BIC" Feld sowie ein "Empfänger" Feld. Beide sollen optional sein. Beide sind ggf. wichtig zur GiroCode generierung. Wenn Empfänger gesetzt ist, 
 	dann wird dieser Name im GiroCode als Name verwendet (und bei den Zahlungsdetails angezeigt), denn es gibt Fälle, wo sich das vom Namen des Dienstleisters
 	unterscheidet.
-5.  Versionierung von Kontoinformationen
+5.  Versionierung von Kontoinformationen — Umgesetzt mit v0.12.0-slice.8
 	Es kommt vor, dass ein Abrechnungsdienstleister seine Kontoinformationen wechselt. Es ist unschön dann einen anderen Dienstleister anzugelegen, da es bei der Auswahl nicht
 	naheliegend ist, welcher ausgewählt werden müsste. Schöner wäre, wenn man die neue Information mit einem Gültigkeitsdatum Eintragen könnte und es immer beim
 	selbem Dienstleister bleibt.

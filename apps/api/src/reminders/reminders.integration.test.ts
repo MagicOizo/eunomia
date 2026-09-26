@@ -236,6 +236,50 @@ test('payment reminders: gating, dry run, delivery and the quiet second run', as
       assert.equal(await countReminders(pool), 0);
     });
 
+    await t.test('the payee is the beneficiary the agency names, where it names one', async () => {
+      const agency = await request(app)
+        .post('/api/v1/agencies')
+        .set(admin)
+        .send({ agencyName: 'Inkasso Mahnung', bankAccount: 'DE02120300000000202051' });
+      const agencyUID = agency.body.data.agencyUID as string;
+      // The account in force names a beneficiary of its own; the undated one
+      // (from creating the agency) does not, and must not win.
+      const inForce = await request(app)
+        .post(`/api/v1/agencies/${agencyUID}/accounts`)
+        .set(admin)
+        .send({
+          validFrom: dayOffset(-30),
+          bankAccount: 'DE89370400440532013000',
+          recipientName: 'Zahlstelle Mahnung',
+        });
+      const invoiceUID = (
+        await pool.query<Array<{ uid: string }>>(
+          "SELECT invoiceUID AS uid FROM Invoices WHERE invoiceNumber = 'R-OVERDUE'",
+        )
+      )[0]?.uid;
+      await request(app).patch(`/api/v1/invoices/${invoiceUID}`).set(admin).send({ agencyUID });
+
+      const payable = await createReminderStore(pool, config.configEncryptionKey)
+        .listPayableInvoices()
+        .then((rows) => rows.find((row) => row.invoiceNumber === 'R-OVERDUE'));
+      assert.equal(payable?.payee, 'Zahlstelle Mahnung');
+
+      // Without a beneficiary the agency's own name carries the line.
+      await request(app)
+        .patch(`/api/v1/agencies/${agencyUID}/accounts/${inForce.body.data.agencyAccountUID}`)
+        .set(admin)
+        .send({ recipientName: null });
+      const withoutBeneficiary = await createReminderStore(pool, config.configEncryptionKey)
+        .listPayableInvoices()
+        .then((rows) => rows.find((row) => row.invoiceNumber === 'R-OVERDUE'));
+      assert.equal(withoutBeneficiary?.payee, 'Inkasso Mahnung');
+
+      await request(app)
+        .patch(`/api/v1/invoices/${invoiceUID}`)
+        .set(admin)
+        .send({ agencyUID: null });
+    });
+
     await t.test('a dry run renders each recipient their own mail and stores nothing', async () => {
       await request(app)
         .put('/api/v1/settings')

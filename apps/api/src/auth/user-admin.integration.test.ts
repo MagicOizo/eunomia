@@ -69,6 +69,7 @@ async function resetData(pool: Pool): Promise<void> {
     'DELETE FROM ContractTerms',
     'DELETE FROM Contracts',
     'DELETE FROM InsuranceCompanies',
+    'DELETE FROM AgencyBankAccounts',
     'DELETE FROM CollectionAgencies',
     'DELETE FROM Facilities',
     'DELETE FROM UserAccountRoles',

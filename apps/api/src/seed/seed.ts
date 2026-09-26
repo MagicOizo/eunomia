@@ -38,6 +38,13 @@ const ids = {
   facilityDoctor: seedId('facility', 0),
   facilityRadiology: seedId('facility', 1),
   agency: seedId('agency', 0),
+  // Index 0 is the account the agency started with, and its seed ID happens to
+  // be exactly what migration 012 derives from the agency's own ID ('g' plus
+  // the same body) — so a seed run over an already-migrated database updates
+  // that row instead of adding a second undated account. The change therefore
+  // takes the next index.
+  agencyAccountFirst: seedId('agencyAccount', 0),
+  agencyAccountNew: seedId('agencyAccount', 1),
   submission: seedId('submission', 0),
   submissionSupplementary: seedId('submission', 1),
   submissionCurrent: seedId('submission', 2),
@@ -106,7 +113,26 @@ async function seedPeople(pool: Pool): Promise<void> {
   await seedRow(pool, 'CollectionAgencies', {
     agencyUID: ids.agency,
     agencyName: 'Beispiel Inkasso GmbH',
+  });
+  // The agency changed its bank account at the turn of the year (Slice 38):
+  // an undated first account — "applies from the beginning", the shape
+  // migration 012 leaves behind — and the one in force since January, which
+  // also names a beneficiary of its own.
+  await seedRow(pool, 'AgencyBankAccounts', {
+    agencyAccountUID: ids.agencyAccountFirst,
+    agencyUID: ids.agency,
+    validFrom: null,
     bankAccount: 'DE02120300000000202051',
+    bic: 'BYLADEM1001',
+  });
+  await seedRow(pool, 'AgencyBankAccounts', {
+    agencyAccountUID: ids.agencyAccountNew,
+    agencyUID: ids.agency,
+    validFrom: seedDate(0, '01-01'),
+    bankAccount: 'DE89370400440532013000',
+    bic: 'COBADEFFXXX',
+    recipientName: 'Zahlstelle Beispiel Inkasso',
+    note: 'Bankwechsel zum Jahreswechsel',
   });
 }
 
@@ -291,7 +317,9 @@ async function seedInvoices(pool: Pool): Promise<void> {
     facilityUID: ids.facilityDoctor,
     invoiceAmount: 200.0,
   });
-  // Done: fully reimbursed over both policies (45 + 15 €) and paid.
+  // Done: fully reimbursed over both policies (45 + 15 €) and paid — through
+  // the agency, and back when its old account was still the valid one, so the
+  // payment details of a paid invoice show the account of that time (Slice 38).
   await seedRow(pool, 'Invoices', {
     invoiceUID: ids.invoiceDone,
     invoiceNumber: 'R-2024-103',
@@ -301,6 +329,8 @@ async function seedInvoices(pool: Pool): Promise<void> {
     facilityUID: ids.facilityRadiology,
     invoiceAmount: 60.0,
     transferDate: seedDate(-1, '04-10'),
+    transferSubject: 'Rechnung 103 / Kundennr. 4711',
+    agencyUID: ids.agency,
   });
   // Billed by hand: the full policy reimbursed nothing (deductible), and the
   // author closed it as billed; not paid yet.

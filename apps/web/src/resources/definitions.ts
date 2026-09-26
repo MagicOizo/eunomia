@@ -1,3 +1,4 @@
+import AgencyDetailDialog from '../agencies/AgencyDetailDialog.vue';
 import {
   BONUS_FORFEIT_RULE_LABEL,
   CONTRACT_KIND_LABEL,
@@ -161,6 +162,11 @@ const facilities: ResourceConfig = {
   detailTitle: (row) => `Leistungserbringer: ${String(row.facilityName ?? '')}`,
 };
 
+/**
+ * The bank account is a history (Slice 38), so the list shows the one in force
+ * today — the API flattens it onto every agency — and the mask carries the rest.
+ * Creating one records its first account, undated.
+ */
 const agencies: ResourceConfig = {
   path: '/agencies',
   singular: 'Abrechnungsdienstleister',
@@ -169,12 +175,16 @@ const agencies: ResourceConfig = {
   columns: [
     { key: 'agencyName', label: 'Name' },
     { key: 'bankAccount', label: 'IBAN' },
+    { key: 'recipientName', label: 'Empfänger', wrap: true },
   ],
   fields: [
     { key: 'agencyName', label: 'Name', type: 'text', required: true },
     { key: 'bankAccount', label: 'IBAN', type: 'text', required: true },
+    { key: 'bic', label: 'BIC', type: 'text' },
+    { key: 'recipientName', label: 'Empfänger (nur wenn abweichend)', type: 'text' },
   ],
   detailTitle: (row) => `Abrechnungsdienstleister: ${String(row.agencyName ?? '')}`,
+  detailDialog: AgencyDetailDialog,
 };
 
 /** Resource configs keyed by their route path. */

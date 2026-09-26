@@ -1279,6 +1279,58 @@ geprüft, an keiner Kante beschnitten.
 **DoD:** Ein Dienstleister mit gewechseltem Konto bleibt ein Eintrag; eine bezahlte Rechnung zeigt das
 Konto von damals, eine offene das heutige; BIC und Empfänger stehen im GiroCode.
 
+**Festlegungen beim Planen (Autor, 2026-09-26):**
+
+- **`validFrom` ist NULL-fähig, NULL heißt „gilt grundsätzlich".** Der Eintrag, mit dem ein
+  Dienstleister anfängt, bekommt kein Datum — erst eine zweite Fassung trägt eins und gilt von da
+  an. Damit muss weder die Migration noch das Anlegen ein Datum erfinden, das niemand kennt, und
+  eine vor Jahren bezahlte Rechnung löst trotzdem auf. Je Dienstleister ist höchstens ein
+  datumsloser Eintrag erlaubt; das prüft die API, weil MariaDB NULL in einem UNIQUE mehrfach zulässt.
+- **In den Zahlungsinformationen steht, wo gesetzt, nur der Empfänger** — „überschreibt" wörtlich
+  genommen. Die Zeile heißt ohnehin schon „Abrechnungsdienstleister / Empfänger".
+- **Das Create-Formular fragt nicht nach „gültig ab"** (folgt aus der NULL-Regel): Name, IBAN, BIC,
+  Empfänger.
+
+**Befunde beim Bauen:**
+
+- **Die Seed-ID des ersten Kontos fällt mit der zusammen, die Migration 012 ableitet.** Die
+  Migration baut die UID der übernommenen Kontoverbindung als `'g'` + Rumpf der Dienstleister-UID;
+  für den Seed-Dienstleister mit Index 0 ist das genau `seedId('agencyAccount', 0)`. Zuerst war das
+  ein stiller Fehler — das zweite Konto wurde nie angelegt, weil `seedRow` es als Dublette ansah —,
+  jetzt ist es die gewollte Eigenschaft: `npm run dev:seed` ohne `--reset` über eine schon
+  migrierte Datenbank aktualisiert diese Zeile, statt ein zweites datumsloses Konto anzulegen. Der
+  Kontowechsel liegt deshalb auf Index 1. Steht als Kommentar im Seed.
+- **`overflow-wrap: anywhere` hätte die IBAN-Spalte kaputtgemacht.** Die Historientabelle war 705 px
+  breit in einem 672 px schmalen Dialog, die Aktionsschalter lagen hinter der Kante. `anywhere` löst
+  das, schrumpft die Spalte aber zusätzlich auf min-content, wodurch die IBAN auch dann umbrach,
+  wenn Platz war; `break-word` bricht nur im Notfall. BIC steht jetzt gedämpft unter der IBAN in
+  derselben Zelle — so muss keins von beiden mitten im Wort brechen.
+- **`DROP COLUMN` hätte die Migration auf einer gewachsenen Datenbank zerlegt.** MariaDB löscht eine
+  Spalte standardmäßig „instant": sie gilt als weg, ihr Platz in der Zeile bleibt für immer
+  reserviert. Nach genügend ADD/DROP COLUMN überschreitet allein dieser Ballast InnoDBs
+  Zeilengrenze, und dann scheitert `ALTER TABLE CollectionAgencies DROP COLUMN bankAccount` mit
+  „Row size too large" — mitten in 012, also mit angelegter `AgencyBankAccounts` und ohne Eintrag
+  im Migrationslog. Jeder weitere Lauf bricht danach mit „Table already exists" ab. Lokal beim
+  wiederholten Testen aufgetreten (jeder Testlauf fährt 006 und 012 einmal hin und zurück), aber es
+  wäre derselbe Fehler auf einer lange gepflegten Produktionsdatenbank. 012 baut die Tabelle
+  deshalb mit `ALGORITHM=COPY` neu auf, in `up` wie in `down`; sechs Testläufe hintereinander gegen
+  dieselbe Datenbank laufen seitdem grün.
+- **Auflösen passiert in TypeScript, nicht in SQL.** `accountInForce` gibt es je einmal in
+  `apps/api/src/domain/agency-accounts.ts` und `apps/web/src/agencies/accounts.ts`, mit denselben
+  Testfällen auf beiden Seiten. Der Erinnerungsversand lädt die Konten und löst damit auf, statt die
+  Regel ein drittes Mal als Unterabfrage zu formulieren — dieselbe Entscheidung wie bei
+  `calcPaymentState` (siehe `reminders/payment.ts`).
+
+**Nachgeprüft (2026-09-26):** 228 API-Tests, 213 Web-Tests, Lint, Typecheck, Prettier. Im Browser
+gegen den Dev-Bestand: die Maske zeigt beide Kontoverbindungen, ein doppelt vergebenes Datum wird
+mit deutschem Satz abgewiesen; die im Vorjahr bezahlte Rechnung zeigt die alte IBAN samt Hinweis
+„Kontoverbindung zum Überweisungsdatum" und die alte BIC, die offene Rechnung die heutige IBAN, BIC
+und den abweichenden Empfänger; ein in die Maske getipptes Zahlungsdatum aus dem Vorjahr schaltet
+IBAN und GiroCode sofort auf das alte Konto um. GiroCode-Payload aus dem Browser-Modul geprüft:
+Zeile 5 BIC, Zeile 6 Empfänger. Probelauf der Zahlungserinnerung nennt den Empfänger der gültigen
+Kontoverbindung. Fokusring im neuen Dialog per Tastatur-Screenshot an jedem Schalter des
+Historienblocks geprüft, an keiner Kante beschnitten.
+
 ## Slice 39 — Papierkorb
 **Ziel:** Gelöschtes ist sichtbar, wiederherstellbar und endgültig entfernbar (issues.md 10).
 - `softDeleteRow` setzt nur `status = -1`; es gibt weder eine Liste der gelöschten Einträge noch

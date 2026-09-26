@@ -16,6 +16,7 @@ const EXPECTED_TABLES = [
   'ContractYears',
   'Facilities',
   'CollectionAgencies',
+  'AgencyBankAccounts',
   'Submissions',
   'SubmissionInvoices',
   'InvoiceExclusions',
@@ -438,6 +439,90 @@ test('migration 011 moves a billing onto its policy and guards the number, and b
       "SELECT submissionUID FROM ServiceBillings WHERE billingUID = 'sMIGRATIO11A'",
     );
     assert.equal(restored?.submissionUID, 'eMIGRATIO11A');
+
+    await migrator.up();
+  } finally {
+    await cleanup().catch(() => undefined);
+    await pool.end();
+  }
+});
+
+test('migration 012 turns an agency account into a history, and back', async (t) => {
+  const config = databaseConfigFromEnv();
+  if (!config) {
+    t.skip('no database configured (DB_* env vars unset)');
+    return;
+  }
+  const pool = createPool(config);
+  try {
+    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
+  } catch {
+    await pool.end();
+    t.skip('database not reachable');
+    return;
+  }
+
+  const cleanup = async (): Promise<void> => {
+    for (const sql of [
+      "DELETE FROM AgencyBankAccounts WHERE agencyUID = 'cMIGRATION12'",
+      "DELETE FROM CollectionAgencies WHERE agencyUID = 'cMIGRATION12'",
+    ]) {
+      await pool.query(sql).catch(() => undefined);
+    }
+  };
+
+  try {
+    await runMigrations(pool);
+    const migrator = createMigrator(pool);
+    const name012 = (await migrator.executed())
+      .map((m) => m.name)
+      .find((n) => n.startsWith('012-'));
+    assert.ok(name012, 'migration 012 should be recorded');
+
+    await cleanup();
+    // Back to the old shape: the agency carries exactly one IBAN.
+    await migrator.down({ to: name012 });
+    await pool.query(
+      `INSERT INTO CollectionAgencies (agencyUID, agencyName, bankAccount)
+       VALUES ('cMIGRATION12', 'Mig Inkasso', 'DE02120300000000202051')`,
+    );
+
+    await migrator.up();
+
+    // The account known so far became the undated first entry, and the column
+    // it came from is gone.
+    const accounts = await pool.query<Array<{ validFrom: string | null; bankAccount: string }>>(
+      "SELECT validFrom, bankAccount FROM AgencyBankAccounts WHERE agencyUID = 'cMIGRATION12'",
+    );
+    assert.deepEqual(accounts, [{ validFrom: null, bankAccount: 'DE02120300000000202051' }]);
+    const columns = await pool.query<Array<{ n: number }>>(
+      `SELECT COUNT(*) AS n FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'CollectionAgencies'
+          AND column_name = 'bankAccount'`,
+    );
+    assert.equal(Number(columns[0]?.n), 0);
+
+    // The undated entry's UID is derived from the agency's own, so a second
+    // account needs a different one.
+    assert.equal(
+      (
+        await pool.query<Array<{ uid: string }>>(
+          "SELECT agencyAccountUID AS uid FROM AgencyBankAccounts WHERE agencyUID = 'cMIGRATION12'",
+        )
+      )[0]?.uid,
+      'gMIGRATION12',
+    );
+
+    // down keeps the account in force — the later one, not the undated one.
+    await pool.query(
+      `INSERT INTO AgencyBankAccounts (agencyAccountUID, agencyUID, validFrom, bankAccount)
+       VALUES ('gMIGRATIO12B', 'cMIGRATION12', '2026-01-01', 'DE89370400440532013000')`,
+    );
+    await migrator.down({ to: name012 });
+    const [restored] = await pool.query<Array<{ bankAccount: string }>>(
+      "SELECT bankAccount FROM CollectionAgencies WHERE agencyUID = 'cMIGRATION12'",
+    );
+    assert.equal(restored?.bankAccount, 'DE89370400440532013000');
 
     await migrator.up();
   } finally {

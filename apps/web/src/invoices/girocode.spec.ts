@@ -42,6 +42,21 @@ describe('buildGirocode', () => {
     expect(payload.split('\n')[6]).toBe('DE02120300000000202051');
   });
 
+  it('carries the BIC in line 5 and normalises it', () => {
+    expect(payloadOf(buildGirocode({ ...base, bic: 'COBADEFFXXX' })).split('\n')[4]).toBe(
+      'COBADEFFXXX',
+    );
+    expect(payloadOf(buildGirocode({ ...base, bic: 'byladem1 001' })).split('\n')[4]).toBe(
+      'BYLADEM1001',
+    );
+  });
+
+  it('leaves the BIC line empty when the account has none — version 002 allows that', () => {
+    for (const bic of [undefined, null, '  ']) {
+      expect(payloadOf(buildGirocode({ ...base, bic })).split('\n')[4]).toBe('');
+    }
+  });
+
   it('leaves the reference line empty when there is no Verwendungszweck', () => {
     expect(payloadOf(buildGirocode({ ...base, subject: null })).split('\n')[10]).toBe('');
   });

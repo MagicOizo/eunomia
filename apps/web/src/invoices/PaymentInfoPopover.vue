@@ -6,12 +6,15 @@ import {
   faEuroSign,
   faHashtag,
   faHouseMedical,
+  faLandmark,
   faMoneyCheckDollar,
   faReceipt,
   faSackDollar,
 } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
+import { accountInForce } from '../agencies/accounts';
+import type { AgencyAccountDto } from '../agencies/api';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
 import { euro, germanDate } from '../lib/format';
@@ -23,18 +26,37 @@ const props = defineProps<{
   invoice: InvoiceDto;
   facilityName: string | null;
   agencyName: string | null;
-  bankAccount: string | null;
+  /**
+   * The agency's bank accounts, the whole history: which of them applies
+   * follows from the day the invoice was paid, so the resolution happens here
+   * rather than at every call site.
+   */
+  accounts?: AgencyAccountDto[];
 }>();
 
 const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.invoice)]})`);
+
+/**
+ * The account the money went to (or is going to): the one in force on the
+ * transfer date, today's while the invoice is unpaid. So a paid invoice keeps
+ * telling where it actually went, even after the agency moved bank.
+ */
+const account = computed(() => accountInForce(props.accounts ?? [], props.invoice.transferDate));
+/** Where the account names a beneficiary of its own, that name is the payee. */
+const payee = computed(() => account.value?.recipientName ?? props.agencyName);
+/**
+ * The shown account is no longer the current one. Worth saying: otherwise the
+ * IBAN here and the one on the agency's page differ without explanation.
+ */
+const historic = computed(
+  () => account.value !== null && account.value !== accountInForce(props.accounts ?? []),
+);
 
 // Nothing left to transfer, nothing to scan: a paid or cash-settled invoice
 // gets no GiroCode. Reuses the traffic light's rule rather than repeating it.
 const showQr = computed(
   () =>
-    props.bankAccount !== null &&
-    props.agencyName !== null &&
-    calcPaymentState(props.invoice) !== 'paid',
+    account.value !== null && payee.value !== null && calcPaymentState(props.invoice) !== 'paid',
 );
 </script>
 
@@ -73,26 +95,39 @@ const showQr = computed(
         <dd><a :href="invoice.documentLink" target="_blank" rel="noopener">Dokument öffnen</a></dd>
       </template>
 
-      <template v-if="agencyName">
+      <template v-if="payee">
         <dt><EuIconLabel :icon="faSackDollar" label="Abrechnungsdienstleister / Empfänger" /></dt>
-        <dd>{{ agencyName }}</dd>
+        <dd>{{ payee }}</dd>
       </template>
 
-      <template v-if="bankAccount">
+      <template v-if="account">
         <dt><EuIconLabel :icon="faMoneyCheckDollar" label="IBAN" /></dt>
         <!-- The GiroCode belongs to the IBAN, so it hangs off that row instead
              of claiming one of its own (which would also mean a label column
              entry for something that is not a value). -->
-        <dd class="eu-pay-grid__mono eu-pay-grid__iban">
-          <span>{{ bankAccount }}</span>
-          <PaymentQrPopover
-            v-if="showQr"
-            :recipient="agencyName ?? ''"
-            :iban="bankAccount"
-            :amount="invoice.invoiceAmount"
-            :subject="invoice.transferSubject"
-          />
+        <dd>
+          <span class="eu-pay-grid__iban eu-pay-grid__mono">
+            <span>{{ account.bankAccount }}</span>
+            <PaymentQrPopover
+              v-if="showQr"
+              :recipient="payee ?? ''"
+              :iban="account.bankAccount"
+              :bic="account.bic"
+              :amount="invoice.invoiceAmount"
+              :subject="invoice.transferSubject"
+            />
+          </span>
+          <!-- A remark about the IBAN above, so it stays inside that row
+               instead of claiming a label of its own. -->
+          <span v-if="historic" class="eu-pay-grid__aside">
+            Kontoverbindung zum Überweisungsdatum
+          </span>
         </dd>
+      </template>
+
+      <template v-if="account?.bic">
+        <dt><EuIconLabel :icon="faLandmark" label="BIC" /></dt>
+        <dd class="eu-pay-grid__mono">{{ account.bic }}</dd>
       </template>
 
       <template v-if="invoice.transferSubject">
@@ -132,6 +167,14 @@ const showQr = computed(
 
 .eu-pay-grid__mono {
   font-family: var(--eu-font-data);
+}
+
+/* Why the shown IBAN is not the agency's current one — quieter and smaller,
+   on its own line under the value. */
+.eu-pay-grid__aside {
+  display: block;
+  color: var(--eu-color-text-muted);
+  font-size: 0.8rem;
 }
 
 /* IBAN and its GiroCode button share the value cell; the IBAN keeps the wrap

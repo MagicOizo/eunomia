@@ -13,6 +13,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, nextTick, ref, watch, watchEffect } from 'vue';
 
+import type { AgencyAccountDto } from '../agencies/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -83,10 +84,17 @@ const contracts = ref<ContractRef[]>([]);
 const facilityOptions = ref<SelectOption[]>([]);
 const facilityNameById = ref<Map<string, string>>(new Map());
 const agencyOptions = ref<SelectOption[]>([]);
-const agencyById = ref<Map<string, { name: string; bankAccount: string }>>(new Map());
-const agencyIbanMap = computed(() =>
-  Object.fromEntries([...agencyById.value].map(([uid, a]) => [uid, a.bankAccount])),
+const agencyById = ref<Map<string, { name: string; accounts: AgencyAccountDto[] }>>(new Map());
+/** agencyUID → its bank accounts, for the mask's IBAN row and its GiroCode. */
+const agencyAccountMap = computed(() =>
+  Object.fromEntries([...agencyById.value].map(([uid, a]) => [uid, a.accounts])),
 );
+/** The agency's name and accounts for one invoice, or empty when it has none. */
+const agencyOf = (invoice: InvoiceDto) =>
+  (invoice.agencyUID ? agencyById.value.get(invoice.agencyUID) : undefined) ?? {
+    name: null,
+    accounts: [],
+  };
 /** facilityUID → name, for the invoice lists of the dialogs. */
 const facilityNameMap = computed(() => Object.fromEntries(facilityNameById.value));
 /** The facility's name for one invoice, or null when it has none. */
@@ -228,14 +236,16 @@ async function loadLookups(): Promise<void> {
   facilityOptions.value = facilities.map((f) => ({ value: f.facilityUID, label: f.facilityName }));
   facilityNameById.value = new Map(facilities.map((f) => [f.facilityUID, f.facilityName]));
 
+  // The whole account history per agency, not just today's IBAN: a paid
+  // invoice shows the account of the day it was paid (see agencies/accounts.ts).
   const agencies = await listResource<{
     agencyUID: string;
     agencyName: string;
-    bankAccount: string;
+    accounts: AgencyAccountDto[];
   }>('/agencies');
   agencyOptions.value = agencies.map((a) => ({ value: a.agencyUID, label: a.agencyName }));
   agencyById.value = new Map(
-    agencies.map((a) => [a.agencyUID, { name: a.agencyName, bankAccount: a.bankAccount }]),
+    agencies.map((a) => [a.agencyUID, { name: a.agencyName, accounts: a.accounts }]),
   );
 }
 
@@ -639,14 +649,8 @@ function confirmDelete(): void {
                 <PaymentInfoPopover
                   :invoice="invoice"
                   :facility-name="facilityName(invoice)"
-                  :agency-name="
-                    invoice.agencyUID ? (agencyById.get(invoice.agencyUID)?.name ?? null) : null
-                  "
-                  :bank-account="
-                    invoice.agencyUID
-                      ? (agencyById.get(invoice.agencyUID)?.bankAccount ?? null)
-                      : null
-                  "
+                  :agency-name="agencyOf(invoice).name"
+                  :accounts="agencyOf(invoice).accounts"
                 >
                   <template #trigger="{ expanded, panelId }">
                     <button
@@ -727,7 +731,7 @@ function confirmDelete(): void {
       :account-name="accountName"
       :facilities="facilityOptions"
       :agencies="agencyOptions"
-      :agency-iban="agencyIbanMap"
+      :agency-accounts="agencyAccountMap"
       :contracts="contractOptions"
       :plan-invoice="detailPlan"
       :submitting="dialogBusy"

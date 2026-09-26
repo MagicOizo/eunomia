@@ -172,10 +172,15 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
   // Policen
   HISTORY_BEFORE_CONTRACT: (d) => `${historyClause(d)} nicht vor dem Vertragsbeginn starten.`,
   HISTORY_AFTER_CONTRACT: (d) => `${historyClause(d)} nicht nach dem Vertragsende starten.`,
-  HISTORY_START_EXISTS: (d) =>
-    d.kind === 'terms'
-      ? 'Für dieses Jahr gibt es bereits Konditionen.'
-      : 'Für dieses Datum gibt es bereits einen Beitragsstand.',
+  HISTORY_START_EXISTS: (d) => {
+    if (d.kind === 'terms') return 'Für dieses Jahr gibt es bereits Konditionen.';
+    if (d.kind === 'agencyAccount') {
+      return d.undated === true
+        ? 'Es gibt schon eine Kontoverbindung ohne Startdatum. Bitte ein „Gültig ab“ angeben.'
+        : 'Für dieses Datum gibt es bereits eine Kontoverbindung.';
+    }
+    return 'Für dieses Datum gibt es bereits einen Beitragsstand.';
+  },
   YEAR_OUTSIDE_CONTRACT: () => 'Das Jahr liegt außerhalb der Vertragslaufzeit.',
   INVALID_YEAR: () => 'Bitte ein gültiges Jahr angeben.',
 
