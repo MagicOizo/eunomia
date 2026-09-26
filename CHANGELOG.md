@@ -7,6 +7,50 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0 — 2026-09-26
+
+Everything from the nine `0.12.0-slice.N` previews below, as one release. It answers the thirteen
+findings that came out of using 0.9.0 on real data:
+
+- **Entering data stops fighting back.** Tab takes the picked entry of a typeahead along instead of
+  dropping it, the suggestion list opens on a click, on typing and on the down arrow but no longer
+  on focus alone, Escape closes the list rather than the whole dialog, and a date pasted in German
+  notation (`24.09.2026`) lands in every date field. Every dialog starts at the top of its body, so
+  the next invoice is not typed into a field scrolled out of view.
+- **Every list can be searched.** Providers, agencies, insured persons, insurers and policies narrow
+  as you type, matching what the table shows — a policy is found by the name of the person it
+  belongs to. An invoice is found by its number alone, across everyone and every year the user may
+  see, and the hit leads straight into its workspace with the row marked and under the keyboard's
+  cursor.
+- **A Leistungsabrechnung belongs to the policy, not to one submission.** Insurers answer invoices
+  handed in on different days in a single letter; the model forbade recording that, so the same
+  letter had to be entered twice. A billing now hangs off the policy, its number is used once per
+  policy, and the dialog books invoices from several submissions in one go — each card saying which
+  day its invoice went in. Withdrawing an invoice from a submission is judged per invoice instead of
+  being blocked by any billing in sight.
+- **A booked reimbursement can be corrected.** Amount and receipt number reopen with a pencil next
+  to the booking, instead of a typo costing the whole assignment and throwing the invoice back
+  through every status. The "no enrichment" rule still holds, measured without the booking's own
+  amount.
+- **The submit dialog offers the policy that was running.** The list holds the policies that covered
+  the treatment period, each with the term it ran; a switch brings the others back, because an
+  insurer does accept a treatment from outside the term. A selection that straddles a change of
+  policy says so instead of guessing.
+- **A collection agency keeps a history of bank accounts.** A new IBAN no longer means creating the
+  agency a second time. Which account applies follows from the day of payment — a paid invoice keeps
+  showing the account that was valid back then, an unpaid one shows today's, and entering a payment
+  date switches the IBAN and the GiroCode before saving. The GiroCode finally carries the BIC and,
+  where the money is addressed to someone else, that beneficiary's name.
+- **What was deleted can be seen, brought back or let go.** Everything Eunomia deleted was only
+  hidden, with no way back and no way out. **Papierkorb** under System lists it by kind, with name,
+  origin and moment, and each row either returns or goes for good — under the new `MANAGE_TRASH`
+  right, which only Admin carries. A restore runs the same checks the masks do and is all or
+  nothing; deleting for good is refused while something active still points at the record and names
+  what that is. A letter comes back together with the reimbursements booked through it.
+- **Deletions now record their moment.** The new `deletedAt` sorts the trash, allows a retention
+  period later, and carries microseconds because it also identifies a single deletion — two
+  deletions a millisecond apart must not be undone as if they were one.
+
 ## 0.12.0-slice.9 — 2026-09-26
 
 - **Deleted records are no longer gone for good — or kept for ever.** Everything Eunomia deletes was
