@@ -19,6 +19,7 @@ export const PERMISSIONS = {
   MANAGE_AGENCIES: 'MANAGE_AGENCIES',
   MANAGE_USERS: 'MANAGE_USERS',
   MANAGE_SETTINGS: 'MANAGE_SETTINGS',
+  MANAGE_TRASH: 'MANAGE_TRASH',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

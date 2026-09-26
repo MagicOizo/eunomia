@@ -83,7 +83,7 @@ Ergänzung nach Durchsicht des ersten Umsetzungsversuchs (siehe 1.4) und Klärun
 
 ## 2.3 Datenmodell (Entwurf v2)
 
-Bewährtes aus dem Vorgängerprojekt wird übernommen: NanoID-basierte öffentliche IDs mit Entitäts-Präfix (siehe `database.md` / `eunomia-description.md` §5), Soft-Delete über eine `status`-Spalte (`1`=aktiv, `0`=inaktiv, `-1`=gelöscht — künftig **konsistent für alle** Entitäten, ohne die Ausnahmen, die `ServiceBillings`/`Assignment` im Vorgänger hatten), Geldbeträge als `DECIMAL`, Datumsfelder als `DATE`.
+Bewährtes aus dem Vorgängerprojekt wird übernommen: NanoID-basierte öffentliche IDs mit Entitäts-Präfix (siehe `database.md` / `eunomia-description.md` §5), Soft-Delete über eine `status`-Spalte (`1`=aktiv, `0`=inaktiv, `-1`=gelöscht — künftig **konsistent für alle** Entitäten, ohne die Ausnahmen, die `ServiceBillings`/`Assignment` im Vorgänger hatten), Geldbeträge als `DECIMAL`, Datumsfelder als `DATE`. Seit Slice 39 trägt jede weich löschbare Tabelle zusätzlich ein `deletedAt DATETIME(6)`: es sortiert den Papierkorb, trägt später eine Aufräumfrist — und identifiziert vor allem **einen Löschvorgang**, weil eine Kaskade denselben exakten Wert in alle betroffenen Zeilen schreibt und das Wiederherstellen genau diesen Vorgang umkehrt. Vor 0.12.0 gelöschte Zeilen haben `NULL` und zeigen „unbekannt".
 
 ### Kern-Fix für Problem 1.3.1: `Submissions` als eigene Entität
 
@@ -1331,7 +1331,7 @@ Zeile 5 BIC, Zeile 6 Empfänger. Probelauf der Zahlungserinnerung nennt den Empf
 Kontoverbindung. Fokusring im neuen Dialog per Tastatur-Screenshot an jedem Schalter des
 Historienblocks geprüft, an keiner Kante beschnitten.
 
-## Slice 39 — Papierkorb
+## Slice 39 — Papierkorb (umgesetzt 2026-09-26)
 **Ziel:** Gelöschtes ist sichtbar, wiederherstellbar und endgültig entfernbar (issues.md 10).
 - `softDeleteRow` setzt nur `status = -1`; es gibt weder eine Liste der gelöschten Einträge noch
   Wiederherstellen noch endgültiges Löschen. Gelöschtes ist damit unsichtbar, aber für immer da.
@@ -1345,6 +1345,75 @@ Historienblocks geprüft, an keiner Kante beschnitten.
 
 **DoD:** Ein gelöschter Eintrag ist im Papierkorb zu finden, kommt zurück oder verschwindet
 endgültig; ein noch referenzierter Eintrag erklärt, warum er nicht endgültig gelöscht werden kann.
+
+**Festlegungen beim Planen (Autor, 2026-09-26):**
+
+- **Eine Seite im Systembereich** (`/system/trash`), nach Entität gruppiert, hinter dem neuen Recht
+  `MANAGE_TRASH` — das nur die Rolle `Admin` trägt. **Kein Account-Scoping:** endgültiges Löschen ist
+  ein administrativer Akt, und der Verweis eines gelöschten Eintrags auf seinen Versicherten kann
+  selbst gelöscht sein — dann bliebe nichts, woran zu scopen wäre.
+- **Wiederherstellen wird abgelehnt, wenn ein Pflicht-Vorfahre im Papierkorb liegt**, und die
+  Meldung nennt ihn. Nur NOT-NULL-Verweise blockieren; ein gelöschter Leistungserbringer an einer
+  Rechnung ist ein Zustand, den die App heute schon verträgt.
+- **Endgültig löschen nimmt mit, was daran hängt und selbst im Papierkorb liegt** (rekursiv), die
+  Abfrage nennt es. Abgelehnt wird nur, wenn noch etwas **Aktives** daran hängt. Symmetrisch dazu:
+  **Wiederherstellen holt die im selben Zug gelöschten Kinder mit zurück**, erkannt am gleichen
+  `deletedAt`.
+- **Gelöschte Einreichungen stehen im Papierkorb, aber ohne Wiederherstellen.** Eine Einreichung
+  verschwindet erst, wenn ihre letzte Rechnung zurückgezogen ist — was im Papierkorb liegt, ist
+  immer eine leere Hülle. Sie bleibt sichtbar, damit der Bestand aufräumbar ist.
+- **Wiederherstellen ist immer eine Transaktion — alles oder nichts.** Scheitert ein Kind des
+  Batches, kommt auch der Vorfahre nicht zurück. Keine Zwischenzustände.
+- **Widerspricht eine Wiederherstellung einer Eindeutigkeits- oder Fachregel, scheitert sie.** Der
+  Papierkorb erzeugt nie einen Zustand, den die Masken selbst verboten hätten.
+- **Jede fehlgeschlagene Wiederherstellung erklärt sich auf Deutsch** am konkreten Eintrag — auch
+  wenn es ein Kind im Batch war — und sagt, dass nichts geändert wurde.
+- Keine automatische Aufräumfrist in dieser Scheibe: `deletedAt` macht sie möglich, die DoD verlangt
+  sie nicht.
+
+**Befunde beim Bauen:**
+
+- **Der Batch-Zeitstempel braucht Mikrosekunden.** Mit `DATETIME` auf Sekunden galten zwei
+  unabhängige Löschungen in derselben Sekunde als ein Batch — im Test sofort sichtbar: das
+  Wiederherstellen einer Police holte den Sekundenbruchteile vorher gelöschten Beitragsstand
+  ungefragt mit. `deletedAt` ist deshalb `DATETIME(6)`, und `deletionTimestamp` liest `NOW(6)` einmal
+  aus, damit eine Kaskade denselben exakten Wert in alle Zeilen schreibt. Der Zeitstempel ist eine
+  **Identität**, kein Anzeigewert; angezeigt wird er auf Minuten gerundet.
+- **Die Beziehungen kommen aus `information_schema`, nicht aus einer Liste.** Wer an wem hängt,
+  steht in den Fremdschlüsseln; eine handgeschriebene Liste wäre eine zweite Wahrheit, die beim
+  nächsten Modellwechsel leise falsch wird. `trash-references.ts` liest sie einmal je Prozess und
+  cacht sie. Daraus folgen alle drei Regeln: Blocker (aktive Zeile mit `RESTRICT`), „geht mit"
+  (gelöschte Zeile oder Verknüpfungszeile) und Pflicht-Vorfahre (NOT-NULL-Spalte).
+- **Verknüpfungstabellen sind keine Einträge.** `SubmissionInvoices`, `InvoiceExclusions`,
+  `ContractBonusTiers` und `ContractYears` haben keine Status-Spalte — Migration 007 hält fest, dass
+  eine Verknüpfung einfach gelöscht wird. Beim endgültigen Löschen gehen sie deshalb mit, statt zu
+  blockieren; die Abfrage benennt sie, weil ein Versicherungsjahr von Hand erfasste Arbeit ist.
+  Verliert eine Einreichung dabei ihre letzte Rechnung, wird sie weich gelöscht — dieselbe Regel wie
+  beim Zurückziehen von Hand.
+- **Die Prüfungen der Masken werden wiederverwendet, nicht nachgebaut.** `assertValidityFree`,
+  `assertStartFree` und `assertBillingNumberFree` gab es schon; sie sind nur exportiert und laufen
+  jetzt auch vor einem Wiederherstellen. Neu ist allein das Bereicherungsverbot für eine einzelne
+  Erstattung. Ein trotzdem durchschlagender 1062 wird als `RESTORE_CONFLICT` übersetzt, damit nie
+  ein Treiberfehler nach außen dringt.
+- **Die Begründung „nicht wiederherstellbar" gehört in die Zusammenhang-Spalte.** In der
+  Aktionen-Spalte drängte sie den verbleibenden Schalter über die Kante des Scroll-Containers — im
+  Screenshot sofort sichtbar, in keiner DOM-Messung.
+- **Eine Sortierung für die ganze Seite, nicht eine je Gruppe.** Alle Gruppen zeigen dieselben drei
+  Spalten; die Zeilen werden als eine flache Liste sortiert und zum Rendern wieder aufgeteilt. Der
+  erste Versuch (ein `useTableSort` je Gruppe, in einem `computed` erzeugt) hätte den Sortierzustand
+  bei jedem Tastendruck in der Suche verloren.
+
+**Nachgeprüft (2026-09-26):** 245 API-Tests, 222 Web-Tests, Lint, Typecheck, Prettier. Migration 013
+viermal hintereinander hoch und runter gegen dieselbe Datenbank (`ALGORITHM=COPY` beim Droppen der
+zwölf Spalten). Im Browser gegen den Dev-Bestand: die Seite zeigt Beitragsstände, Leistungserbringer
+und Rechnungen mit Löschzeitpunkt; eine gelöschte Leistungsabrechnung steht „samt 3 Erstattungen"
+da und kommt mit einem Klick vollständig zurück; das endgültige Löschen des gelöschten
+Leistungserbringers wird mit „Daran hängt noch: 1 Rechnung." abgewiesen; ein Wiederherstellen gegen
+eine inzwischen belegte Beitrags-Startzeit antwortet „Beitragsstand ‚ab 01.07.2023': für dieses
+Datum gibt es bereits einen Beitragsstand. Es wurde nichts wiederhergestellt."; eine leergezogene
+Einreichung zeigt statt des Schalters ihren Grund; die gelöschte Rechnung verschwindet nach der
+Abfrage endgültig. Fokusring per Tastatur-Screenshot an allen vier Schaltern geprüft, auch bei 420 px
+mit waagerecht gescrollter Tabelle — an keiner Kante beschnitten.
 
 ## Backlog aus der Produktionsnutzung
 

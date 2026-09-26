@@ -224,7 +224,8 @@ password nobody uses.
 
 The API lives under `/api/v1` and (except for the version endpoint) requires a Bearer access
 token. Successful responses use the envelope `{ "data": … }`; failures use
-`{ "error": { code, message } }`. Entities are soft-deleted. Log in via
+`{ "error": { code, message } }`. Entities are soft-deleted; what that leaves behind is managed
+under **Trash** below. Log in via
 `POST /api/v1/auth/login` (returns a short-lived `accessToken` in the body; a long-lived refresh
 token is set as an httpOnly cookie scoped to `/api/v1/auth`); use `POST /api/v1/auth/refresh` /
 `/auth/logout` to renew or end the session.
@@ -280,6 +281,20 @@ claim-free years → absolute amount). `GET /api/v1/contracts/:uid` returns the 
 claim-free streak and expected bonus per year, counted from the policy's start value, its forfeit
 rule and each billing's `forfeitsBonus`. `PUT /api/v1/contracts/:uid/years/:year` records the
 bonus actually paid and an optional "forfeited" override.
+
+**Trash** (`MANAGE_TRASH`, held globally — it is an administrative view, not account-scoped):
+deleting anything in Eunomia is a soft delete, and `/api/v1/trash` is where those records are seen,
+restored or removed for good. `GET /` lists them grouped by kind with a label, a context line and
+the moment they went; `POST /:uid/restore` brings one back; `DELETE /:uid` removes it for good. The
+kind follows from the public ID's prefix, so no entity name appears in the URL. Two rules govern it:
+
+- A restore is one transaction over the record **and** what was deleted in the same moment with it
+  (a billing and its reimbursements), and it runs the same checks the forms do — a restore never
+  produces a state a mask forbids. If any part fails, nothing moves and the answer names the record
+  it hung on.
+- Deleting for good takes along the deleted records that hang on it and the link rows that are not
+  records of their own. It is refused while something **active** still points at it; the answer then
+  carries `details.blockers` saying what.
 
 **Instance** — `GET /api/v1/version` reports the running version and needs no token (it doubles as
 the container health check). `GET /api/v1/update-check` compares that version against the latest

@@ -161,7 +161,7 @@ export async function listAccountsWithValidity(
  * day — including the undated case, which the database cannot catch: a UNIQUE
  * key accepts NULL any number of times.
  */
-async function assertStartFree(
+export async function assertStartFree(
   db: Queryable,
   agencyUID: string,
   validFrom: string | null,

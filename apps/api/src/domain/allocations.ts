@@ -22,7 +22,7 @@ import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { authorizeAccount } from './workflow-access.js';
 
-const table: CrudTable = {
+export const allocationsTable: CrudTable = {
   table: 'Allocations',
   uidColumn: 'allocationUID',
   statusColumn: 'allocationStatus',
@@ -189,7 +189,7 @@ export async function createAllocationsForBilling(
 
     const created: Row[] = [];
     for (const entry of entries) {
-      created.push(await insertRow(conn, table, { ...entry, billingUID }));
+      created.push(await insertRow(conn, allocationsTable, { ...entry, billingUID }));
     }
     return created;
   });
@@ -246,7 +246,7 @@ export async function updateAllocation(
         receiptNumber: patch.receiptNumber,
       },
     ]);
-    return updateRow(conn, table, allocationUID, patch);
+    return updateRow(conn, allocationsTable, allocationUID, patch);
   });
 }
 
@@ -298,7 +298,7 @@ export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
     const account = await accountForAllocation(pool, uid);
     if (account === null) throw notFound('Allocation');
     await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
-    sendData(res, await getRow(pool, table, uid));
+    sendData(res, await getRow(pool, allocationsTable, uid));
   });
 
   router.patch('/:uid', requireAuth, async (req, res) => {
@@ -314,7 +314,7 @@ export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
     const account = await accountForAllocation(pool, uid);
     if (account === null) throw notFound('Allocation');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
-    await softDeleteRow(pool, table, uid);
+    await softDeleteRow(pool, allocationsTable, uid);
     res.status(204).end();
   });
 

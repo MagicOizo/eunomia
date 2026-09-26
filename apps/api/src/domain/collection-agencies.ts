@@ -43,7 +43,7 @@ import {
  * fields.
  */
 
-const table: CrudTable = {
+export const agenciesTable: CrudTable = {
   table: 'CollectionAgencies',
   uidColumn: 'agencyUID',
   statusColumn: 'agencyStatus',
@@ -88,7 +88,7 @@ export function createCollectionAgenciesRouter(pool: Pool, config: AppConfig): R
   const requireManage = createRequirePermission(pool, PERMISSIONS.MANAGE_AGENCIES);
 
   router.get('/', requireAuth, async (_req, res) => {
-    const agencies = await listRows(pool, table);
+    const agencies = await listRows(pool, agenciesTable);
     // One query for all accounts instead of one per agency: the set is small,
     // and the list is the page's own query.
     const accounts = await pool.query<Array<AgencyAccount & { agencyUID: string }>>(
@@ -110,7 +110,7 @@ export function createCollectionAgenciesRouter(pool: Pool, config: AppConfig): R
 
   router.get('/:uid', requireAuth, async (req, res) => {
     const uid = pathParam(req, 'uid');
-    const agency = await getRow(pool, table, uid);
+    const agency = await getRow(pool, agenciesTable, uid);
     if (!agency) throw notFound('Collection agency');
     sendData(res, withAccounts(agency, await listAccountsWithValidity(pool, uid)));
   });
@@ -118,7 +118,7 @@ export function createCollectionAgenciesRouter(pool: Pool, config: AppConfig): R
   router.post('/', requireAuth, requireManage, async (req, res) => {
     const { agencyName, ...account } = createSchema.parse(req.body);
     const created = await withTransaction(pool, async (conn) => {
-      const agency = await insertRow(conn, table, { agencyName });
+      const agency = await insertRow(conn, agenciesTable, { agencyName });
       await insertAccount(conn, String(agency.agencyUID), account);
       return agency;
     });
@@ -132,13 +132,13 @@ export function createCollectionAgenciesRouter(pool: Pool, config: AppConfig): R
   router.patch('/:uid', requireAuth, requireManage, async (req, res) => {
     const uid = pathParam(req, 'uid');
     const data = updateSchema.parse(req.body);
-    const updated = await updateRow(pool, table, uid, data);
+    const updated = await updateRow(pool, agenciesTable, uid, data);
     if (!updated) throw notFound('Collection agency');
     sendData(res, withAccounts(updated, await listAccountsWithValidity(pool, uid)));
   });
 
   router.delete('/:uid', requireAuth, requireManage, async (req, res) => {
-    const deleted = await softDeleteRow(pool, table, pathParam(req, 'uid'));
+    const deleted = await softDeleteRow(pool, agenciesTable, pathParam(req, 'uid'));
     if (!deleted) throw notFound('Collection agency');
     res.status(204).end();
   });

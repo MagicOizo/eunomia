@@ -7,11 +7,26 @@ import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
+import type { CrudTable } from '../crud/repository.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { withTransaction } from '../db/transaction.js';
 import { ENTITY_PREFIX, entityIdPattern, generateEntityId } from '../lib/ids.js';
 import { accountForContract, accountForSubmission, authorizeAccount } from './workflow-access.js';
+
+/**
+ * A submission is written by hand here (its invoices come with it, in one
+ * transaction), so the generic CRUD helpers are not used for it — but the
+ * trash needs its table spec like every other entity's, so it lives here
+ * rather than in the registry.
+ */
+export const submissionsTable: CrudTable = {
+  table: 'Submissions',
+  uidColumn: 'submissionUID',
+  statusColumn: 'submissionStatus',
+  entity: 'submission',
+  columns: ['contractUID', 'submittedDate', 'documentLink'],
+};
 
 const createSchema = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
@@ -282,9 +297,10 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
         [uid],
       );
       if (Number(left?.n ?? 0) === 0) {
-        await conn.query('UPDATE Submissions SET submissionStatus = -1 WHERE submissionUID = ?', [
-          uid,
-        ]);
+        await conn.query(
+          'UPDATE Submissions SET submissionStatus = -1, deletedAt = NOW(6) WHERE submissionUID = ?',
+          [uid],
+        );
       }
       await conn.query(
         `UPDATE Invoices i SET i.reimbursementClosed = 0

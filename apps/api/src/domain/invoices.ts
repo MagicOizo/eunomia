@@ -22,7 +22,7 @@ import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { deriveInvoiceStatus, deriveSubmissionStatus } from './invoice-status.js';
 import { accountForContract, accountForInvoice, authorizeAccount } from './workflow-access.js';
 
-const table: CrudTable = {
+export const invoicesTable: CrudTable = {
   table: 'Invoices',
   uidColumn: 'invoiceUID',
   statusColumn: 'invoiceStatus',
@@ -449,7 +449,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const user = getAuthUser(res);
     const data = base.parse(req.body);
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, data.accountUID);
-    const created = await insertRow(pool, table, data);
+    const created = await insertRow(pool, invoicesTable, data);
     const enriched = await getInvoice(pool, created.invoiceUID as string);
     sendData(res, await presentOne(pool, enriched as InvoiceRow), 201);
   });
@@ -481,7 +481,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
           code: ERROR_CODES.INVOICE_NOT_SUBMITTED,
         });
       }
-      await updateRow(conn, table, uid, data);
+      await updateRow(conn, invoicesTable, uid, data);
     });
 
     sendData(res, await presentOne(pool, (await getInvoice(pool, uid)) as InvoiceRow));
@@ -557,7 +557,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const account = await accountForInvoice(pool, uid);
     if (account === null) throw notFound('Invoice');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
-    await softDeleteRow(pool, table, uid);
+    await softDeleteRow(pool, invoicesTable, uid);
     res.status(204).end();
   });
 

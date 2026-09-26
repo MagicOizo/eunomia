@@ -37,6 +37,7 @@ const ids = {
   contractAnnaExpired: seedId('contract', 2),
   facilityDoctor: seedId('facility', 0),
   facilityRadiology: seedId('facility', 1),
+  facilityDeleted: seedId('facility', 2),
   agency: seedId('agency', 0),
   // Index 0 is the account the agency started with, and its seed ID happens to
   // be exactly what migration 012 derives from the agency's own ID ('g' plus
@@ -59,6 +60,8 @@ const ids = {
   invoiceCash: seedId('invoice', 8),
   invoiceObjection: seedId('invoice', 9),
   invoiceCorrected: seedId('invoice', 10),
+  invoiceDeleted: seedId('invoice', 11),
+  invoiceAtDeletedFacility: seedId('invoice', 12),
   billing: seedId('serviceBilling', 0),
   billingSupplementary: seedId('serviceBilling', 1),
   billingObjection: seedId('serviceBilling', 2),
@@ -70,6 +73,7 @@ const ids = {
   allocationObjection: seedId('allocation', 4),
   allocationFirst: seedId('allocation', 5),
   allocationCorrection: seedId('allocation', 6),
+  premiumDeleted: seedId('premium', 9),
 };
 
 /** Anna and her son Ben; Ben has no policy of his own (an edge case in the UI). */
@@ -548,6 +552,7 @@ export async function seedDatabase(pool: Pool): Promise<void> {
   await seedContracts(pool);
   await seedInvoices(pool);
   await seedWorkflow(pool);
+  await seedTrash(pool);
   await seedFamilyPolicy(pool, {
     leadAccountUID: ids.accountAnna,
     parentContractUID: ids.contractAnna,
@@ -556,6 +561,59 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     facilityRadiologyUID: ids.facilityRadiology,
   });
   await seedExampleYears(pool);
+}
+
+/**
+ * Something in the trash, so the Papierkorb (Slice 39) is not empty in
+ * development — and so both outcomes can be tried out:
+ *  - a deleted facility that an ACTIVE invoice still names: deleting it for
+ *    good is refused and the answer names the invoice;
+ *  - a deleted invoice nothing points at: it comes back, or goes for good;
+ *  - a deleted premium of a live policy: restoring it works, unless the same
+ *    start date has been taken again in the meantime.
+ *
+ * `deletedAt` is written here by hand — the seed inserts rows, it does not go
+ * through the delete endpoints.
+ */
+async function seedTrash(pool: Pool): Promise<void> {
+  await seedRow(pool, 'Facilities', {
+    facilityUID: ids.facilityDeleted,
+    facilityName: 'Praxis Alt (gelöscht)',
+    distanceKm: 8,
+    facilityStatus: -1,
+    deletedAt: `${daysFromToday(-9)} 10:12:00.000000`,
+  });
+  // The invoice that keeps the deleted facility from going for good.
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceAtDeletedFacility,
+    invoiceNumber: 'R-2024-190',
+    invoiceDate: seedDate(-1, '03-04'),
+    treatmentDate: seedDate(-1, '03-01'),
+    accountUID: ids.accountAnna,
+    facilityUID: ids.facilityDeleted,
+    invoiceAmount: 64.5,
+    transferDate: seedDate(-1, '03-20'),
+  });
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceDeleted,
+    invoiceNumber: 'R-2024-191',
+    invoiceDate: seedDate(-1, '03-05'),
+    treatmentDate: seedDate(-1, '03-02'),
+    accountUID: ids.accountAnna,
+    facilityUID: ids.facilityRadiology,
+    invoiceAmount: 31.9,
+    invoiceStatus: -1,
+    deletedAt: `${daysFromToday(-4)} 16:45:00.000000`,
+  });
+  await seedRow(pool, 'ContractPremiums', {
+    premiumUID: ids.premiumDeleted,
+    contractUID: ids.contractAnna,
+    validFrom: seedDate(-3, '07-01'),
+    monthlyPremium: 395.0,
+    note: 'Beitragsstand aus Versehen erfasst',
+    premiumStatus: -1,
+    deletedAt: `${daysFromToday(-2)} 08:05:00.000000`,
+  });
 }
 
 /**

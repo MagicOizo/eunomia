@@ -24,6 +24,7 @@ import { createInvoicesRouter } from './domain/invoices.js';
 import { createReimbursementPlanRouter } from './domain/reimbursement-plan.js';
 import { createServiceBillingsRouter } from './domain/service-billings.js';
 import { createSubmissionsRouter } from './domain/submissions.js';
+import { createTrashRouter } from './domain/trash.js';
 import { errorHandler } from './lib/error-handler.js';
 import { createUpdateCheckRouter } from './routes/update-check.js';
 import { versionRouter } from './routes/version.js';
@@ -97,6 +98,7 @@ export function createApp(deps?: AppDependencies): Express {
     app.use('/api/v1/submissions', createSubmissionsRouter(pool, config));
     app.use('/api/v1/billings', createServiceBillingsRouter(pool, config));
     app.use('/api/v1/allocations', createAllocationsRouter(pool, config));
+    app.use('/api/v1/trash', createTrashRouter(pool, config));
 
     // In production the built SPA is served by this same server (same origin, so
     // the httpOnly refresh cookie works without proxy tricks). Absent in dev/

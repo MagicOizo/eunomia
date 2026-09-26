@@ -7,7 +7,7 @@ import { PERMISSIONS } from '../auth/permissions.js';
 import { createMasterDataRouter } from '../crud/master-data-router.js';
 import type { CrudTable } from '../crud/repository.js';
 
-const table: CrudTable = {
+export const companiesTable: CrudTable = {
   table: 'InsuranceCompanies',
   uidColumn: 'companyUID',
   statusColumn: 'companyStatus',
@@ -38,7 +38,7 @@ const base = z.object({
 /** CRUD router for insurance companies. */
 export function createInsuranceCompaniesRouter(pool: Pool, config: AppConfig): Router {
   return createMasterDataRouter(pool, config, {
-    table,
+    table: companiesTable,
     resource: 'Insurance company',
     managePermission: PERMISSIONS.MANAGE_COMPANIES,
     createSchema: base,

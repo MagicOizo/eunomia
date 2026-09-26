@@ -7,6 +7,33 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.12.0-slice.9 — 2026-09-26
+
+- **Deleted records are no longer gone for good — or kept for ever.** Everything Eunomia deletes was
+  only ever hidden: the row stayed in the database, invisible, with no way to bring it back and no
+  way to be rid of it. A new page under System, **Papierkorb**, lists what was deleted — grouped by
+  kind, each entry with its name, where it belonged and when it went — and each row either comes
+  back or goes for good. It is an administrative view: it needs the new `MANAGE_TRASH` right, which
+  only the Admin role carries.
+- **A letter comes back with its reimbursements.** Deleting a Leistungsabrechnung detaches the
+  refunds booked through it; the trash records that as one deletion, shows the letter "samt 3
+  Erstattungen" and restores all of it with one click. The same holds the other way: deleting such
+  an entry for good takes along what hangs on it and is itself in the trash, and the confirmation
+  names every piece — including hand-entered work like a recorded insurance year.
+- **A record that is still in use says who is using it.** Deleting for good is refused while
+  something active still points at the record, and the sentence names it ("Daran hängt noch: 1
+  Rechnung.") instead of failing with a foreign-key error.
+- **A restore never creates a state the forms forbid.** It runs the same checks the masks do — no
+  second premium for one start date, no billing number used twice under a policy, no refunds above
+  the invoice amount — and it is all or nothing: if any part of the batch fails, nothing moves and
+  the message says which record refused, and that nothing was restored.
+- **An emptied submission is visible but not restorable.** A submission only disappears when its
+  last invoice is withdrawn, so what lies in the trash is an empty shell; it is listed with its date
+  and policy, says why it cannot come back, and can be cleared away.
+- **Every deletion now records its moment.** The new `deletedAt` sorts the trash and later allows a
+  retention period; it carries microseconds because it also identifies one deletion — two deletions
+  a millisecond apart must not be undone as if they were one.
+
 ## 0.12.0-slice.8 — 2026-09-26
 
 - **A collection agency that changes bank stays one entry.** Its account used to be a single field,

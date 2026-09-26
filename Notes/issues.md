@@ -43,7 +43,7 @@
 9.  Ändern einmal zugewiesener Rechnungen — Umgesetzt mit v0.12.0-slice.3
 	Wenn eine Rechnung einer Leistungsabrechnung zugeordnet wird, legt man Erstattungsbetrag und Belegnummer fest. Danach sind diese Werte in der UI nicht mehr änderbar.
 	Es muss eine Möglichkeit geben, die Werte nachträglich anzupassen. Der einzige Weg ist heute, dass man die Zuordnung für die Rechnung löscht.
-10. Es fehlt die Ansicht für den "Papierkorb"
+10. Es fehlt die Ansicht für den "Papierkorb" — Umgesetzt mit v0.12.0-slice.9
 	Die App nutzt heute ein Prinzip des Soft-Delete. Es gibt aber noch keine Möglichkeit in der UI zum Zurückholen der gelöschten Items oder auch zum Hard-Delete, wenn sie
 	wirklich nicht mehr benötigt werden (mit einfacher Bestätigungs-Abfrage).
 11. Copy&Paste eines Datums — Umgesetzt mit v0.12.0-slice.1

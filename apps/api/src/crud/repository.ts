@@ -29,6 +29,12 @@ export interface Filter {
 }
 
 const STATUS_DELETED = -1;
+const STATUS_ACTIVE = 1;
+/**
+ * The deletion timestamp, spelled the same on every table (unlike the prefixed
+ * status columns) — added by migration 013 for the trash.
+ */
+const DELETED_AT = 'deletedAt';
 
 interface InsertResult {
   insertId: number;
@@ -118,11 +124,83 @@ export async function updateRow(
   return getRow(pool, t, uid);
 }
 
-/** Soft-deletes a row (status = -1). Returns false if it did not exist / was already deleted. */
-export async function softDeleteRow(pool: Queryable, t: CrudTable, uid: string): Promise<boolean> {
+/**
+ * The database's clock as a `YYYY-MM-DD HH:MM:SS` string — the moment a
+ * deletion is stamped with, down to the microsecond. Read once so a cascade can
+ * write the SAME instant into every row it touches: that shared timestamp is
+ * what makes the rows one deletion *batch*, and the trash restores exactly a
+ * batch (see domain/trash). Microseconds because the timestamp is an identity,
+ * not a display value — two deletions a millisecond apart are two batches. The
+ * clock is the server's, like `NOW()`/`CURDATE()` everywhere else.
+ */
+export async function deletionTimestamp(pool: Queryable): Promise<string> {
+  const rows = await pool.query<Array<{ ts: string }>>(
+    "SELECT DATE_FORMAT(NOW(6), '%Y-%m-%d %H:%i:%s.%f') AS ts",
+  );
+  const stamp = rows[0]?.ts;
+  if (stamp === undefined) throw new Error('The database did not answer with its current time');
+  return stamp;
+}
+
+/**
+ * Soft-deletes a row (status = -1) and stamps `deletedAt`. Returns false if it
+ * did not exist / was already deleted. `at` lets a cascade share one timestamp
+ * (see `deletionTimestamp`); left out, the row is stamped with the database's
+ * time of this statement.
+ */
+export async function softDeleteRow(
+  pool: Queryable,
+  t: CrudTable,
+  uid: string,
+  at?: string,
+): Promise<boolean> {
   const result = (await pool.query(
-    `UPDATE ${t.table} SET ${t.statusColumn} = ? WHERE ${t.uidColumn} = ? AND ${t.statusColumn} <> ?`,
-    [STATUS_DELETED, uid, STATUS_DELETED],
+    `UPDATE ${t.table} SET ${t.statusColumn} = ?, ${DELETED_AT} = ${at === undefined ? 'NOW(6)' : '?'}
+      WHERE ${t.uidColumn} = ? AND ${t.statusColumn} <> ?`,
+    at === undefined
+      ? [STATUS_DELETED, uid, STATUS_DELETED]
+      : [STATUS_DELETED, at, uid, STATUS_DELETED],
+  )) as InsertResult;
+  return result.affectedRows > 0;
+}
+
+/** Fetches a single DELETED row by its UID, or null — the trash's counterpart to `getRow`. */
+export async function getDeletedRow(
+  pool: Queryable,
+  t: CrudTable,
+  uid: string,
+): Promise<Row | null> {
+  const rows = await pool.query<Row[]>(
+    `SELECT ${outputColumns(t)}, ${DELETED_AT} FROM ${t.table}
+      WHERE ${t.uidColumn} = ? AND ${t.statusColumn} = ? LIMIT 1`,
+    [uid, STATUS_DELETED],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Brings a deleted row back and clears its `deletedAt`. Status 1, not 0:
+ * nothing in the application ever writes the "inactive" status, so active is
+ * the only state a row can return to. Returns false when there was no deleted
+ * row under that UID.
+ */
+export async function restoreRow(pool: Queryable, t: CrudTable, uid: string): Promise<boolean> {
+  const result = (await pool.query(
+    `UPDATE ${t.table} SET ${t.statusColumn} = ?, ${DELETED_AT} = NULL
+      WHERE ${t.uidColumn} = ? AND ${t.statusColumn} = ?`,
+    [STATUS_ACTIVE, uid, STATUS_DELETED],
+  )) as InsertResult;
+  return result.affectedRows > 0;
+}
+
+/**
+ * Removes a row for good. Only ever a deleted one: the status condition makes
+ * it impossible for a bug in a caller to hard-delete a live record.
+ */
+export async function hardDeleteRow(pool: Queryable, t: CrudTable, uid: string): Promise<boolean> {
+  const result = (await pool.query(
+    `DELETE FROM ${t.table} WHERE ${t.uidColumn} = ? AND ${t.statusColumn} = ?`,
+    [uid, STATUS_DELETED],
   )) as InsertResult;
   return result.affectedRows > 0;
 }

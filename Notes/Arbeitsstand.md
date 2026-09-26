@@ -25,7 +25,10 @@ in [eunomia-plan.md](eunomia-plan.md). 0.11.0 ist davor als volles Release abges
 | ☑ | 37a | Abrechnung über mehrere Einreichungen — Modell + API | 7 | 0.12.0-slice.6 |
 | ☑ | 37b | Abrechnung über mehrere Einreichungen — UI | 7 | 0.12.0-slice.7 |
 | ☑ | 38 | Kontoverbindungen mit Gültigkeitsdatum, BIC und Empfänger | 5, 4 | 0.12.0-slice.8 |
-| ☐ | 39 | Papierkorb | 10 | |
+| ☑ | 39 | Papierkorb | 10 | 0.12.0-slice.9 |
+
+Alle dreizehn Punkte sind umgesetzt. Offen bleibt nur noch das Release **0.12.0**
+(`npm run version:next -- minor`) — danach wird der Inhalt dieser Datei gelöscht.
 
 Mitgenommen in Slice 33, weil es dieselbe Entscheidung ist — der Backlog aus Slice 32: der im Picker
 stehenbleibende Suchtext (gehört mit der Regel „Fokus öffnet die Liste" zusammen) und der fehlende

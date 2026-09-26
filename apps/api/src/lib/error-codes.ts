@@ -15,7 +15,11 @@ export const ERROR_CODES = {
   INTERNAL: 'INTERNAL',
   /** Unique constraint hit (MariaDB 1062). */
   DUPLICATE_VALUE: 'DUPLICATE_VALUE',
-  /** Row is still referenced by others (1451), e.g. deleting a used facility. */
+  /**
+   * Row is still referenced by others (1451, or the trash's own check), e.g.
+   * deleting a used facility. From the trash it carries `details.blockers`:
+   * what still hangs on the record, so the sentence can name it.
+   */
   STILL_REFERENCED: 'STILL_REFERENCED',
   /** Points at a row that does not exist (1452). */
   MISSING_REFERENCE: 'MISSING_REFERENCE',
@@ -53,6 +57,16 @@ export const ERROR_CODES = {
   HISTORY_START_EXISTS: 'HISTORY_START_EXISTS',
   YEAR_OUTSIDE_CONTRACT: 'YEAR_OUTSIDE_CONTRACT',
   INVALID_YEAR: 'INVALID_YEAR',
+
+  // Papierkorb (see domain/trash.ts). Every failure of a restore additionally
+  // carries `details.entry` — the record it hung on, which may be a child of
+  // the batch, because a restore is all or nothing.
+  /** A NOT NULL ancestor of the record is itself in the trash. */
+  PARENT_IN_TRASH: 'PARENT_IN_TRASH',
+  /** The record cannot be restored at all (an emptied submission). */
+  NOT_RESTORABLE: 'NOT_RESTORABLE',
+  /** Fallback for a unique violation no rule check caught first. */
+  RESTORE_CONFLICT: 'RESTORE_CONFLICT',
 
   // User administration
   SELF_ACCOUNT_ACTION: 'SELF_ACCOUNT_ACTION',

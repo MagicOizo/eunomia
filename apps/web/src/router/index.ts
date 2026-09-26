@@ -8,6 +8,7 @@ import BillingsView from '../invoices/BillingsView.vue';
 import InvoicePickerView from '../invoices/InvoicePickerView.vue';
 import InvoiceWorkspaceView from '../invoices/InvoiceWorkspaceView.vue';
 import { resourceConfigs } from '../resources/definitions';
+import TrashView from '../trash/TrashView.vue';
 import { useAuthStore } from '../stores/auth';
 import DashboardView from '../views/DashboardView.vue';
 import LoginView from '../views/LoginView.vue';
@@ -40,7 +41,10 @@ const navRoutes = [
   ...mainNav.filter(
     (item) => item.to !== '/' && item.to !== '/invoices' && item.to !== '/billings',
   ),
-  ...systemNav.filter((item) => item.to !== '/system/users' && item.to !== '/system/settings'),
+  ...systemNav.filter(
+    (item) =>
+      item.to !== '/system/users' && item.to !== '/system/settings' && item.to !== '/system/trash',
+  ),
 ].map((item) => {
   const config = resourceConfigs[item.to];
   return {
@@ -96,6 +100,12 @@ export const router = createRouter({
       name: '/system/users',
       component: UsersView,
       meta: { title: 'Nutzer & Rechte', requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/system/trash',
+      name: '/system/trash',
+      component: TrashView,
+      meta: { title: 'Papierkorb', requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/system/settings',

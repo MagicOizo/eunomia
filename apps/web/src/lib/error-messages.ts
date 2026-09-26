@@ -122,11 +122,39 @@ const RESOURCE_NAMES: Record<string, string> = {
 const historyClause = (details: Details): string =>
   details.kind === 'terms' ? 'Konditionen können' : 'Ein Beitragsstand kann';
 
+/**
+ * The record a failure hung on, when the API named one (`details.entry`). The
+ * trash needs it: a restore covers a record AND what was deleted with it, so
+ * the sentence has to say which of them refused — and that nothing moved.
+ */
+function entryPrefix(details: Details): string {
+  const entry = details.entry as { singular?: unknown; label?: unknown } | undefined;
+  if (typeof entry?.singular !== 'string' || typeof entry.label !== 'string') return '';
+  return `${entry.singular} ${quoted(entry.label)}: `;
+}
+
+/** Upper-cases the first letter again after a prefix was left out. */
+const sentence = (prefix: string, rest: string): string =>
+  prefix === '' ? rest : prefix + rest.charAt(0).toLocaleLowerCase('de') + rest.slice(1);
+
+/** Everything the trash refuses ends on this, because a restore is all or nothing. */
+const UNCHANGED = ' Es wurde nichts wiederhergestellt.';
+
 const CODE_MESSAGES: Record<string, (details: Details) => string> = {
   NOT_FOUND: (d) =>
     `${RESOURCE_NAMES[String(d.resource)] ?? 'Der Eintrag'} wurde nicht gefunden. Vielleicht ist der Eintrag inzwischen gelöscht.`,
   DUPLICATE_VALUE: () => 'Es gibt bereits einen Eintrag mit diesem Wert.',
-  STILL_REFERENCED: () => 'Der Eintrag wird noch verwendet und kann deshalb nicht gelöscht werden.',
+  STILL_REFERENCED: (d) => {
+    const blockers = Array.isArray(d.blockers)
+      ? (d.blockers as Array<{ label?: unknown; count?: unknown }>)
+          .filter((one) => typeof one.label === 'string')
+          .map((one) => `${String(one.count ?? '')} ${String(one.label)}`.trim())
+      : [];
+    if (blockers.length === 0) {
+      return 'Der Eintrag wird noch verwendet und kann deshalb nicht gelöscht werden.';
+    }
+    return `Der Eintrag wird noch verwendet und kann deshalb nicht endgültig gelöscht werden. Daran hängt noch: ${blockers.join(', ')}.`;
+  },
   MISSING_REFERENCE: () => 'Ein verknüpfter Eintrag existiert nicht mehr.',
   BAD_REQUEST: () => 'Die Anfrage war nicht gültig.',
   CONFLICT: () => 'Die Aktion ist im aktuellen Zustand nicht möglich.',
@@ -153,8 +181,11 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     `Diese Rechnungen sind bereits als abgerechnet markiert: ${list(d.invoices)}.`,
   INVOICES_NOT_SUBMITTED_HERE: (d) =>
     `Diese Rechnungen sind bei der Police dieser Leistungsabrechnung nicht eingereicht: ${list(d.invoices)}.`,
-  REIMBURSEMENT_EXCEEDS_INVOICE: (d) =>
-    `Die Erstattungen würden den Rechnungsbetrag übersteigen: ${list(d.invoices)}.`,
+  REIMBURSEMENT_EXCEEDS_INVOICE: (d) => {
+    const prefix = entryPrefix(d);
+    const text = `Die Erstattungen würden den Rechnungsbetrag übersteigen: ${list(d.invoices)}.`;
+    return prefix === '' ? text : sentence(prefix, text) + UNCHANGED;
+  },
   INVOICE_AMOUNT_BELOW_REIMBURSED: () =>
     'Der Rechnungsbetrag kann nicht unter die bereits erstatteten Beträge sinken.',
   INVOICE_NOT_SUBMITTED: () =>
@@ -166,23 +197,50 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     'Die Police gehört zu einem anderen Versicherten als die Rechnung.',
   INVOICE_HAS_REIMBURSEMENT: () =>
     'Für diese Rechnung wurde bei dieser Police bereits eine Erstattung gebucht, sie kann nicht mehr zurückgezogen werden.',
-  BILLING_NUMBER_TAKEN: (d) =>
-    `Die Leistungsabrechnung ${d.billingNumber} gibt es bei dieser Police schon.`,
+  BILLING_NUMBER_TAKEN: (d) => {
+    const text = `Die Leistungsabrechnung ${d.billingNumber} gibt es bei dieser Police schon.`;
+    const prefix = entryPrefix(d);
+    return prefix === '' ? text : sentence(prefix, text) + UNCHANGED;
+  },
 
   // Policen
   HISTORY_BEFORE_CONTRACT: (d) => `${historyClause(d)} nicht vor dem Vertragsbeginn starten.`,
   HISTORY_AFTER_CONTRACT: (d) => `${historyClause(d)} nicht nach dem Vertragsende starten.`,
   HISTORY_START_EXISTS: (d) => {
-    if (d.kind === 'terms') return 'Für dieses Jahr gibt es bereits Konditionen.';
+    const prefix = entryPrefix(d);
+    const suffix = prefix === '' ? '' : UNCHANGED;
+    if (d.kind === 'terms')
+      return sentence(prefix, 'Für dieses Jahr gibt es bereits Konditionen.') + suffix;
     if (d.kind === 'agencyAccount') {
-      return d.undated === true
-        ? 'Es gibt schon eine Kontoverbindung ohne Startdatum. Bitte ein „Gültig ab“ angeben.'
-        : 'Für dieses Datum gibt es bereits eine Kontoverbindung.';
+      return (
+        sentence(
+          prefix,
+          d.undated === true
+            ? 'Es gibt schon eine Kontoverbindung ohne Startdatum. Bitte ein „Gültig ab“ angeben.'
+            : 'Für dieses Datum gibt es bereits eine Kontoverbindung.',
+        ) + suffix
+      );
     }
-    return 'Für dieses Datum gibt es bereits einen Beitragsstand.';
+    return sentence(prefix, 'Für dieses Datum gibt es bereits einen Beitragsstand.') + suffix;
   },
   YEAR_OUTSIDE_CONTRACT: () => 'Das Jahr liegt außerhalb der Vertragslaufzeit.',
   INVALID_YEAR: () => 'Bitte ein gültiges Jahr angeben.',
+
+  // Papierkorb
+  PARENT_IN_TRASH: (d) => {
+    const parent = d.parent as { singular?: unknown; label?: unknown } | undefined;
+    const named =
+      typeof parent?.singular === 'string' && typeof parent.label === 'string'
+        ? `${parent.singular} ${quoted(parent.label)}`
+        : 'Der übergeordnete Eintrag';
+    return `${entryPrefix(d)}${named} liegt ebenfalls im Papierkorb. Bitte diesen Eintrag zuerst wiederherstellen.${UNCHANGED}`;
+  },
+  NOT_RESTORABLE: (d) =>
+    typeof d.reason === 'string'
+      ? `${entryPrefix(d)}${d.reason}`
+      : 'Dieser Eintrag kann nicht wiederhergestellt werden.',
+  RESTORE_CONFLICT: (d) =>
+    `${entryPrefix(d)}es gibt inzwischen einen Eintrag mit demselben Wert.${UNCHANGED}`,
 
   // Nutzerverwaltung
   SELF_ACCOUNT_ACTION: () => 'Diese Aktion ist für das eigene Konto nicht möglich.',

@@ -8,6 +8,7 @@ import {
   faHouseMedical,
   faReceipt,
   faSackDollar,
+  faTrashCan,
   faUserGroup,
   faUsersGear,
 } from '@fortawesome/free-solid-svg-icons';
@@ -37,5 +38,6 @@ export const mainNav: NavItem[] = [
 /** The separate admin/system area, only shown to users with admin rights. */
 export const systemNav: NavItem[] = [
   { to: '/system/users', title: 'Nutzer & Rechte', icon: faUsersGear },
+  { to: '/system/trash', title: 'Papierkorb', icon: faTrashCan },
   { to: '/system/settings', title: 'Einstellungen', icon: faGear },
 ];

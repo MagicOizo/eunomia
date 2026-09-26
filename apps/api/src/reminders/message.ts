@@ -1,3 +1,4 @@
+import { germanDate, germanMoney } from '../lib/german.js';
 import { type ReminderStage, daysUntil } from './payment.js';
 
 /**
@@ -28,14 +29,6 @@ export interface ReminderMailOptions {
   appUrl?: string | null;
 }
 
-const money = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
-
-/** `2026-10-01` → `01.10.2026`, without pulling the server's locale into it. */
-function germanDate(date: string): string {
-  const [year, month, day] = date.split('-');
-  return `${day}.${month}.${year}`;
-}
-
 /** German plural without a library: the two forms this text needs. */
 function count(n: number, singular: string, plural: string): string {
   return `${n} ${n === 1 ? singular : plural}`;
@@ -57,7 +50,7 @@ function line(entry: ReminderEntry, today: string): string {
     `Rechnung ${entry.invoiceNumber}`,
     entry.accountName,
     entry.payee ?? 'Empfänger nicht erfasst',
-    money.format(entry.amount),
+    germanMoney(entry.amount),
     timing(entry, today),
   ];
   return `- ${parts.join(' · ')}`;

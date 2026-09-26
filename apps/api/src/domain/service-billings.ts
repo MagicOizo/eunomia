@@ -7,14 +7,22 @@ import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';
-import { type CrudTable, type Row, getRow, insertRow, updateRow } from '../crud/repository.js';
+import {
+  type CrudTable,
+  type Queryable,
+  type Row,
+  deletionTimestamp,
+  getRow,
+  insertRow,
+  updateRow,
+} from '../crud/repository.js';
 import { conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { allocationEntriesSchema, createAllocationsForBilling } from './allocations.js';
 import { accountForBilling, accountForContract, authorizeAccount } from './workflow-access.js';
 
-const table: CrudTable = {
+export const billingsTable: CrudTable = {
   table: 'ServiceBillings',
   uidColumn: 'billingUID',
   statusColumn: 'billingStatus',
@@ -80,8 +88,8 @@ const listQuery = z.object({
  * number, instead of the generic "duplicate value" the driver's 1062 maps to.
  * `exceptUID` leaves the billing being edited out of its own check.
  */
-async function assertBillingNumberFree(
-  pool: Pool,
+export async function assertBillingNumberFree(
+  pool: Queryable,
   contractUID: string,
   billingNumber: string,
   exceptUID?: string,
@@ -211,7 +219,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     const account = await accountForBilling(pool, uid);
     if (account === null) throw notFound('Service billing');
     await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
-    sendData(res, toBillingDto(await getRow(pool, table, uid)));
+    sendData(res, toBillingDto(await getRow(pool, billingsTable, uid)));
   });
 
   router.post('/', requireAuth, async (req, res) => {
@@ -221,7 +229,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     if (account === null) throw notFound('Contract');
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
     await assertBillingNumberFree(pool, data.contractUID, data.billingNumber);
-    sendData(res, toBillingDto(await insertRow(pool, table, data)), 201);
+    sendData(res, toBillingDto(await insertRow(pool, billingsTable, data)), 201);
   });
 
   // Booking reimbursements is billing-scoped: the policy — and with it the set
@@ -242,11 +250,11 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
     const patch = updateSchema.parse(req.body);
     if (patch.billingNumber !== undefined) {
-      const current = (await getRow(pool, table, uid)) as { contractUID: string } | null;
+      const current = (await getRow(pool, billingsTable, uid)) as { contractUID: string } | null;
       if (current === null) throw notFound('Service billing');
       await assertBillingNumberFree(pool, current.contractUID, patch.billingNumber, uid);
     }
-    const updated = await updateRow(pool, table, uid, patch);
+    const updated = await updateRow(pool, billingsTable, uid, patch);
     sendData(res, toBillingDto(updated));
   });
 
@@ -261,16 +269,23 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     // this Leistungsabrechnung falls back to "eingereicht" (the derived status
     // ignores soft-deleted allocations). Transactional, so a billing is never
     // left half-deleted with orphaned allocations.
+    //
+    // Billing and allocations are stamped with the SAME deletedAt: that shared
+    // moment is what marks them as one deletion batch, so the trash brings the
+    // reimbursements back together with the letter they belong to (Slice 39).
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      const at = await deletionTimestamp(conn);
       await conn.query(
-        'UPDATE Allocations SET allocationStatus = -1 WHERE billingUID = ? AND allocationStatus <> -1',
-        [uid],
+        `UPDATE Allocations SET allocationStatus = -1, deletedAt = ?
+          WHERE billingUID = ? AND allocationStatus <> -1`,
+        [at, uid],
       );
       await conn.query(
-        'UPDATE ServiceBillings SET billingStatus = -1 WHERE billingUID = ? AND billingStatus <> -1',
-        [uid],
+        `UPDATE ServiceBillings SET billingStatus = -1, deletedAt = ?
+          WHERE billingUID = ? AND billingStatus <> -1`,
+        [at, uid],
       );
       await conn.commit();
     } catch (error) {

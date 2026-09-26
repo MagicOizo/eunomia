@@ -18,7 +18,7 @@ import {
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 
-const table: CrudTable = {
+export const accountsTable: CrudTable = {
   table: 'Accounts',
   uidColumn: 'accountUID',
   statusColumn: 'accountStatus',
@@ -55,7 +55,7 @@ export function createAccountsRouter(pool: Pool, config: AppConfig): Router {
     const user = getAuthUser(res);
     const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_ACCOUNTS);
     if (scope.all) {
-      sendData(res, await listRows(pool, table));
+      sendData(res, await listRows(pool, accountsTable));
       return;
     }
     if (scope.accountUIDs.length === 0) {
@@ -63,7 +63,7 @@ export function createAccountsRouter(pool: Pool, config: AppConfig): Router {
       return;
     }
     const placeholders = scope.accountUIDs.map(() => '?').join(', ');
-    const rows = await listRows(pool, table, {
+    const rows = await listRows(pool, accountsTable, {
       clause: `accountUID IN (${placeholders})`,
       params: scope.accountUIDs,
     });
@@ -71,25 +71,25 @@ export function createAccountsRouter(pool: Pool, config: AppConfig): Router {
   });
 
   router.get('/:uid', requireAuth, canView, async (req, res) => {
-    const row = await getRow(pool, table, pathParam(req, 'uid'));
+    const row = await getRow(pool, accountsTable, pathParam(req, 'uid'));
     if (!row) throw notFound('Account');
     sendData(res, row);
   });
 
   router.post('/', requireAuth, canCreate, async (req, res) => {
     const data = base.parse(req.body);
-    sendData(res, await insertRow(pool, table, data), 201);
+    sendData(res, await insertRow(pool, accountsTable, data), 201);
   });
 
   router.patch('/:uid', requireAuth, canManage, async (req, res) => {
     const data = base.partial().parse(req.body);
-    const updated = await updateRow(pool, table, pathParam(req, 'uid'), data);
+    const updated = await updateRow(pool, accountsTable, pathParam(req, 'uid'), data);
     if (!updated) throw notFound('Account');
     sendData(res, updated);
   });
 
   router.delete('/:uid', requireAuth, canManage, async (req, res) => {
-    const deleted = await softDeleteRow(pool, table, pathParam(req, 'uid'));
+    const deleted = await softDeleteRow(pool, accountsTable, pathParam(req, 'uid'));
     if (!deleted) throw notFound('Account');
     res.status(204).end();
   });

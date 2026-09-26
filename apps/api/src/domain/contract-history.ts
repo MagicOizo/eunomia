@@ -75,7 +75,7 @@ export const termsSchema = z.object({
 
 export type BonusTierInput = z.infer<typeof bonusTier>;
 
-interface HistorySpec {
+export interface HistorySpec {
   /** URL segment under /contracts/:uid. */
   segment: 'premiums' | 'terms';
   /** Singular name for error messages. */
@@ -92,7 +92,7 @@ interface HistorySpec {
 
 const yearOf = (isoDate: string): number => Number(isoDate.slice(0, 4));
 
-const premiumSpec: HistorySpec = {
+export const premiumSpec: HistorySpec = {
   segment: 'premiums',
   label: 'Premium',
   table: premiumsTable,
@@ -115,7 +115,7 @@ const premiumSpec: HistorySpec = {
   },
 };
 
-const termsSpec: HistorySpec = {
+export const termsSpec: HistorySpec = {
   segment: 'terms',
   label: 'Contract terms',
   table: termsTable,
@@ -157,8 +157,12 @@ async function replaceBonusTiers(
   }
 }
 
-/** Throws 409 when another active entry of the contract already uses this validity key. */
-async function assertValidityFree(
+/**
+ * Throws 409 when another active entry of the contract already uses this
+ * validity key. Exported because the trash runs it before restoring an entry:
+ * a restore must never produce a state the mask itself forbids (Slice 39).
+ */
+export async function assertValidityFree(
   db: Queryable,
   spec: HistorySpec,
   contractUID: string,
