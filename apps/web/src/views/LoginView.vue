@@ -46,8 +46,15 @@ async function submit(): Promise<void> {
     <p class="eu-login__subtitle">Verwaltung privater Krankenversicherungs-Abrechnungen</p>
 
     <form class="eu-login__form" @submit.prevent="submit">
-      <EuTextField v-model="email" label="E-Mail" type="email" />
-      <EuTextField v-model="password" label="Passwort" type="password" />
+      <!-- The one place the browser's prefill is wanted, so it is asked for by
+           name; every other field is left at EuTextField's `off`. -->
+      <EuTextField v-model="email" label="E-Mail" type="email" autocomplete="username" />
+      <EuTextField
+        v-model="password"
+        label="Passwort"
+        type="password"
+        autocomplete="current-password"
+      />
       <p v-if="error" class="eu-login__error" role="alert">{{ error }}</p>
       <EuButton type="submit" :disabled="busy">
         {{ busy ? 'Anmelden…' : 'Anmelden' }}

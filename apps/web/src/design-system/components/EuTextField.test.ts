@@ -43,3 +43,29 @@ describe('EuTextField pasting a date', () => {
     expect(event.defaultPrevented).toBe(false);
   });
 });
+
+/**
+ * The browser's own suggestions and prefills are off everywhere (issues.md
+ * 0.11.0 2) -- except where a password manager is supposed to recognise the
+ * field, which is why the default can be overridden at all.
+ */
+describe("EuTextField and the browser's suggestions", () => {
+  it('turns them off unless asked otherwise', () => {
+    const wrapper = mount(EuTextField, { props: { modelValue: '', label: 'Rechnungsnummer' } });
+
+    expect(wrapper.find('input').attributes('autocomplete')).toBe('off');
+  });
+
+  it('passes a named token through, so the login form keeps its prefill', () => {
+    const wrapper = mount(EuTextField, {
+      props: {
+        modelValue: '',
+        label: 'Passwort',
+        type: 'password',
+        autocomplete: 'current-password',
+      },
+    });
+
+    expect(wrapper.find('input').attributes('autocomplete')).toBe('current-password');
+  });
+});

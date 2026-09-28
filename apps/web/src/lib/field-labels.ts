@@ -129,7 +129,7 @@ export const SETTING_LABELS: Record<string, string> = {
   'reminders.hour': 'Uhrzeit des täglichen Laufs (volle Stunde)',
   'reminders.timeZone': 'Zeitzone',
   'reminders.repeatDays': 'Erneut erinnern nach (Tagen)',
-  'reminders.appUrl': 'Adresse dieser Instanz (für den Link in der Mail)',
+  'reminders.appUrl': 'URL dieser Instanz (für den Link in der Mail)',
 };
 
 /** The German label of a setting key, or the key itself if it has none yet. */

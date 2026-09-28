@@ -92,6 +92,7 @@ function onBlur(): void {
         :id="inputId"
         class="eu-currency-field__input"
         inputmode="decimal"
+        autocomplete="off"
         :value="text"
         :aria-label="bare ? label : undefined"
         :aria-invalid="hasError || undefined"

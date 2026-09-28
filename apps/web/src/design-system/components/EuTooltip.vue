@@ -62,7 +62,15 @@ function hide(): void {
 </template>
 
 <style scoped>
+/* Positioned for the same reason as `.eu-toggle`: the trigger carries slotted
+   content that may be absolutely positioned -- `EuIconLabel` hides its label
+   text that way -- and without an anchor here that content is laid out against
+   the nearest positioned ancestor instead, which inside a scrolling dialog body
+   puts it outside the dialog and makes the dialog itself scrollable. The bubble
+   below is unaffected: it is a sibling, not a child, and sits at the viewport
+   via `strategy: 'fixed'`. */
 .eu-tooltip-trigger {
+  position: relative;
   border-bottom: 1px dotted var(--eu-color-text-muted);
   cursor: help;
 }

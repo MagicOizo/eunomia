@@ -57,7 +57,15 @@
 ### Date 20260925
 1.	Rechnung mit mehreren Behandlungstagen
 	Eine Rechnung kann mehr als ein Behandlungsdatum haben. Wir sollten uns auf lange sicht überlegen, wie wir das auch in der Oberfläche berücksichtigen können. Idealerweise soll je Behandlung die Kosten angegeben werden. Derzeit würde ich als Workarround nur eine der Behandlungsdaten angeben. Nur wenn die Daten in unterschiedlichen Jahren liegen, würde ich eine eigene Rechnung daraus extrahieren. Wir müssen das unterstützen und für den Nutzer so einfach wie möglich machen.
-2.	Browservorschlag in Eingabefeldern unterdrücken
+2.	Browservorschlag in Eingabefeldern unterdrücken — Umgesetzt mit v0.13.0-slice.1
 	Es kommt immer wieder vor, dass der Browser einen Vorschlag über seine eigene Vorschlagfunktion für felder macht. Das ist tatsächlich störend und passt nicht recht ins Design. Kann man siede automatischen Vorschläge oder Vorbelegungen unterdrücken?
-3.	Instanzadresse in Einstellungen>Zahlungserinnerungen
+3.	Instanzadresse in Einstellungen>Zahlungserinnerungen — Umgesetzt mit v0.13.0-slice.1
 	Das Feld Label "Adresse dieser Instanz (für den Link in der Mail)" ist zu lang, so dass es umbricht und somid das imput Feld vertikal ggü. des Zeitzone-Feld nach unten drückt. Kürzen z.B. auf "URL dieser Instanz (für den Link in der Mail)"
+## Version 0.12.0
+### Date 20260926
+1.	Scroll Glitch in Rechnungen zuordnen Dialog — Umgesetzt mit v0.13.0-slice.1
+	Beim Zuordnen von Rechnungen gab es einen komischen Glitch bei den Scroll-Balken mit unnützem Weißraum unter der den Hauptschaltflächen, nachdem ich bei einer Leistungsabrechnung den Schalter bei "Diese Rechnung verwirkt den Bonus" abgewählt habe. Siehe Screenshot "Rechungen_Zuordnen_Dialog.png"
+2.	Nicht gedeckte Rechnungen
+	Es gibt Behandlungen, die sind von der Versicherung nicht gedeckt. Wenn das bekannt ist, wird sie niemals eingereicht werden. In diesem Fall soll sie auch nicht in die Berechnung eingehen (z.B. für Erreichnung der  Selbstbeteiligung). Eine Markierung als nicht gedeckt soll auch eine kurze Begründung beinhalten, damit man später nachvollziehen kann, warum man sie so markiert hat.
+3.	Zahlungsdatum bei Direktzahlung
+	Bei direktzahlung soll atomatisch das Rechnungsdatum als Zahlungsziel und Zahlungsdatum gesetzt werden

@@ -31,7 +31,18 @@ const inputId = useId();
 </template>
 
 <style scoped>
+/* Positioned so that it, and not something far above it, is the containing
+   block of the absolutely positioned input below (issues.md 0.12.0 1). Without
+   it the nearest positioned ancestor is the `<dialog>` itself, which Chromium
+   gives `position: fixed`. The input then takes its static position -- deep
+   inside the scrolled `.eu-dialog__body` -- but measured from the dialog, so it
+   lands past the dialog's bottom edge: measured 1212px in a dialog 810px tall.
+   Two things followed from that. The dialog grew scrollable itself (a second
+   scrollbar, and empty space below the footer), and clicking the label focused
+   the hidden input, whereupon Chromium scrolled it into view and pushed the
+   dialog down by 402px, taking the header off screen. */
 .eu-toggle {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;

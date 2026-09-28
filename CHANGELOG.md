@@ -7,6 +7,21 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.13.0-slice.1 — 2026-09-28
+
+- **A dialog keeps its header and its single scrollbar.** Flipping a switch inside a scrolled dialog
+  used to grow a second scrollbar, leave empty space below the buttons and push the title off the
+  top. The switch hides its checkbox with `position: absolute`, and with nothing positioned around
+  it that box was laid out against the `<dialog>` instead of the switch: measured 764px of scrollable
+  height in a dialog 682px tall, and a jump of 82px the moment the label took focus. The switch now
+  anchors its own checkbox, as does the tooltip trigger that carries the icon labels' hidden text.
+- **Input fields no longer offer the browser's own suggestions.** Autofill and the browser's
+  dropdown sat oddly in the design and got in the way of typing. Every field of the app turns them
+  off; the login form keeps them, asking for the account name and the current password by name, so
+  password managers still fill it in.
+- **A settings label fits on one line.** "Adresse dieser Instanz (für den Link in der Mail)" wrapped
+  and pushed its input out of line with the time zone beside it; it now reads "URL dieser Instanz".
+
 ## 0.12.0 — 2026-09-26
 
 Everything from the nine `0.12.0-slice.N` previews below, as one release. It answers the thirteen

@@ -1415,6 +1415,57 @@ Einreichung zeigt statt des Schalters ihren Grund; die gelöschte Rechnung versc
 Abfrage endgültig. Fokusring per Tastatur-Screenshot an allen vier Schaltern geprüft, auch bei 420 px
 mit waagerecht gescrollter Tabelle — an keiner Kante beschnitten.
 
+## Slice 40 — Politur: Dialog-Scroll, Browservorschläge, Label (umgesetzt 2026-09-28)
+**Anlass:** issues.md 0.12.0-1 sowie 0.11.0-2 und 0.11.0-3, aus der Produktionsnutzung. Beim
+Zuordnen von Rechnungen entstehen nach dem Klick auf „Diese Abrechnung verwirkt den Bonus" ein
+zweiter Scrollbalken und Weißraum unter den Schaltflächen, während die Kopfzeile verschwindet. Dazu
+zwei liegengebliebene Kleinigkeiten: Der Browser belegt Eingabefelder mit eigenen Vorschlägen vor,
+und das Label `reminders.appUrl` bricht um und schiebt sein Feld gegenüber dem Zeitzone-Feld nach
+unten.
+
+**Ziel:** Ein Dialog behält beim Schalten seine Kopfzeile und seinen einen Scrollbalken, die Felder
+bleiben leer, bis jemand tippt — außer beim Anmelden, wo der Passwortmanager greifen soll —, und die
+Einstellungsseite steht in einer Linie.
+
+**DoD:** Im Zuordnen-Dialog mit gescrolltem Körper schaltet der Bonus-Schalter, ohne dass der Dialog
+selbst scrollbar wird; `scrollHeight` bleibt gleich `clientHeight`, `scrollTop` bleibt 0. Kein Feld
+der App außer den beiden Anmeldefeldern bietet noch Browservorschläge an. Die Felder „Zeitzone" und
+„URL dieser Instanz" stehen auf einer Höhe.
+
+**Umgesetzt (2026-09-28).** Entscheidungen beim Bau:
+
+- **Der Fehler lag nicht dort, wo er auftrat.** Weder `EuDialog` noch das Zuordnen-Formular sind
+  schuld, sondern `EuToggle`: `.eu-toggle__input` ist `position: absolute`, `.eu-toggle` war
+  `static`. Damit war der nächste positionierte Vorfahr das `<dialog>` selbst, dem Chromium
+  `position: fixed` gibt. Das versteckte 1×1-Input nahm seine statische Position tief im gescrollten
+  `.eu-dialog__body` ein — gemessen aber vom Dialog aus, also jenseits seiner Unterkante.
+- **Nachgemessen, nicht vermutet, und zwar zweimal.** Zuerst isoliert im Headless-Chromium mit der
+  echten CSS (1212 px Scrollhöhe bei 810 px Dialoghöhe), dann in der laufenden App im gemeldeten
+  Dialog selbst: 764 px gegen 682 px, und der Klick aufs Label schob den Dialog um 82 px — genau der
+  Weißraum und die fehlende Kopfzeile aus dem Screenshot des Fundes.
+- **A/B in derselben Sitzung.** Der Vorzustand wurde zur Gegenprobe per eingespeister Regel
+  (`.eu-toggle { position: static !important }`) wiederhergestellt, damit beide Messungen aus
+  demselben Dialog mit denselben Daten stammen. Ohne Fix ist `offsetParent` des Inputs `.eu-dialog`,
+  mit Fix `.eu-toggle`.
+- **Dasselbe Muster ein zweites Mal gefunden:** `.eu-icon-label__text` in `EuIconLabel` ist absolut
+  positioniert, sein Träger `.eu-tooltip-trigger` war es nicht. Der Anker gehört nach `EuTooltip`,
+  weil die Scoped-CSS von `EuIconLabel` den Trigger der Kindkomponente nicht erreicht. Die
+  Sprechblase bleibt unberührt: Sie ist ein Geschwister, kein Kind, und liegt per
+  `strategy: 'fixed'` ohnehin am Viewport.
+- **Kein jsdom-Test für den Scroll-Fall.** jsdom rechnet kein Layout und wendet Scoped-CSS nicht an;
+  ein Test dort wäre eine Attrappe gewesen. Der Nachweis läuft über die Messung im echten Browser,
+  wie in Slice 33a.
+- **Die Vorschläge sind zentral abgeschaltet,** nicht Feld für Feld: `EuTextField` bekommt eine
+  `autocomplete`-Prop mit Default `off`, `EuCurrencyField` und die beiden Inputs in `EuDetailField`
+  setzen es fest; `EuEntityPicker` hatte es schon. Die Prop existiert für die eine Stelle, an der der
+  Vorschlag erwünscht ist: Das Anmeldeformular fragt `username` und `current-password` ausdrücklich
+  an, sonst hätte der Default den Passwortmanager ausgesperrt.
+- **Im laufenden System geprüft** (Headless-Chromium über CDP, hell und dunkel, 1440 px und 390 px):
+  Zuordnen-Dialog, Rechnungsmaske (alle sieben Felder melden `off`), Anzeigemaske des
+  Abrechnungsdienstleisters mit `EuIconLabel`, und die Einstellungsseite — beide Labels einzeilig
+  (19 px), beide Eingabefelder auf derselben Höhe. Es wurde nichts gespeichert, der Dev-Datenbestand
+  blieb unangetastet.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

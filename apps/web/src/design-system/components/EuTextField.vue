@@ -9,8 +9,15 @@ const props = withDefaults(
     label: string;
     error?: string;
     type?: string;
+    /**
+     * Off by default (issues.md 0.11.0 2): the browser's own suggestions and
+     * prefills sit oddly in this design and get in the way of typing. The prop
+     * is there for the one place they are wanted -- the login form, where the
+     * password manager has to recognise the fields.
+     */
+    autocomplete?: string;
   }>(),
-  { error: undefined, type: 'text' },
+  { error: undefined, type: 'text', autocomplete: 'off' },
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
@@ -40,6 +47,7 @@ function onPaste(event: ClipboardEvent): void {
       :id="inputId"
       class="eu-text-field__input"
       :type="type"
+      :autocomplete="autocomplete"
       :value="modelValue"
       :aria-invalid="hasError || undefined"
       :aria-describedby="hasError ? errorId : undefined"
