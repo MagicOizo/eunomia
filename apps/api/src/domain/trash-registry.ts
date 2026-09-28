@@ -3,7 +3,7 @@ import { conflict } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { germanDate, germanMoney } from '../lib/german.js';
 import { ENTITY_PREFIX, type EntityName } from '../lib/ids.js';
-import { accountsTable as agencyAccountsTable, assertStartFree } from './agency-accounts.js';
+import { accountsTable as agencyAccountsTable } from './agency-accounts.js';
 import { allocationsTable } from './allocations.js';
 import { agenciesTable } from './collection-agencies.js';
 import { contractsTable } from './contract-access.js';
@@ -242,26 +242,16 @@ export const TRASH_ENTITIES: TrashEntity[] = [
     plural: 'Kontoverbindungen',
     alias: 'ga',
     listSql: `SELECT ga.agencyAccountUID AS uid, ${DELETED_AT('ga')},
-                     ga.bankAccount, ga.validFrom, ga.agencyUID, g.agencyName
+                     ga.bankAccount, ga.recipientName, ga.note, g.agencyName
                 FROM AgencyBankAccounts ga
                 LEFT JOIN CollectionAgencies g ON g.agencyUID = ga.agencyUID
                WHERE ga.agencyAccountStatus = -1`,
+    // No assertRestorable: since Slice 44 an agency may hold any number of
+    // accounts side by side, so there is no rule a returning one could break.
     describe: (row) => ({
       label: text(row.bankAccount),
-      context: context(
-        text(row.agencyName),
-        row.validFrom === null
-          ? 'gilt grundsätzlich'
-          : `gültig ab ${germanDate(text(row.validFrom))}`,
-      ),
+      context: context(text(row.agencyName), text(row.recipientName), text(row.note)),
     }),
-    assertRestorable: (db, row) =>
-      assertStartFree(
-        db,
-        String(row.agencyUID),
-        row.validFrom === null ? null : String(row.validFrom),
-        null,
-      ),
   },
   {
     key: 'submission',

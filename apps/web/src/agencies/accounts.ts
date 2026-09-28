@@ -1,57 +1,59 @@
-import { germanDate } from '../lib/format';
 import type { AgencyAccountDto } from './api';
 
 /**
- * Which bank account of a collection agency applies, and how to say so.
+ * The bank accounts of a collection agency: several at once, in the order they
+ * were recorded (see Notes/eunomia-plan.md, Slice 44).
  *
- * A `validFrom` of null means "applies from the beginning": the account
- * recorded first carries no date, only a later change does (see
- * Notes/eunomia-plan.md, Slice 38). The resolution below is the twin of
- * `accountInForce` in apps/api/src/domain/agency-accounts.ts — the mail about an
- * invoice and the invoice itself must name the same account, so change one and
- * change the other.
+ * Until then they were a history and a rule said which one applied. Production
+ * said otherwise — an agency names three accounts on one bill and only the
+ * second of them on the next — so the invoice names its account itself. What
+ * is left here is how to suggest one and how to write one down.
  */
-
-/** Today as `YYYY-MM-DD` in the browser's zone. */
-function today(): string {
-  const now = new Date();
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-  ].join('-');
-}
 
 /**
- * The account in force on `date`: the newest entry that had already started, an
- * undated one counting as "started long ago". `date` is the day the money moved
- * (the invoice's `transferDate`); null means today, which is what an unpaid
- * invoice is about. Null only when the agency has no account at all.
+ * The account to suggest for an agency: the one recorded first, which is what
+ * an agency listing several is normally paid on. Only a suggestion — what
+ * counts is what the invoice names. The twin of `defaultAccount` in
+ * apps/api/src/domain/agency-accounts.ts.
  */
-export function accountInForce<T extends { validFrom: string | null }>(
+export function defaultAccount<T>(accounts: T[]): T | null {
+  return accounts[0] ?? null;
+}
+
+/** The account with the given UID, or null — for an invoice naming one. */
+export function accountByUID<T extends { agencyAccountUID: string }>(
   accounts: T[],
-  date: string | null = null,
+  uid: string | null,
 ): T | null {
-  const on = date ?? today();
-  let best: T | null = null;
-  for (const account of accounts) {
-    if (account.validFrom !== null && account.validFrom > on) continue;
-    // An undated entry loses against any dated one that has started.
-    if (best === null || (account.validFrom ?? '') >= (best.validFrom ?? '')) best = account;
-  }
-  return best;
+  if (uid === null) return null;
+  return accounts.find((account) => account.agencyAccountUID === uid) ?? null;
 }
 
 /**
- * The period an account covers, as the history block shows it. An undated entry
- * has no start to name — it is simply the one that came before the first
- * change, or, while it is the only one, the one that always applies.
+ * The account of an invoice: the one it names, and while it names none (an
+ * invoice from before Slice 44, or one entered elsewhere) the agency's first.
  */
-export function accountPeriod(account: Pick<AgencyAccountDto, 'validFrom' | 'validTo'>): string {
-  if (account.validFrom === null) {
-    return account.validTo === null ? 'immer gültig' : `bis ${germanDate(account.validTo)}`;
-  }
-  return account.validTo === null
-    ? `ab ${germanDate(account.validFrom)}`
-    : `${germanDate(account.validFrom)} – ${germanDate(account.validTo)}`;
+export function accountForInvoice<T extends { agencyAccountUID: string }>(
+  accounts: T[],
+  uid: string | null,
+): T | null {
+  return accountByUID(accounts, uid) ?? defaultAccount(accounts);
+}
+
+/** What identifies an account in a picker or a list: its IBAN. */
+export function accountLabel(account: Pick<AgencyAccountDto, 'bankAccount'>): string {
+  return account.bankAccount;
+}
+
+/**
+ * The secondary line of an account in a picker — what tells two IBANs of the
+ * same agency apart: who the money is addressed to, and what the note says.
+ */
+export function accountHint(
+  account: Pick<AgencyAccountDto, 'recipientName' | 'note'>,
+): string | undefined {
+  const parts = [account.recipientName, account.note].filter(
+    (part): part is string => part !== null && part !== '',
+  );
+  return parts.length === 0 ? undefined : parts.join(' · ');
 }

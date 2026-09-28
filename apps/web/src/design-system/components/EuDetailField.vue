@@ -112,6 +112,8 @@ function reset(): void {
     <span class="eu-detail__label" :class="{ 'is-off': disabled }">{{ label }}</span>
 
     <div class="eu-detail__value" :class="{ 'is-off': disabled }">
+      <!-- `after` puts something beside the field itself (the GiroCode next to
+           the chosen bank account), without replacing it the way `value` does. -->
       <slot name="value">
         <span v-if="type === 'readonly'" class="eu-detail__readonly">
           {{ modelValue === null || modelValue === '' ? '–' : modelValue }}
@@ -170,6 +172,7 @@ function reset(): void {
           @update:model-value="emit('update:modelValue', $event)"
         />
       </slot>
+      <slot name="after" />
     </div>
 
     <div class="eu-detail__actions">
@@ -231,6 +234,16 @@ function reset(): void {
 
 .eu-detail__value {
   min-width: 0;
+  /* A row plus what `after` adds to it; the field takes the space that is left
+     and the addition never shrinks. */
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.eu-detail__value > :first-child {
+  min-width: 0;
+  flex: 1;
 }
 
 /* Disabled (e.g. gated off by another field): greyed and clearly inactive. */

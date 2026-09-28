@@ -1697,6 +1697,69 @@ Im laufenden Browser am geseedeten Jahr 2025 von Anna Muster, hell und dunkel: �
 0,00 € von 90,00 € rot, „Teilabgerechnet" mit 150,00 € von 200,00 € orange, „Erledigt" mit voller
 Erstattung sowie „Offen" und „Eingereicht" unverändert.
 
+## Slice 44 — Mehrere Kontoverbindungen je Abrechnungsdienstleister (umgesetzt 2026-09-28)
+**Anlass:** issues.md 0.12.0-4. Die Praxis zeigt: ein Abrechnungsdienstleister hat mehrere gültige
+Konten gleichzeitig. Im auslösenden Fall nannte derselbe Dienstleister auf einer älteren Rechnung
+drei Konten — genutzt wurde immer das erste — und auf der Rechnung eines anderen Leistungserbringers
+nur noch das zweite davon. Kein Kontowechsel, sondern eine Auswahl je Rechnung.
+
+Damit trägt die Annahme aus Slice 38 nicht mehr: dort war das Konto eine Historie
+(`AgencyBankAccounts.validFrom`, höchstens ein Eintrag je Startdatum, genau ein Konto zu jedem
+Zeitpunkt gültig, aufgelöst über `accountInForce()` gegen das Überweisungsdatum).
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Die Gültigkeit entfällt ganz.** `validFrom` und das abgeleitete `validTo` fallen weg, Konten
+  sind eine schlichte, geordnete Menge je Dienstleister. Mit ihnen verschwindet die ganze
+  Auflösungsmechanik (`accountInForce`, `withValidity`, `assertStartFree`, der `agencyAccount`-Zweig
+  von `HISTORY_START_EXISTS`, das `assertRestorable` des Papierkorbs): Die Rechnung sagt jetzt
+  selbst, welches Konto gilt, also braucht es keine Regel mehr, die es errät.
+- **Der Bestand wird eingefroren.** Migration 016 setzt `Invoices.agencyAccountUID` auf genau das
+  Konto, das die alte Regel heute liefert (nach `transferDate`, sonst heute). Was in der Oberfläche
+  stand, bleibt stehen; ab dann ist jede Rechnung ausdrücklich — auch eine offene, die einem
+  späteren Kontowechsel damit nicht mehr folgt.
+- **Vorschlag ist das zuerst erfasste Konto.** Ohne Datum braucht die Vorbelegung eine andere Regel;
+  die Erfassungsreihenfolge entspricht der Beobachtung des Autors. Eine Standard-Markierung gibt es
+  nicht, die Wahl fällt ohnehin je Rechnung. `defaultAccount()` steht deshalb je einmal in
+  `apps/api/src/domain/agency-accounts.ts` und `apps/web/src/agencies/accounts.ts`, mit denselben
+  Testfällen auf beiden Seiten — wie zuvor `accountInForce`.
+- **Erfasste „gültig ab“-Angaben gehen nicht verloren**, sondern wandern in die Notiz des Kontos
+  (`… · gültig ab 01.01.2026`). Von Hand Eingetragenes soll eine Migration nicht stillschweigend
+  wegwerfen.
+- **Die Zuordnungsregel gehört in die API**, neben `nextNotCovered()` (Slice 42) und
+  `nextPaymentDates()` (Slice 43) und nach demselben Muster: `nextAgencyAccount()` leert das Konto
+  mit dem Dienstleister und bei Direktzahlung, und ein Dienstleisterwechsel ohne mitgeschicktes
+  Konto leert es ebenfalls — das alte gehört dem alten Dienstleister. Die Zugehörigkeitsprüfung
+  braucht die Datenbank und steht als `assertAccountOfAgency()` daneben; ein fremdes Konto wird mit
+  `INVOICE_ACCOUNT_NOT_OF_AGENCY` abgewiesen. Beide Masken spiegeln die Regel nur.
+
+**Befunde beim Bauen:**
+
+- **Der Papierkorb brauchte keine Zeile.** Seine Sperren leitet er aus den Fremdschlüsseln ab
+  (Slice 39), also blockiert die neue Spalte das endgültige Löschen eines benutzten Kontos von
+  selbst. Ein in den Papierkorb gelegtes Konto bleibt dagegen verweisbar: die Maske fällt dann auf
+  das erste Konto zurück — dasselbe Verhalten wie bei einem gelöschten Leistungserbringer.
+- **`EuDetailField` bekam einen `after`-Slot.** Die IBAN-Zeile der Anzeigemaske war
+  schreibgeschützt und trug den GiroCode über den `value`-Slot; jetzt ist sie ein Picker, und der
+  Slot hätte ihn ersetzt statt danebengestellt. `after` hängt etwas neben das Feld, ohne es zu
+  ersetzen; die Wertzelle ist dafür eine Flex-Zeile.
+- **Der Migrationstest von 012 lief in die eigene Zukunft.** Er fährt auf 012 zurück, dann `up()`
+  bis zum Ende — und prüfte danach `validFrom`, das 016 inzwischen entfernt. Er fährt jetzt nur bis
+  012 hoch, prüft dort, und geht erst am Schluss ganz nach oben.
+
+**Geprüft:** 257 API-Tests gegen `eunomia_test`, 262 Web-Tests, Lint, Typecheck, Prettier. Migration
+016 zusätzlich auf dem Dev-Bestand *mit* echtem Kontowechsel: die 2025 bezahlte Rechnung behielt das
+alte Konto, die beiden offenen bekamen das jüngste, das Startdatum steht in der Notiz. Im Browser,
+hell und dunkel: die Dienstleister-Liste zeigt „DE02… (+1 weitere)“, der Dialog beide Konten
+gleichrangig; beim Anlegen ist die Kontoverbindung erst ab gewähltem Dienstleister da, mit dessen
+erstem Konto vorbelegt und umwählbar (Empfänger und Notiz als Zusatzzeile im Picker); ein aus dem
+Picker heraus angelegtes drittes Konto ist sofort gewählt; Zahlungsinformationen und GiroCode zeigen
+das gewählte Konto; Dienstleister leeren oder Direktzahlung setzen leert und sperrt die Zeile.
+Probelauf der Zahlungserinnerung: die Rechnung auf dem ersten Konto nennt den Dienstleister, die auf
+dem zweiten dessen Zahlstelle. Fokusring per Tastatur-Screenshot an jedem neuen Schalter geprüft —
+Historienblock, Picker und Aktionen —, an keiner Kante beschnitten. Der Dev-Bestand steht
+anschließend über `npm run dev:reset` wieder wie geseedet.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

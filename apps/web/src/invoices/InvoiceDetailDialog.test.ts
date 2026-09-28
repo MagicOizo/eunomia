@@ -22,6 +22,7 @@ function invoice(overrides: Partial<InvoiceDto> = {}): InvoiceDto {
     transferSubject: 'R-1',
     documentLink: null,
     agencyUID: null,
+    agencyAccountUID: null,
     directPayment: 0,
     reimbursementClosed: false,
     notCovered: false,
@@ -121,6 +122,97 @@ describe('InvoiceDetailDialog direct payment', () => {
 
     expect(row(wrapper, 'Zahlungsziel')?.props('modelValue')).toBe('2025-03-01');
     expect(row(wrapper, 'Zahlungsdatum')?.props('modelValue')).toBe('2025-02-20');
+    wrapper.unmount();
+  });
+});
+
+/**
+ * Slice 44: the invoice names the bank account it goes to. The mask offers the
+ * accounts of the agency it points at, and mirrors the API's rule about what a
+ * change of agency does to that choice.
+ */
+describe('InvoiceDetailDialog bank account', () => {
+  const agencyAccounts = {
+    'c-1': [
+      { agencyAccountUID: 'g-1', bankAccount: 'DE01', bic: null, recipientName: null, note: null },
+      {
+        agencyAccountUID: 'g-2',
+        bankAccount: 'DE02',
+        bic: 'COBADEFFXXX',
+        recipientName: 'Zahlstelle',
+        note: null,
+      },
+    ],
+    'c-2': [
+      { agencyAccountUID: 'g-9', bankAccount: 'DE09', bic: null, recipientName: null, note: null },
+    ],
+  };
+
+  function openWithAgencies(inv: InvoiceDto): VueWrapper {
+    return mount(InvoiceDetailDialog, {
+      props: {
+        open: true,
+        invoice: inv,
+        accountName: 'John Doe',
+        facilities: [],
+        agencies: [
+          { value: 'c-1', label: 'Inkasso Eins' },
+          { value: 'c-2', label: 'Inkasso Zwei' },
+        ],
+        agencyAccounts,
+        contracts: [],
+        planInvoice: null,
+        submitting: false,
+        error: null,
+      },
+      attachTo: document.body,
+    });
+  }
+
+  it("shows the account the invoice names, out of its agency's own", async () => {
+    const wrapper = openWithAgencies(invoice({ agencyUID: 'c-1', agencyAccountUID: 'g-2' }));
+    await nextTick();
+
+    const field = row(wrapper, 'Kontoverbindung');
+    expect(field?.props('modelValue')).toBe('g-2');
+    expect(field?.props('options')).toEqual([
+      { value: 'g-1', label: 'DE01', hint: undefined },
+      { value: 'g-2', label: 'DE02', hint: 'Zahlstelle' },
+    ]);
+    wrapper.unmount();
+  });
+
+  it('takes the suggestion of the new agency when the invoice moves', async () => {
+    const wrapper = openWithAgencies(invoice({ agencyUID: 'c-1', agencyAccountUID: 'g-2' }));
+    await nextTick();
+
+    row(wrapper, 'Abrechnungsdienstleister')?.vm.$emit('update:modelValue', 'c-2');
+    await nextTick();
+    expect(row(wrapper, 'Kontoverbindung')?.props('modelValue')).toBe('g-9');
+
+    // And nothing at all once the agency is gone.
+    row(wrapper, 'Abrechnungsdienstleister')?.vm.$emit('update:modelValue', null);
+    await nextTick();
+    expect(row(wrapper, 'Kontoverbindung')?.props('modelValue')).toBeNull();
+    expect(row(wrapper, 'Kontoverbindung')?.props('disabled')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('leaves the choice alone while the invoice is merely opened', async () => {
+    const wrapper = openWithAgencies(invoice({ agencyUID: 'c-1', agencyAccountUID: 'g-2' }));
+    await nextTick();
+    await nextTick();
+
+    expect(row(wrapper, 'Kontoverbindung')?.props('modelValue')).toBe('g-2');
+    wrapper.unmount();
+  });
+
+  it('drops the account with the agency when the bill was paid directly', async () => {
+    const wrapper = openWithAgencies(invoice({ agencyUID: 'c-1', agencyAccountUID: 'g-2' }));
+    await nextTick();
+    await setDirectPayment(wrapper, true);
+
+    expect(row(wrapper, 'Kontoverbindung')?.props('modelValue')).toBeNull();
     wrapper.unmount();
   });
 });

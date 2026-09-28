@@ -41,6 +41,7 @@ export const invoicesTable: CrudTable = {
     'transferSubject',
     'documentLink',
     'agencyUID',
+    'agencyAccountUID',
     'directPayment',
     'reimbursementClosed',
     'notCovered',
@@ -72,6 +73,12 @@ const base = z.object({
   transferSubject: z.string().trim().min(1).max(100).nullish(),
   documentLink: z.string().trim().url().max(255).nullish(),
   agencyUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.agency)).nullish(),
+  /**
+   * Which bank account of that agency the invoice goes to (Slice 44). An
+   * agency holds several at once, so the invoice names one instead of a rule
+   * guessing it — see `nextAgencyAccount()`.
+   */
+  agencyAccountUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.agencyAccount)).nullish(),
   directPayment: flag.optional(),
   /**
    * "The insurance does not cover this" (Slice 42): the invoice is never
@@ -123,6 +130,7 @@ const INVOICE_COLUMNS = [
   'transferSubject',
   'documentLink',
   'agencyUID',
+  'agencyAccountUID',
   'directPayment',
   'reimbursementClosed',
   'notCovered',
@@ -519,6 +527,74 @@ function nextPaymentDates(
   };
 }
 
+/** Which bank account an invoice is paid on, after a write. */
+interface AgencyAccountChoice {
+  agencyAccountUID: string | null;
+}
+
+/**
+ * What a write leaves behind for the invoice's bank account (Slice 44), or
+ * `null` when it leaves it alone.
+ *
+ * A collection agency holds several accounts at the same time, so nothing can
+ * derive which one an invoice goes to — it names it. The rules are about
+ * keeping that name from pointing somewhere it does not belong:
+ *
+ *  - no agency after the write, or the bill was settled directly → there is
+ *    nothing to transfer to, so the account goes with the agency;
+ *  - the write moves the invoice to another agency without naming an account →
+ *    the account is cleared, because the old one belongs to the old agency;
+ *  - the write names an account → it stands, and the caller checks that it is
+ *    one of that agency's (`assertAccountOfAgency`, which needs the database).
+ */
+function nextAgencyAccount(
+  data: { agencyUID?: string | null; agencyAccountUID?: string | null; directPayment?: number },
+  current: { agencyUID: string | null; directPayment: number },
+): AgencyAccountChoice | null {
+  const agencyUID = data.agencyUID === undefined ? current.agencyUID : data.agencyUID;
+  if (agencyUID === null || (data.directPayment ?? current.directPayment) === 1) {
+    return { agencyAccountUID: null };
+  }
+  if (data.agencyAccountUID !== undefined) return { agencyAccountUID: data.agencyAccountUID };
+  return agencyUID === current.agencyUID ? null : { agencyAccountUID: null };
+}
+
+/** Throws 409 unless the account is an active one of that agency. */
+async function assertAccountOfAgency(
+  db: Queryable,
+  agencyUID: string,
+  agencyAccountUID: string,
+): Promise<void> {
+  const rows = await db.query<Array<{ uid: string }>>(
+    `SELECT agencyAccountUID AS uid FROM AgencyBankAccounts
+      WHERE agencyAccountUID = ? AND agencyUID = ? AND agencyAccountStatus <> -1`,
+    [agencyAccountUID, agencyUID],
+  );
+  if (rows.length === 0) {
+    throw conflict('The bank account does not belong to the collection agency of the invoice', {
+      code: ERROR_CODES.INVOICE_ACCOUNT_NOT_OF_AGENCY,
+    });
+  }
+}
+
+/**
+ * Resolves the account for a write and checks it belongs to the agency. Both
+ * write paths do the same two steps, and forgetting the check would let an
+ * invoice point at a stranger's account.
+ */
+async function resolveAgencyAccount(
+  db: Queryable,
+  data: { agencyUID?: string | null; agencyAccountUID?: string | null; directPayment?: number },
+  current: { agencyUID: string | null; directPayment: number },
+): Promise<AgencyAccountChoice | null> {
+  const choice = nextAgencyAccount(data, current);
+  const agencyUID = data.agencyUID === undefined ? current.agencyUID : data.agencyUID;
+  if (choice?.agencyAccountUID != null && agencyUID !== null) {
+    await assertAccountOfAgency(db, agencyUID, choice.agencyAccountUID);
+  }
+  return choice;
+}
+
 /** Replaces the treatment days of an invoice; the caller has checked them. */
 async function writeTreatmentDays(
   db: Queryable,
@@ -652,6 +728,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     // A new invoice is submitted nowhere, so only the reason rule can bite.
     const mark = nextNotCovered(data, { notCovered: 0, notCoveredReason: null });
     const paid = nextPaymentDates(data, { directPayment: 0, invoiceDate: data.invoiceDate });
+    const account = await resolveAgencyAccount(pool, data, { agencyUID: null, directPayment: 0 });
     const created = await withTransaction(pool, async (conn) => {
       // The stored `treatmentDate` is the earliest day, never just the one
       // that happened to be typed first.
@@ -659,6 +736,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
         ...data,
         ...(mark ?? {}),
         ...(paid ?? {}),
+        ...(account ?? {}),
         treatmentDate: days[0],
       });
       await writeTreatmentDays(conn, row.invoiceUID as string, days);
@@ -709,7 +787,11 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
         directPayment: Number(current.directPayment),
         invoiceDate: current.invoiceDate as string,
       });
-      const patch = { ...data, ...(mark ?? {}), ...(paid ?? {}) };
+      const account = await resolveAgencyAccount(conn, data, {
+        agencyUID: (current.agencyUID as string | null) ?? null,
+        directPayment: Number(current.directPayment),
+      });
+      const patch = { ...data, ...(mark ?? {}), ...(paid ?? {}), ...(account ?? {}) };
       const days = nextTreatmentDays(data, await treatmentDaysOf(conn, uid));
       if (days === null) {
         await updateRow(conn, invoicesTable, uid, patch);

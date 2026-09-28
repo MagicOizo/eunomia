@@ -9,17 +9,14 @@ import type { AgencyAccountDto, AgencyAccountInput } from './api';
 /** Create/edit form for one bank account (Kontoverbindung) of an agency. */
 const props = defineProps<{
   open: boolean;
-  /** The entry being edited, or null to record a bank change. */
+  /** The entry being edited, or null to add another account. */
   entry: AgencyAccountDto | null;
-  /** Prefilled start for a new entry — today, the usual day of a change. */
-  suggestedDate: string;
   submitting: boolean;
   error: string | null;
 }>();
 
 const emit = defineEmits<{ close: []; submit: [payload: AgencyAccountInput] }>();
 
-const validFrom = ref('');
 const bankAccount = ref('');
 const bic = ref('');
 const recipientName = ref('');
@@ -31,7 +28,6 @@ watch(
   ([open, entry]) => {
     if (!open) return;
     localError.value = null;
-    validFrom.value = entry ? (entry.validFrom ?? '') : props.suggestedDate;
     bankAccount.value = entry?.bankAccount ?? '';
     bic.value = entry?.bic ?? '';
     recipientName.value = entry?.recipientName ?? '';
@@ -48,8 +44,6 @@ function submit(): void {
     return;
   }
   emit('submit', {
-    // Empty means "applies from the beginning" — the API stores that as null.
-    validFrom: validFrom.value || null,
     bankAccount: iban,
     bic: bic.value.replace(/\s+/g, '').toUpperCase() || null,
     recipientName: recipientName.value.trim() || null,
@@ -61,18 +55,16 @@ function submit(): void {
 <template>
   <EuDialog
     :open="open"
-    :title="entry ? 'Kontoverbindung bearbeiten' : 'Kontowechsel erfassen'"
+    :title="entry ? 'Kontoverbindung bearbeiten' : 'Kontoverbindung hinzufügen'"
     @close="emit('close')"
   >
     <form class="eu-form" @submit.prevent="submit">
-      <!-- The explanations sit in the labels, as in the other history forms:
-           EuTextField has no hint of its own, and an empty date is the one
-           thing about this form that needs saying. -->
-      <EuTextField v-model="validFrom" label="Gültig ab (leer = gilt von Anfang an)" type="date" />
+      <!-- The explanations sit in the labels, as in the other forms of this
+           kind: EuTextField has no hint of its own. -->
       <EuTextField v-model="bankAccount" label="IBAN" />
       <EuTextField v-model="bic" label="BIC (optional)" />
       <EuTextField v-model="recipientName" label="Empfänger (nur wenn abweichend)" />
-      <EuTextField v-model="note" label="Notiz (z. B. Anlass des Wechsels)" />
+      <EuTextField v-model="note" label="Notiz (z. B. wofür dieses Konto gilt)" />
       <p v-if="error ?? localError" class="eu-form__error" role="alert">
         {{ error ?? localError }}
       </p>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { ref, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 
+import AgencyAccountFormDialog from '../agencies/AgencyAccountFormDialog.vue';
+import type { AgencyAccountDto } from '../agencies/api';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -10,6 +12,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
+import { useAgencyAccountPicker } from './agency-account-picker';
 import type { InvoiceDto } from './api';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import { reasonRequiredMessage } from './not-covered';
@@ -27,6 +30,8 @@ const props = defineProps<{
   accountUID: string;
   facilities: SelectOption[];
   agencies: SelectOption[];
+  /** agencyUID → its bank accounts, to pick the one the invoice goes to. */
+  agencyAccounts: Record<string, AgencyAccountDto[]>;
   submitting: boolean;
   error: string | null;
 }>();
@@ -45,6 +50,7 @@ const form = ref({
   facilityUID: '',
   invoiceAmount: null as number | null,
   agencyUID: '',
+  agencyAccountUID: '',
   transferUntilDate: '',
   transferSubject: '',
   documentLink: '',
@@ -77,6 +83,20 @@ watch(
   { immediate: true },
 );
 
+// The bank account of the picked agency (Slice 44), with its own ad-hoc create.
+const accountPicker = useAgencyAccountPicker(toRef(props, 'agencyAccounts'));
+watch(
+  () => props.agencyAccounts,
+  (map) => accountPicker.refresh(map),
+);
+const accountOptions = computed(() => accountPicker.optionsOf(form.value.agencyUID));
+
+/** Picking an agency suggests its first account; clearing it takes both. */
+function pickAgency(uid: string | null): void {
+  form.value.agencyUID = uid ?? '';
+  form.value.agencyAccountUID = uid === null ? '' : accountPicker.suggestionFor(uid);
+}
+
 // Ad-hoc create ("‹typed name› hinzufügen") — reuses the resource create form.
 const {
   open: createOpen,
@@ -86,16 +106,24 @@ const {
   error: createError,
   start: openCreate,
   submit: onCreateSubmit,
-} = useEntityCreate((kind, option) => {
+} = useEntityCreate((kind, option, row) => {
   if (kind === 'facility') {
     localFacilities.value = [...localFacilities.value, option];
     form.value.facilityUID = option.value;
   } else {
     localAgencies.value = [...localAgencies.value, option];
-    form.value.agencyUID = option.value;
+    // A new agency is created with its first account; that one is the pick.
+    accountPicker.remember(option.value, (row.accounts ?? []) as AgencyAccountDto[]);
+    pickAgency(option.value);
   }
   emit('entityCreated');
 });
+
+/** The account added from the picker is selected right away. */
+async function onAccountCreate(payload: Parameters<typeof accountPicker.submit>[0]): Promise<void> {
+  const uid = await accountPicker.submit(payload);
+  if (uid !== null) form.value.agencyAccountUID = uid;
+}
 
 watch(
   () => [props.open, props.editing] as const,
@@ -110,6 +138,7 @@ watch(
       facilityUID: e?.facilityUID ?? '',
       invoiceAmount: e ? e.invoiceAmount : null,
       agencyUID: e?.agencyUID ?? '',
+      agencyAccountUID: e?.agencyAccountUID ?? '',
       transferUntilDate: e?.transferUntilDate ?? '',
       transferSubject: e?.transferSubject ?? '',
       documentLink: e?.documentLink ?? '',
@@ -171,6 +200,7 @@ function submit(): void {
     transferUntilDate: dp ? null : f.transferUntilDate || null,
     transferSubject: dp ? null : f.transferSubject.trim() || null,
     agencyUID: dp ? null : f.agencyUID || null,
+    agencyAccountUID: dp ? null : f.agencyAccountUID || null,
   };
   // accountUID is immutable after creation.
   if (!props.editing) payload.accountUID = props.accountUID;
@@ -250,8 +280,21 @@ function submit(): void {
           :options="localAgencies"
           allow-create
           create-noun="Abrechnungsdienstleister"
-          @update:model-value="form.agencyUID = $event ?? ''"
+          @update:model-value="pickAgency($event)"
           @create="openCreate('agency', $event)"
+        />
+        <!-- An agency holds several accounts at once, and the bill names the
+             one it is to be paid on (Slice 44). Only once an agency is picked:
+             without one there is nothing to choose between. -->
+        <EuEntityPicker
+          v-if="form.agencyUID"
+          :model-value="form.agencyAccountUID || null"
+          label="Kontoverbindung"
+          :options="accountOptions"
+          allow-create
+          create-noun="Kontoverbindung"
+          @update:model-value="form.agencyAccountUID = $event ?? ''"
+          @create="accountPicker.start(form.agencyUID)"
         />
       </template>
 
@@ -268,6 +311,16 @@ function submit(): void {
       </EuButton>
     </template>
   </EuDialog>
+
+  <!-- Adding a bank account to the picked agency, from its picker above. -->
+  <AgencyAccountFormDialog
+    :open="accountPicker.dialogOpen.value"
+    :entry="null"
+    :submitting="accountPicker.busy.value"
+    :error="accountPicker.error.value"
+    @close="accountPicker.dialogOpen.value = false"
+    @submit="onAccountCreate"
+  />
 
   <!-- Ad-hoc create for the entity picked above, prefilled with the typed name. -->
   <ResourceFormDialog

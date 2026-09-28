@@ -1306,6 +1306,100 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(renamed.body.data.transferUntilDate, '2024-11-08');
       assert.equal(renamed.body.data.transferDate, '2024-10-30');
     });
+
+    // Slice 44: an agency holds several accounts, so the invoice names the one
+    // it goes to (issues.md 0.12.0-4).
+    await t.test('an invoice names the bank account of its agency', async () => {
+      const agency = await post('/api/v1/agencies', {
+        agencyName: 'Inkasso Konten',
+        bankAccount: 'DE02120300000000202051',
+      });
+      const agencyUID = agency.body.data.agencyUID as string;
+      const firstUID = agency.body.data.accounts[0].agencyAccountUID as string;
+      const secondUID = (
+        await post(`/api/v1/agencies/${agencyUID}/accounts`, {
+          bankAccount: 'DE89370400440532013000',
+        })
+      ).body.data.agencyAccountUID as string;
+
+      const otherAgency = await post('/api/v1/agencies', {
+        agencyName: 'Inkasso Fremd',
+        bankAccount: 'DE02500105170137075030',
+      });
+      const foreignUID = otherAgency.body.data.accounts[0].agencyAccountUID as string;
+
+      const created = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-AA-1',
+        invoiceDate: '2024-11-05',
+        treatmentDate: '2024-11-01',
+        accountUID: accountB,
+        invoiceAmount: 120,
+        agencyUID,
+        agencyAccountUID: secondUID,
+      });
+      assert.equal(created.status, 201);
+      assert.equal(created.body.data.agencyAccountUID, secondUID);
+      const uid = created.body.data.invoiceUID as string;
+
+      // An account of another agency is refused, on create and on update.
+      const foreignOnCreate = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-AA-2',
+        invoiceDate: '2024-11-05',
+        treatmentDate: '2024-11-01',
+        accountUID: accountB,
+        invoiceAmount: 10,
+        agencyUID,
+        agencyAccountUID: foreignUID,
+      });
+      assert.equal(foreignOnCreate.status, 409);
+      assert.equal(foreignOnCreate.body.error.code, 'INVOICE_ACCOUNT_NOT_OF_AGENCY');
+      const foreignOnUpdate = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ agencyAccountUID: foreignUID });
+      assert.equal(foreignOnUpdate.status, 409);
+
+      // Changing something else leaves the account alone.
+      const touched = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ transferSubject: 'Rechnung AA-1' });
+      assert.equal(touched.body.data.agencyAccountUID, secondUID);
+
+      // Moving to another agency without naming an account clears it — the old
+      // one belongs to the old agency.
+      const moved = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ agencyUID: otherAgency.body.data.agencyUID });
+      assert.equal(moved.body.data.agencyAccountUID, null);
+
+      // Back, with an account of its own; dropping the agency drops it too.
+      const back = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ agencyUID, agencyAccountUID: firstUID });
+      assert.equal(back.body.data.agencyAccountUID, firstUID);
+      const withoutAgency = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ agencyUID: null });
+      assert.equal(withoutAgency.body.data.agencyAccountUID, null);
+
+      // A direct payment has nothing to transfer, so it keeps no account.
+      const cash = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-AA-3',
+        invoiceDate: '2024-11-06',
+        treatmentDate: '2024-11-02',
+        accountUID: accountB,
+        invoiceAmount: 30,
+        agencyUID,
+        agencyAccountUID: firstUID,
+        directPayment: true,
+      });
+      assert.equal(cash.status, 201);
+      assert.equal(cash.body.data.agencyAccountUID, null);
+    });
   } finally {
     await pool.end();
   }

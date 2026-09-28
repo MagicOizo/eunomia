@@ -180,14 +180,11 @@ test('master-data CRUD and account scoping', async (t) => {
         .set(admin)
         .send({ agencyName: 'Inkasso Test', bankAccount: 'DE02120300000000202051' });
       assert.equal(agency.status, 201);
-      // Creating an agency creates its first bank account, undated.
+      // Creating an agency creates its first bank account.
       assert.equal(agency.body.data.bankAccount, 'DE02120300000000202051');
       assert.deepEqual(
-        agency.body.data.accounts.map((a: { validFrom: string | null; validTo: string | null }) => [
-          a.validFrom,
-          a.validTo,
-        ]),
-        [[null, null]],
+        agency.body.data.accounts.map((a: { bankAccount: string }) => a.bankAccount),
+        ['DE02120300000000202051'],
       );
 
       const badBic = await request(app)
@@ -198,57 +195,38 @@ test('master-data CRUD and account scoping', async (t) => {
       assert.equal(badBic.body.error.code, 'VALIDATION_ERROR');
     });
 
-    await t.test('an agency keeps its identity when its bank account changes', async () => {
+    await t.test('an agency holds several bank accounts side by side', async () => {
       const created = await request(app)
         .post('/api/v1/agencies')
         .set(admin)
-        .send({ agencyName: 'Inkasso Wechsel', bankAccount: 'DE02120300000000202051' });
+        .send({ agencyName: 'Inkasso Mehrkonto', bankAccount: 'DE02120300000000202051' });
       assert.equal(created.status, 201);
       const uid = created.body.data.agencyUID as string;
-      const undatedUID = created.body.data.accounts[0].agencyAccountUID as string;
+      const firstUID = created.body.data.accounts[0].agencyAccountUID as string;
 
-      const changed = await request(app).post(`/api/v1/agencies/${uid}/accounts`).set(admin).send({
-        validFrom: '2026-03-01',
+      const second = await request(app).post(`/api/v1/agencies/${uid}/accounts`).set(admin).send({
         bankAccount: 'DE89370400440532013000',
         bic: 'COBADEFFXXX',
-        recipientName: 'Zahlstelle Wechsel',
-        note: 'Bankwechsel',
+        recipientName: 'Zahlstelle Mehrkonto',
+        note: 'für Rechnungen der Radiologie',
       });
-      assert.equal(changed.status, 201);
-
-      // The read shows the whole history plus the account in force today,
-      // flattened — and the older entry now ends the day before the change.
-      const detail = await request(app).get(`/api/v1/agencies/${uid}`).set(admin);
-      assert.equal(detail.status, 200);
-      assert.equal(detail.body.data.bankAccount, 'DE89370400440532013000');
-      assert.equal(detail.body.data.recipientName, 'Zahlstelle Wechsel');
-      assert.deepEqual(
-        detail.body.data.accounts.map((a: { validFrom: string | null; validTo: string | null }) => [
-          a.validFrom,
-          a.validTo,
-        ]),
-        [
-          [null, '2026-02-28'],
-          ['2026-03-01', null],
-        ],
-      );
-
-      // A second entry starting on the same day, and a second undated one, are
-      // both refused: the resolution would be ambiguous.
-      const sameDay = await request(app)
-        .post(`/api/v1/agencies/${uid}/accounts`)
-        .set(admin)
-        .send({ validFrom: '2026-03-01', bankAccount: 'DE02500105170137075030' });
-      assert.equal(sameDay.status, 409);
-      assert.equal(sameDay.body.error.code, 'HISTORY_START_EXISTS');
-      assert.equal(sameDay.body.error.details.undated, false);
-
-      const secondUndated = await request(app)
+      assert.equal(second.status, 201);
+      const third = await request(app)
         .post(`/api/v1/agencies/${uid}/accounts`)
         .set(admin)
         .send({ bankAccount: 'DE02500105170137075030' });
-      assert.equal(secondUndated.status, 409);
-      assert.equal(secondUndated.body.error.details.undated, true);
+      assert.equal(third.status, 201);
+
+      // All three stand, in the order they were recorded, and the first one is
+      // what the agency flattens as its own — nothing is "in force" any more.
+      const detail = await request(app).get(`/api/v1/agencies/${uid}`).set(admin);
+      assert.equal(detail.status, 200);
+      assert.equal(detail.body.data.bankAccount, 'DE02120300000000202051');
+      assert.equal(detail.body.data.recipientName, null);
+      assert.deepEqual(
+        detail.body.data.accounts.map((a: { bankAccount: string }) => a.bankAccount),
+        ['DE02120300000000202051', 'DE89370400440532013000', 'DE02500105170137075030'],
+      );
 
       // Renaming the agency leaves its accounts alone.
       const renamed = await request(app)
@@ -257,26 +235,25 @@ test('master-data CRUD and account scoping', async (t) => {
         .send({ agencyName: 'Inkasso Umbenannt' });
       assert.equal(renamed.status, 200);
       assert.equal(renamed.body.data.agencyName, 'Inkasso Umbenannt');
-      assert.equal(renamed.body.data.accounts.length, 2);
+      assert.equal(renamed.body.data.accounts.length, 3);
 
-      // Moving the change to another day, then dropping it again: the agency
-      // falls back to the account it started with.
+      // Correcting an account, then dropping it: the rest keeps its order.
       const moved = await request(app)
-        .patch(`/api/v1/agencies/${uid}/accounts/${changed.body.data.agencyAccountUID}`)
+        .patch(`/api/v1/agencies/${uid}/accounts/${second.body.data.agencyAccountUID}`)
         .set(admin)
-        .send({ validFrom: '2026-04-01' });
+        .send({ note: 'für Rechnungen des Labors' });
       assert.equal(moved.status, 200);
-      assert.equal(moved.body.data.validFrom, '2026-04-01');
+      assert.equal(moved.body.data.note, 'für Rechnungen des Labors');
 
       const removed = await request(app)
-        .delete(`/api/v1/agencies/${uid}/accounts/${changed.body.data.agencyAccountUID}`)
+        .delete(`/api/v1/agencies/${uid}/accounts/${second.body.data.agencyAccountUID}`)
         .set(admin);
       assert.equal(removed.status, 204);
 
       const afterDelete = await request(app).get(`/api/v1/agencies/${uid}`).set(admin);
       assert.equal(afterDelete.body.data.bankAccount, 'DE02120300000000202051');
-      assert.equal(afterDelete.body.data.accounts.length, 1);
-      assert.equal(afterDelete.body.data.accounts[0].agencyAccountUID, undatedUID);
+      assert.equal(afterDelete.body.data.accounts.length, 2);
+      assert.equal(afterDelete.body.data.accounts[0].agencyAccountUID, firstUID);
 
       // An account of another agency cannot be reached through this one.
       const otherAgency = await request(app)

@@ -56,6 +56,8 @@ export const ERROR_CODES = {
   INVOICE_NOT_COVERED_REASON_REQUIRED: 'INVOICE_NOT_COVERED_REASON_REQUIRED',
   /** "Not covered" was set on an invoice that is already submitted somewhere. */
   INVOICE_NOT_COVERED_SUBMITTED: 'INVOICE_NOT_COVERED_SUBMITTED',
+  /** The chosen bank account belongs to another collection agency. */
+  INVOICE_ACCOUNT_NOT_OF_AGENCY: 'INVOICE_ACCOUNT_NOT_OF_AGENCY',
   /** The policy already has an active billing under that number. */
   BILLING_NUMBER_TAKEN: 'BILLING_NUMBER_TAKEN',
 

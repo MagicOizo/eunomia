@@ -1,9 +1,20 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import AgencyAccountFormDialog from '../agencies/AgencyAccountFormDialog.vue';
+import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import { reasonRequiredMessage } from './not-covered';
 import { differentYearsMessage } from './treatment-days';
+
+const { saveAgencyAccount } = vi.hoisted(() => ({ saveAgencyAccount: vi.fn() }));
+
+vi.mock('../agencies/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../agencies/api')>()),
+  saveAgencyAccount,
+}));
+
+beforeEach(() => saveAgencyAccount.mockReset());
 
 /** The create form with the minimum a save needs, minus the treatment days. */
 function mountForm() {
@@ -14,6 +25,7 @@ function mountForm() {
       accountUID: 'a-1',
       facilities: [],
       agencies: [],
+      agencyAccounts: {},
       submitting: false,
       error: null,
     },
@@ -145,6 +157,147 @@ describe('InvoiceFormDialog "nicht gedeckt"', () => {
 
     expect(submitted(wrapper)?.notCovered).toBe(false);
     expect(submitted(wrapper)?.notCoveredReason).toBeNull();
+
+    wrapper.unmount();
+  });
+});
+
+/**
+ * A collection agency holds several bank accounts and the invoice names the one
+ * it goes to (Slice 44). The form suggests the agency's first and lets an
+ * unknown one be added on the spot.
+ */
+describe('InvoiceFormDialog bank account', () => {
+  const agencies = [
+    { value: 'c-1', label: 'Inkasso Eins' },
+    { value: 'c-2', label: 'Inkasso Zwei' },
+  ];
+  const agencyAccounts = {
+    'c-1': [
+      { agencyAccountUID: 'g-1', bankAccount: 'DE01', bic: null, recipientName: null, note: null },
+      {
+        agencyAccountUID: 'g-2',
+        bankAccount: 'DE02',
+        bic: null,
+        recipientName: 'Zahlstelle',
+        note: 'Radiologie',
+      },
+    ],
+    'c-2': [
+      { agencyAccountUID: 'g-9', bankAccount: 'DE09', bic: null, recipientName: null, note: null },
+    ],
+  };
+
+  function mountWithAgencies() {
+    return mount(InvoiceFormDialog, {
+      props: {
+        open: true,
+        editing: null,
+        accountUID: 'a-1',
+        facilities: [],
+        agencies,
+        agencyAccounts,
+        submitting: false,
+        error: null,
+      },
+    });
+  }
+
+  /** The picker carrying `label`, by its own prop rather than by position. */
+  const picker = (wrapper: ReturnType<typeof mountWithAgencies>, label: string) =>
+    wrapper.findAllComponents(EuEntityPicker).find((one) => one.props('label') === label);
+
+  it('offers no account before an agency is picked', () => {
+    const wrapper = mountWithAgencies();
+    expect(picker(wrapper, 'Kontoverbindung')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('suggests the first account of the picked agency, and switches with it', async () => {
+    const wrapper = mountWithAgencies();
+    await picker(wrapper, 'Abrechnungsdienstleister')!.setValue('c-1');
+    await flushPromises();
+
+    const accountPicker = picker(wrapper, 'Kontoverbindung')!;
+    expect(accountPicker.props('modelValue')).toBe('g-1');
+    // Beneficiary and note tell two IBANs of one agency apart.
+    expect(accountPicker.props('options')).toEqual([
+      { value: 'g-1', label: 'DE01', hint: undefined },
+      { value: 'g-2', label: 'DE02', hint: 'Zahlstelle · Radiologie' },
+    ]);
+
+    await picker(wrapper, 'Abrechnungsdienstleister')!.setValue('c-2');
+    await flushPromises();
+    expect(picker(wrapper, 'Kontoverbindung')!.props('modelValue')).toBe('g-9');
+
+    wrapper.unmount();
+  });
+
+  it('sends the account that was chosen, not the suggested one', async () => {
+    const wrapper = mountWithAgencies();
+    await fillRequired(wrapper, '2020-02-10');
+    await picker(wrapper, 'Abrechnungsdienstleister')!.setValue('c-1');
+    await flushPromises();
+    await picker(wrapper, 'Kontoverbindung')!.setValue('g-2');
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(submitted(wrapper)?.agencyUID).toBe('c-1');
+    expect(submitted(wrapper)?.agencyAccountUID).toBe('g-2');
+
+    wrapper.unmount();
+  });
+
+  it('selects an account added from the picker right away', async () => {
+    saveAgencyAccount.mockResolvedValue({
+      agencyAccountUID: 'g-neu',
+      bankAccount: 'DE77',
+      bic: null,
+      recipientName: null,
+      note: null,
+    });
+    const wrapper = mountWithAgencies();
+    await picker(wrapper, 'Abrechnungsdienstleister')!.setValue('c-1');
+    await flushPromises();
+
+    picker(wrapper, 'Kontoverbindung')!.vm.$emit('create', 'DE77');
+    await flushPromises();
+    const form = wrapper.findComponent(AgencyAccountFormDialog);
+    expect(form.props('open')).toBe(true);
+    form.vm.$emit('submit', {
+      bankAccount: 'DE77',
+      bic: null,
+      recipientName: null,
+      note: null,
+    });
+    await flushPromises();
+
+    expect(saveAgencyAccount).toHaveBeenCalledWith('c-1', null, {
+      bankAccount: 'DE77',
+      bic: null,
+      recipientName: null,
+      note: null,
+    });
+    const accountPicker = picker(wrapper, 'Kontoverbindung')!;
+    expect(accountPicker.props('modelValue')).toBe('g-neu');
+    expect(accountPicker.props('options')).toHaveLength(3);
+
+    wrapper.unmount();
+  });
+
+  it('keeps no account for a bill that was paid directly', async () => {
+    const wrapper = mountWithAgencies();
+    await fillRequired(wrapper, '2020-02-10');
+    await picker(wrapper, 'Abrechnungsdienstleister')!.setValue('c-1');
+    await flushPromises();
+    // Direktzahlung is the first switch of the form.
+    await wrapper.findAll('.eu-toggle__input')[0].setValue(true);
+    await flushPromises();
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(submitted(wrapper)?.agencyUID).toBeNull();
+    expect(submitted(wrapper)?.agencyAccountUID).toBeNull();
 
     wrapper.unmount();
   });

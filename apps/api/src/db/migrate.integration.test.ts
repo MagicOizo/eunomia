@@ -491,7 +491,9 @@ test('migration 012 turns an agency account into a history, and back', async (t)
        VALUES ('cMIGRATION12', 'Mig Inkasso', 'DE02120300000000202051')`,
     );
 
-    await migrator.up();
+    // Only up to 012: `validFrom` is what this migration introduces, and 016
+    // takes it away again.
+    await migrator.up({ to: name012 });
 
     // The account known so far became the undated first entry, and the column
     // it came from is gone.
@@ -678,6 +680,117 @@ test('migration 015 adds the "not covered" mark and takes it back', async (t) =>
     );
     assert.equal(Number(invoice?.notCovered), 0);
     assert.equal(invoice?.notCoveredReason, null);
+  } finally {
+    await cleanup().catch(() => undefined);
+    await pool.end();
+  }
+});
+
+test('migration 016 freezes each invoice on the account it showed, and drops the dates', async (t) => {
+  const config = databaseConfigFromEnv();
+  if (!config) {
+    t.skip('no database configured (DB_* env vars unset)');
+    return;
+  }
+  const pool = createPool(config);
+  try {
+    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
+  } catch {
+    await pool.end();
+    t.skip('database not reachable');
+    return;
+  }
+
+  const cleanup = async (): Promise<void> => {
+    for (const sql of [
+      "DELETE FROM InvoiceTreatmentDays WHERE invoiceUID IN ('iMIGRATION16', 'iMIGRATI16B')",
+      "DELETE FROM Invoices WHERE invoiceUID IN ('iMIGRATION16', 'iMIGRATI16B')",
+      "DELETE FROM Accounts WHERE accountUID = 'aMIGRATION16'",
+      "DELETE FROM AgencyBankAccounts WHERE agencyUID = 'cMIGRATION16'",
+      "DELETE FROM CollectionAgencies WHERE agencyUID = 'cMIGRATION16'",
+    ]) {
+      await pool.query(sql).catch(() => undefined);
+    }
+  };
+
+  try {
+    await runMigrations(pool);
+    const migrator = createMigrator(pool);
+    const name016 = (await migrator.executed())
+      .map((m) => m.name)
+      .find((n) => n.startsWith('016-'));
+    assert.ok(name016, 'migration 016 should be recorded');
+
+    await cleanup();
+    // Back to the dated shape: an agency that changed its account at the turn
+    // of the year, an invoice paid before the change and one still open.
+    await migrator.down({ to: name016 });
+    await pool.query(
+      `INSERT INTO CollectionAgencies (agencyUID, agencyName) VALUES ('cMIGRATION16', 'Mig Inkasso')`,
+    );
+    await pool.query(
+      `INSERT INTO AgencyBankAccounts (agencyAccountUID, agencyUID, validFrom, bankAccount, note)
+       VALUES ('gMIGRATION16', 'cMIGRATION16', NULL, 'DE02120300000000202051', NULL),
+              ('gMIGRATIO16B', 'cMIGRATION16', '2026-01-01', 'DE89370400440532013000', 'Wechsel')`,
+    );
+    await pool.query(
+      "INSERT INTO Accounts (accountUID, firstname, birthDate) VALUES ('aMIGRATION16', 'Mig', '1990-01-01')",
+    );
+    await pool.query(
+      `INSERT INTO Invoices (invoiceUID, invoiceNumber, invoiceDate, treatmentDate, accountUID,
+                             invoiceAmount, agencyUID, transferDate)
+       VALUES ('iMIGRATION16', 'R-16', '2025-06-01', '2025-05-20', 'aMIGRATION16', 100,
+               'cMIGRATION16', '2025-06-10'),
+              ('iMIGRATI16B', 'R-16B', '2026-06-01', '2026-05-20', 'aMIGRATION16', 100,
+               'cMIGRATION16', NULL)`,
+    );
+
+    await migrator.up();
+
+    // The paid invoice keeps the account of the day it was paid, the open one
+    // takes today's — exactly what the old rule showed before this migration.
+    const invoices = await pool.query<Array<{ invoiceUID: string; agencyAccountUID: string }>>(
+      `SELECT invoiceUID, agencyAccountUID FROM Invoices
+        WHERE invoiceUID IN ('iMIGRATION16', 'iMIGRATI16B') ORDER BY invoiceUID`,
+    );
+    assert.deepEqual(invoices, [
+      { invoiceUID: 'iMIGRATI16B', agencyAccountUID: 'gMIGRATIO16B' },
+      { invoiceUID: 'iMIGRATION16', agencyAccountUID: 'gMIGRATION16' },
+    ]);
+
+    // The start date is gone as a column, but not as information: it is in the
+    // note of the account that carried it.
+    const columns = await pool.query<Array<{ n: number }>>(
+      `SELECT COUNT(*) AS n FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'AgencyBankAccounts'
+          AND column_name = 'validFrom'`,
+    );
+    assert.equal(Number(columns[0]?.n), 0);
+    const notes = await pool.query<Array<{ agencyAccountUID: string; note: string | null }>>(
+      `SELECT agencyAccountUID, note FROM AgencyBankAccounts
+        WHERE agencyUID = 'cMIGRATION16' ORDER BY agencyAccountUID`,
+    );
+    assert.deepEqual(notes, [
+      { agencyAccountUID: 'gMIGRATIO16B', note: 'Wechsel · gültig ab 01.01.2026' },
+      { agencyAccountUID: 'gMIGRATION16', note: null },
+    ]);
+
+    // An invoice cannot point at an account that is not there any more.
+    await assert.rejects(
+      pool.query(
+        "UPDATE Invoices SET agencyAccountUID = 'gNOTTHERE12' WHERE invoiceUID = 'iMIGRATION16'",
+      ),
+      'the pointer is a foreign key',
+    );
+
+    // down takes the pointer away and leaves the accounts undated.
+    await migrator.down({ to: name016 });
+    const back = await pool.query<Array<{ validFrom: string | null }>>(
+      "SELECT validFrom FROM AgencyBankAccounts WHERE agencyUID = 'cMIGRATION16'",
+    );
+    assert.deepEqual(back, [{ validFrom: null }, { validFrom: null }]);
+
+    await migrator.up();
   } finally {
     await cleanup().catch(() => undefined);
     await pool.end();

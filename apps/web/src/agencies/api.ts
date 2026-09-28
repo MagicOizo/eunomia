@@ -1,17 +1,14 @@
 import { apiFetch } from '../lib/api';
 
 /**
- * A collection agency and its bank accounts. The account is a history since
- * Slice 38: an agency that changes its account stays one entry, and an invoice
- * names the account its money went to.
+ * A collection agency and its bank accounts. Since Slice 44 it holds several at
+ * once, in the order they were recorded, and each invoice names the one it goes
+ * to.
  */
 
-/** One bank account; `validTo` is derived by the API from the entry that follows. */
+/** One bank account of an agency. */
 export interface AgencyAccountDto {
   agencyAccountUID: string;
-  /** null = applies from the beginning (see accounts.ts). */
-  validFrom: string | null;
-  validTo: string | null;
   bankAccount: string;
   bic: string | null;
   /** Beneficiary, where the money is addressed to someone else than the agency. */
@@ -19,11 +16,11 @@ export interface AgencyAccountDto {
   note: string | null;
 }
 
-/** An agency as every read hands it out: with its history and today's account flattened. */
+/** An agency as every read hands it out: with all its accounts and the first flattened. */
 export interface AgencyDto {
   agencyUID: string;
   agencyName: string;
-  /** The account in force today, or null while the agency has none at all. */
+  /** The account recorded first, or null while the agency has none at all. */
   bankAccount: string | null;
   bic: string | null;
   recipientName: string | null;
@@ -32,7 +29,7 @@ export interface AgencyDto {
 
 export type AgencyAccountInput = Pick<
   AgencyAccountDto,
-  'validFrom' | 'bankAccount' | 'bic' | 'recipientName' | 'note'
+  'bankAccount' | 'bic' | 'recipientName' | 'note'
 >;
 
 const unwrap = <T>(res: { data: T }): T => res.data;
@@ -45,17 +42,19 @@ export async function updateAgency(uid: string, agencyName: string): Promise<voi
   await apiFetch(`/agencies/${uid}`, { method: 'PATCH', body: { agencyName } });
 }
 
-/** Creates or updates one bank account of an agency. */
+/** Creates or updates one bank account of an agency; hands back the saved row. */
 export async function saveAgencyAccount(
   agencyUID: string,
   entryUID: string | null,
   body: AgencyAccountInput,
-): Promise<void> {
+): Promise<AgencyAccountDto> {
   const base = `/agencies/${agencyUID}/accounts`;
-  await apiFetch(entryUID ? `${base}/${entryUID}` : base, {
-    method: entryUID ? 'PATCH' : 'POST',
-    body,
-  });
+  return unwrap(
+    await apiFetch<{ data: AgencyAccountDto }>(entryUID ? `${base}/${entryUID}` : base, {
+      method: entryUID ? 'PATCH' : 'POST',
+      body,
+    }),
+  );
 }
 
 export async function deleteAgencyAccount(agencyUID: string, entryUID: string): Promise<void> {

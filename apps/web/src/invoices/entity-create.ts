@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import type { PickerOption } from '../design-system/components/EuEntityPicker.vue';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
-import { createResource } from '../lib/resource';
+import { type ResourceRow, createResource } from '../lib/resource';
 import type { ResourceConfig } from '../resources/config';
 import { resourceConfigs } from '../resources/definitions';
 
@@ -23,9 +23,13 @@ export const CREATE_KINDS: Record<CreateKind, { path: string; config: ResourceCo
 
 /**
  * State and handlers for the sub-dialog. `onCreated` receives the saved row as
- * a picker option, so the caller only has to put it into its own list and field.
+ * a picker option, so the caller only has to put it into its own list and
+ * field, and the row itself — a new agency carries its first bank account, and
+ * that account is what the invoice is then suggested (Slice 44).
  */
-export function useEntityCreate(onCreated: (kind: CreateKind, option: PickerOption) => void) {
+export function useEntityCreate(
+  onCreated: (kind: CreateKind, option: PickerOption, row: ResourceRow) => void,
+) {
   const open = ref(false);
   const kind = ref<CreateKind>('facility');
   const prefill = ref<Record<string, string>>({});
@@ -47,10 +51,14 @@ export function useEntityCreate(onCreated: (kind: CreateKind, option: PickerOpti
     error.value = null;
     try {
       const row = await createResource(target.path, payload);
-      onCreated(kind.value, {
-        value: String(row[target.config.idKey]),
-        label: String(row[target.config.columns[0].key]),
-      });
+      onCreated(
+        kind.value,
+        {
+          value: String(row[target.config.idKey]),
+          label: String(row[target.config.columns[0].key]),
+        },
+        row,
+      );
       open.value = false;
     } catch (err) {
       error.value = err instanceof HttpError ? describeError(err) : 'Anlegen fehlgeschlagen.';

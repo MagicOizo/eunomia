@@ -18,6 +18,7 @@ const invoice: InvoiceDto = {
   transferSubject: 'Rechnung 110',
   documentLink: null,
   agencyUID: 'c-1',
+  agencyAccountUID: 'g-2',
   directPayment: 0,
   reimbursementClosed: false,
   notCovered: false,
@@ -31,12 +32,10 @@ const invoice: InvoiceDto = {
   hasOpenObjection: false,
 };
 
-/** The agency moved bank at the turn of the year; the older entry is undated. */
+/** Two accounts side by side; the invoice above goes to the second. */
 const accounts = [
   {
     agencyAccountUID: 'g-1',
-    validFrom: null,
-    validTo: '2025-12-31',
     bankAccount: 'DE02120300000000202051',
     bic: null,
     recipientName: null,
@@ -44,8 +43,6 @@ const accounts = [
   },
   {
     agencyAccountUID: 'g-2',
-    validFrom: '2026-01-01',
-    validTo: null,
     bankAccount: 'DE89370400440532013000',
     bic: 'COBADEFFXXX',
     recipientName: 'Zahlstelle Beispiel Inkasso',
@@ -105,11 +102,11 @@ describe('PaymentInfoPopover labels', () => {
 });
 
 /**
- * Which account applies is the day the money moved, not the day the page is
- * looked at (see agencies/accounts.ts).
+ * Which account applies is what the invoice names, not a rule about dates (see
+ * agencies/accounts.ts).
  */
 describe('PaymentInfoPopover account resolution', () => {
-  it('names the beneficiary of the account in force, not the agency', async () => {
+  it('names the beneficiary of the chosen account, not the agency', async () => {
     const wrapper = await openPopover();
 
     const values = wrapper.findAll('dd').map((dd) => dd.text());
@@ -118,17 +115,14 @@ describe('PaymentInfoPopover account resolution', () => {
     wrapper.unmount();
   });
 
-  it('shows the account of the time for a paid invoice, and says so', async () => {
+  it('falls back to the first account while the invoice names none', async () => {
     const wrapper = await openPopover({
-      invoice: { ...invoice, transferDate: '2025-06-01' },
+      invoice: { ...invoice, agencyAccountUID: null },
     });
 
     const values = wrapper.findAll('dd').map((dd) => dd.text());
     expect(values.some((value) => value.includes('DE02120300000000202051'))).toBe(true);
-    expect(values.some((value) => value.includes('Kontoverbindung zum Überweisungsdatum'))).toBe(
-      true,
-    );
-    // The undated account names no beneficiary, so the agency carries the line.
+    // That account names no beneficiary, so the agency carries the line.
     expect(values).toContain('Beispiel Inkasso GmbH');
     wrapper.unmount();
   });

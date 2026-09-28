@@ -1,7 +1,6 @@
 import type { Pool } from 'mariadb';
 
 import { PERMISSIONS, listUsersWithAccess } from '../auth/permissions.js';
-import { accountInForce } from '../domain/agency-accounts.js';
 import { withTransaction } from '../db/transaction.js';
 import { type EncryptionKey, getSettings, setApplicationValues } from '../settings/repository.js';
 import type { SettingKey, SettingValue } from '../settings/registry.js';
@@ -74,29 +73,9 @@ export interface ReminderStore {
 
 /** The columns the payee is derived from; they never leave the store. */
 interface PayeeSources {
-  agencyUID: string | null;
+  recipientName: string | null;
   agencyName: string | null;
   facilityName: string | null;
-}
-
-/**
- * The beneficiary name of every agency whose account in force today has one —
- * agencies without one are absent, so the caller falls back to the agency's own
- * name.
- */
-async function recipientNamesByAgency(pool: Pool): Promise<Map<string, string>> {
-  const rows = await pool.query<
-    Array<{ agencyUID: string; validFrom: string | null; recipientName: string | null }>
-  >(
-    `SELECT agencyUID, validFrom, recipientName FROM AgencyBankAccounts
-      WHERE agencyAccountStatus <> -1 ORDER BY validFrom`,
-  );
-  const names = new Map<string, string>();
-  for (const agencyUID of new Set(rows.map((row) => row.agencyUID))) {
-    const inForce = accountInForce(rows.filter((row) => row.agencyUID === agencyUID));
-    if (inForce?.recipientName) names.set(agencyUID, inForce.recipientName);
-  }
-  return names;
 }
 
 /** Joins the parts of a name that exist, so a missing surname leaves no gap. */
@@ -145,34 +124,34 @@ export function createReminderStore(pool: Pool, encryptionKey: EncryptionKey): R
     /*
      * Every unpaid invoice, with the payee a transfer would go to: the
      * collection agency when one took the billing over, otherwise the facility.
-     * Where the agency's account names a beneficiary of its own, that name wins
-     * — it is who the money is addressed to (Slice 38). These invoices are all
-     * unpaid, so the account in force is today's; resolving it here in
-     * TypeScript keeps `accountInForce` the single home of that rule.
+     * Where the bank account the invoice names has a beneficiary of its own,
+     * that name wins — it is who the money is addressed to (Slice 38). Since
+     * Slice 44 the invoice names that account itself, so a plain join answers
+     * it; an invoice without one falls back to the agency's name.
      * Filtering by due date is left to calcPaymentState — the set is small
      * (a household's open invoices), and one rule in one place beats a WHERE
      * clause that has to agree with it.
      */
     listPayableInvoices: async (): Promise<PayableInvoiceRow[]> => {
       const rows = await pool.query<Array<Omit<PayableInvoiceRow, 'payee'> & PayeeSources>>(
-        `SELECT i.invoiceUID, i.invoiceNumber, i.accountUID, i.agencyUID,
+        `SELECT i.invoiceUID, i.invoiceNumber, i.accountUID,
                 i.invoiceAmount AS amount, i.transferDate, i.transferUntilDate, i.directPayment,
-                ag.agencyName, f.facilityName,
+                ag.agencyName, gb.recipientName, f.facilityName,
                 CONCAT_WS(' ', a.firstname, a.surname) AS accountName
            FROM Invoices i
            JOIN Accounts a ON a.accountUID = i.accountUID
            LEFT JOIN CollectionAgencies ag ON ag.agencyUID = i.agencyUID
+           LEFT JOIN AgencyBankAccounts gb ON gb.agencyAccountUID = i.agencyAccountUID
            LEFT JOIN Facilities f ON f.facilityUID = i.facilityUID
           WHERE i.invoiceStatus <> -1
             AND i.transferDate IS NULL
             AND i.directPayment = 0
           ORDER BY i.transferUntilDate IS NULL, i.transferUntilDate, i.invoiceNumber`,
       );
-      const beneficiaries = await recipientNamesByAgency(pool);
-      return rows.map(({ agencyUID, agencyName, facilityName, ...invoice }) => {
-        const beneficiary = agencyUID === null ? undefined : beneficiaries.get(agencyUID);
-        return { ...invoice, payee: beneficiary ?? agencyName ?? facilityName };
-      });
+      return rows.map(({ recipientName, agencyName, facilityName, ...invoice }) => ({
+        ...invoice,
+        payee: recipientName ?? agencyName ?? facilityName,
+      }));
     },
 
     listRecipients: async () => {

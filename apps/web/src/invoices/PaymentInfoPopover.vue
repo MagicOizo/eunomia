@@ -13,7 +13,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
-import { accountInForce } from '../agencies/accounts';
+import { accountForInvoice } from '../agencies/accounts';
 import type { AgencyAccountDto } from '../agencies/api';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
@@ -27,9 +27,8 @@ const props = defineProps<{
   facilityName: string | null;
   agencyName: string | null;
   /**
-   * The agency's bank accounts, the whole history: which of them applies
-   * follows from the day the invoice was paid, so the resolution happens here
-   * rather than at every call site.
+   * The agency's bank accounts, all of them: the invoice names the one it goes
+   * to, so the lookup happens here rather than at every call site.
    */
   accounts?: AgencyAccountDto[];
 }>();
@@ -37,20 +36,15 @@ const props = defineProps<{
 const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.invoice)]})`);
 
 /**
- * The account the money went to (or is going to): the one in force on the
- * transfer date, today's while the invoice is unpaid. So a paid invoice keeps
- * telling where it actually went, even after the agency moved bank.
+ * The account the money went to (or is going to): the one the invoice names
+ * (Slice 44). An invoice that names none — one from before the choice existed,
+ * or one whose account was deleted — falls back to the agency's first.
  */
-const account = computed(() => accountInForce(props.accounts ?? [], props.invoice.transferDate));
+const account = computed(() =>
+  accountForInvoice(props.accounts ?? [], props.invoice.agencyAccountUID),
+);
 /** Where the account names a beneficiary of its own, that name is the payee. */
 const payee = computed(() => account.value?.recipientName ?? props.agencyName);
-/**
- * The shown account is no longer the current one. Worth saying: otherwise the
- * IBAN here and the one on the agency's page differ without explanation.
- */
-const historic = computed(
-  () => account.value !== null && account.value !== accountInForce(props.accounts ?? []),
-);
 
 // Nothing left to transfer, nothing to scan: a paid or cash-settled invoice
 // gets no GiroCode. Reuses the traffic light's rule rather than repeating it.
@@ -117,11 +111,6 @@ const showQr = computed(
               :subject="invoice.transferSubject"
             />
           </span>
-          <!-- A remark about the IBAN above, so it stays inside that row
-               instead of claiming a label of its own. -->
-          <span v-if="historic" class="eu-pay-grid__aside">
-            Kontoverbindung zum Überweisungsdatum
-          </span>
         </dd>
       </template>
 
@@ -167,14 +156,6 @@ const showQr = computed(
 
 .eu-pay-grid__mono {
   font-family: var(--eu-font-data);
-}
-
-/* Why the shown IBAN is not the agency's current one — quieter and smaller,
-   on its own line under the value. */
-.eu-pay-grid__aside {
-  display: block;
-  color: var(--eu-color-text-muted);
-  font-size: 0.8rem;
 }
 
 /* IBAN and its GiroCode button share the value cell; the IBAN keeps the wrap

@@ -7,6 +7,19 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.14.0-slice.1 — 2026-09-28
+
+- **A collection agency can be paid on several accounts, and the invoice says which one.** In
+  practice one agency lists several accounts on its bills and names a different one on the next —
+  nothing is replaced, each bill simply picks one. Bank accounts are therefore no longer a history
+  with one account in force at a time: they stand side by side, in the order they were recorded, and
+  the invoice carries the account it goes to. The create form suggests the agency's first account as
+  soon as the agency is picked, offers the others, and takes an unknown one on the spot; the detail
+  mask edits the same choice later, with the GiroCode following it. Payment details and the payment
+  reminder name the account the invoice chose. Every invoice recorded so far keeps the account it
+  showed: the migration writes it down, resolved by the old rule, so nothing changes over the
+  upgrade. The "valid from" date of an account goes — what it said is kept in the account's note.
+
 ## 0.13.0 — 2026-09-28
 
 Everything from the six `0.13.0-slice.N` previews below, as one release. It answers seven of the

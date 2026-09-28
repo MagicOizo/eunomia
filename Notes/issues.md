@@ -69,7 +69,7 @@
 	Es gibt Behandlungen, die sind von der Versicherung nicht gedeckt. Wenn das bekannt ist, wird sie niemals eingereicht werden. In diesem Fall soll sie auch nicht in die Berechnung eingehen (z.B. für Erreichnung der  Selbstbeteiligung). Eine Markierung als nicht gedeckt soll auch eine kurze Begründung beinhalten, damit man später nachvollziehen kann, warum man sie so markiert hat.
 3.	Zahlungsdatum bei Direktzahlung — Umgesetzt mit v0.13.0-slice.5
 	Bei direktzahlung soll atomatisch das Rechnungsdatum als Zahlungsziel und Zahlungsdatum gesetzt werden
-4.	Abrechnungsdienstleiter Kontos pro Leistungserbringer
+4.	Abrechnungsdienstleiter Kontos pro Leistungserbringer — Umgesetzt mit v0.14.0-slice.1
 	In der Praxis zeigt sich, dass es zwei Arten von Abrechnungsdienstleistern gibt:
 	- Abrechnung und Konto: Der Abrechnungsdienstleister kümmert sich um die Abrechnung und die Zahlungsaufforderungen/Mahnungen und hat ein eigenes Konto, dass für alle Leistungserbringer bei diesem Dienstleister passt
 	- Nur Abrechnung: Der Abrechnungsdienstleister kümmert sich um die Abrechnung und die Zahlungsaufforderungen/Mahnungen, er verweist aber je Leistungserbringer auf unterschiedliche Konten

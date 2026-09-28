@@ -206,6 +206,9 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
   INVOICE_NOT_COVERED_SUBMITTED: () =>
     'Eine schon eingereichte Rechnung kann nicht als nicht gedeckt markiert werden. ' +
     'Bitte zuerst die Einreichung zurückziehen oder die Markierung bei der einzelnen Police setzen.',
+  INVOICE_ACCOUNT_NOT_OF_AGENCY: () =>
+    'Die gewählte Kontoverbindung gehört nicht zu diesem Abrechnungsdienstleister. ' +
+    'Bitte eine seiner Kontoverbindungen wählen.',
   INVOICE_HAS_REIMBURSEMENT: () =>
     'Für diese Rechnung wurde bei dieser Police bereits eine Erstattung gebucht, sie kann nicht mehr zurückgezogen werden.',
   BILLING_NUMBER_TAKEN: (d) => {
@@ -222,16 +225,6 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     const suffix = prefix === '' ? '' : UNCHANGED;
     if (d.kind === 'terms')
       return sentence(prefix, 'Für dieses Jahr gibt es bereits Konditionen.') + suffix;
-    if (d.kind === 'agencyAccount') {
-      return (
-        sentence(
-          prefix,
-          d.undated === true
-            ? 'Es gibt schon eine Kontoverbindung ohne Startdatum. Bitte ein „Gültig ab“ angeben.'
-            : 'Für dieses Datum gibt es bereits eine Kontoverbindung.',
-        ) + suffix
-      );
-    }
     return sentence(prefix, 'Für dieses Datum gibt es bereits einen Beitragsstand.') + suffix;
   },
   YEAR_OUTSIDE_CONTRACT: () => 'Das Jahr liegt außerhalb der Vertragslaufzeit.',

@@ -370,6 +370,49 @@ test('trash: list, restore and delete for good', async (t) => {
       assert.equal(res.body.error.details.entry.label, 'LA-3');
     });
 
+    // Slice 44: bank accounts stand side by side, so a returning one breaks no
+    // rule — but an invoice that named one holds it fast.
+    await t.test('a bank account comes back freely and leaves only unused', async () => {
+      const agency = await post('/api/v1/agencies', {
+        agencyName: 'Inkasso Papierkorb',
+        bankAccount: 'DE02120300000000202051',
+      });
+      const agencyUID = agency.body.data.agencyUID as string;
+      const firstUID = agency.body.data.accounts[0].agencyAccountUID as string;
+      const secondUID = (
+        await post(`/api/v1/agencies/${agencyUID}/accounts`, {
+          bankAccount: 'DE89370400440532013000',
+          note: 'zweites Konto',
+        })
+      ).body.data.agencyAccountUID as string;
+
+      // The unused one goes and comes back, although an account without a date
+      // now stands beside another one — which the old rule forbade.
+      assert.equal((await del(`/api/v1/agencies/${agencyUID}/accounts/${secondUID}`)).status, 204);
+      const deleted = await entry('agencyAccount', 'DE89370400440532013000');
+      assert.ok(deleted, 'it is in the trash');
+      assert.match(deleted.context, /Inkasso Papierkorb/);
+      assert.equal((await post(`/api/v1/trash/${secondUID}/restore`, {})).status, 200);
+      assert.equal(
+        (await request(app).get(`/api/v1/agencies/${agencyUID}`).set(admin)).body.data.accounts
+          .length,
+        2,
+      );
+
+      // The one an invoice names cannot be removed for good.
+      const invoiceUID = await makeInvoice('R-KONTO', 50);
+      await request(app)
+        .patch(`/api/v1/invoices/${invoiceUID}`)
+        .set(admin)
+        .send({ agencyUID, agencyAccountUID: firstUID });
+      assert.equal((await del(`/api/v1/agencies/${agencyUID}/accounts/${firstUID}`)).status, 204);
+      const res = await del(`/api/v1/trash/${firstUID}`);
+      assert.equal(res.status, 409);
+      assert.equal(res.body.error.code, 'STILL_REFERENCED');
+      assert.deepEqual(res.body.error.details.blockers, [{ label: 'Rechnung', count: 1 }]);
+      assert.equal((await post(`/api/v1/trash/${firstUID}/restore`, {})).status, 200);
+    });
+
     await t.test('an active reference stops the record from going for good', async () => {
       await del(`/api/v1/facilities/${facilityUID}`);
       const res = await del(`/api/v1/trash/${facilityUID}`);

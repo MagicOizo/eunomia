@@ -47,6 +47,7 @@ function invoice(number: string, overrides: Partial<InvoiceDto> = {}): InvoiceDt
     transferSubject: null,
     documentLink: null,
     agencyUID: null,
+    agencyAccountUID: null,
     directPayment: 0,
     reimbursementClosed: false,
     notCovered: false,

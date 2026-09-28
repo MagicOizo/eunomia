@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { faBan, faPaperPlane, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { computed, nextTick, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, toRef, watch } from 'vue';
 
-import { accountInForce } from '../agencies/accounts';
+import AgencyAccountFormDialog from '../agencies/AgencyAccountFormDialog.vue';
+import { accountForInvoice } from '../agencies/accounts';
 import type { AgencyAccountDto } from '../agencies/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -32,6 +33,7 @@ import {
 import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
 import AllocationDialog from './AllocationDialog.vue';
 import BillingDialog from './BillingDialog.vue';
+import { useAgencyAccountPicker } from './agency-account-picker';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import { type ContractOption, policyLabel, submittableContracts } from './eligibility';
 import { reasonRequiredMessage } from './not-covered';
@@ -68,7 +70,7 @@ const props = defineProps<{
   accountName: string;
   facilities: SelectOption[];
   agencies: SelectOption[];
-  /** agencyUID → its bank accounts, to show the IBAN of the picked agency. */
+  /** agencyUID → its bank accounts, to pick the one the invoice goes to. */
   agencyAccounts: Record<string, AgencyAccountDto[]>;
   /** All policies of the insured person, for the submit and exclusion pickers. */
   contracts: ContractOption[];
@@ -121,16 +123,34 @@ const {
   error: createError,
   start: openCreate,
   submit: onCreateSubmit,
-} = useEntityCreate((kind, option) => {
+} = useEntityCreate((kind, option, row) => {
   if (kind === 'facility') {
     localFacilities.value = [...localFacilities.value, option];
     values.facilityUID = option.value;
   } else {
     localAgencies.value = [...localAgencies.value, option];
+    // A new agency is created with its first account; that one is the pick.
+    accountPicker.remember(option.value, (row.accounts ?? []) as AgencyAccountDto[]);
     values.agencyUID = option.value;
   }
   emit('entityCreated');
 });
+
+// The bank account of the picked agency (Slice 44), with its own ad-hoc create.
+const accountPicker = useAgencyAccountPicker(toRef(props, 'agencyAccounts'));
+watch(
+  () => props.agencyAccounts,
+  (map) => accountPicker.refresh(map),
+);
+const accountOptions = computed(() =>
+  typeof values.agencyUID === 'string' ? accountPicker.optionsOf(values.agencyUID) : [],
+);
+
+/** The account added from the picker is selected right away. */
+async function onAccountCreate(payload: Parameters<typeof accountPicker.submit>[0]): Promise<void> {
+  const uid = await accountPicker.submit(payload);
+  if (uid !== null) values.agencyAccountUID = uid;
+}
 
 /**
  * True while the mask is being filled from an opened invoice. Seeding writes
@@ -158,6 +178,7 @@ watch(
       transferDate: inv.transferDate,
       transferSubject: inv.transferSubject,
       agencyUID: inv.agencyUID,
+      agencyAccountUID: inv.agencyAccountUID,
       documentLink: inv.documentLink,
       reimbursementClosed: inv.reimbursementClosed,
       notCovered: inv.notCovered,
@@ -190,6 +211,7 @@ watch(
       values.transferUntilDate = values.invoiceDate;
       values.transferDate = values.invoiceDate;
       if (values.agencyUID) values.agencyUID = null;
+      if (values.agencyAccountUID) values.agencyAccountUID = null;
       if (values.transferSubject) values.transferSubject = '';
       return;
     }
@@ -199,6 +221,21 @@ watch(
       values.transferUntilDate = null;
       values.transferDate = null;
     }
+  },
+);
+
+/**
+ * Moving the invoice to another agency takes its bank account along: the old
+ * one belongs to the old agency, and the new agency's first is the suggestion.
+ * The API applies the same rule to every write (`nextAgencyAccount`); this is
+ * what the mask shows meanwhile.
+ */
+watch(
+  () => values.agencyUID,
+  (now) => {
+    if (seeding.value) return;
+    values.agencyAccountUID =
+      typeof now === 'string' && now !== '' ? accountPicker.suggestionFor(now) || null : null;
   },
 );
 
@@ -231,18 +268,15 @@ const statusDisplay = computed(() =>
 const directPayment = computed(() => values.directPayment === true);
 const notCovered = computed(() => values.notCovered === true);
 /**
- * The account of the picked agency that applies — resolved against the mask's
- * own Überweisungsdatum, not the saved one: entering the day it was paid shows
- * the account the money went to, right away.
+ * The account the mask names, not the saved one: picking another says at once
+ * where the money will go. Falls back to the agency's first, for an invoice
+ * that names none.
  */
 const accountForSelected = computed(() => {
   const uid = values.agencyUID;
   if (typeof uid !== 'string' || uid === '') return null;
-  const paidOn =
-    typeof values.transferDate === 'string' && values.transferDate !== ''
-      ? values.transferDate
-      : null;
-  return accountInForce(props.agencyAccounts[uid] ?? [], paidOn);
+  const picked = typeof values.agencyAccountUID === 'string' ? values.agencyAccountUID : null;
+  return accountForInvoice(accountPicker.accountsOf(uid), picked);
 });
 const ibanForSelected = computed(() => accountForSelected.value?.bankAccount ?? '');
 const agencyNameForSelected = computed(() => {
@@ -485,6 +519,7 @@ function submit(): void {
     // Only the direct-payment-gated fields are cleared when paid directly.
     transferSubject: dp ? null : str(values.transferSubject) || null,
     agencyUID: dp ? null : values.agencyUID || null,
+    agencyAccountUID: dp ? null : values.agencyAccountUID || null,
     // The "billed" mark only exists for submitted invoices (the API rejects it otherwise).
     ...(isSubmitted.value ? { reimbursementClosed: values.reimbursementClosed === true } : {}),
   });
@@ -582,24 +617,29 @@ function submit(): void {
         create-noun="Abrechnungsdienstleister"
         @create="openCreate('agency', $event)"
       />
+      <!-- An agency holds several accounts at once, and the invoice names the
+           one it goes to (Slice 44). The GiroCode hangs off this row, because
+           what you scan is what this row says. -->
       <EuDetailField
-        label="IBAN"
-        type="readonly"
-        :model-value="ibanForSelected"
-        :disabled="directPayment"
+        v-model="values.agencyAccountUID"
+        :saved-value="saved.agencyAccountUID"
+        label="Kontoverbindung"
+        type="select"
+        :options="accountOptions"
+        :disabled="directPayment || !values.agencyUID"
+        allow-create
+        create-noun="Kontoverbindung"
+        @create="accountPicker.start(String(values.agencyUID ?? ''))"
       >
-        <template #value>
-          <span class="eu-iban">
-            <span>{{ ibanForSelected === '' ? '–' : ibanForSelected }}</span>
-            <PaymentQrPopover
-              v-if="showQr"
-              :recipient="agencyNameForSelected"
-              :iban="ibanForSelected"
-              :bic="accountForSelected?.bic"
-              :amount="amountForQr"
-              :subject="subjectForQr"
-            />
-          </span>
+        <template #after>
+          <PaymentQrPopover
+            v-if="showQr"
+            :recipient="agencyNameForSelected"
+            :iban="ibanForSelected"
+            :bic="accountForSelected?.bic"
+            :amount="amountForQr"
+            :subject="subjectForQr"
+          />
         </template>
       </EuDetailField>
       <EuDetailField
@@ -740,6 +780,16 @@ function submit(): void {
     </template>
   </EuDialog>
 
+  <!-- Adding a bank account to the picked agency, from its picker in the mask. -->
+  <AgencyAccountFormDialog
+    :open="accountPicker.dialogOpen.value"
+    :entry="null"
+    :submitting="accountPicker.busy.value"
+    :error="accountPicker.error.value"
+    @close="accountPicker.dialogOpen.value = false"
+    @submit="onAccountCreate"
+  />
+
   <!-- Ad-hoc create for the entity picked in the mask, prefilled with the typed name. -->
   <ResourceFormDialog
     :open="createOpen"
@@ -843,27 +893,6 @@ function submit(): void {
 <style scoped>
 /* The IBAN row replaces its value cell to carry the GiroCode button next to
    the number, so it repeats the inset of a plain readonly value below. */
-.eu-iban {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 0;
-}
-
-.eu-iban > span {
-  min-width: 0;
-  /* Same inset as EuDetailField's own readonly value, so the IBAN keeps the
-     column's alignment. */
-  padding: 0.2em 0.4em;
-  /* An IBAN has no break opportunity: in the narrow mask of a phone it would
-     otherwise run over the button next to it. Clipped here, in full in the
-     payment popover — and the mask as a whole gets its width in the polish
-     slice (Slice-8 backlog). */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .eu-detail__error {
   margin: 1rem 0 0;
   color: var(--eu-color-error-fg);

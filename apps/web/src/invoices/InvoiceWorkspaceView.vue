@@ -89,7 +89,7 @@ const facilityOptions = ref<SelectOption[]>([]);
 const facilityNameById = ref<Map<string, string>>(new Map());
 const agencyOptions = ref<SelectOption[]>([]);
 const agencyById = ref<Map<string, { name: string; accounts: AgencyAccountDto[] }>>(new Map());
-/** agencyUID → its bank accounts, for the mask's IBAN row and its GiroCode. */
+/** agencyUID → its bank accounts, for the masks' account pickers and the GiroCode. */
 const agencyAccountMap = computed(() =>
   Object.fromEntries([...agencyById.value].map(([uid, a]) => [uid, a.accounts])),
 );
@@ -254,8 +254,8 @@ async function loadLookups(): Promise<void> {
   facilityOptions.value = facilities.map((f) => ({ value: f.facilityUID, label: f.facilityName }));
   facilityNameById.value = new Map(facilities.map((f) => [f.facilityUID, f.facilityName]));
 
-  // The whole account history per agency, not just today's IBAN: a paid
-  // invoice shows the account of the day it was paid (see agencies/accounts.ts).
+  // Every account per agency, not just the first: an agency holds several and
+  // each invoice names the one it goes to (see agencies/accounts.ts).
   const agencies = await listResource<{
     agencyUID: string;
     agencyName: string;
@@ -792,6 +792,7 @@ function confirmDelete(): void {
       :account-u-i-d="accountUID"
       :facilities="facilityOptions"
       :agencies="agencyOptions"
+      :agency-accounts="agencyAccountMap"
       :submitting="dialogBusy"
       :error="dialogError"
       @close="formOpen = false"

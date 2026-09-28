@@ -16,19 +16,18 @@ import {
   softDeleteRow,
   updateRow,
 } from '../crud/repository.js';
-import { conflict, notFound } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
+import { notFound } from '../lib/api-error.js';
 
 /**
- * The bank accounts of a collection agency, as a history (see
- * Notes/eunomia-plan.md, Slice 38): an agency that changes its account keeps
- * its identity, and an invoice shows the account its money actually went to.
+ * The bank accounts of a collection agency: several at once, in the order they
+ * were recorded (see Notes/eunomia-plan.md, Slice 44).
  *
- * Same "valid until the next entry" shape as ContractPremiums, with one
- * difference: `validFrom` may be NULL, which means "applies from the
- * beginning". The first account of an agency therefore carries no date at all —
- * nothing would be known to put there — and only a later change does. At most
- * one undated entry per agency, or the resolution below would be ambiguous.
+ * Slice 38 read them as a history — one account in force at a time, resolved
+ * against the day the invoice was paid. Production said otherwise: an agency
+ * names three accounts on one bill and only the second of them on the next,
+ * without anything having been replaced. So there is no rule that tells which
+ * account applies; the invoice names it itself (`Invoices.agencyAccountUID`),
+ * and all this module has to offer is a sensible suggestion for a new one.
  */
 
 export const accountsTable: CrudTable = {
@@ -36,7 +35,7 @@ export const accountsTable: CrudTable = {
   uidColumn: 'agencyAccountUID',
   statusColumn: 'agencyAccountStatus',
   entity: 'agencyAccount',
-  columns: ['agencyUID', 'validFrom', 'bankAccount', 'bic', 'recipientName', 'note'],
+  columns: ['agencyUID', 'bankAccount', 'bic', 'recipientName', 'note'],
 };
 
 /** IBAN — a loose length/charset check, not a checksum validation (as before). */
@@ -56,8 +55,6 @@ export const recipientNameField = z.string().trim().min(1).max(70);
 
 /** The account fields, without the agency they belong to. */
 export const accountSchema = z.object({
-  /** Missing or null means "applies from the beginning" — see the module comment. */
-  validFrom: z.string().date().nullish(),
   bankAccount: ibanField,
   bic: bicField.nullish(),
   recipientName: recipientNameField.nullish(),
@@ -69,116 +66,36 @@ export type AccountInput = z.infer<typeof accountSchema>;
 /** One stored account, as it leaves the API. */
 export interface AgencyAccount {
   agencyAccountUID: string;
-  validFrom: string | null;
   bankAccount: string;
   bic: string | null;
   recipientName: string | null;
   note: string | null;
 }
 
-/** Today as `YYYY-MM-DD` in the server's zone — the default resolution date. */
-function today(): string {
-  const now = new Date();
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
 /**
- * The account in force on `date`: the newest entry that had already started —
- * an undated entry counts as "started long ago", so it is the fallback for
- * every date before the first recorded change. `date` is the day the money
- * moved (an invoice's `transferDate`); null means today, which is what an
- * unpaid invoice is about. Returns null only when the agency has no account at
- * all. The twin of apps/web/src/agencies/accounts.ts — change one, change the
- * other.
+ * The account to suggest for an agency: the one recorded first. Where an agency
+ * lists several, the first is the one it is normally paid on — that is the
+ * observation this slice started from. Only a suggestion: what counts is what
+ * the invoice names. The twin of apps/web/src/agencies/accounts.ts.
  */
-export function accountInForce<T extends { validFrom: string | null }>(
-  accounts: T[],
-  date: string | null = null,
-): T | null {
-  const on = date ?? today();
-  let best: T | null = null;
-  for (const account of accounts) {
-    if (account.validFrom !== null && account.validFrom > on) continue;
-    // An undated entry loses against any dated one that has started.
-    if (best === null || (account.validFrom ?? '') >= (best.validFrom ?? '')) best = account;
-  }
-  return best;
-}
-
-/** Returns the ISO date one day before the given ISO date. */
-function dayBefore(isoDate: string): string {
-  const date = new Date(`${isoDate}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - 1);
-  return date.toISOString().slice(0, 10);
-}
-
-/** One account plus the `validTo` derived from the entry that follows it. */
-export interface AgencyAccountWithValidity extends AgencyAccount {
-  validTo: string | null;
-}
-
-/**
- * Adds each account's `validTo` — the day before the next entry starts, null
- * for the one in force. Expects the accounts oldest first, with the undated
- * entry (if any) at the front.
- */
-export function withValidity<T extends { validFrom: string | null }>(
-  accounts: T[],
-): Array<T & { validTo: string | null }> {
-  return accounts.map((account, index) => {
-    const next = accounts[index + 1];
-    return { ...account, validTo: next?.validFrom ? dayBefore(next.validFrom) : null };
-  });
+export function defaultAccount<T>(accounts: T[]): T | null {
+  return accounts[0] ?? null;
 }
 
 /** The columns of an account row, as every read hands them out. */
-export const ACCOUNT_COLUMNS = 'agencyAccountUID, validFrom, bankAccount, bic, recipientName, note';
+export const ACCOUNT_COLUMNS = 'agencyAccountUID, bankAccount, bic, recipientName, note';
 
 /**
- * Lists an agency's active accounts, oldest first — an undated entry sorts
- * first, because MariaDB orders NULL lowest, which is exactly what "from the
- * beginning" means — each with its derived `validTo`.
+ * Lists an agency's active accounts in the order they were recorded — the
+ * auto-increment key, because that order is what `defaultAccount` reads.
  */
-export async function listAccountsWithValidity(
-  db: Queryable,
-  agencyUID: string,
-): Promise<AgencyAccountWithValidity[]> {
-  const rows = await db.query<AgencyAccount[]>(
+export async function listAccounts(db: Queryable, agencyUID: string): Promise<AgencyAccount[]> {
+  return db.query<AgencyAccount[]>(
     `SELECT ${ACCOUNT_COLUMNS} FROM AgencyBankAccounts
       WHERE agencyUID = ? AND agencyAccountStatus <> -1
-      ORDER BY validFrom`,
+      ORDER BY agencyAccountID`,
     [agencyUID],
   );
-  return withValidity(rows);
-}
-
-/**
- * Throws 409 when another active account of the agency already starts on this
- * day — including the undated case, which the database cannot catch: a UNIQUE
- * key accepts NULL any number of times.
- */
-export async function assertStartFree(
-  db: Queryable,
-  agencyUID: string,
-  validFrom: string | null,
-  ownUID: string | null,
-): Promise<void> {
-  const rows = await db.query<Array<{ uid: string }>>(
-    `SELECT agencyAccountUID AS uid FROM AgencyBankAccounts
-      WHERE agencyUID = ? AND agencyAccountStatus <> -1
-        AND ${validFrom === null ? 'validFrom IS NULL' : 'validFrom = ?'}`,
-    validFrom === null ? [agencyUID] : [agencyUID, validFrom],
-  );
-  if (rows.some((row) => row.uid !== ownUID)) {
-    throw conflict('Bank account with this start already exists for the agency', {
-      code: ERROR_CODES.HISTORY_START_EXISTS,
-      details: { kind: 'agencyAccount', undated: validFrom === null },
-    });
-  }
 }
 
 /** Inserts a validated account for an agency (also used by the agency create transaction). */
@@ -187,7 +104,6 @@ export async function insertAccount(
   agencyUID: string,
   data: AccountInput,
 ): Promise<Row> {
-  await assertStartFree(db, agencyUID, data.validFrom ?? null, null);
   return insertRow(db, accountsTable, { ...data, agencyUID });
 }
 
@@ -229,13 +145,9 @@ export function createAgencyAccountsRouter(pool: Pool, config: AppConfig): Route
     const agencyUID = pathParam(req, 'uid');
     await assertAgency(agencyUID);
     const entryUID = pathParam(req, 'entryUID');
-    const entry = await loadEntry(agencyUID, entryUID);
-    const data = accountSchema.partial().parse(req.body);
+    await loadEntry(agencyUID, entryUID);
     // The schema has no agencyUID, so an account can never move between agencies.
-    const validFrom = (
-      Object.prototype.hasOwnProperty.call(data, 'validFrom') ? data.validFrom : entry.validFrom
-    ) as string | null;
-    await assertStartFree(pool, agencyUID, validFrom ?? null, entryUID);
+    const data = accountSchema.partial().parse(req.body);
     const updated = await updateRow(pool, accountsTable, entryUID, data);
     if (!updated) throw notFound('Bank account');
     sendData(res, updated);

@@ -21,6 +21,7 @@ function invoice(invoiceUID: string, treatmentDate: string, ...more: string[]): 
     transferSubject: null,
     documentLink: null,
     agencyUID: null,
+    agencyAccountUID: null,
     directPayment: 0,
     reimbursementClosed: false,
     notCovered: false,

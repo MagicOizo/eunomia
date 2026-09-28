@@ -39,13 +39,13 @@ const ids = {
   facilityRadiology: seedId('facility', 1),
   facilityDeleted: seedId('facility', 2),
   agency: seedId('agency', 0),
-  // Index 0 is the account the agency started with, and its seed ID happens to
-  // be exactly what migration 012 derives from the agency's own ID ('g' plus
+  // Index 0 is the account the agency was created with, and its seed ID happens
+  // to be exactly what migration 012 derives from the agency's own ID ('g' plus
   // the same body) — so a seed run over an already-migrated database updates
-  // that row instead of adding a second undated account. The change therefore
+  // that row instead of adding a duplicate of it. The second account therefore
   // takes the next index.
   agencyAccountFirst: seedId('agencyAccount', 0),
-  agencyAccountNew: seedId('agencyAccount', 1),
+  agencyAccountSecond: seedId('agencyAccount', 1),
   submission: seedId('submission', 0),
   submissionSupplementary: seedId('submission', 1),
   submissionCurrent: seedId('submission', 2),
@@ -119,25 +119,23 @@ async function seedPeople(pool: Pool): Promise<void> {
     agencyUID: ids.agency,
     agencyName: 'Beispiel Inkasso GmbH',
   });
-  // The agency changed its bank account at the turn of the year (Slice 38):
-  // an undated first account — "applies from the beginning", the shape
-  // migration 012 leaves behind — and the one in force since January, which
-  // also names a beneficiary of its own.
+  // Two accounts side by side (Slice 44): the agency names both on its bills,
+  // the first is what it is normally paid on, and the second is addressed to a
+  // payment office of its own. Which one an invoice goes to is the invoice's
+  // own statement, not a rule.
   await seedRow(pool, 'AgencyBankAccounts', {
     agencyAccountUID: ids.agencyAccountFirst,
     agencyUID: ids.agency,
-    validFrom: null,
     bankAccount: 'DE02120300000000202051',
     bic: 'BYLADEM1001',
   });
   await seedRow(pool, 'AgencyBankAccounts', {
-    agencyAccountUID: ids.agencyAccountNew,
+    agencyAccountUID: ids.agencyAccountSecond,
     agencyUID: ids.agency,
-    validFrom: seedDate(0, '01-01'),
     bankAccount: 'DE89370400440532013000',
     bic: 'COBADEFFXXX',
     recipientName: 'Zahlstelle Beispiel Inkasso',
-    note: 'Bankwechsel zum Jahreswechsel',
+    note: 'für Rechnungen der Radiologie',
   });
 }
 
@@ -323,8 +321,8 @@ async function seedInvoices(pool: Pool): Promise<void> {
     invoiceAmount: 200.0,
   });
   // Done: fully reimbursed over both policies (45 + 15 €) and paid — through
-  // the agency, and back when its old account was still the valid one, so the
-  // payment details of a paid invoice show the account of that time (Slice 38).
+  // the agency, on the second of its accounts, which is the one the radiology
+  // is billed on (Slice 44).
   await seedRow(pool, 'Invoices', {
     invoiceUID: ids.invoiceDone,
     invoiceNumber: 'R-2024-103',
@@ -336,6 +334,7 @@ async function seedInvoices(pool: Pool): Promise<void> {
     transferDate: seedDate(-1, '04-10'),
     transferSubject: 'Rechnung 103 / Kundennr. 4711',
     agencyUID: ids.agency,
+    agencyAccountUID: ids.agencyAccountSecond,
   });
   // Billed by hand: the full policy reimbursed nothing (deductible), and the
   // author closed it as billed; not paid yet.
@@ -374,6 +373,7 @@ async function seedInvoices(pool: Pool): Promise<void> {
     transferUntilDate: daysFromToday(-14),
     transferSubject: 'Rechnung 110 / Kundennr. 4711',
     agencyUID: ids.agency,
+    agencyAccountUID: ids.agencyAccountFirst,
   });
   // Due in a few days: the amber light.
   await seedRow(pool, 'Invoices', {
@@ -387,6 +387,7 @@ async function seedInvoices(pool: Pool): Promise<void> {
     transferUntilDate: daysFromToday(5),
     transferSubject: 'Rechnung 111 / Kundennr. 4711',
     agencyUID: ids.agency,
+    agencyAccountUID: ids.agencyAccountSecond,
   });
   // Paid in cash at the practice: no transfer data at all.
   await seedRow(pool, 'Invoices', {

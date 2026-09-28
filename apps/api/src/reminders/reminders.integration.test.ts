@@ -237,19 +237,18 @@ test('payment reminders: gating, dry run, delivery and the quiet second run', as
       assert.equal(await countReminders(pool), 0);
     });
 
-    await t.test('the payee is the beneficiary the agency names, where it names one', async () => {
+    await t.test('the payee is the beneficiary the chosen account names', async () => {
       const agency = await request(app)
         .post('/api/v1/agencies')
         .set(admin)
         .send({ agencyName: 'Inkasso Mahnung', bankAccount: 'DE02120300000000202051' });
       const agencyUID = agency.body.data.agencyUID as string;
-      // The account in force names a beneficiary of its own; the undated one
-      // (from creating the agency) does not, and must not win.
-      const inForce = await request(app)
+      // The second account names a beneficiary of its own; the first one (from
+      // creating the agency) does not, and the invoice picks the second.
+      const chosen = await request(app)
         .post(`/api/v1/agencies/${agencyUID}/accounts`)
         .set(admin)
         .send({
-          validFrom: dayOffset(-30),
           bankAccount: 'DE89370400440532013000',
           recipientName: 'Zahlstelle Mahnung',
         });
@@ -258,7 +257,10 @@ test('payment reminders: gating, dry run, delivery and the quiet second run', as
           "SELECT invoiceUID AS uid FROM Invoices WHERE invoiceNumber = 'R-OVERDUE'",
         )
       )[0]?.uid;
-      await request(app).patch(`/api/v1/invoices/${invoiceUID}`).set(admin).send({ agencyUID });
+      await request(app)
+        .patch(`/api/v1/invoices/${invoiceUID}`)
+        .set(admin)
+        .send({ agencyUID, agencyAccountUID: chosen.body.data.agencyAccountUID });
 
       const payable = await createReminderStore(pool, config.configEncryptionKey)
         .listPayableInvoices()
@@ -267,7 +269,7 @@ test('payment reminders: gating, dry run, delivery and the quiet second run', as
 
       // Without a beneficiary the agency's own name carries the line.
       await request(app)
-        .patch(`/api/v1/agencies/${agencyUID}/accounts/${inForce.body.data.agencyAccountUID}`)
+        .patch(`/api/v1/agencies/${agencyUID}/accounts/${chosen.body.data.agencyAccountUID}`)
         .set(admin)
         .send({ recipientName: null });
       const withoutBeneficiary = await createReminderStore(pool, config.configEncryptionKey)

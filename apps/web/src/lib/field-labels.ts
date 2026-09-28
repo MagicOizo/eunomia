@@ -30,6 +30,7 @@ export const FIELD_LABELS: Record<string, string> = {
   distanceKm: 'Entfernung',
   agencyName: 'Name',
   agencyUID: 'Abrechnungsdienstleister',
+  agencyAccountUID: 'Kontoverbindung',
   bankAccount: 'IBAN',
   bic: 'BIC',
   recipientName: 'Empfänger',

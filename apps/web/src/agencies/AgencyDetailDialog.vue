@@ -9,8 +9,6 @@ import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { describeError } from '../lib/errors';
-import { plural } from '../lib/format';
-import { accountPeriod } from './accounts';
 import {
   type AgencyAccountDto,
   type AgencyAccountInput,
@@ -24,10 +22,10 @@ import AgencyAccountFormDialog from './AgencyAccountFormDialog.vue';
 
 /**
  * View/edit a collection agency as a display mask (see dialog-design.md), plus
- * the history of its bank accounts: an agency that changes bank stays one
- * entry, and every invoice keeps naming the account its money went to (Slice
- * 38). Opened by ResourceView via ResourceConfig.detailDialog; creating an
- * agency stays the classic form, which records its first account.
+ * its bank accounts: an agency holds several side by side, and every invoice
+ * names the one it goes to (Slice 44). Opened by ResourceView via
+ * ResourceConfig.detailDialog; creating an agency stays the classic form, which
+ * records its first account.
  */
 const props = defineProps<{
   open: boolean;
@@ -48,8 +46,6 @@ const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
 const saving = ref(false);
 const saveError = ref<string | null>(null);
-/** Whether the history shows the accounts before the one in force. */
-const showOlder = ref(false);
 
 async function load(): Promise<void> {
   if (!props.uid) return;
@@ -68,7 +64,6 @@ watch(
   () => [props.open, props.uid] as const,
   ([open]) => {
     saveError.value = null;
-    showOlder.value = false;
     if (open) void load();
     else agency.value = null;
   },
@@ -109,9 +104,6 @@ const entryError = ref<string | null>(null);
 const pendingDelete = ref<{ uid: string; label: string } | null>(null);
 const deleteError = ref<string | null>(null);
 
-/** Today — a bank change is normally recorded on the day it takes effect. */
-const todayIso = new Date().toISOString().slice(0, 10);
-
 function openAccount(entry: AgencyAccountDto | null): void {
   entryError.value = null;
   accountDialog.entry = entry;
@@ -151,16 +143,8 @@ async function confirmDelete(): Promise<void> {
   }
 }
 
-/**
- * Newest first, like the policy's histories: the account in force is what one
- * comes here for, the ones before it sit behind one button. The API sorts
- * ascending (undated first), so the current one is its last.
- */
-const accountsNewestFirst = computed(() => [...(agency.value?.accounts ?? [])].reverse());
-const visibleAccounts = computed(() =>
-  showOlder.value ? accountsNewestFirst.value : accountsNewestFirst.value.slice(0, 1),
-);
-const olderCount = computed(() => Math.max(accountsNewestFirst.value.length - 1, 0));
+/** All of them, in the order the API hands them out: as they were recorded. */
+const accounts = computed(() => agency.value?.accounts ?? []);
 </script>
 
 <template>
@@ -182,7 +166,7 @@ const olderCount = computed(() => Math.max(accountsNewestFirst.value.length - 1,
         <div class="eu-agency__block-head">
           <h3 id="eu-agency-accounts">Kontoverbindungen</h3>
           <EuButton variant="secondary" :icon="faPlus" @click="openAccount(null)"
-            >Kontowechsel erfassen</EuButton
+            >Kontoverbindung hinzufügen</EuButton
           >
         </div>
         <p v-if="agency.accounts.length === 0" class="eu-agency__hint">
@@ -192,20 +176,14 @@ const olderCount = computed(() => Math.max(accountsNewestFirst.value.length - 1,
           <table class="eu-agency__table">
             <thead>
               <tr>
-                <th scope="col">Gültig</th>
                 <th scope="col">IBAN / BIC</th>
                 <th scope="col">Empfänger</th>
+                <th scope="col">Notiz</th>
                 <th scope="col" class="eu-agency__actions">Aktionen</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="account in visibleAccounts" :key="account.agencyAccountUID">
-                <td class="eu-agency__period">
-                  {{ accountPeriod(account) }}
-                  <span v-if="account.note" class="eu-agency__note">
-                    <EuIconLabel :icon="faCommentDots" :label="account.note" />
-                  </span>
-                </td>
+              <tr v-for="account in accounts" :key="account.agencyAccountUID">
                 <!-- The BIC belongs to the IBAN and is rarely looked at on its
                      own; under it, neither of the two has to break mid-token to
                      fit the dialog. -->
@@ -214,37 +192,30 @@ const olderCount = computed(() => Math.max(accountsNewestFirst.value.length - 1,
                   <span v-if="account.bic" class="eu-agency__bic">{{ account.bic }}</span>
                 </td>
                 <td>{{ account.recipientName ?? '–' }}</td>
+                <td class="eu-agency__note">
+                  <EuIconLabel v-if="account.note" :icon="faCommentDots" :label="account.note" />
+                  <template v-else>–</template>
+                </td>
                 <td class="eu-agency__actions">
                   <EuButton
                     variant="secondary"
                     icon-only
                     :icon="faPen"
-                    :aria-label="`Kontoverbindung ${accountPeriod(account)} bearbeiten`"
+                    :aria-label="`Kontoverbindung ${account.bankAccount} bearbeiten`"
                     @click="openAccount(account)"
                   />
                   <EuButton
                     variant="secondary"
                     icon-only
                     :icon="faTrash"
-                    :aria-label="`Kontoverbindung ${accountPeriod(account)} löschen`"
+                    :aria-label="`Kontoverbindung ${account.bankAccount} löschen`"
                     @click="
                       pendingDelete = {
                         uid: account.agencyAccountUID,
-                        label: `die Kontoverbindung ${accountPeriod(account)}`,
+                        label: `die Kontoverbindung ${account.bankAccount}`,
                       }
                     "
                   />
-                </td>
-              </tr>
-              <tr v-if="olderCount > 0">
-                <td colspan="4" class="eu-agency__more">
-                  <button type="button" :aria-expanded="showOlder" @click="showOlder = !showOlder">
-                    {{
-                      showOlder
-                        ? 'Ältere Einträge ausblenden'
-                        : `${plural(olderCount, 'älteren Eintrag', 'ältere Einträge')} anzeigen`
-                    }}
-                  </button>
                 </td>
               </tr>
             </tbody>
@@ -264,7 +235,6 @@ const olderCount = computed(() => Math.max(accountsNewestFirst.value.length - 1,
   <AgencyAccountFormDialog
     :open="accountDialog.open"
     :entry="accountDialog.entry"
-    :suggested-date="todayIso"
     :submitting="entrySaving"
     :error="entryError"
     @close="accountDialog.open = false"
@@ -357,10 +327,6 @@ const olderCount = computed(() => Math.max(accountsNewestFirst.value.length - 1,
   font-size: 0.8rem;
 }
 
-.eu-agency__table .eu-agency__period {
-  white-space: nowrap;
-}
-
 .eu-agency__table .eu-agency__actions {
   width: 1%;
   white-space: nowrap;
@@ -371,29 +337,9 @@ const olderCount = computed(() => Math.max(accountsNewestFirst.value.length - 1,
   margin-left: 0.4rem;
 }
 
-/* A recorded note: the bubble stands next to the period it belongs to, the
-   text itself is the tooltip (and the icon's accessible name). */
+/* A recorded note: the bubble carries it, the text itself is the tooltip (and
+   the icon's accessible name), so a long note cannot stretch the table. */
 .eu-agency__note {
-  margin-left: 0.4rem;
   color: var(--eu-color-text-muted);
-}
-
-/* The disclosure row under the history — a quiet link, not a data row. */
-.eu-agency__table .eu-agency__more {
-  border-bottom: none;
-  padding-top: 0.5rem;
-}
-
-.eu-agency__more button {
-  border: none;
-  background: none;
-  padding: 0.15rem 0;
-  font: inherit;
-  color: var(--eu-color-accent-text);
-  cursor: pointer;
-}
-
-.eu-agency__more button:hover {
-  text-decoration: underline;
 }
 </style>
