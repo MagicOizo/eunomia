@@ -44,7 +44,10 @@ export interface InvoiceDto {
   invoiceUID: string;
   invoiceNumber: string;
   invoiceDate: string;
+  /** The leading treatment day: the earliest of `treatmentDates`. */
   treatmentDate: string;
+  /** Every day the invoice bills, earliest first — the complete list (Slice 41). */
+  treatmentDates: string[];
   accountUID: string;
   facilityUID: string | null;
   invoiceAmount: number;

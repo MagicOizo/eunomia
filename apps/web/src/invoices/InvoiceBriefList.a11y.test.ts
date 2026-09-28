@@ -11,6 +11,7 @@ function invoice(overrides: Partial<InvoiceDto> = {}): InvoiceDto {
     invoiceNumber: 'R-2026-113',
     invoiceDate: '2026-02-01',
     treatmentDate: '2026-01-15',
+    treatmentDates: ['2026-01-15'],
     accountUID: 'a-1',
     facilityUID: 'f-1',
     invoiceAmount: 500,

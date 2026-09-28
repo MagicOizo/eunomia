@@ -29,6 +29,7 @@ const hit = {
   invoiceUID: 'inv-1',
   invoiceNumber: 'R-2024-100',
   treatmentDate: '2024-03-14',
+  treatmentDates: ['2024-03-14', '2024-03-21'],
   accountUID: 'a-1',
   invoiceAmount: 248.5,
   workflowStatus: 'abgerechnet',

@@ -9,6 +9,7 @@ import { euro, germanDate } from '../lib/format';
 import { listResource } from '../lib/resource';
 import { type InvoiceDto, searchInvoicesByNumber } from './api';
 import { STATUS_DISPLAY } from './status';
+import { treatmentDaysLabel } from './treatment-days';
 
 interface AccountDto {
   accountUID: string;
@@ -101,7 +102,8 @@ onMounted(async () => {
               personName.get(invoice.accountUID) ?? 'Unbekannt'
             }}</span>
             <span class="eu-picker__meta">
-              Behandlung {{ germanDate(invoice.treatmentDate) }} · {{ euro(invoice.invoiceAmount) }}
+              Behandlung {{ treatmentDaysLabel(invoice.treatmentDates) }} ·
+              {{ euro(invoice.invoiceAmount) }}
             </span>
             <EuBadge
               :tone="STATUS_DISPLAY[invoice.workflowStatus].tone"

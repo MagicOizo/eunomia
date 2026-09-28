@@ -7,6 +7,20 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.13.0-slice.3 — 2026-09-28
+
+- **The treatment days of an invoice can be entered, seen and corrected.** The model learned the
+  whole list in the previous preview; the masks now follow. The create form keeps
+  "Behandlungsdatum" as the leading day and adds repeatable rows for the rest, and the detail mask
+  edits the same list, so a day mistyped weeks ago can still be put right. Both refuse a day from
+  another calendar year before they ask the server, in the server's own words.
+- **Lists show the span an invoice covers**, `11.02.–18.02.2025` instead of one of its days, with
+  all the days in the cell's tooltip — the span says when the treatment began and ended, not which
+  days in between were billed. Sorting still goes by the earliest day.
+- **The submit dialog judges a policy on the whole treatment span.** It used to look at the leading
+  day alone, so an invoice whose last appointment fell outside a policy's term was offered as if it
+  were covered.
+
 ## 0.13.0-slice.2 — 2026-09-28
 
 - **An invoice can name every day it bills, not just one.** A bill from a practice often covers

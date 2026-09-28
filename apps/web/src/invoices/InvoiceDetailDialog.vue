@@ -7,6 +7,7 @@ import type { AgencyAccountDto } from '../agencies/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import type { DetailValue } from '../design-system/components/EuDetailField.vue';
+import EuDetailDays from '../design-system/components/EuDetailDays.vue';
 import EuDetailField from '../design-system/components/EuDetailField.vue';
 import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -33,6 +34,13 @@ import AllocationDialog from './AllocationDialog.vue';
 import BillingDialog from './BillingDialog.vue';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import { type ContractOption, policyLabel, submittableContracts } from './eligibility';
+import {
+  differentYearsMessage,
+  furtherDays,
+  normalizeDays,
+  sameCalendarYear,
+  treatmentDaysLabel,
+} from './treatment-days';
 import ExclusionDialog from './ExclusionDialog.vue';
 import ObjectionDialog from './ObjectionDialog.vue';
 import PaymentQrPopover from './PaymentQrPopover.vue';
@@ -80,6 +88,11 @@ const emit = defineEmits<{
 
 const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
+// The treatment days besides the leading one (Slice 41). They live beside
+// `values` rather than in it: a mask value is a single scalar, and widening
+// that type would reach into the policy and agency masks as well.
+const extraDays = ref<string[]>([]);
+const savedExtraDays = ref<string[]>([]);
 const localError = ref<string | null>(null);
 
 // Local option copies so an ad-hoc-created entity can be appended and selected
@@ -142,6 +155,8 @@ watch(
     };
     Object.assign(values, seed);
     Object.assign(saved, seed);
+    extraDays.value = furtherDays(inv);
+    savedExtraDays.value = [...extraDays.value];
   },
   { immediate: true },
 );
@@ -156,6 +171,19 @@ watch(
     if (values.transferSubject) values.transferSubject = '';
   },
 );
+
+/**
+ * The span the edited days cover, shown under the list once there is more than
+ * one day. It follows the mask, not the saved invoice, so adding a day says
+ * right away what the invoice will then cover.
+ */
+const treatmentSpan = computed(() => {
+  const days = normalizeDays([
+    typeof values.treatmentDate === 'string' ? values.treatmentDate : '',
+    ...extraDays.value,
+  ]);
+  return days.length > 1 ? `Zeitraum ${treatmentDaysLabel(days)}` : null;
+});
 
 const statusDisplay = computed(() =>
   props.invoice ? STATUS_DISPLAY[props.invoice.workflowStatus] : null,
@@ -383,11 +411,19 @@ function submit(): void {
       'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
     return;
   }
+  // The complete list, leading day included: the API takes its earliest entry
+  // as `treatmentDate` (Slice 41).
+  const days = normalizeDays([String(values.treatmentDate), ...extraDays.value]);
+  if (!sameCalendarYear(days)) {
+    localError.value = differentYearsMessage();
+    return;
+  }
   const dp = directPayment.value;
   emit('submit', {
     invoiceNumber: str(values.invoiceNumber),
     invoiceDate: values.invoiceDate,
     treatmentDate: values.treatmentDate,
+    treatmentDates: days,
     invoiceAmount: values.invoiceAmount,
     directPayment: dp,
     facilityUID: values.facilityUID || null,
@@ -433,6 +469,15 @@ function submit(): void {
         label="Behandlungsdatum"
         type="date"
         required
+      />
+      <!-- One bill of a practice often covers several appointments (Slice 41).
+           The field above is the leading day; the rest are this list. -->
+      <EuDetailDays
+        v-model="extraDays"
+        :saved-value="savedExtraDays"
+        label="Weitere Behandlungstage"
+        add-label="Behandlungstag hinzufügen"
+        :hint="treatmentSpan"
       />
       <EuDetailField
         v-model="values.facilityUID"

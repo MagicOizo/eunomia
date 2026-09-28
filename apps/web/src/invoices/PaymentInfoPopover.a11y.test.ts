@@ -9,6 +9,7 @@ const invoice: InvoiceDto = {
   invoiceNumber: 'R-1',
   invoiceDate: '2026-02-01',
   treatmentDate: '2026-01-15',
+  treatmentDates: ['2026-01-15'],
   accountUID: 'a-1',
   facilityUID: 'f-1',
   invoiceAmount: 320,

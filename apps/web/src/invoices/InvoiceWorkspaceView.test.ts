@@ -80,6 +80,7 @@ function invoice(uid: string, number: string, treatmentDate: string) {
     invoiceNumber: number,
     invoiceDate: treatmentDate,
     treatmentDate,
+    treatmentDates: [treatmentDate],
     accountUID: 'a-1',
     facilityUID: null,
     invoiceAmount: 100,

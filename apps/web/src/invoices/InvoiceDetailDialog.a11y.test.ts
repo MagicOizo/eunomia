@@ -45,6 +45,8 @@ const invoice: InvoiceDto = {
   invoiceNumber: 'R-1',
   invoiceDate: '2025-02-01',
   treatmentDate: '2025-01-15',
+  // Three days: the mask's list of further treatment days has rows to show.
+  treatmentDates: ['2025-01-15', '2025-01-22', '2025-02-03'],
   accountUID: 'a-1',
   facilityUID: null,
   invoiceAmount: 1000,

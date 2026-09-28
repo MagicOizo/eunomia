@@ -153,7 +153,7 @@ describe('unbilledSubmissions', () => {
 });
 
 describe('treatmentPeriod', () => {
-  const treated = (treatmentDate: string) => ({ treatmentDate });
+  const treated = (...treatmentDates: string[]) => ({ treatmentDates });
 
   it('is the one date for a single invoice', () => {
     expect(treatmentPeriod([treated('2024-03-12')])).toEqual({
@@ -169,6 +169,11 @@ describe('treatmentPeriod', () => {
       treated('2024-01-05'),
     ]);
     expect(span).toEqual({ from: '2023-02-01', to: '2024-06-30' });
+  });
+
+  it('reaches to the last day of an invoice, not only its leading one', () => {
+    const span = treatmentPeriod([treated('2024-03-12', '2024-03-19', '2024-04-02')]);
+    expect(span).toEqual({ from: '2024-03-12', to: '2024-04-02' });
   });
 
   it('is null without invoices', () => {

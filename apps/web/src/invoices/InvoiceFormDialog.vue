@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
@@ -11,6 +12,12 @@ import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import type { InvoiceDto } from './api';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
+import {
+  differentYearsMessage,
+  furtherDays,
+  normalizeDays,
+  sameCalendarYear,
+} from './treatment-days';
 
 const props = defineProps<{
   open: boolean;
@@ -41,6 +48,9 @@ const form = ref({
   transferSubject: '',
   documentLink: '',
 });
+// The days besides the leading one, one per repeatable row. An empty row is a
+// row still being filled in and is dropped on save, not complained about.
+const extraDays = ref<string[]>([]);
 // directPayment = the bill was already paid directly, e.g. cash at a pharmacy —
 // so there is nothing left for the user to transfer.
 const directPayment = ref(false);
@@ -98,10 +108,19 @@ watch(
       transferSubject: e?.transferSubject ?? '',
       documentLink: e?.documentLink ?? '',
     };
+    extraDays.value = e ? furtherDays(e) : [];
     directPayment.value = e ? e.directPayment === 1 : false;
   },
   { immediate: true },
 );
+
+function addDay(): void {
+  extraDays.value = [...extraDays.value, ''];
+}
+
+function removeDay(index: number): void {
+  extraDays.value = extraDays.value.filter((_, i) => i !== index);
+}
 
 function submit(): void {
   localError.value = null;
@@ -111,12 +130,21 @@ function submit(): void {
       'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
     return;
   }
+  // The whole list, the leading day included — the API reads `treatmentDates`
+  // as the complete set and takes its earliest entry as `treatmentDate`.
+  const days = normalizeDays([f.treatmentDate, ...extraDays.value]);
+  if (!sameCalendarYear(days)) {
+    // The API's own sentence, so the dialog and the round trip say the same.
+    localError.value = differentYearsMessage();
+    return;
+  }
 
   const dp = directPayment.value;
   const payload: Record<string, unknown> = {
     invoiceNumber: f.invoiceNumber.trim(),
     invoiceDate: f.invoiceDate,
     treatmentDate: f.treatmentDate,
+    treatmentDates: days,
     invoiceAmount: f.invoiceAmount,
     directPayment: dp,
     facilityUID: f.facilityUID || null,
@@ -143,6 +171,33 @@ function submit(): void {
       <EuTextField v-model="form.invoiceNumber" label="Rechnungsnummer" />
       <EuTextField v-model="form.invoiceDate" label="Rechnungsdatum" type="date" />
       <EuTextField v-model="form.treatmentDate" label="Behandlungsdatum" type="date" />
+
+      <!-- One bill of a practice often covers several appointments (Slice 41).
+           The first day stays the field above; the rest are rows here. -->
+      <fieldset class="eu-form__group">
+        <legend>Weitere Behandlungstage</legend>
+        <p v-if="extraDays.length === 0" class="eu-form__hint">
+          Nur ein Behandlungstag. Alle Tage müssen im selben Kalenderjahr liegen.
+        </p>
+        <div v-for="(day, index) in extraDays" :key="index" class="eu-form__day">
+          <EuTextField
+            :model-value="day"
+            :label="`Behandlungstag ${index + 2}`"
+            type="date"
+            @update:model-value="extraDays[index] = $event"
+          />
+          <EuButton
+            variant="secondary"
+            icon-only
+            :icon="faXmark"
+            :aria-label="`Behandlungstag ${index + 2} entfernen`"
+            @click="removeDay(index)"
+          />
+        </div>
+        <EuButton variant="secondary" :icon="faPlus" @click="addDay"
+          >Behandlungstag hinzufügen</EuButton
+        >
+      </fieldset>
       <EuEntityPicker
         :model-value="form.facilityUID || null"
         label="Leistungserbringer"
@@ -209,5 +264,38 @@ function submit(): void {
   margin: 0;
   color: var(--eu-color-error-fg);
   font-size: 0.9rem;
+}
+
+.eu-form__group {
+  border: 1px solid var(--eu-color-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.eu-form__group legend {
+  font-family: var(--eu-font-heading);
+  padding: 0 0.4rem;
+}
+
+.eu-form__hint {
+  margin: 0;
+  color: var(--eu-color-text-muted);
+  font-size: 0.9rem;
+}
+
+/* The remove action sits at the field's baseline, next to it (create mode puts
+   actions beside the field, not in a column — dialog-design.md). */
+.eu-form__day {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.eu-form__day > :first-child {
+  flex: 1;
 }
 </style>

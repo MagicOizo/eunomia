@@ -5,13 +5,14 @@ import { describe, expect, it } from 'vitest';
 import type { InvoiceDto } from './api';
 import SubmitDialog from './SubmitDialog.vue';
 
-/** An invoice reduced to what the dialog reads: the treatment date and the list row. */
-function invoice(invoiceUID: string, treatmentDate: string): InvoiceDto {
+/** An invoice reduced to what the dialog reads: the treatment days and the list row. */
+function invoice(invoiceUID: string, treatmentDate: string, ...more: string[]): InvoiceDto {
   return {
     invoiceUID,
     invoiceNumber: `R-${invoiceUID}`,
     invoiceDate: treatmentDate,
     treatmentDate,
+    treatmentDates: [treatmentDate, ...more],
     accountUID: 'a-1',
     facilityUID: null,
     invoiceAmount: 100,

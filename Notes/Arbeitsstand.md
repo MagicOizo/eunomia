@@ -20,7 +20,7 @@ geblieben sind, und die drei aus 0.12.0. Geplant als Slices 40–43 in
 | --- | ----- | ----------------------------------------- | -------------------- | -------------- |
 | ☑   | 40    | Politur: Dialog-Scroll, Vorschläge, Label | 0.12.0-1, 0.11.0-2/3 | 0.13.0-slice.1 |
 | ☑   | 41a   | Mehrere Behandlungstage — Modell + API    | 0.11.0-1             | 0.13.0-slice.2 |
-| ☐   | 41b   | Mehrere Behandlungstage — UI              | 0.11.0-1             |                |
+| ☑   | 41b   | Mehrere Behandlungstage — UI              | 0.11.0-1             | 0.13.0-slice.3 |
 | ☐   | 42    | Nicht gedeckte Rechnungen                 | 0.12.0-2             |                |
 | ☐   | 43    | Zahlungsdatum bei Direktzahlung           | 0.12.0-3             |                |
 

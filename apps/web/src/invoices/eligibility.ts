@@ -97,12 +97,16 @@ export interface TreatmentPeriod {
 /**
  * The treatment span of a selection — what a policy has to cover to be the
  * right one. Null for an empty selection, which rules nothing out.
+ *
+ * Over *every* treatment day, not just the leading one (Slice 41): an invoice
+ * billing three appointments ends on its last, and judging the policy by the
+ * first would hand the submit dialog too short a span.
  */
 export function treatmentPeriod(
-  invoices: Pick<InvoiceDto, 'treatmentDate'>[],
+  invoices: Pick<InvoiceDto, 'treatmentDates'>[],
 ): TreatmentPeriod | null {
-  if (invoices.length === 0) return null;
-  const dates = invoices.map((invoice) => invoice.treatmentDate);
+  const dates = invoices.flatMap((invoice) => invoice.treatmentDates);
+  if (dates.length === 0) return null;
   return {
     from: dates.reduce((a, b) => (a < b ? a : b)),
     to: dates.reduce((a, b) => (a > b ? a : b)),

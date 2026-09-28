@@ -53,6 +53,7 @@ import RecommendationBadge from './RecommendationBadge.vue';
 import { type InvoiceBadgeView, invoiceBadge } from './recommendation';
 import SettleDialog from './SettleDialog.vue';
 import SubmitDialog from './SubmitDialog.vue';
+import { treatmentDaysLabel } from './treatment-days';
 import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, calcPaymentState } from './payment';
 import { STATUS_DISPLAY, STATUS_ORDER } from './status';
 
@@ -100,6 +101,14 @@ const facilityNameMap = computed(() => Object.fromEntries(facilityNameById.value
 /** The facility's name for one invoice, or null when it has none. */
 const facilityName = (invoice: InvoiceDto): string | null =>
   invoice.facilityUID ? (facilityNameById.value.get(invoice.facilityUID) ?? null) : null;
+
+/**
+ * All treatment days, for the column's tooltip. The span in the cell says when
+ * the treatment began and ended, not which days in between were billed — so
+ * wherever it is shown, the full list belongs within reach.
+ */
+const treatmentTitle = (invoice: InvoiceDto): string | undefined =>
+  invoice.treatmentDates.length < 2 ? undefined : invoice.treatmentDates.map(germanDate).join(', ');
 const plan = ref<ReimbursementPlanDto | null>(null);
 /** The optimizer's advice per invoice; invoices with nothing to do have no entry. */
 const recommendationBadges = computed(() => {
@@ -638,7 +647,9 @@ function confirmDelete(): void {
               </div>
             </td>
             <td>{{ germanDate(invoice.invoiceDate) }}</td>
-            <td>{{ germanDate(invoice.treatmentDate) }}</td>
+            <td :title="treatmentTitle(invoice)">
+              {{ treatmentDaysLabel(invoice.treatmentDates) }}
+            </td>
             <td>{{ invoice.invoiceNumber }}</td>
             <td class="eu-ws__facility" :title="facilityName(invoice) ?? undefined">
               {{ facilityName(invoice) ?? '–' }}

@@ -1526,6 +1526,39 @@ Liste, Wandern des führenden Tags, Abweisen eines fremden Jahres beim Anlegen u
 (mitsamt Rollback) und das Hard-Delete über den Papierkorb. Dazu im laufenden Dev-System über die
 API durchgespielt und der Bestand anschließend neu aufgebaut.
 
+### 41b — UI (umgesetzt 2026-09-28)
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Die Tage sind in _beiden_ Masken pflegbar** — Abweichung von der ersten Skizze, die dem
+  Anzeigedialog nur das Anzeigen zugedacht hatte. Beim Nachsehen zeigte sich, dass
+  `InvoiceWorkspaceView.openEdit` die Anzeigemaske öffnet und das Anlege-Formular nur zum Anlegen
+  benutzt wird: Ein Vertipper im dritten Tag wäre nie mehr zu korrigieren gewesen. Der Autor hat
+  entschieden, beide Masken zu bedienen.
+- **Eine neue Maskenzeile `EuDetailDays` statt eines neuen `type` an `EuDetailField`.** Dessen
+  `DetailValue` ist ein einzelner Skalar, und die `values`-Records aller drei Anzeigemasken
+  (Rechnung, Police, Abrechnungsdienstleister) sind darauf typisiert; eine Liste dort hinein hätte
+  sich durch alle drei gezogen. Die neue Zeile löst sich mit `display: contents` genauso in das
+  Maskenraster auf und trägt dieselbe Aktionsreihe (Hinzufügen, Leeren, Zurücksetzen).
+- **Die Zeile umschließt ihr Datum, statt die Wertspalte zu füllen.** Gestreckt saß das ✕ der Zeile
+  unmittelbar neben dem ✕ der Aktionsspalte — zwei gleiche Symbole nebeneinander, die Verschiedenes
+  tun (einen Tag entfernen / die ganze Liste leeren). Im Browser gesehen und geändert.
+- **Ein Ort für den Satz zur Jahresregel.** Beide Masken prüfen vor dem Speichern und holen den
+  deutschen Satz über `describeCode('TREATMENT_DAYS_DIFFERENT_YEARS')` aus `lib/error-messages.ts` —
+  dieselbe Formulierung, gleich ob der Dialog oder die API sie auslöst.
+- **`treatmentPeriod()` rechnet über alle Tage**, nicht mehr über den führenden allein. Das ist der
+  einzige Ort, an dem die weiteren Tage fachlich wirken: Der Einreichen-Dialog beurteilte die Police
+  sonst an einem zu kurzen Zeitraum. In den Listen steht der Zeitraum (`11.02.–18.02.2025`), die
+  vollständige Liste im Titel der Zelle — der Zeitraum sagt nicht, welche Tage dazwischen abgerechnet
+  wurden. Sortiert wird weiter nach dem führenden Tag.
+
+**Geprüft:** Vitest (Web) mit neuen Tests für die Tagesregeln, das Anlege-Formular und den
+erweiterten Zeitraum; dazu im laufenden Browser an der dreitägigen Seed-Rechnung: Zeitraum und
+Titel in der Liste, Tag ändern/entfernen/hinzufügen in der Anzeigemaske samt Wandern des führenden
+Tags nach dem Speichern, Abweisen eines Tags aus dem Vorjahr mit dem Satz der API, Anlegen einer
+Rechnung mit drei Tagen und der Tastaturfokus auf den neuen Schaltflächen. Der Bestand wurde
+anschließend neu aufgebaut.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.
