@@ -79,3 +79,11 @@
 	Es fehlt eine Möglichkeit zu sehen, welche Rechnungen einen bestimmten Abrechnungsdienstleister nutzen. Das ist im Zuge des Issues 0.12.0-4 aufgefallen
 6.	Markierung nicht vollständig ersetzer Leistungen — Umgesetzt mit v0.13.0-slice.6
 	Wenn durch Tarifliche Eigenbeteiligung oder Selbstbeteilung nicht die Volle Rechnungssumme ersetzt wurde, soll die Erstattungssumme in der Rechnungsübersicht rot geschrieben werden, damit der Unterschied direkt auffällt.
+## Version 0.13.0
+### Date 20260928
+1.	Unnötige Meldung bei Direktzahlung
+	Meldung "Zahlungsziel und Zahlungsdatum werden auf das Rechnungsdatum gesetzt." muss nicht im Dialog stehen, wenn auf Direktzahlung geschaltet wird. Das nimmt nur Platz weg.
+2.	"Nicht gedeckt" nicht im Anlegen-Dialog
+	"Nicht gedeckt" ist eine Eigenschaft, die erst nach dem Anlegen festgelegt werden muss, sie braucht nicht im Anlegen, sondern nur im Bearbeiten-Dialog eingestellt werden können
+3.	Weitere-Behandlungstage nimmt zu viel Raum ein
+	Die Funktion kommt nur bei ca. 10% der Rechnungen zum Einsatz. Sie sollte dezenter im Anlegen-Dialog enthalten sein. Der Rahmen mit fettem Label, Beschreibung und riesiger Schaltfläche sieht so aus, als wäre diese Angabe fast immer erforderlich
