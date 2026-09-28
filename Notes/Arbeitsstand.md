@@ -12,10 +12,10 @@ Nach jeder umgesetzten Scheibe wandern drei Dinge zusammen: der Haken hier, der 
 
 ## Paket: Findings aus der Produktion 0.12.0 → 0.13.0
 
-Acht offene Punkte aus [issues.md](issues.md): die drei aus 0.11.0, die beim Paket davor liegen
-geblieben sind, die drei aus 0.12.0 und die zwei, die beim Arbeiten mit 0.12.0 dazugekommen sind.
-Geplant als Slices 40–43 in [eunomia-plan.md](eunomia-plan.md); Slice 44 steht hier erst als
-Merkposten.
+Neun offene Punkte aus [issues.md](issues.md): die drei aus 0.11.0, die beim Paket davor liegen
+geblieben sind, die drei aus 0.12.0 und die drei, die beim Arbeiten mit 0.12.0 dazugekommen sind.
+Geplant als Slices 40–43 in [eunomia-plan.md](eunomia-plan.md); Scheibe 43a ist der zuletzt
+dazugekommene Punkt, vor den großen Brocken gezogen, und Slice 44 steht hier erst als Merkposten.
 
 | ✓   | Slice | Inhalt                                    | issues.md            | Version        |
 | --- | ----- | ----------------------------------------- | -------------------- | -------------- |
@@ -23,7 +23,8 @@ Merkposten.
 | ☑   | 41a   | Mehrere Behandlungstage — Modell + API    | 0.11.0-1             | 0.13.0-slice.2 |
 | ☑   | 41b   | Mehrere Behandlungstage — UI              | 0.11.0-1             | 0.13.0-slice.3 |
 | ☑   | 42    | Nicht gedeckte Rechnungen                 | 0.12.0-2             | 0.13.0-slice.4 |
-| ☐   | 43    | Zahlungsdatum bei Direktzahlung           | 0.12.0-3             |                |
+| ☑   | 43    | Zahlungsdatum bei Direktzahlung           | 0.12.0-3             | 0.13.0-slice.5 |
+| ☐   | 43a   | Nicht vollständig erstattete Rechnungen   | 0.12.0-6             |                |
 | ☐   | 44    | Konten je Leistungserbringer, Rechnungen je Dienstleister | 0.12.0-4/5 |    |
 
 ### Slice 40 — Politur: Dialog-Scroll, Browservorschläge, Label
@@ -166,6 +167,26 @@ bearbeitbar hält). Läge die Regel nur im Formular, liefen die beiden auseinand
   `!directPayment`, das gesetzte `transferDate` bestätigt es nur.
 - Test: Anlegen und Ändern mit Direktzahlung setzen beide Daten; wird sie abgewählt, sind sie wieder
   frei.
+
+### Scheibe 43a — Nicht vollständig erstattete Rechnungen
+
+issues.md 0.12.0-6, beim Arbeiten mit 0.12.0 dazugekommen und auf Wunsch des Autors vor Scheibe 44
+gezogen: Führen tarifliche Eigenbeteiligung oder Selbstbeteiligung dazu, dass nicht die volle
+Rechnungssumme ersetzt wurde, soll die Erstattungssumme in der Übersicht auffallen. **Rein in der
+Oberfläche** — `reimbursedTotal`, `remainingAmount` und `workflowStatus` stehen im DTO schon.
+
+Zwei Stufen, vom Autor entschieden (2026-09-28):
+
+- **rot** bei `abgerechnet`/`erledigt` mit Restbetrag: der Fall ist abgeschlossen, von Hand „als
+  abgerechnet markiert", und was bleibt, ist Eigenanteil.
+- **orange** bei `teilabgerechnet`: eine Leistungsabrechnung ist da, aber es kann noch etwas kommen
+  — genau die Lage, in der der Optimierer eine zweite Police vorschlägt.
+- `offen` und `eingereicht` bleiben unauffällig; dort ist die Null keine Nachricht. Eine nicht
+  gedeckte Rechnung steht auf `offen` und ist damit von selbst nicht betroffen.
+
+Die Regel als reines Modul mit Test (`reimbursement-gap.ts`, wie `not-covered.ts` daneben), die
+Farbe als Token neben `--eu-color-error-fg`, beide Paarungen in `CONTRAST.md` nachgerechnet. Farbe
+allein trägt keine Bedeutung: derselbe Satz steht im Titel und für Vorleseprogramme in der Zelle.
 
 ### Slice 44 — Konten je Leistungserbringer, Rechnungen je Dienstleister
 

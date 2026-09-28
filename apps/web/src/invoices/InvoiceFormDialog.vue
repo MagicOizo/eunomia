@@ -166,7 +166,8 @@ function submit(): void {
     notCoveredReason: notCovered.value ? reason : null,
     facilityUID: f.facilityUID || null,
     documentLink: f.documentLink.trim() || null,
-    // When paid directly there is no transfer, so these are always cleared.
+    // When paid directly there is no transfer, so these are cleared — the API
+    // then dates the invoice as due and paid on its own date (Slice 43).
     transferUntilDate: dp ? null : f.transferUntilDate || null,
     transferSubject: dp ? null : f.transferSubject.trim() || null,
     agencyUID: dp ? null : f.agencyUID || null,
@@ -227,6 +228,9 @@ function submit(): void {
       <EuCurrencyField v-model="form.invoiceAmount" label="Betrag" />
 
       <EuToggle v-model="directPayment" label="Direkt-/Barzahlung" />
+      <p v-if="directPayment" class="eu-form__hint">
+        Zahlungsziel und Zahlungsdatum werden auf das Rechnungsdatum gesetzt.
+      </p>
 
       <!-- Not covered by the insurance at all (Slice 42): never submitted, and
            out of every deductible. The reason goes with the mark. -->

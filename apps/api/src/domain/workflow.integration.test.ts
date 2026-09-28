@@ -1237,6 +1237,75 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       const after = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
       assert.equal(after.body.data.notCovered, false);
     });
+
+    // Slice 43: a direct payment dates itself (issues.md 0.12.0-3). The bill
+    // was settled on the spot, so it is due and paid on its own date.
+    await t.test('a direct payment is due and paid on the invoice date', async () => {
+      const created = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-DP-1',
+        invoiceDate: '2024-10-05',
+        treatmentDate: '2024-10-01',
+        accountUID: accountB,
+        invoiceAmount: 60,
+        directPayment: true,
+        // Contradicted by the flag on purpose: the rule has the last word.
+        transferUntilDate: '2024-11-30',
+      });
+      assert.equal(created.status, 201);
+      assert.equal(created.body.data.transferUntilDate, '2024-10-05');
+      assert.equal(created.body.data.transferDate, '2024-10-05');
+      const uid = created.body.data.invoiceUID as string;
+
+      // A corrected invoice date takes both dates with it.
+      const moved = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ invoiceDate: '2024-10-07' });
+      assert.equal(moved.status, 200);
+      assert.equal(moved.body.data.transferUntilDate, '2024-10-07');
+      assert.equal(moved.body.data.transferDate, '2024-10-07');
+
+      // Dropping the flag frees both dates again, empty: "paid on the invoice
+      // date" must not stay behind as a statement nobody made.
+      const freed = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ directPayment: false });
+      assert.equal(freed.status, 200);
+      assert.equal(freed.body.data.transferUntilDate, null);
+      assert.equal(freed.body.data.transferDate, null);
+    });
+
+    await t.test('dates sent while direct payment is dropped are kept', async () => {
+      const uid = (
+        await post('/api/v1/invoices', {
+          invoiceNumber: 'R-DP-2',
+          invoiceDate: '2024-10-08',
+          treatmentDate: '2024-10-08',
+          accountUID: accountB,
+          invoiceAmount: 40,
+          directPayment: true,
+        })
+      ).body.data.invoiceUID as string;
+
+      const corrected = await request(app).patch(`/api/v1/invoices/${uid}`).set(admin).send({
+        directPayment: false,
+        transferUntilDate: '2024-11-08',
+        transferDate: '2024-10-30',
+      });
+      assert.equal(corrected.status, 200);
+      assert.equal(corrected.body.data.transferUntilDate, '2024-11-08');
+      assert.equal(corrected.body.data.transferDate, '2024-10-30');
+
+      // An ordinary invoice keeps its dates when something else changes.
+      const renamed = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ invoiceNumber: 'R-DP-2b', invoiceDate: '2024-10-09' });
+      assert.equal(renamed.status, 200);
+      assert.equal(renamed.body.data.transferUntilDate, '2024-11-08');
+      assert.equal(renamed.body.data.transferDate, '2024-10-30');
+    });
   } finally {
     await pool.end();
   }

@@ -474,6 +474,51 @@ function notCoveredOf(row: InvoiceRow): NotCovered {
   };
 }
 
+/** The two transfer dates of an invoice: when it is due, and when it was paid. */
+interface PaymentDates {
+  transferUntilDate: string | null;
+  transferDate: string | null;
+}
+
+/**
+ * What a write leaves behind for the two transfer dates (Slice 43), or `null`
+ * when it leaves them alone.
+ *
+ * A direct payment is the bill settled on the spot — cash at the counter, card
+ * at the practice. Nothing is transferred and nothing is waited for, so both
+ * dates are the invoice date and the invoice counts as paid the moment it is
+ * entered. The rule lives here and not in the masks: the create form and the
+ * detail mask both write `directPayment`, and a rule in one of them would let
+ * the two drift apart.
+ *
+ *  - the flag stands after the write → both dates ARE the invoice date, so a
+ *    corrected invoice date takes them with it;
+ *  - the write drops the flag and says nothing about either date → both are
+ *    cleared. "Paid on the invoice date" would otherwise stay behind as a
+ *    statement nobody made. A date sent along with the same write wins.
+ */
+function nextPaymentDates(
+  data: {
+    directPayment?: number;
+    invoiceDate?: string;
+    transferUntilDate?: string | null;
+    transferDate?: string | null;
+  },
+  current: { directPayment: number; invoiceDate: string },
+): PaymentDates | null {
+  if ((data.directPayment ?? current.directPayment) === 1) {
+    const paidOn = data.invoiceDate ?? current.invoiceDate;
+    return { transferUntilDate: paidOn, transferDate: paidOn };
+  }
+  // Only the write that actually drops the flag clears the dates; for an
+  // invoice that was never a direct payment they are the user's own.
+  if (data.directPayment === undefined || current.directPayment !== 1) return null;
+  return {
+    transferUntilDate: data.transferUntilDate ?? null,
+    transferDate: data.transferDate ?? null,
+  };
+}
+
 /** Replaces the treatment days of an invoice; the caller has checked them. */
 async function writeTreatmentDays(
   db: Queryable,
@@ -606,12 +651,14 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     assertOneYear(days);
     // A new invoice is submitted nowhere, so only the reason rule can bite.
     const mark = nextNotCovered(data, { notCovered: 0, notCoveredReason: null });
+    const paid = nextPaymentDates(data, { directPayment: 0, invoiceDate: data.invoiceDate });
     const created = await withTransaction(pool, async (conn) => {
       // The stored `treatmentDate` is the earliest day, never just the one
       // that happened to be typed first.
       const row = await insertRow(conn, invoicesTable, {
         ...data,
         ...(mark ?? {}),
+        ...(paid ?? {}),
         treatmentDate: days[0],
       });
       await writeTreatmentDays(conn, row.invoiceUID as string, days);
@@ -658,7 +705,11 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
           code: ERROR_CODES.INVOICE_NOT_COVERED_SUBMITTED,
         });
       }
-      const patch = { ...data, ...(mark ?? {}) };
+      const paid = nextPaymentDates(data, {
+        directPayment: Number(current.directPayment),
+        invoiceDate: current.invoiceDate as string,
+      });
+      const patch = { ...data, ...(mark ?? {}), ...(paid ?? {}) };
       const days = nextTreatmentDays(data, await treatmentDaysOf(conn, uid));
       if (days === null) {
         await updateRow(conn, invoicesTable, uid, patch);

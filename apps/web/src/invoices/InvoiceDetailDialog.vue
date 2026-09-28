@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { faBan, faPaperPlane, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 
 import { accountInForce } from '../agencies/accounts';
 import type { AgencyAccountDto } from '../agencies/api';
@@ -132,6 +132,13 @@ const {
   emit('entityCreated');
 });
 
+/**
+ * True while the mask is being filled from an opened invoice. Seeding writes
+ * the same fields a user can change, and the rules below must not read that as
+ * a change — an invoice would otherwise look edited the moment it is opened.
+ */
+const seeding = ref(false);
+
 // Seeded per opened invoice only: a reload after a block action passes a
 // fresh invoice object and must not discard unsaved edits in the mask.
 watch(
@@ -156,22 +163,42 @@ watch(
       notCovered: inv.notCovered,
       notCoveredReason: inv.notCoveredReason,
     };
+    seeding.value = true;
     Object.assign(values, seed);
     Object.assign(saved, seed);
+    // Cleared once the watchers this seeding triggered have run.
+    void nextTick(() => (seeding.value = false));
     extraDays.value = furtherDays(inv);
     savedExtraDays.value = [...extraDays.value];
   },
   { immediate: true },
 );
 
-// Switching to direct payment empties the now-inactive fields (only when they
-// hold something, so loading a direct-payment invoice doesn't look edited).
+/**
+ * Direct payment, spelled out in the mask (Slice 43). The bill was settled on
+ * the spot, so it is due and paid on its own date and there is nothing left to
+ * transfer: the two dates follow the invoice date — correcting it here shows
+ * at once what will be saved — and the transfer fields are emptied. Switching
+ * the flag off frees all four again, empty. The API keeps the same rule for
+ * every write; this is only what the mask shows while it is open.
+ */
 watch(
-  () => values.directPayment,
-  (now) => {
-    if (now !== true) return;
-    if (values.agencyUID) values.agencyUID = null;
-    if (values.transferSubject) values.transferSubject = '';
+  () => [values.directPayment, values.invoiceDate] as const,
+  ([now], [before]) => {
+    if (seeding.value) return;
+    if (now === true) {
+      values.transferUntilDate = values.invoiceDate;
+      values.transferDate = values.invoiceDate;
+      if (values.agencyUID) values.agencyUID = null;
+      if (values.transferSubject) values.transferSubject = '';
+      return;
+    }
+    // Only the switch going off clears them; a corrected invoice date on an
+    // ordinary invoice leaves the dates the user entered alone.
+    if (before === true) {
+      values.transferUntilDate = null;
+      values.transferDate = null;
+    }
   },
 );
 
@@ -521,12 +548,14 @@ function submit(): void {
         :saved-value="saved.transferUntilDate"
         label="Zahlungsziel"
         type="date"
+        :disabled="directPayment"
       />
       <EuDetailField
         v-model="values.transferDate"
         :saved-value="saved.transferDate"
         label="Zahlungsdatum"
         type="date"
+        :disabled="directPayment"
       />
       <EuDetailField
         v-model="values.invoiceAmount"

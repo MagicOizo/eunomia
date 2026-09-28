@@ -7,6 +7,19 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.13.0-slice.5 — 2026-09-28
+
+- **A bill paid on the spot dates itself.** Cash at the counter or card at the practice: there is
+  nothing to transfer and nothing to wait for, so an invoice marked as a direct payment is now due
+  and paid on its own date. Until now both dates stayed empty, which left a bill that had long been
+  settled standing as unpaid — and kept it from ever reaching "Erledigt", however completely it was
+  reimbursed.
+- **One rule for every way of writing it.** The create form and the detail mask both set the mark,
+  so the rule lives in the API and not in either of them. Correcting the invoice date takes the two
+  dates with it, and dropping the mark frees them again, empty: "paid on the invoice date" must not
+  stay behind as a statement nobody made. In the detail mask the two dates are shown and locked
+  while the mark stands, so what will be saved is what is on screen.
+
 ## 0.13.0-slice.4 — 2026-09-28
 
 - **An invoice can be marked as not covered by the insurance.** Some treatments are outside the

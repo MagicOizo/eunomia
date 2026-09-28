@@ -1622,6 +1622,45 @@ Satz der API abgewiesen; Markieren der eingereichten Rechnung mit dem richtigen 
 Anlegen einer markierten Rechnung über das Formular; Tastaturfokus auf dem neuen Schalter in beiden
 Masken mit vollständigem Fokusring. Der Bestand wurde anschließend neu aufgebaut.
 
+## Slice 43 — Zahlungsdatum bei Direktzahlung (umgesetzt 2026-09-28)
+**Anlass:** issues.md 0.12.0-3. Bei Direktzahlung — bar an der Theke, Karte in der Praxis — soll
+das Rechnungsdatum automatisch Zahlungsziel und Zahlungsdatum werden. Bisher blieben beide leer:
+eine längst beglichene Rechnung stand als unbezahlt da und konnte den Status „Erledigt" nie
+erreichen, so vollständig sie auch erstattet war (`deriveInvoiceStatus()` hängt ihn an
+`transferDate`).
+
+**Entscheidungen (Planmodus):**
+
+- **Die Regel gehört in die API, nicht in die Masken.** Rechnungsmaske und Anzeigemaske schreiben
+  beide `directPayment`, und die Anzeigemaske hält die zwei Daten einzeln bearbeitbar. Läge die
+  Regel in einer von beiden, liefen sie auseinander. `nextPaymentDates()` in `invoices.ts` steht
+  deshalb neben `nextNotCovered()` aus Slice 42 — dasselbe Muster, eine Stelle für jeden
+  Schreibweg.
+- **Maßgeblich ist, was der Schreibvorgang hinterlässt**, nicht was er mitschickt: Steht das
+  Kennzeichen danach, _sind_ beide Daten das Rechnungsdatum — auch wenn derselbe Aufruf etwas
+  anderes mitgibt, und auch wenn nur das Rechnungsdatum korrigiert wird, das die beiden dann
+  mitnimmt.
+- **Das Abwählen leert beide Daten**, sofern der Aufruf nicht selbst welche mitschickt. Ein stehen
+  gebliebenes „bezahlt am Rechnungsdatum" wäre eine Aussage, die niemand gemacht hat. Rechnungen,
+  die nie Direktzahlung waren, rührt die Regel nicht an.
+- **Die Maske zeigt, was gespeichert wird.** In der Anzeigemaske tragen die beiden Felder das
+  Rechnungsdatum, solange das Kennzeichen steht, und sind dabei gesperrt — dieselbe Linie, die der
+  GiroCode dort schon fährt. Ein `seeding`-Merker hält die Regel beim Öffnen zurück: eine alte
+  Direktzahlungs-Rechnung ohne Daten sähe sonst beim bloßen Öffnen „bearbeitet" aus.
+
+**Gewollte Nebenwirkung:** Eine voll erstattete Direktzahlungs-Rechnung erreicht damit erstmals
+„Erledigt". Zahlungs-Ampel (`payment.ts`) und Erinnerungsversand (`reminders/store.ts`) klammern
+`directPayment` ohnehin schon aus; dort ändert sich nichts.
+
+**Geprüft:** 259 API-Tests gegen `eunomia_test` (Anlegen setzt beide Daten und überschreibt ein
+mitgeschicktes Zahlungsziel, korrigiertes Rechnungsdatum zieht sie nach, Abwählen leert sie,
+mitgeschickte Daten beim Abwählen gewinnen, gewöhnliche Rechnungen bleiben unberührt) und 248
+Web-Tests, darunter die neue `InvoiceDetailDialog.test.ts`. Dazu im laufenden Browser: Rechnung mit
+Direktzahlung angelegt — Zahlungsziel und Zahlungsdatum tragen das Rechnungsdatum und sind
+gesperrt, die Ampel steht auf „Bereits bezahlt"; Kennzeichen aus → beide leer und frei, wieder an
+→ beide zurück auf das Rechnungsdatum. Die Testrechnung wurde anschließend über den Papierkorb
+endgültig gelöscht, der Bestand steht also wie vorher.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.
