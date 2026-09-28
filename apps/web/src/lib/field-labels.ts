@@ -64,6 +64,7 @@ export const FIELD_LABELS: Record<string, string> = {
   invoiceUIDs: 'Rechnungen',
   invoiceDate: 'Rechnungsdatum',
   treatmentDate: 'Behandlungsdatum',
+  treatmentDates: 'Behandlungstage',
   invoiceAmount: 'Rechnungsbetrag',
   directPayment: 'Direkt-/Barzahlung',
   transferUntilDate: 'Zahlungsziel',

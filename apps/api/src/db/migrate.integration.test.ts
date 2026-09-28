@@ -21,6 +21,7 @@ const EXPECTED_TABLES = [
   'SubmissionInvoices',
   'InvoiceExclusions',
   'Invoices',
+  'InvoiceTreatmentDays',
   'ServiceBillings',
   'Allocations',
 ];
@@ -163,6 +164,7 @@ test('migration 006 drops contract workflow data but keeps invoices and master d
       'the company is kept',
     );
 
+    await pool.query("DELETE FROM InvoiceTreatmentDays WHERE invoiceUID = 'iMIGRATION06'");
     await pool.query("DELETE FROM Invoices WHERE invoiceUID = 'iMIGRATION06'");
     await pool.query("DELETE FROM InsuranceCompanies WHERE companyUID = 'vMIGRATION06'");
     await pool.query("DELETE FROM Accounts WHERE accountUID = 'aMIGRATION06'");
@@ -189,6 +191,7 @@ test('migration 007 moves submissions into SubmissionInvoices and back', async (
   const cleanup = async (): Promise<void> => {
     for (const sql of [
       "DELETE FROM SubmissionInvoices WHERE invoiceUID = 'iMIGRATION07'",
+      "DELETE FROM InvoiceTreatmentDays WHERE invoiceUID = 'iMIGRATION07'",
       "DELETE FROM Invoices WHERE invoiceUID = 'iMIGRATION07'",
       "DELETE FROM Submissions WHERE submissionUID IN ('eMIGRATIO07A', 'eMIGRATIO07B')",
       "DELETE FROM Contracts WHERE contractUID IN ('pMIGRATIO07A', 'pMIGRATIO07B')",
@@ -342,6 +345,7 @@ test('migration 011 moves a billing onto its policy and guards the number, and b
       "DELETE FROM Allocations WHERE allocationUID LIKE 'oMIGRATIO11%'",
       "DELETE FROM ServiceBillings WHERE billingUID LIKE 'sMIGRATIO11%'",
       "DELETE FROM SubmissionInvoices WHERE invoiceUID LIKE 'iMIGRATION11%'",
+      "DELETE FROM InvoiceTreatmentDays WHERE invoiceUID LIKE 'iMIGRATION11%'",
       "DELETE FROM Invoices WHERE invoiceUID LIKE 'iMIGRATION11%'",
       "DELETE FROM Submissions WHERE submissionUID LIKE 'eMIGRATIO11%'",
       "DELETE FROM Contracts WHERE contractUID LIKE 'pMIGRATIO11%'",
@@ -523,6 +527,83 @@ test('migration 012 turns an agency account into a history, and back', async (t)
       "SELECT bankAccount FROM CollectionAgencies WHERE agencyUID = 'cMIGRATION12'",
     );
     assert.equal(restored?.bankAccount, 'DE89370400440532013000');
+
+    await migrator.up();
+  } finally {
+    await cleanup().catch(() => undefined);
+    await pool.end();
+  }
+});
+
+test('migration 014 gives every invoice its treatment day, and takes it back', async (t) => {
+  const config = databaseConfigFromEnv();
+  if (!config) {
+    t.skip('no database configured (DB_* env vars unset)');
+    return;
+  }
+  const pool = createPool(config);
+  try {
+    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
+  } catch {
+    await pool.end();
+    t.skip('database not reachable');
+    return;
+  }
+
+  const cleanup = async (): Promise<void> => {
+    for (const sql of [
+      "DELETE FROM InvoiceTreatmentDays WHERE invoiceUID = 'iMIGRATION14'",
+      "DELETE FROM Invoices WHERE invoiceUID = 'iMIGRATION14'",
+      "DELETE FROM Accounts WHERE accountUID = 'aMIGRATION14'",
+    ]) {
+      await pool.query(sql).catch(() => undefined);
+    }
+  };
+
+  try {
+    await runMigrations(pool);
+    const migrator = createMigrator(pool);
+    const name014 = (await migrator.executed())
+      .map((m) => m.name)
+      .find((n) => n.startsWith('014-'));
+    assert.ok(name014, 'migration 014 should be recorded');
+
+    await cleanup();
+    // Back to the one-day shape, with an invoice from before the change. It is
+    // soft-deleted on purpose: what is in the trash must carry its day too, or
+    // a restore would bring back an invoice without one.
+    await migrator.down({ to: name014 });
+    await pool.query(
+      "INSERT INTO Accounts (accountUID, firstname, birthDate) VALUES ('aMIGRATION14', 'Mig', '1990-01-01')",
+    );
+    await pool.query(
+      `INSERT INTO Invoices (invoiceUID, invoiceNumber, invoiceDate, treatmentDate, accountUID,
+                             invoiceAmount, invoiceStatus)
+       VALUES ('iMIGRATION14', 'R-14', '2024-02-01', '2024-02-03', 'aMIGRATION14', 100, -1)`,
+    );
+
+    await migrator.up();
+
+    const days = await pool.query<Array<{ treatmentDate: string }>>(
+      "SELECT treatmentDate FROM InvoiceTreatmentDays WHERE invoiceUID = 'iMIGRATION14'",
+    );
+    assert.deepEqual(days, [{ treatmentDate: '2024-02-03' }], 'the day it already had');
+
+    // The same day twice is a typo, not a date — the primary key says so.
+    await assert.rejects(
+      pool.query(
+        `INSERT INTO InvoiceTreatmentDays (invoiceUID, treatmentDate)
+         VALUES ('iMIGRATION14', '2024-02-03')`,
+      ),
+      'a day cannot be recorded twice for one invoice',
+    );
+
+    // down only takes the table away: the leading day never left the invoice.
+    await migrator.down({ to: name014 });
+    const [invoice] = await pool.query<Array<{ treatmentDate: string }>>(
+      "SELECT treatmentDate FROM Invoices WHERE invoiceUID = 'iMIGRATION14'",
+    );
+    assert.equal(invoice?.treatmentDate, '2024-02-03');
 
     await migrator.up();
   } finally {

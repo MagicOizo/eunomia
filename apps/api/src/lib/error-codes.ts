@@ -48,6 +48,8 @@ export const ERROR_CODES = {
   INVOICE_ALREADY_EXCLUDED: 'INVOICE_ALREADY_EXCLUDED',
   CONTRACT_ACCOUNT_MISMATCH: 'CONTRACT_ACCOUNT_MISMATCH',
   INVOICE_HAS_REIMBURSEMENT: 'INVOICE_HAS_REIMBURSEMENT',
+  /** The treatment days of one invoice span more than one calendar year. */
+  TREATMENT_DAYS_DIFFERENT_YEARS: 'TREATMENT_DAYS_DIFFERENT_YEARS',
   /** The policy already has an active billing under that number. */
   BILLING_NUMBER_TAKEN: 'BILLING_NUMBER_TAKEN',
 

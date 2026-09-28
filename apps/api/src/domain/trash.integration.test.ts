@@ -64,6 +64,7 @@ async function resetData(pool: Pool): Promise<void> {
     'DELETE FROM SubmissionInvoices',
     'DELETE FROM InvoiceExclusions',
     'DELETE FROM InvoiceReminders',
+    'DELETE FROM InvoiceTreatmentDays',
     'DELETE FROM Invoices',
     'DELETE FROM Submissions',
     'DELETE FROM ContractPremiums',
@@ -424,6 +425,24 @@ test('trash: list, restore and delete for good', async (t) => {
 
     await t.test('purging an invoice takes its submission links along', async () => {
       const invoiceUID = await makeInvoice('R-PURGE', 40);
+      // Two treatment days, so the purge has something of Slice 41a to take
+      // along. They are registered nowhere: `purgeEntry` reads the foreign
+      // keys out of information_schema and clears the RESTRICT links that are
+      // not records of their own — proven here rather than assumed.
+      await request(app)
+        .patch(`/api/v1/invoices/${invoiceUID}`)
+        .set(admin)
+        .send({ treatmentDates: ['2024-05-01', '2024-05-08'] });
+      const dayCount = async (): Promise<number> =>
+        Number(
+          (
+            await pool.query<Array<{ n: number }>>(
+              'SELECT COUNT(*) AS n FROM InvoiceTreatmentDays WHERE invoiceUID = ?',
+              [invoiceUID],
+            )
+          )[0]?.n,
+        );
+      assert.equal(await dayCount(), 2);
       const submissionUID = (
         await post('/api/v1/submissions', {
           contractUID,
@@ -444,6 +463,7 @@ test('trash: list, restore and delete for good', async (t) => {
         [invoiceUID],
       );
       assert.equal(Number(links[0]?.n), 0, 'the link is gone');
+      assert.equal(await dayCount(), 0, 'the treatment days went with it');
       // The submission it emptied followed its invoice into the trash.
       const submission = await pool.query<Array<{ submissionStatus: number }>>(
         'SELECT submissionStatus FROM Submissions WHERE submissionUID = ?',

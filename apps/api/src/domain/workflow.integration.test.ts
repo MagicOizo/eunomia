@@ -65,6 +65,7 @@ async function resetData(pool: Pool): Promise<void> {
     'DELETE FROM ServiceBillings',
     'DELETE FROM SubmissionInvoices',
     'DELETE FROM InvoiceExclusions',
+    'DELETE FROM InvoiceTreatmentDays',
     'DELETE FROM Invoices',
     'DELETE FROM Submissions',
     'DELETE FROM ContractPremiums',
@@ -1041,6 +1042,106 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         billingNumber: 'LA-C-SPARE',
       });
       assert.equal(reused.status, 201);
+    });
+
+    // Slice 41a: an invoice bills several treatment days (issues.md 0.11.0-1).
+    // `treatmentDate` stays, as the leading day and as the anchor of every
+    // YEAR() evaluation, and the API keeps it on the earliest day.
+    await t.test('an invoice that names one day has exactly that day', async () => {
+      const res = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
+      assert.deepEqual(res.body.data.treatmentDates, ['2024-05-01']);
+    });
+
+    await t.test('several days come back sorted, the earliest leading', async () => {
+      const created = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-DAYS',
+        invoiceDate: '2024-07-20',
+        // Deliberately not the earliest, and the list unsorted: the API sorts
+        // and moves the leading day, the client need not.
+        treatmentDate: '2024-07-10',
+        treatmentDates: ['2024-07-18', '2024-07-03', '2024-07-10'],
+        accountUID: accountB,
+        invoiceAmount: 300,
+      });
+      assert.equal(created.status, 201);
+      assert.deepEqual(created.body.data.treatmentDates, [
+        '2024-07-03',
+        '2024-07-10',
+        '2024-07-18',
+      ]);
+      assert.equal(created.body.data.treatmentDate, '2024-07-03');
+    });
+
+    await t.test('the list sent replaces the days, and the leading day follows', async () => {
+      const uid = (
+        await post('/api/v1/invoices', {
+          invoiceNumber: 'R-DAYS-2',
+          invoiceDate: '2024-08-20',
+          treatmentDate: '2024-08-10',
+          treatmentDates: ['2024-08-10', '2024-08-11'],
+          accountUID: accountB,
+          invoiceAmount: 200,
+        })
+      ).body.data.invoiceUID as string;
+
+      const changed = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ treatmentDates: ['2024-08-02', '2024-08-01'] });
+      assert.equal(changed.status, 200);
+      assert.deepEqual(changed.body.data.treatmentDates, ['2024-08-01', '2024-08-02']);
+      assert.equal(changed.body.data.treatmentDate, '2024-08-01');
+
+      // Only the date, without the list: the leading day MOVES, the others
+      // stay — what a client that knows nothing of several days means by it.
+      const moved = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ treatmentDate: '2024-08-05' });
+      assert.equal(moved.status, 200);
+      assert.deepEqual(moved.body.data.treatmentDates, ['2024-08-02', '2024-08-05']);
+      assert.equal(moved.body.data.treatmentDate, '2024-08-02');
+
+      // A write that says nothing about the days leaves them alone.
+      const elsewhere = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ invoiceAmount: 210 });
+      assert.equal(elsewhere.status, 200);
+      assert.deepEqual(elsewhere.body.data.treatmentDates, ['2024-08-02', '2024-08-05']);
+    });
+
+    await t.test('days from two calendar years are refused, creating and changing', async () => {
+      const across = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-DAYS-3',
+        invoiceDate: '2025-01-10',
+        treatmentDate: '2024-12-28',
+        treatmentDates: ['2024-12-28', '2025-01-02'],
+        accountUID: accountB,
+        invoiceAmount: 100,
+      });
+      assert.equal(across.status, 400);
+      assert.equal(across.body.error.code, 'TREATMENT_DAYS_DIFFERENT_YEARS');
+      assert.deepEqual(across.body.error.details, { years: ['2024', '2025'] });
+
+      const uid = (
+        await post('/api/v1/invoices', {
+          invoiceNumber: 'R-DAYS-4',
+          invoiceDate: '2024-12-30',
+          treatmentDate: '2024-12-28',
+          accountUID: accountB,
+          invoiceAmount: 100,
+        })
+      ).body.data.invoiceUID as string;
+      const later = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ treatmentDates: ['2024-12-28', '2025-01-02'] });
+      assert.equal(later.status, 400);
+      assert.equal(later.body.error.code, 'TREATMENT_DAYS_DIFFERENT_YEARS');
+      // Refused means unchanged: the transaction rolled back.
+      const unchanged = await request(app).get(`/api/v1/invoices/${uid}`).set(admin);
+      assert.deepEqual(unchanged.body.data.treatmentDates, ['2024-12-28']);
     });
   } finally {
     await pool.end();

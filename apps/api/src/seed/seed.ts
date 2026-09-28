@@ -546,6 +546,28 @@ async function seedWorkflow(pool: Pool): Promise<void> {
   });
 }
 
+/**
+ * The treatment days of every seeded invoice (Slice 41). The seed writes its
+ * rows straight into the tables, so the leading day is mirrored here in one
+ * step instead of at each of the two dozen invoices — exactly as migration 014
+ * does it for an existing database. One invoice then gets two further days, so
+ * the development data holds the case the slice is about.
+ */
+async function seedTreatmentDays(pool: Pool): Promise<void> {
+  await pool.query(`
+    INSERT INTO InvoiceTreatmentDays (invoiceUID, treatmentDate)
+    SELECT i.invoiceUID, i.treatmentDate FROM Invoices i
+     WHERE NOT EXISTS (SELECT 1 FROM InvoiceTreatmentDays d WHERE d.invoiceUID = i.invoiceUID)
+  `);
+  // All in the year of its leading day (02-11): an invoice stays within one.
+  for (const day of [seedDate(-1, '02-14'), seedDate(-1, '02-18')]) {
+    await seedRow(pool, 'InvoiceTreatmentDays', {
+      invoiceUID: ids.invoiceBilled,
+      treatmentDate: day,
+    });
+  }
+}
+
 /** Inserts the full seed dataset. */
 export async function seedDatabase(pool: Pool): Promise<void> {
   await seedPeople(pool);
@@ -561,6 +583,8 @@ export async function seedDatabase(pool: Pool): Promise<void> {
     facilityRadiologyUID: ids.facilityRadiology,
   });
   await seedExampleYears(pool);
+  // Last: it mirrors the leading day of every invoice the seeders wrote.
+  await seedTreatmentDays(pool);
 }
 
 /**

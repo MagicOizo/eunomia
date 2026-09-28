@@ -7,6 +7,16 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.13.0-slice.2 — 2026-09-28
+
+- **An invoice can name every day it bills, not just one.** A bill from a practice often covers
+  several appointments; until now one of them had to be picked and the rest were lost. The model and
+  the API now carry the whole list: it comes back sorted, the recorded treatment date is always its
+  earliest day, and a client that sends just the one date keeps working exactly as before — it moves
+  the leading day and leaves the others alone. All days of an invoice must fall in the same calendar
+  year, because deductible and bonus are counted per treatment year; anything across the turn of the
+  year is split into a second invoice, which nothing prevents. The masks follow in the next preview.
+
 ## 0.13.0-slice.1 — 2026-09-28
 
 - **A dialog keeps its header and its single scrollbar.** Flipping a switch inside a scrolled dialog

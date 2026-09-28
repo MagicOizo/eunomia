@@ -53,8 +53,15 @@ const base = z.object({
   invoiceNumber: z.string().trim().min(1).max(50),
   invoiceDate: z.string().date(),
   // Mandatory: the deductible/bonus year is keyed by treatment date, not billing
-  // date (see Notes/eunomia-plan.md, Slice 8).
+  // date (see Notes/eunomia-plan.md, Slice 8). It is the LEADING day; the whole
+  // list lives in `treatmentDates` (Slice 41).
   treatmentDate: z.string().date(),
+  /**
+   * The complete list of treatment days, not "the further ones" (Slice 41).
+   * Optional, so a client that knows nothing of it keeps working: leaving it
+   * out means the invoice is billed for the one day in `treatmentDate`.
+   */
+  treatmentDates: z.array(z.string().date()).min(1).max(60).optional(),
   accountUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.account)),
   facilityUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.facility)).nullish(),
   invoiceAmount: money,
@@ -135,6 +142,11 @@ interface InvoiceSubmissionRow {
   billingCount: number;
   allocationCount: number;
   reimbursed: number;
+}
+
+interface InvoiceTreatmentDayRow {
+  invoiceUID: string;
+  treatmentDate: string;
 }
 
 interface InvoiceExclusionRow {
@@ -267,6 +279,16 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
       uids,
     ),
   );
+  // The days the invoice bills, earliest first; `treatmentDate` is the first
+  // of them (migration 014 fills the table for every invoice there is).
+  const treatmentDays = byInvoice(
+    await db.query<InvoiceTreatmentDayRow[]>(
+      `SELECT invoiceUID, treatmentDate FROM InvoiceTreatmentDays
+        WHERE invoiceUID IN (${placeholders})
+        ORDER BY treatmentDate`,
+      uids,
+    ),
+  );
   const exclusions = byInvoice(
     await db.query<InvoiceExclusionRow[]>(
       `SELECT x.invoiceUID, x.contractUID, c.contractNumber, v.companyName, x.note
@@ -291,6 +313,7 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
     });
     return {
       ...row,
+      treatmentDates: (treatmentDays.get(row.invoiceUID) ?? []).map((day) => day.treatmentDate),
       reimbursementClosed: Boolean(row.reimbursementClosed),
       hasOpenObjection: Boolean(Number(row.hasOpenObjection)),
       ...status,
@@ -334,6 +357,78 @@ async function presentOne(db: Queryable, row: InvoiceRow): Promise<Record<string
 async function getInvoice(db: Queryable, uid: string): Promise<InvoiceRow | null> {
   const rows = await queryInvoices(db, 'i.invoiceUID = ? AND i.invoiceStatus <> -1', [uid]);
   return rows[0] ?? null;
+}
+
+/** The treatment days of an invoice, earliest first. */
+async function treatmentDaysOf(db: Queryable, invoiceUID: string): Promise<string[]> {
+  const rows = await db.query<Array<{ treatmentDate: string }>>(
+    'SELECT treatmentDate FROM InvoiceTreatmentDays WHERE invoiceUID = ? ORDER BY treatmentDate',
+    [invoiceUID],
+  );
+  return rows.map((row) => row.treatmentDate);
+}
+
+/** An invoice always has at least one treatment day, and the first is the earliest. */
+type TreatmentDays = [string, ...string[]];
+
+/** Sorted and without duplicates: the days of an invoice are a set, not a list. */
+function asDays(days: string[]): TreatmentDays {
+  const [earliest, ...rest] = [...new Set(days)].sort();
+  if (earliest === undefined) throw new Error('an invoice needs at least one treatment day');
+  return [earliest, ...rest];
+}
+
+/**
+ * The days a write leaves behind, read from what the request carries:
+ *
+ *  - `treatmentDates` given: it IS the list (a `treatmentDate` sent alongside
+ *    joins it, which for the app's own masks is the same day anyway);
+ *  - only `treatmentDate`: the leading day MOVES — the earliest day so far is
+ *    replaced, the others stay. For a one-day invoice that is exactly what
+ *    "the treatment date changed" has always meant, and a client that knows
+ *    nothing of several days cannot drop one by accident;
+ *  - neither (update only): `null`, the days are left alone.
+ */
+function nextTreatmentDays(
+  data: { treatmentDate?: string; treatmentDates?: string[] },
+  current: string[],
+): TreatmentDays | null {
+  if (data.treatmentDates !== undefined) {
+    return asDays([...data.treatmentDates, ...(data.treatmentDate ? [data.treatmentDate] : [])]);
+  }
+  if (data.treatmentDate === undefined) return null;
+  return asDays([...current.slice(1), data.treatmentDate]);
+}
+
+/**
+ * Rejects days from different calendar years. Deductible and bonus are yearly
+ * figures keyed by `YEAR(treatmentDate)`, so an invoice spanning the turn of
+ * the year has no single year to count in; it is split into two invoices, and
+ * nothing stops that — `invoiceNumber` carries neither a UNIQUE nor a
+ * duplicate check, so the same number may stand twice.
+ */
+function assertOneYear(days: string[]): void {
+  const years = [...new Set(days.map((day) => day.slice(0, 4)))];
+  if (years.length > 1) {
+    throw badRequest('All treatment days of an invoice must fall in the same calendar year', {
+      code: ERROR_CODES.TREATMENT_DAYS_DIFFERENT_YEARS,
+      details: { years },
+    });
+  }
+}
+
+/** Replaces the treatment days of an invoice; the caller has checked them. */
+async function writeTreatmentDays(
+  db: Queryable,
+  invoiceUID: string,
+  days: TreatmentDays,
+): Promise<void> {
+  await db.query('DELETE FROM InvoiceTreatmentDays WHERE invoiceUID = ?', [invoiceUID]);
+  await db.query(
+    `INSERT INTO InvoiceTreatmentDays (invoiceUID, treatmentDate)
+     VALUES ${days.map(() => '(?, ?)').join(', ')}`,
+    days.flatMap((day) => [invoiceUID, day]),
+  );
 }
 
 async function submissionCount(db: Queryable, invoiceUID: string): Promise<number> {
@@ -449,7 +544,16 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const user = getAuthUser(res);
     const data = base.parse(req.body);
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, data.accountUID);
-    const created = await insertRow(pool, invoicesTable, data);
+    // `treatmentDate` is mandatory here, so there is always a day to write.
+    const days = nextTreatmentDays(data, []) as TreatmentDays;
+    assertOneYear(days);
+    const created = await withTransaction(pool, async (conn) => {
+      // The stored `treatmentDate` is the earliest day, never just the one
+      // that happened to be typed first.
+      const row = await insertRow(conn, invoicesTable, { ...data, treatmentDate: days[0] });
+      await writeTreatmentDays(conn, row.invoiceUID as string, days);
+      return row;
+    });
     const enriched = await getInvoice(pool, created.invoiceUID as string);
     sendData(res, await presentOne(pool, enriched as InvoiceRow), 201);
   });
@@ -481,7 +585,14 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
           code: ERROR_CODES.INVOICE_NOT_SUBMITTED,
         });
       }
-      await updateRow(conn, invoicesTable, uid, data);
+      const days = nextTreatmentDays(data, await treatmentDaysOf(conn, uid));
+      if (days === null) {
+        await updateRow(conn, invoicesTable, uid, data);
+      } else {
+        assertOneYear(days);
+        await updateRow(conn, invoicesTable, uid, { ...data, treatmentDate: days[0] });
+        await writeTreatmentDays(conn, uid, days);
+      }
     });
 
     sendData(res, await presentOne(pool, (await getInvoice(pool, uid)) as InvoiceRow));

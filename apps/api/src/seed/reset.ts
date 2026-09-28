@@ -16,6 +16,7 @@ export async function clearData(pool: Pool): Promise<void> {
     'ServiceBillings',
     'SubmissionInvoices',
     'InvoiceExclusions',
+    'InvoiceTreatmentDays',
     'Invoices',
     'Submissions',
     'ContractPremiums',

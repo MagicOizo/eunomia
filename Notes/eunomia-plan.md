@@ -1466,6 +1466,66 @@ der App außer den beiden Anmeldefeldern bietet noch Browservorschläge an. Die 
   (19 px), beide Eingabefelder auf derselben Höhe. Es wurde nichts gespeichert, der Dev-Datenbestand
   blieb unangetastet.
 
+## Slice 41 — Mehrere Behandlungstage je Rechnung
+**Anlass:** issues.md 0.11.0-1. Eine Rechnung der Praxis deckt oft mehrere Termine ab; `Invoices`
+hält aber genau ein `treatmentDate`, so dass einer der Tage eingetragen wird und die übrigen
+verlorengehen.
+
+**Festlegung (Autor, 2026-09-28):** **nur die Tage, keine Beträge je Behandlung** — Beträge je Tag
+zu erfassen wäre umständlich und brächte kaum Informationsgewinn. Und eine Rechnung bleibt in
+**einem** Kalenderjahr; Jahresübergreifendes wird weiter auf zwei Rechnungen aufgeteilt. Damit
+bleibt jeder `YEAR(treatmentDate)`-Drehpunkt — Vertragsjahre, Bonus-Timeline, Erstattungsoptimierer,
+Erstattungsplan — unangetastet. Das Aufteilen ist heute schon möglich: Auf `invoiceNumber` liegt
+weder ein UNIQUE noch eine Dublettenprüfung, dieselbe Nummer darf also zweimal stehen.
+
+**Ziel:** Die Rechnung führt die vollständige Liste ihrer Behandlungstage, die Oberfläche zeigt und
+pflegt sie, und der Einreichen-Dialog beurteilt die Police am ganzen Zeitraum. Zwei Scheiben:
+Modell + API, danach UI.
+
+**DoD:** Eine Rechnung mit drei Behandlungstagen lässt sich anlegen, ändern und wieder lesen; der
+gespeicherte `treatmentDate` ist immer der früheste Tag; ein Tag aus einem anderen Kalenderjahr wird
+mit einem deutschen Satz abgewiesen, der auf die zweite Rechnung hinweist.
+
+### 41a — Modell + API (umgesetzt 2026-09-28)
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Die Kindtabelle ist die _vollständige_ Liste, nicht „die weiteren Tage".** Migration 014 legt für
+  **jede** vorhandene Rechnung eine Zeile aus ihrem heutigen `treatmentDate` an, gelöschte
+  eingeschlossen (wie in 012). Andernfalls bräuchte jeder Leser einen Sonderfall für den ersten Tag.
+- **Kein `treatmentDayUID`** — Abweichung von der ersten Skizze. `InvoiceTreatmentDays` ist ein
+  Anhängsel, keine Entität: Primärschlüssel `(invoiceUID, treatmentDate)`, der zugleich der
+  geforderte UNIQUE ist („derselbe Tag zweimal ist kein Datum, sondern ein Vertipper"). Dieselbe Form
+  wie `SubmissionInvoices`, `InvoiceExclusions`, `ContractBonusTiers`, `ContractYears`; kein neues
+  Präfix in `lib/ids.ts`, keine ID-Erzeugung, denn die Zeilen werden nie einzeln adressiert — die API
+  ersetzt die Liste immer als Ganzes.
+- **`Invoices.treatmentDate` bleibt und bleibt NOT NULL:** der führende Tag und der Anker aller
+  `YEAR()`-Auswertungen. Die API hält ihn bei jedem Schreiben auf dem frühesten Tag, damit „erster"
+  und „frühester" nicht auseinanderlaufen. Der gespiegelte Wert ist hier unbedenklich, anders als bei
+  der Kontoverbindung in 012: Durch die Ein-Jahres-Regel liefert jeder Tag dasselbe `YEAR()`.
+- **Ein PATCH, das nur `treatmentDate` schickt, verschiebt den führenden Tag** — der bisher früheste
+  wird ersetzt, die übrigen bleiben stehen. Bei einer Ein-Tages-Rechnung ist das genau das bisherige
+  Verhalten; entscheidend ist der andere Fall: Beide vorhandenen Masken schicken `treatmentDate` bei
+  **jedem** Speichern mit, auch wenn nur das Zahlungsdatum geändert wurde. Mit der naheliegenderen
+  Regel „`treatmentDate` allein heißt: genau dieser eine Tag" hätte ein solches Speichern die
+  weiteren Tage stillschweigend gelöscht. Im laufenden System nachgestellt: Die Anzeigemaske
+  speichert die dreitägige Seed-Rechnung, alle drei Tage stehen danach noch.
+- **Papierkorb: nichts zu registrieren, aber nachgewiesen.** `purgeEntry` leitet die mitzulöschenden
+  Link-Tabellen aus den Fremdschlüsseln der `information_schema` ab und räumt RESTRICT-Links, die
+  nicht selbst Entität sind; `blockers()` zählt nur Entitätstabellen. Die neue Tabelle fällt genau
+  darunter — der Trash-Integrationstest zeigt es an einer Rechnung mit zwei Tagen, statt es
+  anzunehmen.
+- **Der Seed spiegelt die Tage in einem Schritt** (er schreibt seine Zeilen per SQL, nicht über die
+  API) und gibt einer Rechnung zwei weitere Tage, damit der Entwicklungsbestand den Fall zeigt, um
+  den es geht. `clearData` und die `resetData`-Listen der Integrationstests räumen die neue Tabelle
+  vor `Invoices` — sonst hält der RESTRICT-Fremdschlüssel dagegen, und aus demselben Grund löschen
+  die Aufräumblöcke der Migrationstests 006/007/011 jetzt erst die Tage.
+
+**Geprüft:** 250 API-Tests gegen `eunomia_test`, darunter Anlegen mit mehreren Tagen, Ersetzen der
+Liste, Wandern des führenden Tags, Abweisen eines fremden Jahres beim Anlegen und beim Ändern
+(mitsamt Rollback) und das Hard-Delete über den Papierkorb. Dazu im laufenden Dev-System über die
+API durchgespielt und der Bestand anschließend neu aufgebaut.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

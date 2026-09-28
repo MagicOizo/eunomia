@@ -195,6 +195,10 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     'Die Rechnung ist bei dieser Police bereits als nicht erstattungsfähig markiert.',
   CONTRACT_ACCOUNT_MISMATCH: () =>
     'Die Police gehört zu einem anderen Versicherten als die Rechnung.',
+  TREATMENT_DAYS_DIFFERENT_YEARS: () =>
+    'Alle Behandlungstage einer Rechnung müssen im selben Kalenderjahr liegen. ' +
+    'Für das andere Jahr bitte eine zweite Rechnung anlegen — dieselbe Rechnungsnummer ' +
+    'darf dabei zweimal vorkommen.',
   INVOICE_HAS_REIMBURSEMENT: () =>
     'Für diese Rechnung wurde bei dieser Police bereits eine Erstattung gebucht, sie kann nicht mehr zurückgezogen werden.',
   BILLING_NUMBER_TAKEN: (d) => {
