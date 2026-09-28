@@ -69,3 +69,11 @@
 	Es gibt Behandlungen, die sind von der Versicherung nicht gedeckt. Wenn das bekannt ist, wird sie niemals eingereicht werden. In diesem Fall soll sie auch nicht in die Berechnung eingehen (z.B. für Erreichnung der  Selbstbeteiligung). Eine Markierung als nicht gedeckt soll auch eine kurze Begründung beinhalten, damit man später nachvollziehen kann, warum man sie so markiert hat.
 3.	Zahlungsdatum bei Direktzahlung
 	Bei direktzahlung soll atomatisch das Rechnungsdatum als Zahlungsziel und Zahlungsdatum gesetzt werden
+4.	Abrechnungsdienstleiter Kontos pro Leistungserbringer
+	In der Praxis zeigt sich, dass es zwei Arten von Abrechnungsdienstleistern gibt:
+	- Abrechnung und Konto: Der Abrechnungsdienstleister kümmert sich um die Abrechnung und die Zahlungsaufforderungen/Mahnungen und hat ein eigenes Konto, dass für alle Leistungserbringer bei diesem Dienstleister passt
+	- Nur Abrechnung: Der Abrechnungsdienstleister kümmert sich um die Abrechnung und die Zahlungsaufforderungen/Mahnungen, er verweist aber je Leistungserbringer auf unterschiedliche Konten
+	Das muss im Tool abgebildet werden und macht die gesamte Pflege von Konten und Abrechnungsdienstleistern auch bei Erstellung komplexer.
+	Alternativ Pflegen wir ein Konto eher beim Leistungserbringer, und die Wahl des Abrechnungsdienstleisters wirkt nur als "Default"-Konto. Der ursprüngliche Zweck im Design überhaupt Abrechnungsdienstleister zu bauen war, dass der Autor dachte, dass es sonst zur doppelten Pflege kommen würde.
+5.	Rechnungsliste je Abrechnungsdienstleister
+	Es fehlt eine Möglichkeit zu sehen, welche Rechnungen einen bestimmten Abrechnungsdienstleister nutzen. Das ist im Zuge des Issues 0.12.0-4 aufgefallen
