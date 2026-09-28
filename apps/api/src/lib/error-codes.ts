@@ -41,6 +41,8 @@ export const ERROR_CODES = {
   INVOICES_EXCLUDED: 'INVOICES_EXCLUDED',
   INVOICES_ALREADY_BILLED: 'INVOICES_ALREADY_BILLED',
   INVOICES_NOT_SUBMITTED_HERE: 'INVOICES_NOT_SUBMITTED_HERE',
+  /** Marked as not covered by the insurance: it is never submitted anywhere. */
+  INVOICES_NOT_COVERED: 'INVOICES_NOT_COVERED',
   REIMBURSEMENT_EXCEEDS_INVOICE: 'REIMBURSEMENT_EXCEEDS_INVOICE',
   INVOICE_AMOUNT_BELOW_REIMBURSED: 'INVOICE_AMOUNT_BELOW_REIMBURSED',
   INVOICE_NOT_SUBMITTED: 'INVOICE_NOT_SUBMITTED',
@@ -50,6 +52,10 @@ export const ERROR_CODES = {
   INVOICE_HAS_REIMBURSEMENT: 'INVOICE_HAS_REIMBURSEMENT',
   /** The treatment days of one invoice span more than one calendar year. */
   TREATMENT_DAYS_DIFFERENT_YEARS: 'TREATMENT_DAYS_DIFFERENT_YEARS',
+  /** "Not covered" was set without the reason that is the whole point of it. */
+  INVOICE_NOT_COVERED_REASON_REQUIRED: 'INVOICE_NOT_COVERED_REASON_REQUIRED',
+  /** "Not covered" was set on an invoice that is already submitted somewhere. */
+  INVOICE_NOT_COVERED_SUBMITTED: 'INVOICE_NOT_COVERED_SUBMITTED',
   /** The policy already has an active billing under that number. */
   BILLING_NUMBER_TAKEN: 'BILLING_NUMBER_TAKEN',
 

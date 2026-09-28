@@ -43,6 +43,8 @@ interface CandidateInvoice {
   invoiceNumber: string;
   accountUID: string;
   reimbursementClosed: number;
+  /** Marked as not covered by the insurance: it goes to no policy at all. */
+  notCovered: number;
   /** Whether the invoice is already submitted to the requested contract. */
   alreadySubmitted: number;
   /** Whether the invoice is marked as not reimbursable under the requested contract. */
@@ -52,8 +54,9 @@ interface CandidateInvoice {
 /**
  * Validates that every requested invoice can join a submission to this
  * contract: it must exist and be active, belong to the contract's account,
- * not already be submitted to this contract (other contracts are fine), not
- * be marked as excluded for it, and not be closed as billed. Rejects with a
+ * not be marked as not covered by the insurance at all, not already be
+ * submitted to this contract (other contracts are fine), not be marked as
+ * excluded for it, and not be closed as billed. Rejects with a
  * descriptive 400/409 otherwise. Runs inside the caller's transaction with row
  * locks (FOR UPDATE) so two concurrent submissions cannot both grab the same
  * invoice; UNIQUE (invoiceUID, contractUID) on SubmissionInvoices is the
@@ -86,6 +89,15 @@ function assertInvoicesSubmittable(
       `Invoices do not belong to the contract's account: ${wrongAccount.join(', ')}`,
       { code: ERROR_CODES.INVOICES_WRONG_ACCOUNT, details: { invoices: wrongAccount } },
     );
+  }
+  // A property of the invoice, not of the pair, so it comes before the checks
+  // that look at this one policy (Slice 42).
+  const notCovered = failing((c) => Number(c.notCovered) > 0);
+  if (notCovered.length > 0) {
+    throw conflict(`Invoices are marked as not covered: ${notCovered.join(', ')}`, {
+      code: ERROR_CODES.INVOICES_NOT_COVERED,
+      details: { invoices: notCovered },
+    });
   }
   const alreadySubmitted = failing((c) => Number(c.alreadySubmitted) > 0);
   if (alreadySubmitted.length > 0) {
@@ -133,7 +145,7 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
         input.invoiceUIDs,
       );
       const candidates = await conn.query<CandidateInvoice[]>(
-        `SELECT i.invoiceUID, i.invoiceNumber, i.accountUID, i.reimbursementClosed,
+        `SELECT i.invoiceUID, i.invoiceNumber, i.accountUID, i.reimbursementClosed, i.notCovered,
                 EXISTS (
                   SELECT 1 FROM SubmissionInvoices si
                     JOIN Submissions s

@@ -4,20 +4,22 @@ import type { InvoiceDto, InvoiceSubmissionDto } from './api';
 /** The invoice fields that decide where it can still go. */
 type InvoiceRouting = Pick<
   InvoiceDto,
-  'workflowStatus' | 'reimbursementClosed' | 'submissions' | 'exclusions'
+  'workflowStatus' | 'reimbursementClosed' | 'notCovered' | 'submissions' | 'exclusions'
 >;
 
 /**
  * Policies the invoice can still be submitted to: an invoice goes to each
  * policy at most once and never to one it is marked as not reimbursable
  * under. A closed ("als abgerechnet markiert") or fully reimbursed invoice
- * goes nowhere any more. Mirrors the server-side checks, so the dialog never
- * offers a choice the API would reject.
+ * goes nowhere any more, and one marked as not covered by the insurance goes
+ * nowhere at all (Slice 42). Mirrors the server-side checks, so the dialog
+ * never offers a choice the API would reject.
  */
 export function submittableContracts<C extends { value: string }>(
   invoice: InvoiceRouting,
   contracts: C[],
 ): C[] {
+  if (invoice.notCovered) return [];
   if (invoice.reimbursementClosed) return [];
   if (invoice.workflowStatus === 'abgerechnet' || invoice.workflowStatus === 'erledigt') return [];
   const blocked = new Set([

@@ -20,6 +20,8 @@ const invoice: InvoiceDto = {
   agencyUID: 'c-1',
   directPayment: 0,
   reimbursementClosed: false,
+  notCovered: false,
+  notCoveredReason: null,
   reimbursedTotal: 0,
   allocationCount: 0,
   remainingAmount: 320,

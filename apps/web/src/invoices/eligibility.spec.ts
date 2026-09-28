@@ -38,12 +38,16 @@ function submission(
 
 function invoice(
   overrides: Partial<
-    Pick<InvoiceDto, 'workflowStatus' | 'reimbursementClosed' | 'submissions' | 'exclusions'>
+    Pick<
+      InvoiceDto,
+      'workflowStatus' | 'reimbursementClosed' | 'notCovered' | 'submissions' | 'exclusions'
+    >
   >,
 ) {
   return {
     workflowStatus: 'offen' as const,
     reimbursementClosed: false,
+    notCovered: false,
     submissions: [],
     exclusions: [],
     ...overrides,
@@ -64,6 +68,12 @@ describe('submittableContracts', () => {
       exclusions: [{ contractUID: 'pZ', contractNumber: 'pZ', companyName: 'AG', note: null }],
     });
     expect(values(submittableContracts(inv, contracts))).toEqual(['pY']);
+  });
+
+  // Slice 42: not covered by the insurance is a property of the invoice, so it
+  // rules out every policy at once — including one taken out later.
+  it('offers nothing for an invoice marked as not covered', () => {
+    expect(submittableContracts(invoice({ notCovered: true }), contracts)).toEqual([]);
   });
 
   it('offers nothing once the invoice is billed or closed by hand', () => {

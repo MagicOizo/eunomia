@@ -91,6 +91,8 @@ function invoice(uid: string, number: string, treatmentDate: string) {
     agencyUID: null,
     directPayment: 0,
     reimbursementClosed: false,
+    notCovered: false,
+    notCoveredReason: null,
     reimbursedTotal: 0,
     allocationCount: 0,
     remainingAmount: 100,

@@ -72,6 +72,8 @@ export const FIELD_LABELS: Record<string, string> = {
   transferSubject: 'Verwendungszweck',
   documentLink: 'Dokument-Link',
   reimbursementClosed: 'Als abgerechnet markiert',
+  notCovered: 'Nicht gedeckt',
+  notCoveredReason: 'Begründung',
 
   // Einreichungen, Leistungsabrechnungen, Erstattungen
   submittedDate: 'Einreichungsdatum',

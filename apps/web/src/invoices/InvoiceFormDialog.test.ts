@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
+import { reasonRequiredMessage } from './not-covered';
 import { differentYearsMessage } from './treatment-days';
 
 /** The create form with the minimum a save needs, minus the treatment days. */
@@ -87,6 +88,63 @@ describe('InvoiceFormDialog treatment days', () => {
 
     expect(wrapper.emitted('submit')).toBeUndefined();
     expect(wrapper.find('[role="alert"]').text()).toBe(differentYearsMessage());
+
+    wrapper.unmount();
+  });
+});
+
+describe('InvoiceFormDialog "nicht gedeckt"', () => {
+  /** The field of the row whose label starts with `label`. */
+  function fieldOf(wrapper: Form, label: string) {
+    const field = wrapper
+      .findAll('.eu-text-field')
+      .find((candidate) => candidate.find('label').text().startsWith(label));
+    return field?.find('input');
+  }
+
+  /** Flips the mark; it is the second switch of the form after Direktzahlung. */
+  async function markNotCovered(wrapper: Form): Promise<void> {
+    await wrapper.findAll('.eu-toggle__input')[1].setValue(true);
+    await flushPromises();
+  }
+
+  it("asks for a reason before it saves, in the API's own words", async () => {
+    const wrapper = mountForm();
+    await fillRequired(wrapper, '2020-02-10');
+    await markNotCovered(wrapper);
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(wrapper.emitted('submit')).toBeUndefined();
+    expect(wrapper.find('[role="alert"]').text()).toBe(reasonRequiredMessage());
+
+    wrapper.unmount();
+  });
+
+  it('sends the mark with its reason', async () => {
+    const wrapper = mountForm();
+    await fillRequired(wrapper, '2020-02-10');
+    await markNotCovered(wrapper);
+    await fieldOf(wrapper, 'Begründung')?.setValue('  Kosmetische Behandlung  ');
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(submitted(wrapper)?.notCovered).toBe(true);
+    expect(submitted(wrapper)?.notCoveredReason).toBe('Kosmetische Behandlung');
+
+    wrapper.unmount();
+  });
+
+  it('leaves the reason out while the mark is not set', async () => {
+    const wrapper = mountForm();
+    await fillRequired(wrapper, '2020-02-10');
+    // The row is not even there to fill in.
+    expect(fieldOf(wrapper, 'Begründung')).toBeUndefined();
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(submitted(wrapper)?.notCovered).toBe(false);
+    expect(submitted(wrapper)?.notCoveredReason).toBeNull();
 
     wrapper.unmount();
   });

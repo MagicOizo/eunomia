@@ -48,6 +48,7 @@ const invoice = (
     amount,
     treatmentDate: `2025-01-${String(counter % 28 || 28).padStart(2, '0')}`,
     reimbursementClosed: false,
+    notCovered: false,
     policies,
     ...overrides,
   };
@@ -399,4 +400,36 @@ test('the deductible progress counts answered invoices and skips exclusions', ()
   });
   assert.equal(policy(result, 'x').deductibleUsed, 250);
   assert.equal(policy(result, 'x').eligibleCosts, 250);
+});
+
+// Slice 42 (issues.md 0.12.0-2): "nicht gedeckt" is a property of the invoice,
+// so it counts as excluded at every policy — the one the mark was set with and
+// any taken out later alike.
+test('an invoice marked as not covered fills no deductible anywhere', () => {
+  const notCovered = run({
+    policies: [pkvX(0, { bonusMode: 'forfeited', deductible: 500 })],
+    invoices: [invoice(150), invoice(400, {}, { notCovered: true })],
+  });
+  assert.equal(policy(notCovered, 'x').deductibleUsed, 150, 'only the covered invoice counts');
+  assert.equal(policy(notCovered, 'x').eligibleCosts, 150);
+  // Nothing is modelled for it, and its advice needs no policy to say so.
+  assert.equal(notCovered.invoices[1]?.action, 'not-reimbursable');
+  assert.deepEqual(
+    notCovered.invoices[1]?.policies.map((p) => [p.action, p.reimbursement]),
+    [['excluded', 0]],
+  );
+  // It is still an invoice the year was billed for: the total says so.
+  assert.equal(notCovered.invoiceTotal, 550);
+
+  // Without the mark the same 400 € would have filled the deductible.
+  const covered = run({
+    policies: [pkvX(0, { bonusMode: 'forfeited', deductible: 500 })],
+    invoices: [invoice(150), invoice(400)],
+  });
+  assert.equal(policy(covered, 'x').deductibleUsed, 500);
+});
+
+test('a not-covered invoice is not reimbursable even without any policy', () => {
+  const result = run({ policies: [], invoices: [invoice(90, {}, { notCovered: true })] });
+  assert.equal(result.invoices[0]?.action, 'not-reimbursable');
 });

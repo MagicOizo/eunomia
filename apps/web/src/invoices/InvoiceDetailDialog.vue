@@ -34,6 +34,7 @@ import AllocationDialog from './AllocationDialog.vue';
 import BillingDialog from './BillingDialog.vue';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import { type ContractOption, policyLabel, submittableContracts } from './eligibility';
+import { reasonRequiredMessage } from './not-covered';
 import {
   differentYearsMessage,
   furtherDays,
@@ -152,6 +153,8 @@ watch(
       agencyUID: inv.agencyUID,
       documentLink: inv.documentLink,
       reimbursementClosed: inv.reimbursementClosed,
+      notCovered: inv.notCovered,
+      notCoveredReason: inv.notCoveredReason,
     };
     Object.assign(values, seed);
     Object.assign(saved, seed);
@@ -172,6 +175,16 @@ watch(
   },
 );
 
+// Dropping the "nicht gedeckt" mark drops its reason, the way the API stores it
+// (Slice 42): a reason without the mark is a dead entry.
+watch(
+  () => values.notCovered,
+  (now) => {
+    if (now === true) return;
+    if (values.notCoveredReason) values.notCoveredReason = '';
+  },
+);
+
 /**
  * The span the edited days cover, shown under the list once there is more than
  * one day. It follows the mask, not the saved invoice, so adding a day says
@@ -189,6 +202,7 @@ const statusDisplay = computed(() =>
   props.invoice ? STATUS_DISPLAY[props.invoice.workflowStatus] : null,
 );
 const directPayment = computed(() => values.directPayment === true);
+const notCovered = computed(() => values.notCovered === true);
 /**
  * The account of the picked agency that applies — resolved against the mask's
  * own Überweisungsdatum, not the saved one: entering the day it was paid shows
@@ -256,10 +270,14 @@ const facilityNames = computed(() =>
   Object.fromEntries(localFacilities.value.map((f) => [f.value, f.label])),
 );
 
-/** Policies that can still be marked: not submitted there and not marked yet. */
+/**
+ * Policies that can still be marked: not submitted there and not marked yet.
+ * An invoice that is not covered at all needs none of them — the mark at the
+ * single policy would say less than the one it already carries (Slice 42).
+ */
 const markableContracts = computed(() => {
   const inv = props.invoice;
-  if (!inv) return [];
+  if (!inv || inv.notCovered) return [];
   const taken = new Set([
     ...inv.submissions.map((s) => s.contractUID),
     ...inv.exclusions.map((x) => x.contractUID),
@@ -418,6 +436,11 @@ function submit(): void {
     localError.value = differentYearsMessage();
     return;
   }
+  const reason = str(values.notCoveredReason);
+  if (notCovered.value && reason === '') {
+    localError.value = reasonRequiredMessage();
+    return;
+  }
   const dp = directPayment.value;
   emit('submit', {
     invoiceNumber: str(values.invoiceNumber),
@@ -426,6 +449,8 @@ function submit(): void {
     treatmentDates: days,
     invoiceAmount: values.invoiceAmount,
     directPayment: dp,
+    notCovered: notCovered.value,
+    notCoveredReason: notCovered.value ? reason : null,
     facilityUID: values.facilityUID || null,
     documentLink: str(values.documentLink) || null,
     transferUntilDate: values.transferUntilDate || null,
@@ -561,6 +586,22 @@ function submit(): void {
         :saved-value="saved.documentLink"
         label="Rechnungslink"
         type="text"
+      />
+
+      <!-- Not covered by the insurance at all (Slice 42): the invoice goes to no
+           policy and fills no deductible; the reason goes with the mark. -->
+      <EuDetailField
+        v-model="values.notCovered"
+        :saved-value="saved.notCovered"
+        label="Nicht gedeckt"
+        type="toggle"
+      />
+      <EuDetailField
+        v-model="values.notCoveredReason"
+        :saved-value="saved.notCoveredReason"
+        label="Begründung"
+        type="text"
+        :disabled="!notCovered"
       />
 
       <!-- Zuordnungsblock (Karten je Leistungsabrechnung): Slice 21. -->

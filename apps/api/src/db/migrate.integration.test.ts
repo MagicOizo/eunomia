@@ -611,3 +611,75 @@ test('migration 014 gives every invoice its treatment day, and takes it back', a
     await pool.end();
   }
 });
+
+test('migration 015 adds the "not covered" mark and takes it back', async (t) => {
+  const config = databaseConfigFromEnv();
+  if (!config) {
+    t.skip('no database configured (DB_* env vars unset)');
+    return;
+  }
+  const pool = createPool(config);
+  try {
+    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
+  } catch {
+    await pool.end();
+    t.skip('database not reachable');
+    return;
+  }
+
+  const columnsOfInvoices = async (): Promise<string[]> => {
+    const rows = await pool.query<Array<{ COLUMN_NAME: string }>>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Invoices'`,
+    );
+    return rows.map((row) => row.COLUMN_NAME);
+  };
+
+  const cleanup = async (): Promise<void> => {
+    for (const sql of [
+      "DELETE FROM InvoiceTreatmentDays WHERE invoiceUID = 'iMIGRATION15'",
+      "DELETE FROM Invoices WHERE invoiceUID = 'iMIGRATION15'",
+      "DELETE FROM Accounts WHERE accountUID = 'aMIGRATION15'",
+    ]) {
+      await pool.query(sql).catch(() => undefined);
+    }
+  };
+
+  try {
+    await runMigrations(pool);
+    const migrator = createMigrator(pool);
+    const name015 = (await migrator.executed())
+      .map((m) => m.name)
+      .find((n) => n.startsWith('015-'));
+    assert.ok(name015, 'migration 015 should be recorded');
+
+    await cleanup();
+    // Back to the shape without the mark, with an invoice from before it.
+    await migrator.down({ to: name015 });
+    const before = await columnsOfInvoices();
+    assert.ok(!before.includes('notCovered'), 'the flag is gone after down');
+    assert.ok(!before.includes('notCoveredReason'), 'the reason is gone after down');
+
+    await pool.query(
+      "INSERT INTO Accounts (accountUID, firstname, birthDate) VALUES ('aMIGRATION15', 'Mig', '1990-01-01')",
+    );
+    await pool.query(
+      `INSERT INTO Invoices (invoiceUID, invoiceNumber, invoiceDate, treatmentDate, accountUID,
+                             invoiceAmount)
+       VALUES ('iMIGRATION15', 'R-15', '2024-03-01', '2024-03-02', 'aMIGRATION15', 100)`,
+    );
+
+    await migrator.up();
+
+    // Every invoice recorded so far is covered: none of them was ever marked,
+    // because there was nothing to mark with.
+    const [invoice] = await pool.query<Array<{ notCovered: number; notCoveredReason: null }>>(
+      "SELECT notCovered, notCoveredReason FROM Invoices WHERE invoiceUID = 'iMIGRATION15'",
+    );
+    assert.equal(Number(invoice?.notCovered), 0);
+    assert.equal(invoice?.notCoveredReason, null);
+  } finally {
+    await cleanup().catch(() => undefined);
+    await pool.end();
+  }
+});

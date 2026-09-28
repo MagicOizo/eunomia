@@ -127,9 +127,11 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
         invoiceAmount: number;
         treatmentDate: string;
         reimbursementClosed: number;
+        notCovered: number;
       }>
     >(
-      `SELECT invoiceUID, invoiceNumber, invoiceAmount, treatmentDate, reimbursementClosed
+      `SELECT invoiceUID, invoiceNumber, invoiceAmount, treatmentDate, reimbursementClosed,
+              notCovered
          FROM Invoices
         WHERE accountUID = ? AND invoiceStatus <> -1 AND YEAR(treatmentDate) = ?`,
       [accountUID, year],
@@ -186,6 +188,7 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
       amount: Number(row.invoiceAmount),
       treatmentDate: row.treatmentDate,
       reimbursementClosed: Boolean(row.reimbursementClosed),
+      notCovered: Boolean(row.notCovered),
       policies: states.get(row.invoiceUID) ?? {},
     }));
     const invoiceNumbers = new Map(invoiceRows.map((row) => [row.invoiceUID, row.invoiceNumber]));

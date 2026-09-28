@@ -1143,6 +1143,100 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       const unchanged = await request(app).get(`/api/v1/invoices/${uid}`).set(admin);
       assert.deepEqual(unchanged.body.data.treatmentDates, ['2024-12-28']);
     });
+
+    // Slice 42: "nicht gedeckt" (issues.md 0.12.0-2). A flag of the invoice, so
+    // it holds at every policy — including one taken out later — and the reason
+    // is what makes it readable months on.
+    await t.test('an invoice can be marked as not covered, with its reason', async () => {
+      const created = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-NC-1',
+        invoiceDate: '2024-09-01',
+        treatmentDate: '2024-09-01',
+        accountUID: accountB,
+        invoiceAmount: 150,
+        notCovered: true,
+        notCoveredReason: 'Kosmetische Behandlung',
+      });
+      assert.equal(created.status, 201);
+      assert.equal(created.body.data.notCovered, true);
+      assert.equal(created.body.data.notCoveredReason, 'Kosmetische Behandlung');
+
+      // Dropping the mark drops the reason with it: a reason without a mark
+      // would be a dead entry.
+      const cleared = await request(app)
+        .patch(`/api/v1/invoices/${created.body.data.invoiceUID}`)
+        .set(admin)
+        .send({ notCovered: false });
+      assert.equal(cleared.status, 200);
+      assert.equal(cleared.body.data.notCovered, false);
+      assert.equal(cleared.body.data.notCoveredReason, null);
+    });
+
+    await t.test('the mark without a reason is refused, creating and changing', async () => {
+      const created = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-NC-2',
+        invoiceDate: '2024-09-02',
+        treatmentDate: '2024-09-02',
+        accountUID: accountB,
+        invoiceAmount: 80,
+        notCovered: true,
+      });
+      assert.equal(created.status, 400);
+      assert.equal(created.body.error.code, 'INVOICE_NOT_COVERED_REASON_REQUIRED');
+
+      const uid = await makeInvoice(accountB, 80, 'R-NC-3');
+      const changed = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ notCovered: true });
+      assert.equal(changed.status, 400);
+      assert.equal(changed.body.error.code, 'INVOICE_NOT_COVERED_REASON_REQUIRED');
+      // Refused means unchanged.
+      const after = await request(app).get(`/api/v1/invoices/${uid}`).set(admin);
+      assert.equal(after.body.data.notCovered, false);
+
+      // The reason already stored counts as given: the mark may be set on its
+      // own afterwards.
+      const withReason = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ notCovered: true, notCoveredReason: 'Nicht im Tarif' });
+      assert.equal(withReason.status, 200);
+      const again = await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ notCovered: true });
+      assert.equal(again.status, 200);
+      assert.equal(again.body.data.notCoveredReason, 'Nicht im Tarif');
+    });
+
+    await t.test('a marked invoice is refused by the submission', async () => {
+      const uid = await makeInvoice(accountA, 120, 'R-NC-4');
+      await request(app)
+        .patch(`/api/v1/invoices/${uid}`)
+        .set(admin)
+        .send({ notCovered: true, notCoveredReason: 'Zahnersatz ausgeschlossen' });
+
+      const submitted = await post('/api/v1/submissions', {
+        contractUID: contractA,
+        submittedDate: '2024-09-10',
+        invoiceUIDs: [uid],
+      });
+      assert.equal(submitted.status, 409);
+      assert.equal(submitted.body.error.code, 'INVOICES_NOT_COVERED');
+      assert.deepEqual(submitted.body.error.details, { invoices: ['R-NC-4'] });
+    });
+
+    await t.test('an invoice already submitted cannot be marked', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/invoices/${inv1}`)
+        .set(admin)
+        .send({ notCovered: true, notCoveredReason: 'zu spät erkannt' });
+      assert.equal(res.status, 409);
+      assert.equal(res.body.error.code, 'INVOICE_NOT_COVERED_SUBMITTED');
+      const after = await request(app).get(`/api/v1/invoices/${inv1}`).set(admin);
+      assert.equal(after.body.data.notCovered, false);
+    });
   } finally {
     await pool.end();
   }

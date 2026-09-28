@@ -7,6 +7,24 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.13.0-slice.4 — 2026-09-28
+
+- **An invoice can be marked as not covered by the insurance.** Some treatments are outside the
+  cover; once that is known the invoice is never handed in, and it should not count towards any
+  deductible either. The mark belongs to the invoice, not to a single policy — a policy taken out
+  later would not be covered by a set of per-policy marks, and there the invoice would start
+  counting again. A short reason goes with the mark and is required by it: months on it says why
+  the invoice was put aside.
+- **A marked invoice drops out of the calculation.** It fills no deductible at any policy, is left
+  out of the eligible costs, and the overall advice for it reads "Nicht erstattbar" without a new
+  status being invented. It still counts in the year's invoice total, because it is an invoice that
+  was billed and paid — only the insurance has nothing to do with it.
+- **The mark is only for an invoice that was never submitted.** Submitting one is refused, the
+  submit action disappears from its row and its detail dialog, and marking an invoice that is
+  already at a policy is refused in turn, with the advice to withdraw it first or to mark it at that
+  one policy. Along the way the invoice mask stopped explaining every rejected save with the same
+  sentence about the amount: each refusal now says what actually happened.
+
 ## 0.13.0-slice.3 — 2026-09-28
 
 - **The treatment days of an invoice can be entered, seen and corrected.** The model learned the

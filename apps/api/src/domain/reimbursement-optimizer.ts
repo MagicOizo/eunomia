@@ -84,6 +84,13 @@ export interface OptimizerInvoice {
   treatmentDate: string;
   /** "Als abgerechnet markiert": nothing further is expected for it. */
   reimbursementClosed: boolean;
+  /**
+   * "Nicht gedeckt" (Slice 42): the insurance covers this treatment at no
+   * policy, so the invoice is never submitted and fills no deductible. It
+   * counts as excluded everywhere — including at a policy taken out later,
+   * which is why it is a flag of the invoice and not a set of marks.
+   */
+  notCovered: boolean;
   policies: Partial<Record<string, InvoicePolicyState>>;
 }
 
@@ -240,7 +247,7 @@ function runScenario(
       for (const invoice of invoices) {
         const state = invoice.policies[policy.contractUID];
         if (state?.excluded || state?.actualReimbursement != null) continue;
-        if (invoice.reimbursementClosed) continue;
+        if (invoice.reimbursementClosed || invoice.notCovered) continue;
         const base = open.get(invoice.invoiceUID) ?? 0;
         if (base <= 0) continue;
         const toDeductible = Math.min(deductibleLeft, base);
@@ -311,6 +318,7 @@ function worthUsingAbove(
       amount: toEuros(cents),
       treatmentDate: '9999-12-31',
       reimbursementClosed: false,
+      notCovered: false,
       policies: {},
     },
   ];
@@ -426,7 +434,7 @@ export function optimizeReimbursement(input: OptimizerInput): OptimizerResult {
     for (const invoice of invoices) {
       const state = invoice.policies[policy.contractUID];
       if (state?.actualReimbursement != null) actualCents += toCents(state.actualReimbursement);
-      if (!state?.excluded) eligibleCents += toCents(invoice.amount);
+      if (!state?.excluded && !invoice.notCovered) eligibleCents += toCents(invoice.amount);
     }
     const deductibleScenario = best.used.has(policy.contractUID)
       ? best.scenario
@@ -457,7 +465,7 @@ export function optimizeReimbursement(input: OptimizerInput): OptimizerResult {
       if (state?.actualReimbursement != null) {
         action = 'answered';
         reimbursement = state.actualReimbursement;
-      } else if (state?.excluded) {
+      } else if (invoice.notCovered || state?.excluded) {
         action = 'excluded';
       } else if (modelled !== undefined) {
         if (state?.submitted) action = 'submitted';
@@ -470,7 +478,12 @@ export function optimizeReimbursement(input: OptimizerInput): OptimizerResult {
     });
     return {
       invoiceUID: invoice.invoiceUID,
-      action: invoiceAction(perPolicy.map((entry) => entry.action)),
+      // A not-covered invoice says so on its own, without asking the policies:
+      // an insured person may have none at all, and then the list of per-policy
+      // actions is empty and would fall through to `hold` (Slice 42).
+      action: invoice.notCovered
+        ? 'not-reimbursable'
+        : invoiceAction(perPolicy.map((entry) => entry.action)),
       policies: perPolicy,
     };
   });

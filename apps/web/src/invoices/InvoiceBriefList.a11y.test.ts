@@ -22,6 +22,8 @@ function invoice(overrides: Partial<InvoiceDto> = {}): InvoiceDto {
     agencyUID: null,
     directPayment: 0,
     reimbursementClosed: false,
+    notCovered: false,
+    notCoveredReason: null,
     reimbursedTotal: 0,
     allocationCount: 0,
     remainingAmount: 500,

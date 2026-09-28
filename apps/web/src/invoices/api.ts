@@ -59,6 +59,13 @@ export interface InvoiceDto {
   directPayment: number;
   /** Marked as billed by hand although the reimbursements do not cover the amount. */
   reimbursementClosed: boolean;
+  /**
+   * "Nicht gedeckt" (Slice 42): the insurance covers this treatment at no
+   * policy. The invoice is submitted nowhere and counts towards no deductible.
+   */
+  notCovered: boolean;
+  /** Why it is not covered — always there while `notCovered` is set. */
+  notCoveredReason: string | null;
   reimbursedTotal: number;
   allocationCount: number;
   /** Not yet reimbursed amount over all policies. */

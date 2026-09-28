@@ -179,6 +179,8 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     `Diese Rechnungen sind bei dieser Police als nicht erstattungsfähig markiert: ${list(d.invoices)}.`,
   INVOICES_ALREADY_BILLED: (d) =>
     `Diese Rechnungen sind bereits als abgerechnet markiert: ${list(d.invoices)}.`,
+  INVOICES_NOT_COVERED: (d) =>
+    `Diese Rechnungen sind als nicht gedeckt markiert und werden nicht eingereicht: ${list(d.invoices)}.`,
   INVOICES_NOT_SUBMITTED_HERE: (d) =>
     `Diese Rechnungen sind bei der Police dieser Leistungsabrechnung nicht eingereicht: ${list(d.invoices)}.`,
   REIMBURSEMENT_EXCEEDS_INVOICE: (d) => {
@@ -199,6 +201,11 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     'Alle Behandlungstage einer Rechnung müssen im selben Kalenderjahr liegen. ' +
     'Für das andere Jahr bitte eine zweite Rechnung anlegen — dieselbe Rechnungsnummer ' +
     'darf dabei zweimal vorkommen.',
+  INVOICE_NOT_COVERED_REASON_REQUIRED: () =>
+    'Bitte eine kurze Begründung angeben, warum die Rechnung nicht gedeckt ist — sie ist der Zweck der Markierung.',
+  INVOICE_NOT_COVERED_SUBMITTED: () =>
+    'Eine schon eingereichte Rechnung kann nicht als nicht gedeckt markiert werden. ' +
+    'Bitte zuerst die Einreichung zurückziehen oder die Markierung bei der einzelnen Police setzen.',
   INVOICE_HAS_REIMBURSEMENT: () =>
     'Für diese Rechnung wurde bei dieser Police bereits eine Erstattung gebucht, sie kann nicht mehr zurückgezogen werden.',
   BILLING_NUMBER_TAKEN: (d) => {

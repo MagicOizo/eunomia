@@ -12,6 +12,7 @@ import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import type { InvoiceDto } from './api';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
+import { reasonRequiredMessage } from './not-covered';
 import {
   differentYearsMessage,
   furtherDays,
@@ -54,6 +55,11 @@ const extraDays = ref<string[]>([]);
 // directPayment = the bill was already paid directly, e.g. cash at a pharmacy —
 // so there is nothing left for the user to transfer.
 const directPayment = ref(false);
+// notCovered = the insurance covers this treatment at no policy, so the invoice
+// is never submitted and counts towards no deductible (Slice 42). The reason is
+// what makes the mark readable later, and is therefore mandatory with it.
+const notCovered = ref(false);
+const notCoveredReason = ref('');
 const localError = ref<string | null>(null);
 
 // Local option copies so an ad-hoc-created entity can be appended and selected
@@ -110,6 +116,8 @@ watch(
     };
     extraDays.value = e ? furtherDays(e) : [];
     directPayment.value = e ? e.directPayment === 1 : false;
+    notCovered.value = e?.notCovered ?? false;
+    notCoveredReason.value = e?.notCoveredReason ?? '';
   },
   { immediate: true },
 );
@@ -139,6 +147,12 @@ function submit(): void {
     return;
   }
 
+  const reason = notCoveredReason.value.trim();
+  if (notCovered.value && reason === '') {
+    localError.value = reasonRequiredMessage();
+    return;
+  }
+
   const dp = directPayment.value;
   const payload: Record<string, unknown> = {
     invoiceNumber: f.invoiceNumber.trim(),
@@ -147,6 +161,9 @@ function submit(): void {
     treatmentDates: days,
     invoiceAmount: f.invoiceAmount,
     directPayment: dp,
+    notCovered: notCovered.value,
+    // Cleared with the mark, the way the API stores it.
+    notCoveredReason: notCovered.value ? reason : null,
     facilityUID: f.facilityUID || null,
     documentLink: f.documentLink.trim() || null,
     // When paid directly there is no transfer, so these are always cleared.
@@ -210,6 +227,15 @@ function submit(): void {
       <EuCurrencyField v-model="form.invoiceAmount" label="Betrag" />
 
       <EuToggle v-model="directPayment" label="Direkt-/Barzahlung" />
+
+      <!-- Not covered by the insurance at all (Slice 42): never submitted, and
+           out of every deductible. The reason goes with the mark. -->
+      <EuToggle v-model="notCovered" label="Nicht gedeckt (wird nie eingereicht)" />
+      <EuTextField
+        v-if="notCovered"
+        v-model="notCoveredReason"
+        label="Begründung (z. B. kosmetische Behandlung)"
+      />
 
       <template v-if="!directPayment">
         <EuTextField v-model="form.transferUntilDate" label="Zahlungsziel" type="date" />

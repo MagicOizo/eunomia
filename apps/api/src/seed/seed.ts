@@ -62,6 +62,7 @@ const ids = {
   invoiceCorrected: seedId('invoice', 10),
   invoiceDeleted: seedId('invoice', 11),
   invoiceAtDeletedFacility: seedId('invoice', 12),
+  invoiceNotCovered: seedId('invoice', 13),
   billing: seedId('serviceBilling', 0),
   billingSupplementary: seedId('serviceBilling', 1),
   billingObjection: seedId('serviceBilling', 2),
@@ -419,6 +420,22 @@ async function seedInvoices(pool: Pool): Promise<void> {
     accountUID: ids.accountAnna,
     facilityUID: ids.facilityDoctor,
     invoiceAmount: 260.0,
+  });
+  // Not covered by the insurance at all (Slice 42): a cosmetic treatment Anna
+  // pays herself. It is submitted nowhere and counts towards no deductible, so
+  // the reimbursement plan of the current year shows the case.
+  await seedRow(pool, 'Invoices', {
+    invoiceUID: ids.invoiceNotCovered,
+    invoiceNumber: `R-${seedYear(0)}-115`,
+    invoiceDate: daysFromToday(-45),
+    treatmentDate: daysFromToday(-50),
+    accountUID: ids.accountAnna,
+    facilityUID: ids.facilityDoctor,
+    invoiceAmount: 150.0,
+    directPayment: 1,
+    transferDate: daysFromToday(-45),
+    notCovered: 1,
+    notCoveredReason: 'Kosmetische Behandlung, laut Tarif ausgeschlossen',
   });
 
   // The open invoice is a hospital stay the outpatient supplementary policy

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  faBan,
   faChevronLeft,
   faCircleCheck,
   faFileInvoiceDollar,
@@ -45,6 +46,7 @@ import {
   submittableContracts,
 } from './eligibility';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
+import { notCoveredTitle } from './not-covered';
 import InvoiceBriefList from './InvoiceBriefList.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
@@ -114,7 +116,13 @@ const plan = ref<ReimbursementPlanDto | null>(null);
 const recommendationBadges = computed(() => {
   const policies = new Map((plan.value?.policies ?? []).map((p) => [p.contractUID, p]));
   const badges = new Map<string, InvoiceBadgeView>();
+  // A not-covered invoice carries its own mark in the row; the optimizer's
+  // "Nicht erstattbar" beside it would say the same thing twice (Slice 42).
+  const notCovered = new Set(
+    invoices.value.filter((invoice) => invoice.notCovered).map((invoice) => invoice.invoiceUID),
+  );
   for (const invoicePlan of plan.value?.invoices ?? []) {
+    if (notCovered.has(invoicePlan.invoiceUID)) continue;
     const badge = invoiceBadge(invoicePlan, policies);
     if (badge) badges.set(invoicePlan.invoiceUID, badge);
   }
@@ -378,10 +386,14 @@ function openEdit(invoice: InvoiceDto): void {
 function submitDetail(payload: Record<string, unknown>): void {
   const invoice = dialogInvoice.value;
   if (!invoice) return;
+  // No blanket conflict sentence here: the invoice PATCH answers 409 with
+  // several codes — the amount below what was reimbursed, "only a submitted
+  // invoice can be marked as billed", and since Slice 42 "an invoice already
+  // submitted cannot be marked as not covered". Each of them is translated by
+  // its code in lib/error-messages.ts, and a hint would shadow all but one.
   void runDialog(
     () => updateInvoice(invoice.invoiceUID, payload).then(() => undefined),
     () => (detailOpen.value = false),
-    'Der Rechnungsbetrag kann nicht unter die bereits erstatteten Beträge sinken.',
   );
 }
 function openSubmit(targets: InvoiceDto[]): void {
@@ -640,6 +652,14 @@ function confirmDelete(): void {
                 >
                   <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
                 </span>
+                <EuBadge
+                  v-if="invoice.notCovered"
+                  tone="neutral"
+                  :icon="faBan"
+                  :title="notCoveredTitle(invoice)"
+                >
+                  Nicht gedeckt
+                </EuBadge>
                 <RecommendationBadge
                   v-if="recommendationBadges.has(invoice.invoiceUID)"
                   :badge="recommendationBadges.get(invoice.invoiceUID)!"

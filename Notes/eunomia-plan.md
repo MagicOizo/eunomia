@@ -1559,6 +1559,69 @@ Tags nach dem Speichern, Abweisen eines Tags aus dem Vorjahr mit dem Satz der AP
 Rechnung mit drei Tagen und der Tastaturfokus auf den neuen Schaltflächen. Der Bestand wurde
 anschließend neu aufgebaut.
 
+## Slice 42 — Nicht gedeckte Rechnungen (umgesetzt 2026-09-28)
+**Anlass:** issues.md 0.12.0-2. Manche Behandlungen sind von der Versicherung nicht gedeckt. Ist das
+bekannt, wird die Rechnung nie eingereicht — und sie darf dann auch nicht in die Berechnung eingehen,
+vor allem nicht in die Selbstbeteiligung. Zur Markierung gehört eine kurze Begründung, damit später
+nachvollziehbar bleibt, warum.
+
+**Ausgangslage:** Die halbe Miete stand schon. `InvoiceExclusions` und der Dialog „Nicht
+erstattungsfähig markieren" kennzeichnen eine Rechnung **bei einer Police**, und der Optimierer
+rechnet sie dort bereits aus `eligibleCosts` und aus der Selbstbeteiligung heraus. Es fehlte genau
+_eine_ Markierung statt einer je Police.
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Ein eigenes Kennzeichen an der Rechnung**, kein Sammelschreiben der vorhandenen
+  Policen-Markierungen. Eine später angelegte Police wäre sonst nicht erfasst, und dort zählte die
+  Rechnung wieder in die Selbstbeteiligung — „wird niemals eingereicht" ist eine Eigenschaft der
+  Rechnung, nicht eines Paares aus Rechnung und Police.
+- **Die Begründung ist Pflicht, solange das Kennzeichen steht**, und fällt mit ihm weg. Sie ist der
+  ganze Zweck der Markierung; eine Begründung ohne Kennzeichen wäre eine Karteileiche, die die
+  Masken trotzdem anzeigen müssten. Beide Regeln liegen in `nextNotCovered()` in `invoices.ts`, also
+  an einer Stelle für jeden Schreibweg.
+- **Markiert wird nur, was nirgends eingereicht ist** (Autor, 2026-09-28). Dieselbe Linie zieht die
+  Policen-Markierung schon (`INVOICE_ALREADY_SUBMITTED`), und die Spiegelregel zu „als abgerechnet
+  markiert" (`INVOICE_NOT_SUBMITTED`) steht daneben. Wer nach einer Absage nachträglich markieren
+  will, zieht zuerst zurück oder markiert bei der einzelnen Police. So kann keine „nicht erstattbare"
+  Rechnung mit Einreichung oder gebuchtem Geld entstehen.
+- **Kein neuer Status.** Der Optimierer behandelt das Kennzeichen wie „bei jeder Police
+  ausgeschlossen", womit die Gesamtempfehlung von selbst auf das vorhandene `not-reimbursable`
+  fällt. Nur die Herleitung geht am `invoiceAction()`-Umweg vorbei: Ein Versicherter ohne Police hat
+  eine leere Aktionsliste, und die fiele sonst auf `hold` zurück.
+- **`invoiceTotal` behält die Rechnung.** Sie wurde gestellt und bezahlt; erstattungsfähig ist sie
+  nicht, und das sagen die `eligibleCosts` je Police.
+- **Eine Regel, eine Quelle in der UI.** `submittableContracts()` gibt bei einer markierten Rechnung
+  `[]` zurück — damit verschwindet die Einreichen-Aktion in der Zeile, im Detaildialog und in der
+  Sammelaktion an einer Stelle, und die Oberfläche spiegelt wieder genau die API. Ebenso sperrt sich
+  die Policen-Markierung von selbst, weil `markableContracts` leer ist.
+- **Nebenbefund, mitgenommen:** Die Anzeigemaske gab `runDialog()` einen pauschalen 409-Satz
+  („Der Rechnungsbetrag kann nicht unter die bereits erstatteten Beträge sinken.") mit, der in
+  `describeError()` jeden anderen Konfliktcode überdeckte — schon vorher den zu „nur eine
+  eingereichte Rechnung kann als abgerechnet markiert werden". Der Satz ist über den Code ohnehin
+  übersetzt; der Hinweis entfällt, und jede Ablehnung sagt wieder, was wirklich war. Im Browser an
+  beiden Fällen nachgewiesen.
+
+**Umsetzung:** Migration 015 hängt `notCovered`/`notCoveredReason` an `Invoices` (Default 0, keine
+Datenmigration — markiert war bisher nichts, es gab nichts zum Markieren; `down` mit `ALGORITHM=COPY`,
+die Lehre aus 012). Die API führt beide Felder im DTO und beim Schreiben, `submissions.ts` weist eine
+markierte Rechnung vor allen policenbezogenen Prüfungen ab (`INVOICES_NOT_COVERED`). Der Optimierer
+kennt `notCovered` an `OptimizerInvoice`. In der Oberfläche tragen Anlege- und Anzeigemaske Schalter
+und Begründung, der Arbeitsbereich ein Kennzeichen mit der Begründung im Titel — das
+Empfehlungs-Badge „Nicht erstattbar" wird daneben unterdrückt, es sagte dasselbe zweimal. Der Seed
+legt eine nicht gedeckte Rechnung an, damit der Entwicklungsbestand den Fall zeigt.
+
+**Geprüft:** 257 API-Tests gegen `eunomia_test` (Anlegen und Ändern mit Kennzeichen, Begründung
+verlangt beim Anlegen wie beim Ändern, Begründung fällt mit dem Kennzeichen weg, Einreichen
+abgewiesen, Markieren einer eingereichten Rechnung abgewiesen, Migration 015 hin und zurück) und 243
+Web-Tests. Dazu im laufenden Browser: die geseedete Rechnung mit Kennzeichen und Begründung im
+Tooltip, ohne Einreichen-Aktion; Kennzeichen aus → Begründung geleert, Zeile wieder mit
+Einreichen-Aktion, erstattungsfähige Kosten des Jahres von 1.540 auf 1.690 € (Rechnungssumme
+unverändert 1.690 €), Kennzeichen wieder an → zurück auf 1.540 €; Speichern ohne Begründung mit dem
+Satz der API abgewiesen; Markieren der eingereichten Rechnung mit dem richtigen Satz abgewiesen;
+Anlegen einer markierten Rechnung über das Formular; Tastaturfokus auf dem neuen Schalter in beiden
+Masken mit vollständigem Fokusring. Der Bestand wurde anschließend neu aufgebaut.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

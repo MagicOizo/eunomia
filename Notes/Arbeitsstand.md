@@ -12,17 +12,19 @@ Nach jeder umgesetzten Scheibe wandern drei Dinge zusammen: der Haken hier, der 
 
 ## Paket: Findings aus der Produktion 0.12.0 → 0.13.0
 
-Sechs offene Punkte aus [issues.md](issues.md): die drei aus 0.11.0, die beim Paket davor liegen
-geblieben sind, und die drei aus 0.12.0. Geplant als Slices 40–43 in
-[eunomia-plan.md](eunomia-plan.md).
+Acht offene Punkte aus [issues.md](issues.md): die drei aus 0.11.0, die beim Paket davor liegen
+geblieben sind, die drei aus 0.12.0 und die zwei, die beim Arbeiten mit 0.12.0 dazugekommen sind.
+Geplant als Slices 40–43 in [eunomia-plan.md](eunomia-plan.md); Slice 44 steht hier erst als
+Merkposten.
 
 | ✓   | Slice | Inhalt                                    | issues.md            | Version        |
 | --- | ----- | ----------------------------------------- | -------------------- | -------------- |
 | ☑   | 40    | Politur: Dialog-Scroll, Vorschläge, Label | 0.12.0-1, 0.11.0-2/3 | 0.13.0-slice.1 |
 | ☑   | 41a   | Mehrere Behandlungstage — Modell + API    | 0.11.0-1             | 0.13.0-slice.2 |
 | ☑   | 41b   | Mehrere Behandlungstage — UI              | 0.11.0-1             | 0.13.0-slice.3 |
-| ☐   | 42    | Nicht gedeckte Rechnungen                 | 0.12.0-2             |                |
+| ☑   | 42    | Nicht gedeckte Rechnungen                 | 0.12.0-2             | 0.13.0-slice.4 |
 | ☐   | 43    | Zahlungsdatum bei Direktzahlung           | 0.12.0-3             |                |
+| ☐   | 44    | Konten je Leistungserbringer, Rechnungen je Dienstleister | 0.12.0-4/5 |    |
 
 ### Slice 40 — Politur: Dialog-Scroll, Browservorschläge, Label
 
@@ -164,3 +166,20 @@ bearbeitbar hält). Läge die Regel nur im Formular, liefen die beiden auseinand
   `!directPayment`, das gesetzte `transferDate` bestätigt es nur.
 - Test: Anlegen und Ändern mit Direktzahlung setzen beide Daten; wird sie abgewählt, sind sie wieder
   frei.
+
+### Slice 44 — Konten je Leistungserbringer, Rechnungen je Dienstleister
+
+**Merkposten, noch nicht geplant** (Aufnahme auf Anweisung des Autors, 2026-09-28): Die Detailplanung
+kommt, wenn Slice 43 steht — hier stehen nur die beiden Punkte und die Frage, die sie aufwerfen.
+
+- **Konten je Leistungserbringer** (issues.md 0.12.0-4): Es gibt zwei Arten von
+  Abrechnungsdienstleistern — solche mit einem eigenen Konto für alle ihre Leistungserbringer und
+  solche, die je Leistungserbringer auf ein anderes Konto verweisen. Heute hängt die Kontoverbindung
+  allein am Dienstleister (`AgencyBankAccounts`, Slice 38), die zweite Art hat also keinen Platz.
+- **Zu klären, bevor irgendetwas gebaut wird:** der Autor stellt in derselben Notiz die Umkehrung zur
+  Debatte — das Konto am Leistungserbringer zu führen und den Dienstleister nur als Vorbelegung
+  wirken zu lassen. Das rührt an den Grund, aus dem es Abrechnungsdienstleister überhaupt gibt
+  (Vermeidung doppelter Pflege), und entscheidet über die Form der ganzen Scheibe.
+- **Rechnungsliste je Abrechnungsdienstleister** (issues.md 0.12.0-5): Es fehlt die Sicht darauf,
+  welche Rechnungen über einen bestimmten Dienstleister laufen. Beim Schreiben der Notiz zu 0.12.0-4
+  aufgefallen und vermutlich der kleinere Teil.

@@ -43,6 +43,8 @@ export const invoicesTable: CrudTable = {
     'agencyUID',
     'directPayment',
     'reimbursementClosed',
+    'notCovered',
+    'notCoveredReason',
   ],
 };
 
@@ -71,6 +73,13 @@ const base = z.object({
   documentLink: z.string().trim().url().max(255).nullish(),
   agencyUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.agency)).nullish(),
   directPayment: flag.optional(),
+  /**
+   * "The insurance does not cover this" (Slice 42): the invoice is never
+   * submitted and counts towards no deductible. The reason is mandatory while
+   * the flag is set and is dropped with it — see `nextNotCovered()`.
+   */
+  notCovered: flag.optional(),
+  notCoveredReason: z.string().trim().min(1).max(255).nullish(),
 });
 
 // accountUID is immutable after creation (moving an invoice between insured
@@ -116,6 +125,8 @@ const INVOICE_COLUMNS = [
   'agencyUID',
   'directPayment',
   'reimbursementClosed',
+  'notCovered',
+  'notCoveredReason',
   'invoiceStatus',
 ]
   .map((c) => `i.${c}`)
@@ -126,6 +137,7 @@ type InvoiceRow = Record<string, unknown> & {
   invoiceAmount: number;
   transferDate: string | null;
   reimbursementClosed: number;
+  notCovered: number;
   reimbursedTotal: number;
   allocationCount: number;
   hasOpenObjection: number;
@@ -315,6 +327,7 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
       ...row,
       treatmentDates: (treatmentDays.get(row.invoiceUID) ?? []).map((day) => day.treatmentDate),
       reimbursementClosed: Boolean(row.reimbursementClosed),
+      notCovered: Boolean(row.notCovered),
       hasOpenObjection: Boolean(Number(row.hasOpenObjection)),
       ...status,
       submissions: invoiceSubmissions.map((s) => ({
@@ -415,6 +428,50 @@ function assertOneYear(days: string[]): void {
       details: { years },
     });
   }
+}
+
+/** The "not covered" mark of an invoice: the flag and the reason for it. */
+interface NotCovered {
+  notCovered: number;
+  notCoveredReason: string | null;
+}
+
+/**
+ * What a write leaves behind for the "not covered" mark (Slice 42), or `null`
+ * when it says nothing about either field and the mark is left alone.
+ *
+ * Two rules live here, because both masks and every other client have to obey
+ * them alike:
+ *
+ *  - the reason is mandatory while the flag is set — it is the whole point of
+ *    the mark, the sentence that says months later why the invoice was put
+ *    aside;
+ *  - clearing the flag clears the reason. A reason without a flag would be a
+ *    dead entry that the masks would still have to show.
+ */
+function nextNotCovered(
+  data: { notCovered?: number; notCoveredReason?: string | null },
+  current: NotCovered,
+): NotCovered | null {
+  if (data.notCovered === undefined && data.notCoveredReason === undefined) return null;
+  const flagged = (data.notCovered ?? current.notCovered) === 1;
+  if (!flagged) return { notCovered: 0, notCoveredReason: null };
+  const reason =
+    data.notCoveredReason === undefined ? current.notCoveredReason : data.notCoveredReason;
+  if (reason === null || reason === '') {
+    throw badRequest('A reason is required to mark an invoice as not covered', {
+      code: ERROR_CODES.INVOICE_NOT_COVERED_REASON_REQUIRED,
+    });
+  }
+  return { notCovered: 1, notCoveredReason: reason };
+}
+
+/** The mark as it stands on an invoice row. */
+function notCoveredOf(row: InvoiceRow): NotCovered {
+  return {
+    notCovered: Number(row.notCovered),
+    notCoveredReason: (row.notCoveredReason as string | null) ?? null,
+  };
 }
 
 /** Replaces the treatment days of an invoice; the caller has checked them. */
@@ -547,10 +604,16 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     // `treatmentDate` is mandatory here, so there is always a day to write.
     const days = nextTreatmentDays(data, []) as TreatmentDays;
     assertOneYear(days);
+    // A new invoice is submitted nowhere, so only the reason rule can bite.
+    const mark = nextNotCovered(data, { notCovered: 0, notCoveredReason: null });
     const created = await withTransaction(pool, async (conn) => {
       // The stored `treatmentDate` is the earliest day, never just the one
       // that happened to be typed first.
-      const row = await insertRow(conn, invoicesTable, { ...data, treatmentDate: days[0] });
+      const row = await insertRow(conn, invoicesTable, {
+        ...data,
+        ...(mark ?? {}),
+        treatmentDate: days[0],
+      });
       await writeTreatmentDays(conn, row.invoiceUID as string, days);
       return row;
     });
@@ -585,12 +648,23 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
           code: ERROR_CODES.INVOICE_NOT_SUBMITTED,
         });
       }
+      // "Not covered" means "will never be submitted", so it is only for an
+      // invoice that has not been (decided by the author, 2026-09-28) — the
+      // same line the per-policy mark draws. After a refusal the way round is
+      // to withdraw first, or to mark it at that one policy.
+      const mark = nextNotCovered(data, notCoveredOf(current));
+      if (mark?.notCovered === 1 && (await submissionCount(conn, uid)) > 0) {
+        throw conflict('An invoice that is already submitted cannot be marked as not covered', {
+          code: ERROR_CODES.INVOICE_NOT_COVERED_SUBMITTED,
+        });
+      }
+      const patch = { ...data, ...(mark ?? {}) };
       const days = nextTreatmentDays(data, await treatmentDaysOf(conn, uid));
       if (days === null) {
-        await updateRow(conn, invoicesTable, uid, data);
+        await updateRow(conn, invoicesTable, uid, patch);
       } else {
         assertOneYear(days);
-        await updateRow(conn, invoicesTable, uid, { ...data, treatmentDate: days[0] });
+        await updateRow(conn, invoicesTable, uid, { ...patch, treatmentDate: days[0] });
         await writeTreatmentDays(conn, uid, days);
       }
     });
