@@ -7,6 +7,50 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.13.0 — 2026-09-28
+
+Everything from the six `0.13.0-slice.N` previews below, as one release. It answers seven of the
+nine findings that came out of using 0.11.0 and 0.12.0 on real data; the two about bank accounts
+per provider are a subject of their own and open the next package.
+
+- **An invoice can name every day it bills.** A bill from a practice often covers several
+  appointments, and until now one of them had to be picked while the rest were lost. The whole list
+  is now carried, entered and corrected: the create form keeps "Behandlungsdatum" as the leading day
+  and adds rows for the others, the detail mask edits the same list weeks later, and the lists show
+  the span an invoice covers (`11.02.–18.02.2025`) with every day in the tooltip. All days of an
+  invoice must fall in the same calendar year, because deductible and bonus are counted per
+  treatment year; anything across the turn of the year is split into a second invoice, which nothing
+  prevents. The submit dialog now judges a policy on the whole span instead of the leading day
+  alone, so an invoice whose last appointment fell outside a term is no longer offered as covered.
+- **An invoice can be marked as not covered by the insurance.** Some treatments are outside the
+  cover; once that is known the invoice is never handed in, and it should not count towards any
+  deductible either. The mark belongs to the invoice rather than to a single policy — a policy taken
+  out later would not be covered by a set of per-policy marks — and a short reason is required with
+  it, so months on it still says why the invoice was put aside. A marked invoice fills no deductible
+  anywhere, is left out of the eligible costs, and reads "Nicht erstattbar" without a new status
+  being invented; submitting it is refused, as is marking one that already sits at a policy.
+- **A bill paid on the spot dates itself.** Cash at the counter or card at the practice: there is
+  nothing to transfer and nothing to wait for, so an invoice marked as a direct payment is now due
+  and paid on its own date. Until now both dates stayed empty, which left a settled bill standing as
+  unpaid and kept it from ever reaching "Erledigt". The rule lives in the API, where both ways of
+  writing an invoice meet, so correcting the invoice date takes the two dates with it and dropping
+  the mark frees them again.
+- **The invoice list says when a reimbursement fell short.** A tariff excess or a deductible can
+  leave part of an invoice with the insured person, and that difference had to be worked out from
+  two columns. The reimbursement is now written in red once the case is closed and in amber while a
+  supplementary policy can still answer; an invoice nobody has answered yet stays plain. The colour
+  is never the only carrier: the same sentence, naming the amount, is the cell's tooltip and is read
+  out before the figure, and both colours were measured in light and dark mode.
+- **A dialog keeps its header and its single scrollbar.** Flipping a switch inside a scrolled dialog
+  used to grow a second scrollbar, leave empty space below the buttons and push the title off the
+  top — the switch hid its checkbox with `position: absolute` and, with nothing positioned around
+  it, that box was laid out against the `<dialog>` itself. The switch now anchors its own checkbox,
+  as does the tooltip trigger behind the icon labels.
+- **Input fields no longer offer the browser's own suggestions**, which sat oddly in the design and
+  got in the way of typing; the login form keeps them, so password managers still fill it in. And
+  the instance-address label in the reminder settings fits on one line again, instead of pushing its
+  input out of line with the time zone beside it.
+
 ## 0.13.0-slice.6 — 2026-09-28
 
 - **The invoice list says when a reimbursement fell short.** A tariff excess or a deductible can
