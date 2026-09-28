@@ -1661,6 +1661,42 @@ gesperrt, die Ampel steht auf „Bereits bezahlt"; Kennzeichen aus → beide lee
 → beide zurück auf das Rechnungsdatum. Die Testrechnung wurde anschließend über den Papierkorb
 endgültig gelöscht, der Bestand steht also wie vorher.
 
+## Slice 43a — Nicht vollständig erstattete Rechnungen (umgesetzt 2026-09-28)
+**Anlass:** issues.md 0.12.0-6, beim Arbeiten mit 0.12.0 dazugekommen und auf Wunsch des Autors vor
+den großen Brocken von Slice 44 gezogen. Tarifliche Eigenbeteiligung und Selbstbeteiligung lassen
+einen Teil der Rechnung beim Versicherten; dieser Unterschied war bisher nur aus zwei Spalten zu
+erschließen.
+
+**Rein in der Oberfläche:** `reimbursedTotal`, `remainingAmount` und `workflowStatus` stehen im DTO
+seit Slice 17. Weder Migration noch API-Änderung.
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Zwei Stufen statt einer.** Rot bei `abgerechnet`/`erledigt` mit Restbetrag: von Hand „als
+  abgerechnet markiert", obwohl das Geld nicht reicht — der Rest bleibt beim Versicherten und
+  ändert sich nicht mehr. Orange bei `teilabgerechnet`: auch zu wenig, aber eine Zusatzpolice kann
+  noch antworten, und genau das schlägt der Optimierer dort vor. Rot an dieser Stelle wäre ein
+  Fehlalarm.
+- **`offen` und `eingereicht` bleiben unauffällig.** Dort ist noch nichts gebucht, und eine Null,
+  die niemand beantwortet hat, ist keine Nachricht. Eine nicht gedeckte Rechnung (Slice 42) steht
+  auf `offen` und fällt damit von selbst heraus.
+- **Farbe trägt nichts allein** (WCAG 1.4.1). Derselbe Satz samt Betrag ist Titel der Zelle und
+  steht für Vorleseprogramme vor der Zahl; dafür gibt es jetzt `.eu-visually-hidden` in
+  `global.css`, die es bisher nicht gab.
+
+**Umsetzung:** Die Regel als reines Modul `reimbursement-gap.ts` mit Spec — wie `not-covered.ts`
+daneben —, damit Wortlaut und Regel an einer Stelle liegen und der Vergleich in Cent statt in
+Gleitkomma stattfindet. Rot ist das vorhandene `--eu-color-error-fg`; für Orange kommt
+`--eu-color-warning-fg` in die Feedback-Gruppe (`#6b4e00` hell, `#ffd873` dunkel, die Töne der
+Statusfarbe „Eingereicht"). Beide Paare stehen erstmals als Text auf der Kartenfläche, sind also in
+`CONTRAST.md` nachgerechnet: 8,68:1 und 7,74:1 hell, 9,84:1 und 12,30:1 dunkel.
+
+**Geprüft:** 254 Web-Tests, darunter `reimbursement-gap.spec.ts` und zwei neue Fälle im
+Arbeitsbereich (Klasse und Titel je Stufe, der verborgene Satz nur dort, wo es etwas zu sagen gibt).
+Im laufenden Browser am geseedeten Jahr 2025 von Anna Muster, hell und dunkel: „Abgerechnet" mit
+0,00 € von 90,00 € rot, „Teilabgerechnet" mit 150,00 € von 200,00 € orange, „Erledigt" mit voller
+Erstattung sowie „Offen" und „Eingereicht" unverändert.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

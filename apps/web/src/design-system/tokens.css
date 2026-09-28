@@ -52,6 +52,10 @@
   /* Feedback */
   --eu-color-error-bg: #fbe0df;
   --eu-color-error-fg: #8f2317;
+  /* Text that warns without being an error — a figure still in motion. Same
+     amber as the "submitted" badge; measured as text on the surface in
+     CONTRAST.md. */
+  --eu-color-warning-fg: #6b4e00;
 
   /* Status scale (invoice lifecycle) */
   --eu-color-status-open-bg: #fbe0df;
@@ -90,6 +94,7 @@
 
     --eu-color-error-bg: #4a1f1a;
     --eu-color-error-fg: #ffb3a8;
+    --eu-color-warning-fg: #ffd873;
 
     --eu-color-status-open-bg: #4a1f1a;
     --eu-color-status-open-fg: #ffb3a8;

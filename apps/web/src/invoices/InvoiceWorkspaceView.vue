@@ -53,6 +53,7 @@ import InvoiceSummary from './InvoiceSummary.vue';
 import PaymentInfoPopover from './PaymentInfoPopover.vue';
 import RecommendationBadge from './RecommendationBadge.vue';
 import { type InvoiceBadgeView, invoiceBadge } from './recommendation';
+import { reimbursementGap } from './reimbursement-gap';
 import SettleDialog from './SettleDialog.vue';
 import SubmitDialog from './SubmitDialog.vue';
 import { treatmentDaysLabel } from './treatment-days';
@@ -699,7 +700,20 @@ function confirmDelete(): void {
                 </PaymentInfoPopover>
               </div>
             </td>
-            <td class="eu-ws__num">{{ euro(invoice.reimbursedTotal) }}</td>
+            <!-- A tariff excess or a deductible that ate into the reimbursement
+                 should catch the eye (issues.md 0.12.0-6). The colour never
+                 says it alone: the same sentence is the cell's tooltip and is
+                 read out before the figure. -->
+            <td
+              class="eu-ws__num"
+              :class="`is-${reimbursementGap(invoice)?.tone ?? 'covered'}`"
+              :title="reimbursementGap(invoice)?.label"
+            >
+              <span v-if="reimbursementGap(invoice)" class="eu-visually-hidden">
+                {{ reimbursementGap(invoice)?.label }}:
+              </span>
+              {{ euro(invoice.reimbursedTotal) }}
+            </td>
             <td class="eu-ws__actions">
               <EuButton
                 v-if="invoice.documentLink"
@@ -961,6 +975,16 @@ function confirmDelete(): void {
 .eu-ws__table .eu-ws__num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Closed and still short: what is left is the insured person's own share. */
+.eu-ws__table .eu-ws__num.is-short {
+  color: var(--eu-color-error-fg);
+}
+
+/* Short, but a further policy can still answer. */
+.eu-ws__table .eu-ws__num.is-pending {
+  color: var(--eu-color-warning-fg);
 }
 
 .eu-ws__badges {

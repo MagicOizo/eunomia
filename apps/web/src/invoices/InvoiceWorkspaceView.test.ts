@@ -164,3 +164,75 @@ describe('InvoiceWorkspaceView arriving from the invoice-number search', () => {
     wrapper.unmount();
   });
 });
+
+// issues.md 0.12.0-6: where an excess or a deductible ate into the
+// reimbursement, the column has to say so at a glance.
+describe('InvoiceWorkspaceView reimbursement column', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiFetch.mockResolvedValue({ data: { firstname: 'Anna', surname: 'Muster' } });
+    listResource.mockResolvedValue([]);
+    listInvoiceYears.mockResolvedValue([2026]);
+    reimbursementPlan.mockResolvedValue(null);
+  });
+
+  /** The reimbursement cell of every row, in table order. */
+  const cells = (wrapper: ReturnType<typeof mount>) => wrapper.findAll('tbody tr td.eu-ws__num');
+
+  it('separates a closed shortfall, a running one and a covered invoice', async () => {
+    listInvoices.mockResolvedValue([
+      // Sorted by invoice date descending, which is the order asserted below.
+      {
+        ...invoice('inv-short', 'R-2026-3', '2026-03-01'),
+        workflowStatus: 'abgerechnet',
+        reimbursementClosed: true,
+        allocationCount: 1,
+        reimbursedTotal: 60,
+        remainingAmount: 40,
+      },
+      {
+        ...invoice('inv-pending', 'R-2026-2', '2026-02-01'),
+        workflowStatus: 'teilabgerechnet',
+        allocationCount: 1,
+        reimbursedTotal: 70,
+        remainingAmount: 30,
+      },
+      {
+        ...invoice('inv-full', 'R-2026-1', '2026-01-01'),
+        workflowStatus: 'erledigt',
+        allocationCount: 1,
+        reimbursedTotal: 100,
+        remainingAmount: 0,
+      },
+    ]);
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+
+    const [short, pending, full] = cells(wrapper);
+    expect(short.classes()).toContain('is-short');
+    expect(short.attributes('title')).toBe('Nicht vollständig erstattet – Eigenanteil 40,00 €');
+    expect(pending.classes()).toContain('is-pending');
+    expect(pending.attributes('title')).toBe('Noch nicht vollständig erstattet – offen 30,00 €');
+    expect(full.classes()).toContain('is-covered');
+    expect(full.attributes('title')).toBeUndefined();
+    // The colour never carries it alone: the sentence is in the cell as well.
+    expect(short.find('.eu-visually-hidden').text()).toContain('Eigenanteil');
+    expect(full.find('.eu-visually-hidden').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('says nothing about an invoice nobody has answered yet', async () => {
+    listInvoices.mockResolvedValue([invoice('inv-open', 'R-2026-9', '2026-05-05')]);
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+
+    expect(cells(wrapper)[0].classes()).toContain('is-covered');
+    wrapper.unmount();
+  });
+});

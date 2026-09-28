@@ -7,6 +7,18 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.13.0-slice.6 — 2026-09-28
+
+- **The invoice list says when a reimbursement fell short.** A tariff excess or a deductible can
+  leave part of an invoice with the insured person, and until now that difference had to be worked
+  out from two columns. The reimbursement is now written in red once the case is closed — the
+  invoice was marked as billed although the money does not cover it, so what is left is borne by
+  the insured person — and in amber while it is still running, where a supplementary policy can
+  still answer. An invoice nobody has answered yet stays plain: a zero is no news there.
+- **The colour is never the only carrier.** The same sentence, naming the amount, is the cell's
+  tooltip and is read out before the figure, and both colours were measured as text on the card
+  surface in light and dark mode (design-system/CONTRAST.md).
+
 ## 0.13.0-slice.5 — 2026-09-28
 
 - **A bill paid on the spot dates itself.** Cash at the counter or card at the practice: there is

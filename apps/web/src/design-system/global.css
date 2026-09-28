@@ -47,6 +47,23 @@ h4 {
   margin: calc(-1 * var(--eu-focus-ring-space));
 }
 
+/*
+ * Text for screen readers only: where a colour carries a meaning, the same
+ * sentence has to be readable without it (WCAG 1.4.1). Not `display: none`,
+ * which would take it out of the accessibility tree along with the screen.
+ */
+.eu-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 .eu-sidebar :focus-visible {
   outline-color: var(--eu-color-focus-ring-on-brand);
 }

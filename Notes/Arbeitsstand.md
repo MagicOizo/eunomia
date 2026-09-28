@@ -24,7 +24,7 @@ dazugekommene Punkt, vor den großen Brocken gezogen, und Slice 44 steht hier er
 | ☑   | 41b   | Mehrere Behandlungstage — UI              | 0.11.0-1             | 0.13.0-slice.3 |
 | ☑   | 42    | Nicht gedeckte Rechnungen                 | 0.12.0-2             | 0.13.0-slice.4 |
 | ☑   | 43    | Zahlungsdatum bei Direktzahlung           | 0.12.0-3             | 0.13.0-slice.5 |
-| ☐   | 43a   | Nicht vollständig erstattete Rechnungen   | 0.12.0-6             |                |
+| ☑   | 43a   | Nicht vollständig erstattete Rechnungen   | 0.12.0-6             | 0.13.0-slice.6 |
 | ☐   | 44    | Konten je Leistungserbringer, Rechnungen je Dienstleister | 0.12.0-4/5 |    |
 
 ### Slice 40 — Politur: Dialog-Scroll, Browservorschläge, Label
