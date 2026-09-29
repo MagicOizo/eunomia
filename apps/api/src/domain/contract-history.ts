@@ -30,7 +30,7 @@ import { type ContractRow, loadAuthorizedContract } from './contract-access.js';
 
 const money = z.number().min(0).max(999999.99);
 
-export const premiumsTable: CrudTable = {
+const premiumsTable: CrudTable = {
   table: 'ContractPremiums',
   uidColumn: 'premiumUID',
   statusColumn: 'premiumStatus',
@@ -38,7 +38,7 @@ export const premiumsTable: CrudTable = {
   columns: ['contractUID', 'validFrom', 'monthlyPremium', 'note'],
 };
 
-export const termsTable: CrudTable = {
+const termsTable: CrudTable = {
   table: 'ContractTerms',
   uidColumn: 'termsUID',
   statusColumn: 'termsStatus',

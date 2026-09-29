@@ -33,9 +33,15 @@ export const ENTITY_PREFIX = {
 
 export type EntityName = keyof typeof ENTITY_PREFIX;
 
-/** Matches a valid public ID for the given prefix (prefix + 11 body chars). */
+/**
+ * Matches a valid public ID for the given prefix (prefix + 11 body chars).
+ * The body class is built from ID_ALPHABET rather than written out beside it,
+ * so the check cannot drift from what generateEntityId actually hands out —
+ * a hand-written `a-z` let the excluded `l` through. Every character of the
+ * alphabet is alphanumeric, hence safe inside a class without escaping.
+ */
 export function entityIdPattern(prefix: string): RegExp {
-  return new RegExp(`^${prefix}[2-9A-HJ-NP-Za-z]{11}$`);
+  return new RegExp(`^${prefix}[${ID_ALPHABET}]{${ID_BODY_LENGTH}}$`);
 }
 
 /**

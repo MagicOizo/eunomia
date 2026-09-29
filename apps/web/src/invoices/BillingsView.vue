@@ -24,7 +24,7 @@ import { euro, germanDate, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { listResource } from '../lib/resource';
-import { useTableSort } from '../lib/useTableSort';
+import { useTableSort } from '../lib/table-sort';
 import {
   type BillingDto,
   type BillingListDto,

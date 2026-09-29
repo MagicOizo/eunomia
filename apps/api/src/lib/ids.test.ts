@@ -18,6 +18,16 @@ test('generateEntityId never emits ambiguous characters', () => {
   }
 });
 
+test('entityIdPattern rejects the characters the alphabet leaves out', () => {
+  const pattern = entityIdPattern(ENTITY_PREFIX.invoice);
+  // The body is 11 valid characters with one ambiguous character swapped in;
+  // `l` is the one a hand-written `a-z` used to wave through.
+  for (const char of ['0', 'O', '1', 'I', 'l']) {
+    assert.doesNotMatch(`${ENTITY_PREFIX.invoice}${char}2345678AB`, pattern, char);
+  }
+  assert.match(`${ENTITY_PREFIX.invoice}23456789ABC`, pattern);
+});
+
 test('every entity has a distinct prefix', () => {
   const prefixes = Object.values(ENTITY_PREFIX);
   assert.equal(new Set(prefixes).size, prefixes.length);

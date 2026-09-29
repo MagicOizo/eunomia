@@ -170,10 +170,7 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
         accounts.body.data.map((a: { accountUID: string }) => a.accountUID),
         [accountA],
       );
-      assert.equal(
-        (await request(app).get(`/api/v1/accounts/${accountB}/ping`).set(clerk)).status,
-        403,
-      );
+      assert.equal((await request(app).get(`/api/v1/accounts/${accountB}`).set(clerk)).status, 403);
 
       // A non-admin cannot use the admin API.
       assert.equal((await request(app).get('/api/v1/users').set(clerk)).status, 403);

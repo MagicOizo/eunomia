@@ -3,7 +3,7 @@ import { faSortDown, faSortUp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed } from 'vue';
 
-import type { SortState } from '../../lib/useTableSort';
+import type { SortState } from '../../lib/table-sort';
 
 /**
  * A sortable table-header cell. Renders a `<th>` (so it drops straight into a

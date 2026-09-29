@@ -9,7 +9,7 @@ import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { describeError } from '../lib/errors';
 import { germanDateTime, plural } from '../lib/format';
-import { useTableSort } from '../lib/useTableSort';
+import { useTableSort } from '../lib/table-sort';
 import { type TrashEntryDto, type TrashGroupDto, loadTrash, purgeEntry, restoreEntry } from './api';
 
 /**

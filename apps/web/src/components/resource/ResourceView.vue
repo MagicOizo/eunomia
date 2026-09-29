@@ -7,7 +7,7 @@ import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuSortableTh from '../../design-system/components/EuSortableTh.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
 import { describeError } from '../../lib/errors';
-import { useTableSort } from '../../lib/useTableSort';
+import { useTableSort } from '../../lib/table-sort';
 import {
   type ResourceRow,
   createResource,

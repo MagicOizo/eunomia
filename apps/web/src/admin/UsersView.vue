@@ -9,7 +9,7 @@ import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
-import { useTableSort } from '../lib/useTableSort';
+import { useTableSort } from '../lib/table-sort';
 import {
   type AdminUserDto,
   type RoleDto,

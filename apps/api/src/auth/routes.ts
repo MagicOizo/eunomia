@@ -1,9 +1,9 @@
-import { type Request, Router } from 'express';
+import { Router } from 'express';
 import type { Pool } from 'mariadb';
 
 import type { AppConfig } from '../config/env.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './http.js';
-import { createRequireAuth, createRequirePermission, getAuthUser } from './middleware.js';
+import { createRequireAuth, getAuthUser } from './middleware.js';
 import { PERMISSIONS, getEffectivePermissions } from './permissions.js';
 import type { AuthUser } from './repository.js';
 import { loginSchema, setupSchema } from './schemas.js';
@@ -67,31 +67,6 @@ export function createAuthRouter(pool: Pool, config: AppConfig): Router {
     const setupTokenActive = isAdmin && config.auth.setupToken !== undefined;
     res.json({ user: publicUser(user), permissions, setupTokenActive });
   });
-
-  // Protected demo endpoints proving the guard works (Slice 3 DoD):
-  // one instance-wide (global permission only)...
-  router.get(
-    '/admin/ping',
-    requireAuth,
-    createRequirePermission(pool, PERMISSIONS.MANAGE_USERS),
-    (_req, res) => {
-      res.json({ ok: true, scope: 'global' });
-    },
-  );
-
-  // ...and one account-scoped (global OR a grant for this account).
-  const accountUIDFromParams = (req: Request): string | undefined => {
-    const value = req.params.accountUID;
-    return typeof value === 'string' ? value : undefined;
-  };
-  router.get(
-    '/accounts/:accountUID/ping',
-    requireAuth,
-    createRequirePermission(pool, PERMISSIONS.VIEW_INVOICES, accountUIDFromParams),
-    (req, res) => {
-      res.json({ ok: true, scope: 'account', accountUID: req.params.accountUID });
-    },
-  );
 
   return router;
 }

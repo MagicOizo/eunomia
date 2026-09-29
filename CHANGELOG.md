@@ -7,6 +7,24 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.16.0-slice.2 — 2026-09-29
+
+First of the slices that work off the two reviews before 1.0.0, and the smallest: five findings that
+change no behaviour, only what the code claims about itself.
+
+- **Dead paths are gone.** Two demo endpoints from the very early days — `GET /admin/ping` and
+  `GET /accounts/:accountUID/ping` — were shipped in every release since, kept alive by nothing but
+  two test cases. They are deleted, and the cases now prove the same two guards over routes that
+  really exist: the globally gated user list, and a single account. The collected export file of the
+  design system, which named five of its fifteen components and was imported nowhere, is deleted as
+  well, and so are two exports without a caller.
+- **The ID check no longer promises more than it keeps.** Public IDs leave out the characters that
+  are read wrong out loud (`0`, `O`, `1`, `I`, `l`), but the pattern that enforces this was written
+  out by hand beside the alphabet and let `l` through. It is built from the alphabet now, so the two
+  cannot drift apart again, with a test on the excluded characters.
+- **One file name follows the convention.** `lib/useTableSort.ts` is `lib/table-sort.ts`, like every
+  other file beside it. The function keeps its name.
+
 ## 0.16.0-slice.1 — 2026-09-29
 
 - **A version check reaches the footer.** The button in the system settings asks GitHub on the spot,

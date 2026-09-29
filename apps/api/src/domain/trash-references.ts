@@ -92,8 +92,3 @@ export async function linksFrom(db: Queryable, table: string): Promise<ForeignKe
   const links = await schemaLinks(db);
   return links.filter((link) => link.table === table);
 }
-
-/** Forgets the cached schema — for tests that migrate a database up and down. */
-export function forgetSchemaLinks(): void {
-  cache.clear();
-}

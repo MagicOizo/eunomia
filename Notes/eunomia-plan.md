@@ -2018,6 +2018,40 @@ gegen eine eigene Instanz mit `UPDATE_CHECK_REPO` auf einem öffentlichen Reposi
 dem Laden stumm, nach „Jetzt prüfen" steht `v3.5.43 verfügbar` darin — ohne Reload, bei unveränderter
 Adresse —, eine zweite Prüfung ohne Fund nimmt ihn wieder weg, und nach dem Abmelden ist er fort.
 
+## Slice 51 — Tote Pfade und Namen im Kleinen (umgesetzt 2026-09-29)
+**Anlass:** Erste Scheibe des Pakets „Die zwei Reviews auf dem Weg zu 1.0.0" (Block I,
+[Arbeitsstand.md](Arbeitsstand.md)), und die kleinste: CR-28, CR-35, CR-36, CR-31 und CR-21. Alle
+fünf Befunde haben dieselbe Form — der Code behauptet etwas, das nicht stimmt: eine Sammeldatei, die
+keine öffentliche Oberfläche ist; zwei Demo-Endpunkte, die nur noch leben, weil Tests sie benutzen;
+exportierte Helfer ohne Aufrufer; ein Dateiname gegen die Konvention; ein Prüfmuster, das mehr
+erlaubt als der Generator vergibt.
+
+**Entscheidung (Planmodus):** Kein Verhalten ändern, keine Migration, keine API-Felder. Löschen statt
+bewahren, wo der Review beides anbietet — `forgetSchemaLinks()` beschreibt einen Testaufbau, den es
+nicht gibt, und ein Aufruf im Migrationstest würde ihn erst erfinden. `entityIdPattern` leitet die
+Zeichenklasse aus `ID_ALPHABET` und `ID_BODY_LENGTH` ab, statt sie danebenzuschreiben: so kann sie
+nicht wieder auseinanderlaufen. `useTableSort` behält seinen Funktionsnamen, nur die Datei heißt
+kebab-case wie ihre Nachbarn. `requireEntityAccount` bleibt liegen — es gehört zu CR-08 in Scheibe 4,
+wo es Aufrufer bekommt statt gelöscht zu werden.
+
+**Befunde beim Bauen:**
+
+- **Für den globalen Wächter taugt `/me` nicht.** Der Review empfiehlt, die zwei `/ping`-Testfälle auf
+  `GET /me` und `GET /accounts/:uid` umzuschreiben. `/me` hängt aber nur an `requireAuth` und würde
+  über eine *globale Berechtigung* nichts beweisen, während der Testfall genau das behauptet
+  („passes the global-permission guard"). Stattdessen `GET /users`, global an `MANAGE_USERS` gebunden
+  — dieselbe Wache, die `/admin/ping` vorgeführt hat, und dieselbe Route, die
+  `user-admin.integration.test.ts` schon für ihren 403 benutzt.
+- **Der 403 für das fremde Konto hängt nicht an der Zeile.** Im Auth-Test existiert das zweite Konto
+  gar nicht. Das bleibt richtig, weil `createRequirePermission` vor dem Handler antwortet: es fehlt
+  die Berechtigung, nicht der Datensatz — 403, nicht 404, genau wie beim gelöschten `/ping`.
+
+**Geprüft:** 261 API-Tests gegen `eunomia_test` (einer neu: das ID-Muster weist `0`, `O`, `1`, `I`
+und `l` ab; die drei umgeschriebenen Wächter-Fälle grün), 301 Web-Tests, Lint, Typecheck, Prettier,
+Build beider Apps, `version:check`. Kein Browser-Nachweis: keine der fünf Änderungen ist sichtbar —
+ein Dateiname, zwei Endpunkte, die kein Client aufruft, zwei `export`-Schlüsselwörter und eine
+Zeichenklasse, die strenger wird als das, was je vergeben wurde.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

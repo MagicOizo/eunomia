@@ -24,7 +24,7 @@ import { apiFetch } from '../lib/api';
 import { euro, germanDate, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
-import { useTableSort } from '../lib/useTableSort';
+import { useTableSort } from '../lib/table-sort';
 import {
   type InvoiceDto,
   type ReimbursementPlanDto,

@@ -170,11 +170,13 @@ test('auth flow: setup, login, protected access, scoping, refresh, logout', asyn
     });
 
     await t.test('admin passes the global-permission guard', async () => {
+      // GET /users is gated globally on MANAGE_USERS (auth/admin-routes.ts),
+      // so reaching it is the proof that the global guard lets an admin past.
       const res = await request(app)
-        .get('/api/v1/admin/ping')
+        .get('/api/v1/users')
         .set('Authorization', `Bearer ${adminToken}`);
       assert.equal(res.status, 200);
-      assert.equal(res.body.ok, true);
+      assert.ok(Array.isArray(res.body.data));
     });
 
     // A non-admin user with the Nutzer role scoped to exactly one account.
@@ -208,19 +210,22 @@ test('auth flow: setup, login, protected access, scoping, refresh, logout', asyn
       assert.equal(login.status, 200);
       userToken = login.body.accessToken;
 
-      // Granted account: allowed. Other account: forbidden. Admin route: forbidden.
+      // Granted account: allowed. Other account: forbidden (the guard answers
+      // before the handler, so the missing row never comes into it). Globally
+      // gated route: forbidden.
       const granted = await request(app)
-        .get(`/api/v1/accounts/${grantedAccount}/ping`)
+        .get(`/api/v1/accounts/${grantedAccount}`)
         .set('Authorization', `Bearer ${userToken}`);
       assert.equal(granted.status, 200);
+      assert.equal(granted.body.data.accountUID, grantedAccount);
 
       const denied = await request(app)
-        .get(`/api/v1/accounts/${otherAccount}/ping`)
+        .get(`/api/v1/accounts/${otherAccount}`)
         .set('Authorization', `Bearer ${userToken}`);
       assert.equal(denied.status, 403);
 
       const adminOnly = await request(app)
-        .get('/api/v1/admin/ping')
+        .get('/api/v1/users')
         .set('Authorization', `Bearer ${userToken}`);
       assert.equal(adminOnly.status, 403);
     });

@@ -35,8 +35,10 @@ ausdrücklich vor einer anderen steht.
 
 ### Block I — Ordnung (Release 0.16.0)
 
-- [ ] **1 — Tote Pfade und Namen im Kleinen.** CR-28, CR-35, CR-36, CR-31 (★), CR-21.
+- [x] **1 — Tote Pfade und Namen im Kleinen.** CR-28, CR-35, CR-36, CR-31 (★), CR-21.
       Kein Verhalten ändert sich; danach ist die Liste der toten Pfade leer.
+      Umgesetzt mit v0.16.0-slice.2 (Slice 51). Offen geblieben ist allein `requireEntityAccount`
+      aus CR-36 — es bekommt in Scheibe 4 Aufrufer statt gelöscht zu werden.
 - [ ] **2 — Kleine Korrekturen an der API.** CR-06, CR-12, CR-13, CR-14, CR-22 (★), SEC-12, SEC-16.
 - [ ] **3 — Ein Name für die Kontoverbindung.** CR-20 (★). Mechanisch, quer durch beide Apps,
       ohne Migration. Muss vor den größeren Umbauten liegen, sonst kollidiert sie mit ihnen.
