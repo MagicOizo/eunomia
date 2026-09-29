@@ -246,6 +246,27 @@ An semver orientiert, mit einer projektspezifischen Belegung für die Slice-Arbe
 
 **Mechanik dazu:** in Slice 26 umgesetzt (Bump-Skript `scripts/version.ts`, `latest`-Guard und Release-Job in `.github/workflows/docker.yml`, `CHANGELOG.md` als Quelle der Release-Notes, `npm run version:check` in der CI). Der Alltagsablauf steht in [DEV.md](../DEV.md) unter „Versioning a change".
 
+## 2.10 Sicherheit (erstmals geprüft 2026-09-29, vor 1.0.0)
+
+Die Sicherheitsakte des Projekts ist ein eigenes Dokument: [Sicherheits-Review.md](Sicherheits-Review.md).
+Dort stehen das Bedrohungsmodell, die **Sicherheits-Invarianten I-1 bis I-13** und die Befunde mit
+Nachweis und Fundstelle. Hier steht nur, was das für die Planung bedeutet:
+
+- **Die Invarianten sind Vorgabe, nicht Beschreibung.** Jede Scheibe wird gegen sie geprüft. Wer eine
+  brechen will, ändert sie zuerst dort — begründet.
+- Der Maßstab ist die geplante Internet-Exposition, nicht der heutige LAN-Betrieb. Jeder Befund trägt
+  deshalb zwei Risikonoten. Eine Version 1.0 soll exponierbar sein.
+- Die Befunde sind als Punkte in [issues.md](issues.md) unter `0.16.0-slice.1` eingetragen und werden
+  wie jeder andere Befund in Scheiben abgearbeitet.
+- Schwerpunkt des ersten Durchgangs: SEC-01 (ausführbare Schemata im Dokument-Link), SEC-02 (keine
+  Security-Header/CSP) und SEC-09 (kein Audit-Trail). Der Rest ist geordnet, aber nachrangig.
+- Nach dem Code-Review folgt eine **Delta-Nachprüfung** auf den dabei berührten Dateien, bevor 1.0.0
+  gebumpt wird (Abschnitt 8 des Reviews).
+
+Der Datenbestand fällt unter Art. 9 DSGVO. Das ist keine Formalie, sondern der Grund, warum
+Nachvollziehbarkeit (SEC-09), Löschfristen (SEC-15) und Backup-Verschlüsselung (SEC-14) in diesem
+Projekt Befunde sind und nicht Komfortwünsche.
+
 ---
 
 # 3 Umsetzungsplanung (Slices)

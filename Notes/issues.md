@@ -97,3 +97,41 @@
 ### Date 20260929
 1.	Vorschlagsliste zu schmal für die IBAN — Umgesetzt mit v0.14.0-slice.3
 	Bei der Auswahl der Kontoverbindung ist das Vorschlagsfeld nicht lang genug für die IBAN, es entsteht ein horizontaler Scrollbalken. Anklicken lässt er sich nicht, weil das Feld dabei direkt ausgeblendet wird, und schön ist er ohnehin nicht.
+## Version 0.16.0-slice.1
+### Date 20260929
+Befunde aus dem Sicherheits-Review (Meilenstein 1 vor 1.0.0). Begründung, Fundstelle und Nachweis
+je Punkt in [Sicherheits-Review.md](Sicherheits-Review.md), dort unter der genannten SEC-Nummer.
+1.	Dokument-Link erlaubt ausführbare Schemata (SEC-01)
+	Der Dokument-Link wird mit `z.string().url()` geprüft, und das lässt `javascript:`, `data:`, `vbscript:` und `file:` durch — nachgewiesen gegen die installierte zod-Version. In den Zahlungsinformationen landet der Wert in einem `<a href>`; ein Klick führt den Code in der Origin der App aus, wo auch der Access-Token liegt. Der passende Prüfer existiert schon im Projekt (`isHttpUrl` in settings/registry.ts) und muss nur zum gemeinsamen Helfer werden und auf Rechnung und Leistungsabrechnung angewandt werden. Frontend prüft zusätzlich vor dem Öffnen, Bestandsdaten einmalig durchsehen.
+2.	Keine Security-Header, keine CSP (SEC-02)
+	Die API setzt keinen einzigen Sicherheits-Header: keine Content-Security-Policy, kein nosniff, keine Referrer-Policy, kein Frame-Schutz, kein HSTS; dazu verrät `x-powered-by` den Server. Die CSP ist genau die Schicht, die den Befund SEC-01 von "Token weg" auf "Klick tut nichts" reduziert hätte. helmet vor die Router, CSP passend zur SPA (die GiroCode-QR braucht `img-src data:`).
+3.	Kein Audit-Trail (SEC-09)
+	Das Ereignis-Log ist gut gebaut, wird aber nur von Mailversand, Erinnerungen und Update-Check benutzt. Es gibt kein Ereignis für Anmeldung (erfolgreich wie fehlgeschlagen), für abgewiesene Berechtigungen, für Anlegen/Ändern/Deaktivieren von Nutzern, für Rollenänderungen, für das endgültige Löschen im Papierkorb und für Änderungen an den Systemeinstellungen. Ein Rateangriff auf ein Passwort wäre heute unsichtbar, und nach einem Vorfall ließe sich nicht feststellen, wer was gesehen oder gelöscht hat. In die Zeile gehören nur UIDs, keine Falldaten.
+4.	Vorschau der Zahlungserinnerungen zeigt fremde Konten (SEC-03)
+	Der Probelauf der Erinnerungen gibt für jeden Empfänger dessen E-Mail-Adresse und den vollständigen Mailtext zurück — mit Rechnungsnummern, Namen der behandelten Person, Zahlungsempfänger und Beträgen, über alle Konten hinweg. Der Endpunkt hängt an MANAGE_SETTINGS, nicht an VIEW_INVOICES. Der Erinnerungslauf selbst filtert korrekt; nur die Vorschau gibt alles heraus. Sie muss auf das eingeschränkt werden, was der Aufrufer sehen darf.
+5.	Passwortänderung beendet bestehende Sitzungen nicht (SEC-05)
+	Wird einem Nutzer ein neues Passwort gesetzt, bleiben seine Refresh-Token gültig — bis zu 30 Tage. Das ist genau der Fall, für den man das Passwort wechselt: ein Angreifer mit gestohlenem Token bleibt drin. Die Deaktivierung eines Nutzers wirkt dagegen richtigerweise sofort. Beim Setzen eines neuen Passworts alle Refresh-Token des Nutzers widerrufen.
+6.	Kein eigener Passwortwechsel (SEC-06)
+	Passwörter kann heute nur ein Administrator über die Benutzerverwaltung ändern; ein Nutzer kann sein eigenes nicht wechseln, und der Administrator kennt danach das neue. Es fehlt ein Endpunkt mit altem und neuem Passwort, der anschließend die übrigen Sitzungen des Nutzers beendet. Gehört mit SEC-05 in eine Scheibe.
+7.	Papierkorb wirkt an der Kontotrennung vorbei (SEC-04)
+	MANAGE_TRASH wird ohne Konto geprüft und die Papierkorbliste danach nicht gefiltert. Wer die Berechtigung hält, sieht gelöschte Datensätze aller Konten mit Rechnungsnummern, Namen und Beträgen und kann sie wiederherstellen oder endgültig löschen. Entweder nach den zugänglichen Konten filtern, oder im Rechtemodell festschreiben, dass MANAGE_TRASH eine instanzweite Administratorberechtigung ist.
+8.	Verwundbare Abhängigkeiten, kein Audit in der CI (SEC-10)
+	Im Produktionsimage stecken drei bekannte Schwachstellen; materiell ist davon `qs` über express, das bei jeder Anfrage die Query zerlegt. Für alle gibt es einen Fix. Die CI prüft Abhängigkeiten gar nicht, der nächste Fund fiele also wieder erst bei einem Review auf. `npm audit fix` fahren und einen Audit-Schritt in die CI aufnehmen.
+9.	Backup liegt unverschlüsselt (SEC-14)
+	Das Backup-Skript schreibt einen vollständigen Klartext-Dump; die dokumentierte Verwendung legt ihn unverschlüsselt im Arbeitsverzeichnis ab. Die Settings-Secrets bleiben darin unlesbar — das funktioniert —, die Gesundheitsdaten liegen aber offen. Ein optionaler Verschlüsselungsschritt im Skript und ein ausdrücklicher Abschnitt in der README: wohin Backups gehören, wie lange sie bleiben, und dass sie verschlüsselt sein müssen.
+10.	Keine Löschfrist, kein endgültiges Löschen von Nutzern, keine Auskunft (SEC-15)
+	Drei zusammenhängende Lücken bei Art.-9-Daten: der Papierkorb hält gelöschte Datensätze unbegrenzt und kennt keine Frist; ein Nutzer wird nur auf Status -1 gesetzt, Name und E-Mail bleiben dauerhaft stehen, und der Papierkorb kennt die Entität nicht; es gibt keinen Weg, die zu einer Person gespeicherten Daten vollständig auszugeben. Aufbewahrungsfrist als Systemeinstellung mit automatischer Endlöschung, Nutzer in den Papierkorb aufnehmen, Konto-Export als eigener Vorschlag.
+11.	Port-Bindung und Container-Härtung (SEC-13)
+	Das Deployment ist im Kern gut (eigener Benutzer statt root, keine Datenbank nach außen, zufälliges Root-Passwort). Offen: der API-Port wird auf allen Host-Schnittstellen gebunden, also auch am Reverse-Proxy und dessen TLS vorbei — hinter einem Proxy gehört dorthin 127.0.0.1. Dazu fehlen no-new-privileges, read_only und Ressourcengrenzen.
+12.	Keine Erkennung wiederverwendeter Refresh-Token (SEC-07)
+	Die Rotation ist da und richtig: ein vorgezeigter Token wird widerrufen. Was fehlt, ist die Schlussfolgerung — ein zweites Vorzeigen desselben Tokens ist ein sicheres Zeichen für Diebstahl und sollte die ganze Token-Kette des Nutzers fallen lassen, nicht nur diese Anfrage abweisen. Dazu ein Log-Ereignis.
+13.	Keine Zusicherung, dass jede Route bewacht ist (SEC-17)
+	Kein Loch: alle 47 Routen wurden geprüft, jede ist abgedeckt. Aber ein Teil der Prüfungen sitzt im Handler und teils erst in der aufgerufenen Service-Funktion, so dass eine Route ungeprüft aussieht und es nicht ist. Eine neue Route, die den Aufruf vergisst, fiele niemandem auf. Ein Integrationstest soll die Routentabelle auslesen und für jede Route ohne Token 401 und mit fremdkontigem Nutzer 403 erzwingen — damit wird die Regel prüfbar statt nur dokumentiert.
+14.	Refresh-Token werden nie aufgeräumt (SEC-08)
+	Abgelaufene und widerrufene Zeilen bleiben für immer stehen; jede Anmeldung und jede Rotation legt eine neue an. Im täglichen Erinnerungs-Tick mit aufräumen.
+15.	Unbegrenzte Listen in drei Schemata (SEC-11)
+	Die Buchungseinträge einer Leistungsabrechnung sowie Rollen und Konto-Grants eines Nutzers haben keine Obergrenze; jeder Eintrag wird als eigenes INSERT in einer Transaktion geschrieben, bei den Buchungen zusätzlich unter Sperren auf allen betroffenen Rechnungen. Begrenzt wird das heute nur durch die Größe des Request-Bodys. Je eine fachlich sinnvolle Obergrenze setzen.
+16.	Steuerzeichen in Text-Einstellungen nicht abgewiesen (SEC-16)
+	Der Absendername geht ungeprüft in den From-Header der Mails; geprüft werden nur Länge und teils ein Format, nicht aber Zeilenumbrüche. Nodemailer kodiert Anzeigenamen, weshalb daraus voraussichtlich nichts folgt — wir verlassen uns damit aber auf eine Bibliothekseigenschaft statt auf eine eigene Grenze. Steuerzeichen für alle Text-Einstellungen abweisen.
+17.	Körpergrenze des JSON-Parsers nicht ausgeschrieben (SEC-12)
+	Der JSON-Parser läuft ohne Optionen und damit auf dem Standardwert von 100 kB. Es besteht kein Loch, aber die Grenze steht nirgends im Projekt und hinge an einem Standardwert, den ein Major-Upgrade ändern könnte. Ausschreiben und den Grund dazu vermerken.
