@@ -1,3 +1,5 @@
+import { faFilter } from '@fortawesome/free-solid-svg-icons';
+
 import AgencyDetailDialog from '../agencies/AgencyDetailDialog.vue';
 import {
   BONUS_FORFEIT_RULE_LABEL,
@@ -159,14 +161,16 @@ const facilities: ResourceConfig = {
     { key: 'facilityName', label: 'Name', type: 'text', required: true },
     { key: 'distanceKm', label: 'Entfernung (km)', type: 'number', step: '1' },
   ],
+  rowActions: [
+    {
+      icon: faFilter,
+      label: (row) => `Rechnungen von ${String(row.facilityName ?? '')} anzeigen`,
+      to: (row) => `/invoices?facility=${String(row.facilityUID ?? '')}`,
+    },
+  ],
   detailTitle: (row) => `Leistungserbringer: ${String(row.facilityName ?? '')}`,
 };
 
-/**
- * The bank account is a history (Slice 38), so the list shows the one in force
- * today — the API flattens it onto every agency — and the mask carries the rest.
- * Creating one records its first account, undated.
- */
 /**
  * The IBAN column of an agency shows its first account — the one a new invoice
  * is suggested — and says how many others stand beside it (Slice 44). Which one
@@ -193,6 +197,15 @@ const agencies: ResourceConfig = {
     { key: 'bankAccount', label: 'IBAN', type: 'text', required: true },
     { key: 'bic', label: 'BIC', type: 'text' },
     { key: 'recipientName', label: 'Empfänger (nur wenn abweichend)', type: 'text' },
+  ],
+  // Which invoices go through this agency (issues.md 0.12.0-5) — the filtered
+  // invoice list answers it, so the row links there.
+  rowActions: [
+    {
+      icon: faFilter,
+      label: (row) => `Rechnungen über ${String(row.agencyName ?? '')} anzeigen`,
+      to: (row) => `/invoices?agency=${String(row.agencyUID ?? '')}`,
+    },
   ],
   detailTitle: (row) => `Abrechnungsdienstleister: ${String(row.agencyName ?? '')}`,
   detailDialog: AgencyDetailDialog,

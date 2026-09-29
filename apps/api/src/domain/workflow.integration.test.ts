@@ -1400,6 +1400,93 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(cash.status, 201);
       assert.equal(cash.body.data.agencyAccountUID, null);
     });
+    // Slice 45: which invoices use this agency, this bank account of it, this
+    // provider — and what of that is still running (issues.md 0.12.0-5).
+    await t.test('invoices are found by agency, bank account, provider and status', async () => {
+      const agency = await post('/api/v1/agencies', {
+        agencyName: 'Inkasso Filter',
+        bankAccount: 'DE12500105170648489890',
+      });
+      const agencyUID = agency.body.data.agencyUID as string;
+      const firstUID = agency.body.data.accounts[0].agencyAccountUID as string;
+      const secondUID = (
+        await post(`/api/v1/agencies/${agencyUID}/accounts`, {
+          bankAccount: 'DE44500105175407324931',
+        })
+      ).body.data.agencyAccountUID as string;
+      const facilityUID = (await post('/api/v1/facilities', { facilityName: 'Praxis Filter' })).body
+        .data.facilityUID as string;
+
+      const makeFiltered = async (
+        number: string,
+        body: Record<string, unknown>,
+      ): Promise<string> => {
+        const res = await post('/api/v1/invoices', {
+          invoiceNumber: number,
+          invoiceDate: '2024-12-01',
+          treatmentDate: '2024-12-01',
+          accountUID: accountA,
+          invoiceAmount: 40,
+          ...body,
+        });
+        assert.equal(res.status, 201);
+        return res.body.data.invoiceUID as string;
+      };
+
+      const onFirst = await makeFiltered('R-F-1', {
+        facilityUID,
+        agencyUID,
+        agencyAccountUID: firstUID,
+      });
+      const onSecond = await makeFiltered('R-F-2', { agencyUID, agencyAccountUID: secondUID });
+      // A third one carries neither, so every filter has something to leave out.
+      await makeFiltered('R-F-3', {});
+
+      const uids = async (query: string): Promise<string[]> => {
+        const res = await request(app).get(`/api/v1/invoices?${query}`).set(admin);
+        assert.equal(res.status, 200);
+        return (res.body.data as Array<{ invoiceUID: string }>).map((i) => i.invoiceUID).sort();
+      };
+
+      assert.deepEqual(await uids(`agencyUID=${agencyUID}`), [onFirst, onSecond].sort());
+      assert.deepEqual(await uids(`agencyAccountUID=${secondUID}`), [onSecond]);
+      assert.deepEqual(await uids(`facilityUID=${facilityUID}`), [onFirst]);
+      // The filters narrow each other, and the number search narrows them too.
+      assert.deepEqual(await uids(`agencyUID=${agencyUID}&facilityUID=${facilityUID}`), [onFirst]);
+      assert.deepEqual(await uids(`agencyUID=${agencyUID}&q=R-F-2`), [onSecond]);
+
+      // The status is derived, so the filter has to work on the presented rows:
+      // the second invoice is handed in, closed by hand and paid — erledigt.
+      const submitted = await post('/api/v1/submissions', {
+        contractUID: contractA,
+        submittedDate: '2024-12-10',
+        invoiceUIDs: [onSecond],
+      });
+      assert.equal(submitted.status, 201);
+      const closed = await request(app)
+        .patch(`/api/v1/invoices/${onSecond}`)
+        .set(admin)
+        .send({ reimbursementClosed: true, transferDate: '2024-12-15' });
+      assert.equal(closed.body.data.workflowStatus, 'erledigt');
+
+      assert.deepEqual(await uids(`agencyUID=${agencyUID}&status=offen`), [onFirst]);
+      assert.deepEqual(await uids(`agencyUID=${agencyUID}&status=nicht-erledigt`), [onFirst]);
+      assert.deepEqual(await uids(`agencyUID=${agencyUID}&status=erledigt`), [onSecond]);
+      // The limit counts what the status filter left over, not what it read.
+      assert.equal((await uids(`status=nicht-erledigt&limit=1`)).length, 1);
+
+      // The filtered list stays inside what the user may see.
+      const scoped = await scopedNutzer(pool, app, 'agency-filter@example.com', accountB);
+      const denied = await request(app).get(`/api/v1/invoices?agencyUID=${agencyUID}`).set(scoped);
+      assert.equal(denied.status, 200);
+      assert.deepEqual(denied.body.data, []);
+
+      // An id that is none is named, not quietly ignored.
+      const bad = await request(app)
+        .get('/api/v1/invoices?agencyUID=kein-dienstleister')
+        .set(admin);
+      assert.equal(bad.status, 400);
+    });
   } finally {
     await pool.end();
   }

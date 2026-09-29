@@ -19,7 +19,13 @@ import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
-import { deriveInvoiceStatus, deriveSubmissionStatus } from './invoice-status.js';
+import {
+  STATUS_FILTERS,
+  type WorkflowStatus,
+  deriveInvoiceStatus,
+  deriveSubmissionStatus,
+  matchesStatus,
+} from './invoice-status.js';
 import { accountForContract, accountForInvoice, authorizeAccount } from './workflow-access.js';
 
 export const invoicesTable: CrudTable = {
@@ -103,14 +109,33 @@ const updateSchema = base
  * one insured person and one treatment year; `q` is the invoice-number search
  * that works without either of them (issues.md 6), so an invoice can be found
  * when only its number is known.
+ *
+ * The reference filters — agency, one of its bank accounts, provider — answer
+ * "which invoices use this one?" (issues.md 0.12.0-5). Each is a plain equality
+ * on a column of the invoice, so a further one is this field plus its `if`
+ * block below. `status` is the odd one out: it is derived, never stored, and
+ * therefore applied after the rows were presented.
  */
 const listQuery = z.object({
   accountUID: z.string().trim().min(1).optional(),
   year: z.coerce.number().int().min(1900).max(2999).optional(),
   /** Substring of the invoice number; deliberately nothing else. */
   q: z.string().trim().min(1).max(50).optional(),
+  agencyUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.agency)).optional(),
+  agencyAccountUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.agencyAccount)).optional(),
+  facilityUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.facility)).optional(),
+  status: z.enum(STATUS_FILTERS).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
+
+/**
+ * How many rows a status-filtered list reads before narrowing them down. The
+ * filter cannot run in SQL (see `listQuery`), so `limit` has to be applied
+ * afterwards — this cap keeps such a query bounded all the same. A household's
+ * archive stays far below it; if it ever did not, the answer is a narrower
+ * filter, not a longer list.
+ */
+const STATUS_SCAN_CAP = 1000;
 
 const exclusionSchema = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
@@ -662,8 +687,40 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       params.push(`%${filters.q}%`);
     }
 
-    const rows = await queryInvoices(pool, where.join(' AND '), params, filters.limit);
-    sendData(res, await present(pool, rows));
+    // The reference filters, one block each — the pattern a further one copies.
+    if (filters.agencyUID !== undefined) {
+      where.push('i.agencyUID = ?');
+      params.push(filters.agencyUID);
+    }
+
+    if (filters.agencyAccountUID !== undefined) {
+      where.push('i.agencyAccountUID = ?');
+      params.push(filters.agencyAccountUID);
+    }
+
+    if (filters.facilityUID !== undefined) {
+      where.push('i.facilityUID = ?');
+      params.push(filters.facilityUID);
+    }
+
+    // With a status filter the limit belongs to what the filter leaves over, so
+    // the query reads up to the cap and the list is cut to size afterwards.
+    const status = filters.status;
+    const rows = await queryInvoices(
+      pool,
+      where.join(' AND '),
+      params,
+      status === undefined ? filters.limit : STATUS_SCAN_CAP,
+    );
+    const presented = await present(pool, rows);
+    if (status === undefined) {
+      sendData(res, presented);
+      return;
+    }
+    const matching = presented.filter((invoice) =>
+      matchesStatus(invoice.workflowStatus as WorkflowStatus, status),
+    );
+    sendData(res, filters.limit === undefined ? matching : matching.slice(0, filters.limit));
   });
 
   // Distinct treatment years for an account, so the UI can offer year tabs

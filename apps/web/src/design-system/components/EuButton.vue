@@ -12,6 +12,13 @@ const props = withDefaults(
     type?: 'button' | 'submit' | 'reset';
     /** Required when iconOnly is true — otherwise screen reader users get an unlabeled button. */
     ariaLabel?: string;
+    /**
+     * Makes the button a link to that route instead of a button. For an action
+     * that leads somewhere (Slice 45: "show the invoices of this agency") — a
+     * real link opens in a new tab and answers a middle click, which a button
+     * with a `router.push` never would.
+     */
+    to?: string;
   }>(),
   {
     variant: 'primary',
@@ -20,6 +27,7 @@ const props = withDefaults(
     disabled: false,
     type: 'button',
     ariaLabel: undefined,
+    to: undefined,
   },
 );
 
@@ -35,7 +43,12 @@ const classes = computed(() => [
 </script>
 
 <template>
+  <RouterLink v-if="to" :to="to" :class="classes" :aria-label="iconOnly ? ariaLabel : undefined">
+    <FontAwesomeIcon v-if="icon" :icon="icon" aria-hidden="true" />
+    <span v-if="!iconOnly"><slot /></span>
+  </RouterLink>
   <button
+    v-else
     :type="type"
     :class="classes"
     :disabled="disabled"
@@ -49,6 +62,7 @@ const classes = computed(() => [
 <style scoped>
 .eu-button {
   display: inline-flex;
+  text-decoration: none;
   align-items: center;
   gap: 0.5em;
   font-family: var(--eu-font-body);

@@ -76,9 +76,18 @@ export const router = createRouter({
       meta: { title: 'Startseite', requiresAuth: true },
     },
     {
+      // The search filter lives in the URL (Slice 45): the filter buttons of
+      // the master-data lists point here, and a followed hit finds its way back.
       path: '/invoices',
       name: '/invoices',
       component: InvoicePickerView,
+      props: (route) => ({
+        q: queryString(route.query.q),
+        agency: queryString(route.query.agency),
+        account: queryString(route.query.account),
+        facility: queryString(route.query.facility),
+        status: queryString(route.query.status),
+      }),
       meta: { title: 'Rechnungen', requiresAuth: true },
     },
     {

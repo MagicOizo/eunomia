@@ -1,3 +1,4 @@
+import { faFilter } from '@fortawesome/free-solid-svg-icons';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -38,8 +39,12 @@ const config: ResourceConfig = {
   },
 };
 
-async function mountView() {
-  const wrapper = mount(ResourceView, { props: { config } });
+async function mountView(resourceConfig: ResourceConfig = config) {
+  const wrapper = mount(ResourceView, {
+    props: { config: resourceConfig },
+    // Renders a row action as href, so its target can be read off the DOM.
+    global: { stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } },
+  });
   await flushPromises();
   return wrapper;
 }
@@ -91,5 +96,22 @@ describe('ResourceView search', () => {
 
     expect(wrapper.find('.eu-resource__search').exists()).toBe(false);
     expect(wrapper.text()).toContain('Noch keine Leistungserbringer erfasst.');
+  });
+
+  it('renders a row action as a link to its target', async () => {
+    const wrapper = await mountView({
+      ...config,
+      rowActions: [
+        {
+          icon: faFilter,
+          label: (row) => `Rechnungen von ${String(row.facilityName)} anzeigen`,
+          to: (row) => `/invoices?facility=${String(row.facilityUID)}`,
+        },
+      ],
+    });
+
+    const link = wrapper.find('tbody tr a');
+    expect(link.attributes('href')).toBe('/invoices?facility=f-1');
+    expect(link.attributes('aria-label')).toBe('Rechnungen von Praxis Nord anzeigen');
   });
 });

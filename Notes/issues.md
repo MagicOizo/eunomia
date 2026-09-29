@@ -75,7 +75,7 @@
 	- Nur Abrechnung: Der Abrechnungsdienstleister kümmert sich um die Abrechnung und die Zahlungsaufforderungen/Mahnungen, er verweist aber je Leistungserbringer auf unterschiedliche Konten
 	Das muss im Tool abgebildet werden und macht die gesamte Pflege von Konten und Abrechnungsdienstleistern auch bei Erstellung komplexer.
 	Alternativ Pflegen wir ein Konto eher beim Leistungserbringer, und die Wahl des Abrechnungsdienstleisters wirkt nur als "Default"-Konto. Der ursprüngliche Zweck im Design überhaupt Abrechnungsdienstleister zu bauen war, dass der Autor dachte, dass es sonst zur doppelten Pflege kommen würde.
-5.	Rechnungsliste je Abrechnungsdienstleister
+5.	Rechnungsliste je Abrechnungsdienstleister — Umgesetzt mit v0.14.0-slice.2
 	Es fehlt eine Möglichkeit zu sehen, welche Rechnungen einen bestimmten Abrechnungsdienstleister nutzen. Das ist im Zuge des Issues 0.12.0-4 aufgefallen
 6.	Markierung nicht vollständig ersetzer Leistungen — Umgesetzt mit v0.13.0-slice.6
 	Wenn durch Tarifliche Eigenbeteiligung oder Selbstbeteilung nicht die Volle Rechnungssumme ersetzt wurde, soll die Erstattungssumme in der Rechnungsübersicht rot geschrieben werden, damit der Unterschied direkt auffällt.

@@ -7,6 +7,22 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.14.0-slice.2 — 2026-09-29
+
+- **The invoice list can be asked who bills it.** Which invoices go through this collection agency,
+  which of them on this bank account of it, which came from this provider — questions that grew out
+  of an agency holding several accounts at once, and that nothing could answer so far. The invoice
+  page keeps its number search and gains a filter row beside it: agency, one of its accounts (as
+  soon as an agency is chosen), provider, and a status, from a single one to "not done yet". Every
+  search fills the same result list, which now names the provider, the agency and the IBAN an
+  invoice goes to, so a further filter is a matter of one more entry.
+- **The master-data lists lead there.** A row of "Abrechnungsdienstleister" and of
+  "Leistungserbringer" carries a filter action that opens the invoice list already narrowed to that
+  record. It is a real link, so it opens in a new tab like any other.
+- **The filter stays where it was.** It is written into the address, so a filtered list can be
+  bookmarked and reloaded, and following a hit into the workspace and coming back through its arrow
+  lands on the same list again instead of an empty page.
+
 ## 0.14.0-slice.1 — 2026-09-28
 
 - **A collection agency can be paid on several accounts, and the invoice says which one.** In

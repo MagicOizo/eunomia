@@ -1,3 +1,4 @@
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import type { Component } from 'vue';
 
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
@@ -42,6 +43,19 @@ export interface LookupConfig {
   label: (row: ResourceRow) => string;
 }
 
+/**
+ * An action in a row that leads somewhere else instead of changing the record
+ * — e.g. "show the invoices of this agency" (Slice 45). It is rendered as a
+ * link, so it opens in a new tab like any other.
+ */
+export interface RowActionConfig {
+  icon: IconDefinition;
+  /** The accessible name, naming the record it is about. */
+  label: (row: ResourceRow) => string;
+  /** Where it leads, as a route path. */
+  to: (row: ResourceRow) => string;
+}
+
 export interface ResourceConfig {
   path: string;
   /** Singular/plural German labels for headings and buttons. */
@@ -51,6 +65,8 @@ export interface ResourceConfig {
   idKey: string;
   columns: ColumnConfig[];
   fields: FieldConfig[];
+  /** Shown in the actions cell, before editing and deleting. */
+  rowActions?: RowActionConfig[];
   lookups?: Record<string, LookupConfig>;
   /**
    * Title of the view/edit mask, naming the record ("Versicherung: AXA").

@@ -1760,6 +1760,56 @@ dem zweiten dessen Zahlstelle. Fokusring per Tastatur-Screenshot an jedem neuen 
 Historienblock, Picker und Aktionen —, an keiner Kante beschnitten. Der Dev-Bestand steht
 anschließend über `npm run dev:reset` wieder wie geseedet.
 
+## Slice 45 — Rechnungen je Abrechnungsdienstleister und Leistungserbringer (umgesetzt 2026-09-29)
+**Anlass:** issues.md 0.12.0-5, aufgefallen beim Bau von Slice 44. Sobald ein Dienstleister mehrere
+Konten führt, lässt sich nicht mehr nachsehen, welche Rechnung auf welchem Konto liegt — und beim
+Aufräumen eines Kontos sieht man nicht, was daran hängt. Dieselbe Frage stellt sich beim
+Leistungserbringer.
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Der Ort ist der Rechnungs-Picker, nicht der Dienstleister-Dialog.** Dort wird schon nach
+  Rechnungsnummern gesucht; die Filterzeile steht daneben und füllt dieselbe Ergebnisliste. In den
+  Stammdatenlisten führt je eine Aktionsschaltfläche (`fa-filter`) dorthin, mit gesetztem Filter.
+- **Eine Ergebnisdarstellung für jede Suchart.** Die klickbaren Kartenzeilen bleiben, ergänzt um
+  Rechnungsdatum, Leistungserbringer, Dienstleister und IBAN. Damit ist ein weiterer Filter je eine
+  Zeile: ein Feld im Schema der API, ein Eintrag in `FIELDS` (Web) und einer in `references` — der
+  Leistungserbringer ist in dieser Scheibe gleich der Beweis dafür.
+- **Kein eigener Endpunkt**, anders als zunächst notiert: `GET /invoices` bringt die Rechteprüfung je
+  Versichertem schon mit (`getAccessibleAccounts`), also bekommt es die Filter. Ein zweiter Endpunkt
+  hätte Scoping, Nummernsuche, Limit und `present()` wiederholt.
+- **Der Status ist eine Auswahlliste** („Alle", „Nicht erledigt", je Stufe), und er wird **nach**
+  `present()` gefiltert, nicht in SQL: Der Status ist abgeleitet und nirgends gespeichert (2.3), die
+  Leiter steht genau einmal in `invoice-status.ts`. Das Limit gilt dann für das, was der Filter
+  übrig lässt; die Abfrage selbst bleibt über `STATUS_SCAN_CAP` begrenzt.
+- **Der Filter steht in der Adresse** — eine gefilterte Liste ist damit merk- und neuladbar — und
+  wird zusätzlich im Modul gemerkt, damit der Zurück-Pfeil des Arbeitsbereichs und der Menüpunkt
+  nicht auf einer leeren Seite landen. Kein `localStorage`: die App benutzt bewusst keinen.
+
+**Befunde beim Bauen:**
+
+- **Zwei Vokabulare, ein Filter.** Die Adresse sagt `agency`/`account`/`facility`, die API
+  `agencyUID`/`agencyAccountUID`/`facilityUID` — denn `accountUID` ist dort der Versicherte, nicht
+  die Kontoverbindung. Der erste Wurf schickte die kurzen Namen an die API; zod wirft unbekannte
+  Parameter still weg, also kam eine vollständige, ungefilterte Liste zurück. Beide Namen stehen
+  jetzt nebeneinander in einer Tabelle (`FIELDS`), und ein Test prüft die API-Namen.
+- **Das Leeren eines Kontos gehört in den Bedienweg, nicht in einen Watcher.** Ein Watcher auf den
+  Dienstleister löscht die Kontoverbindung auch dann, wenn beide zusammen aus der URL kommen. Jetzt
+  räumt der Auswahl-Handler auf: wer den Dienstleister wechselt, verliert das Konto; was gemeinsam
+  ankommt, bleibt zusammen.
+- **`EuButton` kann jetzt ein Link sein** (`to`), damit die Zeilenaktion im neuen Tab und mit
+  Mittelklick funktioniert, statt ein Knopf mit `router.push` zu sein. `ResourceConfig.rowActions`
+  ist der allgemeine Weg dorthin; `EuSelectField` bekam ein `emptyLabel`, weil „nichts gewählt" in
+  einem Filter „alle" heißt und nicht „keine".
+
+**Geprüft:** 260 API-Tests gegen `eunomia_test`, 277 Web-Tests, Lint, Typecheck, Prettier. Im
+laufenden Browser am geseedeten Bestand, hell und dunkel: die Filterschaltfläche beim Dienstleister
+führt auf drei Rechnungen, die Kontoverbindung schneidet auf eine zu, „Erledigt" auf keine,
+„Nicht erledigt" wieder auf eine; ein Treffer öffnet die Rechnung im Jahr des Versicherten, der
+Zurück-Pfeil bringt genau diese Liste zurück; die Schaltfläche beim Leistungserbringer zeigt dessen
+zehn Rechnungen. Fokusring per Tastatur-Screenshot an allen vier Filterfeldern und an der
+Zeilenaktion am rechten Tabellenrand — nirgends beschnitten.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

@@ -236,6 +236,15 @@ async function confirmDelete(): Promise<void> {
             </td>
             <td class="eu-resource__actions">
               <EuButton
+                v-for="action in config.rowActions ?? []"
+                :key="action.label(row)"
+                variant="secondary"
+                icon-only
+                :icon="action.icon"
+                :aria-label="action.label(row)"
+                :to="action.to(row)"
+              />
+              <EuButton
                 variant="secondary"
                 icon-only
                 :icon="faPen"

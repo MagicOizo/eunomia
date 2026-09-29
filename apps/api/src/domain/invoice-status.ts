@@ -67,3 +67,29 @@ export function deriveInvoiceStatus(input: InvoiceStatusInput): InvoiceStatus {
 export function deriveSubmissionStatus(allocationCount: number): SubmissionStatus {
   return allocationCount > 0 ? 'abgerechnet' : 'eingereicht';
 }
+
+/**
+ * What a status filter of the invoice list may ask for: one of the statuses, or
+ * "everything that is not done yet" — the question behind most filtered views
+ * ("was steht bei diesem Dienstleister noch offen?"). Leaving the filter out
+ * means every status, so there is no 'alle' value here.
+ */
+export const STATUS_FILTERS = [
+  'offen',
+  'eingereicht',
+  'teilabgerechnet',
+  'abgerechnet',
+  'erledigt',
+  'nicht-erledigt',
+] as const;
+
+export type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+/**
+ * Whether a derived status passes a status filter. The status is never stored
+ * (see above), so the invoice list can only apply this once it has computed it
+ * — there is no column to put in a WHERE clause.
+ */
+export function matchesStatus(status: WorkflowStatus, filter: StatusFilter): boolean {
+  return filter === 'nicht-erledigt' ? status !== 'erledigt' : status === filter;
+}

@@ -14,5 +14,5 @@ Nach jeder umgesetzten Scheibe wandern drei Dinge zusammen: der Haken hier, der 
 
 - [x] **Slice 44 — Mehrere Kontoverbindungen je Dienstleister** (issues.md 0.12.0-4),
       v0.14.0-slice.1
-- [ ] **Slice 45 — Rechnungsliste je Abrechnungsdienstleister** (issues.md 0.12.0-5): braucht einen
-      eigenen Endpunkt samt Rechteprüfung je Versichertem (`getAccessibleAccounts`)
+- [x] **Slice 45 — Rechnungsliste je Abrechnungsdienstleister** (issues.md 0.12.0-5), v0.14.0-slice.2
+      — als Filter im Rechnungs-Picker, gleich mit für Leistungserbringer

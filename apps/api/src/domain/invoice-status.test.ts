@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { deriveInvoiceStatus, deriveSubmissionStatus } from './invoice-status.js';
+import {
+  type WorkflowStatus,
+  deriveInvoiceStatus,
+  deriveSubmissionStatus,
+  matchesStatus,
+} from './invoice-status.js';
 
 const base = {
   invoiceAmount: 100,
@@ -67,4 +72,18 @@ test('closed by hand counts as abgerechnet, even without any reimbursement', () 
 test('submission status follows its own allocations', () => {
   assert.equal(deriveSubmissionStatus(0), 'eingereicht');
   assert.equal(deriveSubmissionStatus(1), 'abgerechnet');
+});
+
+test('a status filter names exactly one status', () => {
+  assert.equal(matchesStatus('eingereicht', 'eingereicht'), true);
+  assert.equal(matchesStatus('eingereicht', 'offen'), false);
+  assert.equal(matchesStatus('erledigt', 'erledigt'), true);
+});
+
+test('"nicht-erledigt" keeps every status but the last one', () => {
+  const running: WorkflowStatus[] = ['offen', 'eingereicht', 'teilabgerechnet', 'abgerechnet'];
+  for (const status of running) {
+    assert.equal(matchesStatus(status, 'nicht-erledigt'), true, status);
+  }
+  assert.equal(matchesStatus('erledigt', 'nicht-erledigt'), false);
 });

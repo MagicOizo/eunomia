@@ -1,5 +1,6 @@
 import type { BonusForfeitRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
+import { type InvoiceFilter, apiQueryFromFilter } from './invoice-search';
 import type { SubmissionStatus, WorkflowStatus } from './status';
 
 /** What one service billing reimbursed for this invoice. */
@@ -187,12 +188,13 @@ export async function listInvoices(accountUID: string, year: number): Promise<In
 }
 
 /**
- * Invoices whose number contains `q`, over every insured person the user may
- * see and every treatment year (issues.md 6): the way back to an invoice when
- * only its number is at hand. The API scopes the result to the user's accounts.
+ * The invoice search of the picker page, over every insured person the user may
+ * see and every treatment year: by number (issues.md 6), by the agency, one of
+ * its bank accounts or the provider (issues.md 0.12.0-5), narrowed to a status.
+ * The API scopes the result to the user's accounts.
  */
-export async function searchInvoicesByNumber(q: string, limit = 25): Promise<InvoiceDto[]> {
-  const query = new URLSearchParams({ q, limit: String(limit) });
+export async function searchInvoices(filter: InvoiceFilter, limit = 50): Promise<InvoiceDto[]> {
+  const query = new URLSearchParams({ ...apiQueryFromFilter(filter), limit: String(limit) });
   return unwrap(await apiFetch<{ data: InvoiceDto[] }>(`/invoices?${query.toString()}`));
 }
 

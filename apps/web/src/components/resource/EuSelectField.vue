@@ -12,6 +12,11 @@ defineProps<{
   options: SelectOption[];
   disabled?: boolean;
   required?: boolean;
+  /**
+   * What the empty entry says where "nothing chosen" is not "none": a filter
+   * that is not set means every row, not a row without a value (Slice 45).
+   */
+  emptyLabel?: string;
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
 
@@ -28,7 +33,7 @@ const selectId = useId();
       :disabled="disabled"
       @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
-      <option value="">{{ required ? '– bitte wählen –' : '– keine –' }}</option>
+      <option value="">{{ emptyLabel ?? (required ? '– bitte wählen –' : '– keine –') }}</option>
       <option v-for="option in options" :key="option.value" :value="option.value">
         {{ option.label }}
       </option>
