@@ -9,12 +9,3 @@ Eintrag im Plan oder im Changelog. Was Bestand hat, steht in [issues.md](issues.
 
 Nach jeder umgesetzten Scheibe wandern drei Dinge zusammen: der Haken hier, der Vermerk
 `Umgesetzt mit vX.Y.Z-slice.N` am Punkt in `issues.md`, und der Eintrag im `CHANGELOG.md`.
-
-## Paket: Konten der Abrechnungsdienstleister (0.14.0)
-
-- [x] **Slice 44 — Mehrere Kontoverbindungen je Dienstleister** (issues.md 0.12.0-4),
-      v0.14.0-slice.1
-- [x] **Slice 45 — Rechnungsliste je Abrechnungsdienstleister** (issues.md 0.12.0-5), v0.14.0-slice.2
-      — als Filter im Rechnungs-Picker, gleich mit für Leistungserbringer
-- [x] **Slice 46 — Die Vorschlagsliste erträgt lange Einträge** (issues.md 0.14.0-slice.2-1),
-      v0.14.0-slice.3 — die Liste darf breiter werden als ihr Feld, die IBAN steht in Vierergruppen

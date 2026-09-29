@@ -7,6 +7,40 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.14.0 — 2026-09-29
+
+Everything from the three `0.14.0-slice.N` previews below, as one release. It answers the two
+findings the 0.13.0 package deliberately left open — the accounts a collection agency is paid on and
+the invoice list per agency (`Notes/issues.md` 0.12.0-4/5) — together with the one that came out of
+building them.
+
+- **A collection agency can be paid on several accounts, and the invoice says which one.** In
+  practice one agency lists several accounts on its bills and names a different one on the next —
+  nothing is replaced, each bill simply picks one. Bank accounts are therefore no longer a history
+  with one account in force at a time: they stand side by side, in the order they were recorded, and
+  the invoice carries the account it goes to. The create form suggests the agency's first account as
+  soon as the agency is picked, offers the others, and takes an unknown one on the spot; the detail
+  mask edits the same choice later, with the GiroCode, the payment details and the payment reminder
+  all following it. Every invoice recorded so far keeps the account it showed: the migration writes
+  it down, resolved by the old rule, so nothing changes over the upgrade. The "valid from" date of
+  an account goes — what it said is kept in the account's note.
+- **The invoice list can be asked who bills it.** Which invoices go through this agency, which of
+  them on this account of it, which came from this provider — questions that grew out of an agency
+  holding several accounts at once, and that nothing could answer so far. The invoice page keeps its
+  number search and gains a filter row beside it: agency, one of its accounts, provider, and a
+  status, from a single one to "not done yet". The result list names the provider, the agency and
+  the IBAN an invoice goes to, so a further filter is a matter of one more entry. A row of
+  "Abrechnungsdienstleister" and of "Leistungserbringer" links straight into that list, already
+  narrowed to the record. The filter is written into the address, so a filtered list can be
+  bookmarked, reloaded, and returned to from the workspace instead of landing on an empty page.
+- **A suggestion list bears what it offers.** Picking a bank account showed the IBAN in a list
+  pinned to the width of its field, so it scrolled sideways — on a scrollbar that could not even be
+  grabbed, since reaching for it closed the list. The list now takes the field's width as its
+  minimum and grows with its content up to the room the window leaves, breaking an entry onto a
+  second line where even that is not enough. Every picker in the app is the better for it. And an
+  IBAN is printed the way it is read, grouped in fours, wherever it is shown; what is stored, sent
+  and encoded into the GiroCode stays compact, and the search ignores spaces.
+
 ## 0.14.0-slice.3 — 2026-09-29
 
 - **A suggestion list is no longer too narrow for what it offers.** Picking a bank account showed
