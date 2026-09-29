@@ -7,6 +7,14 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.15.0-slice.3 — 2026-09-29
+
+- **The GiroCode no longer gives up its place.** Entering a payment date takes the code away — there
+  is nothing left to transfer — and the button simply disappeared with it. The detail mask sizes
+  itself to its content, so on a wide screen the whole dialog jumped narrower mid-entry. The button
+  now keeps its place when it goes: hidden rather than removed, out of the tab order and out of a
+  screen reader's way, but with its space held, so the row and the dialog stay put.
+
 ## 0.15.0-slice.2 — 2026-09-29
 
 - **An amount is taken over with one click.** When invoices are booked onto a Leistungsabrechnung,

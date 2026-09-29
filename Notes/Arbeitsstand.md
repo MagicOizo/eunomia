@@ -16,6 +16,6 @@ Nach jeder umgesetzten Scheibe wandern drei Dinge zusammen: der Haken hier, der 
       (issues.md 0.13.0-1/-2/-3), v0.15.0-slice.1
 - [x] **Slice 48 — Betrag per Klick in die Erstattung übernehmen** (issues.md 0.13.0-4),
       v0.15.0-slice.2
-- [ ] **Slice 49 — Der GiroCode gibt seinen Platz nicht her** (issues.md 0.13.0-5): der Knopf
-      verschwindet per `v-if`, und der wide-Dialog misst sich am Inhalt
+- [x] **Slice 49 — Der GiroCode gibt seinen Platz nicht her** (issues.md 0.13.0-5),
+      v0.15.0-slice.3
 

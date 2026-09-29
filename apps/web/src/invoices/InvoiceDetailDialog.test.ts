@@ -127,6 +127,65 @@ describe('InvoiceDetailDialog direct payment', () => {
 });
 
 /**
+ * Slice 49: the GiroCode keeps its place. The wide dialog measures itself
+ * against its content, so a button that comes and goes carried the dialog's
+ * width with it (issues.md 0.13.0-5).
+ */
+describe('InvoiceDetailDialog GiroCode', () => {
+  const agencyAccounts = {
+    'c-1': [
+      {
+        agencyAccountUID: 'g-1',
+        bankAccount: 'DE89370400440532013000',
+        bic: null,
+        recipientName: null,
+        note: null,
+      },
+    ],
+  };
+
+  function openWithAccount(overrides: Partial<InvoiceDto> = {}) {
+    return mount(InvoiceDetailDialog, {
+      props: {
+        open: true,
+        invoice: invoice({ agencyUID: 'c-1', agencyAccountUID: 'g-1', ...overrides }),
+        accountName: 'John Doe',
+        facilities: [],
+        agencies: [{ value: 'c-1', label: 'Inkasso Eins' }],
+        agencyAccounts,
+        contracts: [],
+        planInvoice: null,
+        submitting: false,
+        error: null,
+      },
+      attachTo: document.body,
+    });
+  }
+
+  it('offers the code while there is something left to transfer', () => {
+    const wrapper = openWithAccount();
+    const slot = wrapper.find('.eu-detail__qr');
+
+    expect(slot.exists()).toBe(true);
+    expect(slot.classes()).not.toContain('is-hidden');
+    wrapper.unmount();
+  });
+
+  it("keeps the button's place once the invoice is paid, instead of dropping it", async () => {
+    const wrapper = openWithAccount();
+
+    row(wrapper, 'Zahlungsdatum')?.vm.$emit('update:modelValue', '2025-02-20');
+    await nextTick();
+
+    const slot = wrapper.find('.eu-detail__qr');
+    // Still in the mask — hidden, so the row and the dialog keep their width.
+    expect(slot.exists()).toBe(true);
+    expect(slot.classes()).toContain('is-hidden');
+    wrapper.unmount();
+  });
+});
+
+/**
  * Slice 44: the invoice names the bank account it goes to. The mask offers the
  * accounts of the agency it points at, and mirrors the API's rule about what a
  * change of agency does to that choice.

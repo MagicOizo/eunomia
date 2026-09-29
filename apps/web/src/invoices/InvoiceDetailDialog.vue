@@ -632,14 +632,20 @@ function submit(): void {
         @create="accountPicker.start(String(values.agencyUID ?? ''))"
       >
         <template #after>
-          <PaymentQrPopover
-            v-if="showQr"
-            :recipient="agencyNameForSelected"
-            :iban="ibanForSelected"
-            :bic="accountForSelected?.bic"
-            :amount="amountForQr"
-            :subject="subjectForQr"
-          />
+          <!-- Always rendered, only hidden: the wide dialog measures itself
+               against its content, so a button that disappears takes the
+               dialog's width with it while a payment date is being typed
+               (issues.md 0.13.0-5). `visibility: hidden` keeps the space and
+               takes the button out of the tab order and the a11y tree alike. -->
+          <span class="eu-detail__qr" :class="{ 'is-hidden': !showQr }">
+            <PaymentQrPopover
+              :recipient="agencyNameForSelected"
+              :iban="ibanForSelected"
+              :bic="accountForSelected?.bic"
+              :amount="amountForQr"
+              :subject="subjectForQr"
+            />
+          </span>
         </template>
       </EuDetailField>
       <EuDetailField
@@ -891,6 +897,14 @@ function submit(): void {
 </template>
 
 <style scoped>
+/* The GiroCode keeps its place in the IBAN row even once there is nothing left
+   to transfer: the mask sizes itself to its content, so a button that vanishes
+   narrows the whole dialog while a payment date is being typed (issues.md
+   0.13.0-5). Hidden, not removed — the space stays, the button does not. */
+.eu-detail__qr.is-hidden {
+  visibility: hidden;
+}
+
 /* The IBAN row replaces its value cell to carry the GiroCode button next to
    the number, so it repeats the inset of a plain readonly value below. */
 .eu-detail__error {

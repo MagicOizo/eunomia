@@ -1926,6 +1926,36 @@ und auf „noch offen 100,00 €" den jeweiligen Wert ins Feld, Tab erreicht bei
 übernimmt, der Fokusring (3 px) steht frei im Scroll-Container; in „Erstattung ändern" springt der
 Betrag von der gebuchten 100,00 € auf die vollen 260,00 €.
 
+## Slice 49 — Der GiroCode gibt seinen Platz nicht her (umgesetzt 2026-09-29)
+**Anlass:** issues.md 0.13.0-5. Sobald ein Zahlungsdatum gesetzt wird, gibt es nichts mehr zu
+überweisen, und `showQr` wird falsch — der Knopf verschwand per `v-if` ersatzlos. Der
+Anzeigemasken-Dialog (`is-wide`) misst sich zwischen 38rem und 44rem am Inhalt, also wurde der ganze
+Dialog beim Tippen schmaler.
+
+**Entscheidung (Planmodus, mit dem Autor geklärt):** verborgen statt entfernt, genau der
+Unterschied, den der Befund benennt. `PaymentQrPopover` wird immer gerendert, in einem
+`<span class="eu-detail__qr">`, der bei `!showQr` `visibility: hidden` trägt. Das nimmt den Knopf aus
+der Tabreihenfolge **und** aus dem Accessibility-Baum, hält aber exakt seinen eigenen Platz — kein
+geschätztes Maß für einen Platzhalter. `showQr` selbst bleibt, wie es war; falsch war nicht die
+Bedingung, sondern ihre Wirkung auf die Geometrie.
+
+**Befunde beim Bauen:**
+
+- **Kosten: keine.** `PaymentQrPopover` erzeugt den Code erst beim ersten Öffnen (`requested`), ein
+  unsichtbarer Knopf rechnet also nichts.
+- **Der Dev-Datenbestand zeigt den Fehler nicht.** Jede Maske dort bleibt unter der 38rem-Untergrenze
+  des Dialogs, die Breite kommt also vom Minimum und nicht vom Inhalt — gemessen: 608 px, vorher wie
+  nachher. Der Mechanismus wurde deshalb im laufenden Browser freigelegt, indem die Untergrenze
+  kurz aufgehoben wurde: mit Knopf 598,9 px, ohne Knopf (das alte `v-if`) 570,1 px, mit dem neuen
+  verborgenen Knopf wieder 598,9 px. Die knapp 29 px sind der Sprung, den der Autor auf 1905 px
+  Bildschirmbreite gesehen hat.
+
+**Geprüft:** 292 Web-Tests (zwei neue: der Slot steht mit und ohne Zahlungsdatum, die Klasse
+`is-hidden` kommt dazu statt des Knopfes zu verschwinden), 260 API-Tests gegen `eunomia_test`, Lint,
+Typecheck, Prettier. Im laufenden Browser bei 1905 px, hell und dunkel: Zahlungsdatum setzen lässt
+die Dialogbreite bei 608 px, der Platz des Knopfes bleibt 24,8 px breit, `visibility` wechselt auf
+`hidden` und der Knopf ist nicht mehr per Tab erreichbar.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

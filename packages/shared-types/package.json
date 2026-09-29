@@ -1,6 +1,6 @@
 {
   "name": "@eunomia/shared-types",
-  "version": "0.15.0-slice.2",
+  "version": "0.15.0-slice.3",
   "private": true,
   "description": "TypeScript types shared between apps/api and apps/web.",
   "type": "module",
