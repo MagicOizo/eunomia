@@ -37,7 +37,7 @@ const invoice: InvoiceDto = {
   reimbursedTotal: 150,
   allocationCount: 1,
   remainingAmount: 250,
-  workflowStatus: 'teilerstattet',
+  workflowStatus: 'teilabgerechnet',
   submissions: [],
   exclusions: [],
   hasOpenObjection: false,

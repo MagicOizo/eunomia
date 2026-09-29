@@ -1919,6 +1919,14 @@ allermeisten Fällen schon in der Kopfzeile der Karte darüber — und wurde tro
   ein Komma; ein Zeilenumbruch vor dem Textknoten hätte daraus „260,00 € ," gemacht. Die
   `</button\n>`-Schreibweise (die Prettier selbst erzeugt) hält den Satz zusammen.
 
+**Nachtrag (in der CI aufgefallen):** Das neue Fixture in `AllocationDialog.test.ts` trug
+`workflowStatus: 'teilerstattet'` — ein Status, den es nicht gibt (`status.ts` kennt
+`teilabgerechnet`). Vitest prüft keine Typen, der Fehler fiel also erst im `vue-tsc`-Lauf der CI und
+im Docker-Build auf. Lokal war er sichtbar gewesen: `npm run typecheck` läuft über alle Workspaces
+und macht nach einem Fehlschlag mit dem nächsten weiter, sodass die letzten Ausgabezeilen grün
+aussehen, während der Exit-Code 2 ist. Seither wird der Exit-Code geprüft, nicht das Ende der
+Ausgabe.
+
 **Geprüft:** 290 Web-Tests (fünf neue: Übernahme beider Beträge, die Nachbarkarte bleibt leer, die
 aria-Labels, und zwei für „Erstattung ändern"), 260 API-Tests gegen `eunomia_test`, Lint, Typecheck,
 Prettier. Im laufenden Browser, hell und dunkel: im Zuordnen-Dialog setzt der Klick auf „260,00 €"
