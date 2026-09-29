@@ -138,8 +138,10 @@ je Punkt in [Sicherheits-Review.md](Sicherheits-Review.md), dort unter der genan
 ## Version 0.16.0-slice.2
 ### Date 20260929
 Befunde aus dem Code-Review (Meilenstein B vor 1.0.0). Begründung, Fundstelle, Aufwand und Risiko
-je Punkt in [Code-Review.md](Code-Review.md), dort unter der genannten CR-Nummer. Die Empfehlung
-„vor 1.0“ / „nach 1.0“ steht dort ebenfalls; die Auswahl trifft der Autor.
+je Punkt in [Code-Review.md](Code-Review.md), dort unter der genannten CR-Nummer. Alle 37 Punkte
+werden vor 1.0.0 umgesetzt (Entscheidung vom 20260929); besonders benannt wurden CR-04, CR-05,
+CR-20, CR-22, CR-23, CR-29, CR-30 und CR-31. Der Schnitt in Scheiben steht in Abschnitt 7 des
+Code-Reviews.
 1.	Geteilte Typen: `packages/shared-types` ist seit Slice 1 leer (CR-01)
 	Das Paket enthält nur `export type Placeholder = never`. Seitdem führen beide Apps dieselben Verträge doppelt: die Status-Unions, die 51 Fehlercodes, die Enum-Werte (`ContractKind`, `BonusForfeitRule`), die Settings-Schlüssel und rund zwanzig DTO-Formen, die im Web als Interface nachgeschrieben sind. Der Compiler prüft heute keine einzige dieser Zusagen; eine Spalte, die ihren Typ wechselt, fällt erst zur Laufzeit auf. Paket aufsetzen (Build-Reihenfolge, Vite-Alias, Image) und zuerst hineinlegen, was auseinanderlaufen kann: Status, Fehlercodes, Enums, Settings-Schlüssel. CR-02 bis CR-05 folgen dieser Scheibe.
 2.	Zahlungsampel zweimal implementiert, mit abweichender Datumsrechnung (CR-02)

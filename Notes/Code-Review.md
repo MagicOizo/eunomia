@@ -19,6 +19,13 @@ Dokument trägt Begründung, Fundstelle, Aufwand und Risiko; `issues.md` trägt 
 ist ein Vorschlag, keine Entscheidung. Kein Befund hier ist ein Fehler, den ein Nutzer heute sieht —
 wo doch, steht es ausdrücklich dabei.
 
+**Entscheidung des Autors, 2026-09-29: alle 37 Befunde werden vor 1.0.0 umgesetzt.** Es gibt keine
+Frist, auf die das Release zuläuft, und damit keinen Grund, etwas als Rückstand zu führen. Die
+Spalte „Empfehlung“ in der Übersicht bleibt stehen, weil sie festhält, wie das Review selbst
+gewichtet hat — sie ist ab hier eine Notiz, keine Anweisung. Als besonders behebenswert benannt hat
+der Autor CR-04, CR-05, CR-20 (ausdrücklich unter dem Gesichtspunkt der Lesbarkeit), CR-22, CR-23,
+CR-29, CR-30 und CR-31; sie sind im Schnitt in Abschnitt 7 nach vorn gezogen.
+
 ## 2 Maßstab
 
 Geprüft wurde gegen das, was dieses Projekt sich selbst vorgenommen hat, nicht gegen einen
@@ -932,25 +939,64 @@ prüft:
   Umgebungsvariable dafür wäre Vorrat ohne Bedarf.
 - *Der Verzicht auf eine Logging-Bibliothek.* In `lib/log.ts` begründet, und die Begründung trägt.
 
-## 7 Vorschlag für den Schnitt der Scheiben
+## 7 Der Schnitt der Scheiben
 
-Nicht Teil der Befunde, sondern das, was beim Lesen als natürliche Gruppierung auffiel. Die
-Entscheidung, was davon vor 1.0.0 gehört, trifft der Autor.
+Nach der Entscheidung aus Abschnitt 1 (alles vor 1.0.0) sind die 37 Befunde dieses Reviews und die
+17 des Sicherheits-Reviews zu **18 Scheiben in vier Blöcken** geschnitten. Die Reihenfolge folgt drei
+Zwängen, nicht dem Geschmack:
 
-1. **Aufräumen** (CR-28, CR-35, CR-36, CR-21, CR-06, CR-12, CR-13) — lauter kleine Schnitte, kein Risiko,
-   und danach ist die Liste der toten Pfade leer. Ein halber Tag.
-2. **Die Helfer durchsetzen** (CR-08, CR-09, CR-10, CR-11) — vier mechanische Vereinheitlichungen,
-   durch die Integrationstests gedeckt.
-3. **Der Client hält die Sitzung** (CR-24, CR-25) — muss vor der SEC-07-Scheibe liegen.
-4. **Die Kontoskopierung bekommt einen Ort** (CR-07) — zusammen mit SEC-04, das dieselbe Frage von
-   der anderen Seite stellt.
-5. **`invoices.ts` schneiden** (CR-15) — vor den SEC-Scheiben, die dieselbe Datei anfassen.
-6. **Das geteilte Paket** (CR-01, CR-02, CR-03) — die größte der frühen Scheiben, und die, die den
-   meisten künftigen Ärger verhindert.
-7. **Die Oberfläche lernt das Rechtemodell** (CR-26) — breit, sichtbar, und die einzige echte
-   Funktionslücke.
-8. **Die Zahl sehen** (CR-32, CR-33) — zusammen mit SEC-10 und SEC-17, weil alle vier die CI und die
-   Testsuiten anfassen.
+- **CR-24 vor SEC-07.** Ohne Single-Flight im Client löst die App selbst aus, was die
+  Reuse-Erkennung als Diebstahl werten würde.
+- **CR-15 vor SEC-01 und SEC-11.** Die Sicherheitsscheiben landen in `invoices.ts`; die Datei wird
+  vorher geteilt, sonst wird derselbe Code zweimal angefasst.
+- **CR-20 früh.** Eine Umbenennung quer durch die Module kollidiert mit jedem größeren Umbau, der
+  danach käme — also kommt sie davor.
 
-Was danach bleibt (CR-04, CR-05, CR-14 bis CR-20, CR-22, CR-23, CR-27, CR-29 bis CR-31, CR-34,
-CR-37), ist Rückstand ohne Frist.
+Die acht vom Autor besonders benannten Befunde (CR-04, CR-05, CR-20, CR-22, CR-23, CR-29, CR-30,
+CR-31) sind entsprechend nach vorn gezogen; sie sind unten mit **(★)** markiert.
+
+### Block I — Ordnung
+
+1. **Tote Pfade und Namen im Kleinen** — CR-28, CR-35, CR-36, CR-31 (★), CR-21. Nichts davon ändert
+   Verhalten; danach ist die Liste der toten Pfade leer.
+2. **Kleine Korrekturen an der API** — CR-06, CR-12, CR-13, CR-14, CR-22 (★), SEC-12, SEC-16. Sieben
+   Einzelfehler, jeder für sich in Minuten erledigt, jeder für sich schwer wiederzufinden.
+3. **Ein Name für die Kontoverbindung** — CR-20 (★). Rein mechanisch, quer durch beide Apps, ohne
+   Migration: `bankAccount` statt `account`, wo die Bankverbindung gemeint ist.
+4. **Die Helfer durchsetzen** — CR-08, CR-09, CR-10, CR-11, CR-23 (★). Vier Vereinheitlichungen und
+   eine verschobene Zeile; danach gibt es je einen Weg, zu antworten, zu transaktionieren, zu prüfen
+   und Parameter zu lesen.
+5. **Das geteilte Paket** — CR-01, CR-02, CR-03, CR-04 (★), CR-05 (★). Die größte Scheibe des Blocks
+   und die, die den meisten künftigen Ärger verhindert.
+
+### Block II — Sitzung und Sichtbarkeit
+
+6. **Der Client hält die Sitzung** — CR-24, CR-25. Muss vor Scheibe 7 liegen.
+7. **Anmeldung und Sitzungen** — SEC-05, SEC-06, SEC-07, SEC-08. Der ganze Auth-Block auf einmal:
+   eigener Passwortwechsel, Widerruf bei Passwortänderung, Reuse-Erkennung, Aufräumen.
+8. **Kontotrennung an einem Ort** — CR-07, SEC-03, SEC-04. Der Skopierungs-Helfer und die beiden
+   Stellen, an denen die Trennung heute nicht greift.
+
+### Block III — Struktur
+
+9. **`invoices.ts` schneiden** — CR-15. Vor den Sicherheitsscheiben, die dieselbe Datei anfassen.
+10. **Grenzen an den Eingängen** — SEC-01, SEC-11, CR-18. Schemata, Obergrenzen und das
+    Stapel-Einfügen, das an denselben Listen hängt.
+11. **Dialoge und große Ansichten** — CR-29 (★), CR-30 (★). Das Gegenstück zu Scheibe 9 auf der
+    Web-Seite, und die Vorbereitung für Scheibe 12.
+12. **Die Oberfläche lernt das Rechtemodell** — CR-26. Die einzige echte Funktionslücke des Reviews.
+13. **Weniger Fragen an die Datenbank** — CR-16, CR-17, CR-27.
+14. **Typen statt Zusicherungen** — CR-19.
+
+### Block IV — Betrieb und Nachweis
+
+15. **Header, Image, Abhängigkeiten** — SEC-02, SEC-10, SEC-13, SEC-14, CR-37. Alles, was außerhalb
+    des Anwendungscodes liegt.
+16. **Prüfbar statt dokumentiert** — SEC-17, CR-32, CR-33, CR-34. Die Routentabelle, das Rechtemodell
+    und die Abdeckungszahl.
+17. **Audit-Trail** — SEC-09.
+18. **Aufbewahrung, Löschung, Auskunft** — SEC-15. Die größte der Sicherheitsscheiben, und die
+    einzige mit neuen Masken.
+
+Danach folgen die Delta-Nachprüfung der Invarianten I-1 bis I-13 (Abschnitt 8 des
+Sicherheits-Reviews) und 1.0.0.
