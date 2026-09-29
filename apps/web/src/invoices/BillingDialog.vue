@@ -195,6 +195,17 @@ const forfeit = usePresetToggle(() => {
 // Another billing or policy means another stored choice: drop the user's flip.
 watch([selectedBilling, contractUID], () => forfeit.reset());
 
+/**
+ * An amount from the card's head goes straight into its reimbursement field
+ * (issues.md 0.13.0-4). Both amounts shown there are worth taking: the full one
+ * where the policy reimbursed everything, the open one where an earlier billing
+ * already paid part of the bill.
+ */
+function takeAmount(invoiceUID: string, amount: number): void {
+  const entry = entries[invoiceUID];
+  if (entry) entry.reimbursement = amount;
+}
+
 function resetEntries(): void {
   for (const key of Object.keys(entries)) delete entries[key];
   for (const invoice of rows.value) {
@@ -401,8 +412,26 @@ function submit(): void {
                 (invoice.facilityUID && facilityNames[invoice.facilityUID]) ||
                 'ohne Leistungserbringer'
               }}
-              · {{ germanDate(invoice.invoiceDate) }} · {{ euro(invoice.invoiceAmount) }} · noch
-              offen {{ euro(invoice.remainingAmount) }}
+              · {{ germanDate(invoice.invoiceDate) }} ·
+              <button
+                type="button"
+                class="eu-bill__take"
+                :aria-label="`Rechnungsbetrag ${euro(invoice.invoiceAmount)} in Erstattung übernehmen`"
+                :title="`${euro(invoice.invoiceAmount)} in Erstattung übernehmen`"
+                @click="takeAmount(invoice.invoiceUID, invoice.invoiceAmount)"
+              >
+                {{ euro(invoice.invoiceAmount) }}
+              </button>
+              · noch offen
+              <button
+                type="button"
+                class="eu-bill__take"
+                :aria-label="`Offenen Betrag ${euro(invoice.remainingAmount)} in Erstattung übernehmen`"
+                :title="`${euro(invoice.remainingAmount)} in Erstattung übernehmen`"
+                @click="takeAmount(invoice.invoiceUID, invoice.remainingAmount)"
+              >
+                {{ euro(invoice.remainingAmount) }}
+              </button>
               <template v-if="submittedAt(invoice, contractUID)">
                 · eingereicht am {{ germanDate(submittedAt(invoice, contractUID)!) }}
               </template>
@@ -545,6 +574,27 @@ function submit(): void {
   flex: 1;
   color: var(--eu-color-text-muted);
   font-size: 0.85rem;
+}
+
+/* The two amounts in the card's head double as a shortcut into the field under
+   them (issues.md 0.13.0-4): they read as the text they were, and only hover
+   and focus say that there is something to click. */
+.eu-bill__take {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0.2em;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
+.eu-bill__take:hover,
+.eu-bill__take:focus-visible {
+  color: var(--eu-color-accent-text);
+  text-decoration-style: solid;
 }
 
 .eu-bill__fields {

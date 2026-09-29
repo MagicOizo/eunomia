@@ -3,6 +3,7 @@ import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BillingListDto, InvoiceDto, InvoiceSubmissionDto } from './api';
+import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import BillingDialog from './BillingDialog.vue';
 
 const { searchBillings, listAccountInvoices } = vi.hoisted(() => ({
@@ -113,6 +114,54 @@ async function openDialog(props: Partial<InstanceType<typeof BillingDialog>['$pr
 beforeEach(() => {
   searchBillings.mockResolvedValue([billing]);
   listAccountInvoices.mockResolvedValue(invoices);
+});
+
+/**
+ * The amounts in a card's head are a shortcut into its reimbursement field
+ * (issues.md 0.13.0-4): the value stands right above the field it almost always
+ * belongs in, and was still typed by hand.
+ */
+describe('BillingDialog amount shortcut', () => {
+  /** The reimbursement field of the nth card, as the currency component sees it. */
+  function amountOf(wrapper: Awaited<ReturnType<typeof openDialog>>, index: number) {
+    return wrapper.findAllComponents(EuCurrencyField)[index].props('modelValue');
+  }
+
+  /** The nth take action of the card at `card` — 0 the invoice amount, 1 the open one. */
+  function take(wrapper: Awaited<ReturnType<typeof openDialog>>, card: number, which: number) {
+    return wrapper.findAll('.eu-bill__card')[card].findAll('.eu-bill__take')[which];
+  }
+
+  it('takes the invoice amount into the card it belongs to', async () => {
+    const wrapper = await openDialog();
+
+    await take(wrapper, 0, 0).trigger('click');
+
+    expect(amountOf(wrapper, 0)).toBe(400);
+    // The other card is untouched: each shortcut fills its own field.
+    expect(amountOf(wrapper, 1)).toBeNull();
+    wrapper.unmount();
+  });
+
+  it('takes the open amount where an earlier billing already paid part', async () => {
+    const wrapper = await openDialog({
+      invoices: [invoice('R-1', { reimbursedTotal: 150, remainingAmount: 250 })],
+    });
+
+    await take(wrapper, 0, 1).trigger('click');
+
+    expect(amountOf(wrapper, 0)).toBe(250);
+    wrapper.unmount();
+  });
+
+  it('says what each amount would do, for a screen reader as well', async () => {
+    const wrapper = await openDialog();
+    const labels = take(wrapper, 0, 0).attributes('aria-label');
+
+    expect(labels).toContain('in Erstattung übernehmen');
+    expect(take(wrapper, 0, 1).attributes('aria-label')).toContain('Offenen Betrag');
+    wrapper.unmount();
+  });
 });
 
 describe('BillingDialog with several invoices', () => {

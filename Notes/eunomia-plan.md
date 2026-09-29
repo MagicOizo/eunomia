@@ -1892,6 +1892,40 @@ hinzufügen, füllen und entfernen, und eine Rechnung mit zwei Tagen wurde angel
 über Papierkorb → endgültig löschen wieder entfernt). Fokusring per Tastatur auf der leisen
 Schaltfläche — 3 px, 2 px Abstand, unbeschnitten.
 
+## Slice 48 — Der Betrag springt mit einem Klick in die Erstattung (umgesetzt 2026-09-29)
+**Anlass:** issues.md 0.13.0-4. Beim Zuordnen steht der Betrag, der in „Erstattung" gehört, in den
+allermeisten Fällen schon in der Kopfzeile der Karte darüber — und wurde trotzdem abgetippt.
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Beide Beträge sind klickbar, nicht nur einer.** Der Rechnungsbetrag ist der Griff, wenn die
+  Police alles erstattet hat; „noch offen" der, wenn eine frühere Leistungsabrechnung schon einen
+  Teil getragen hat. Welcher gemeint ist, weiß nur der Brief in der Hand des Nutzers, also bietet
+  die Karte beide an.
+- **Der Griff sitzt am Betrag selbst, nicht in einem Icon daneben.** Die Zeile bleibt Text; erst
+  Hover und Fokus färben und verfestigen die punktierte Unterstreichung. Ein Icon je Betrag hätte
+  aus der ruhigen Metazeile eine Werkzeugleiste gemacht.
+- **Derselbe Griff in „Erstattung ändern".** Der Dialog nennt den Rechnungsbetrag im Notiztext über
+  genau dem Feld, das korrigiert wird (`AllocationDialog`) — dieselbe Handbewegung, dieselbe Optik.
+  Was für diese eine Buchung zu viel ist, fängt wie bisher die Prüfung beim Speichern ab, hier wie
+  auf dem Server.
+
+**Befunde beim Bauen:**
+
+- **Die Karte füllt nur ihr eigenes Feld.** `takeAmount(invoiceUID, betrag)` greift in `entries`,
+  das je Rechnung einen Eintrag hält; ein Test mit zwei Karten sichert, dass der Klick nicht in die
+  Nachbarkarte schreibt.
+- **Leerzeichen vor dem Komma.** Im Notiztext von „Erstattung ändern" folgt dem Betrag unmittelbar
+  ein Komma; ein Zeilenumbruch vor dem Textknoten hätte daraus „260,00 € ," gemacht. Die
+  `</button\n>`-Schreibweise (die Prettier selbst erzeugt) hält den Satz zusammen.
+
+**Geprüft:** 290 Web-Tests (fünf neue: Übernahme beider Beträge, die Nachbarkarte bleibt leer, die
+aria-Labels, und zwei für „Erstattung ändern"), 260 API-Tests gegen `eunomia_test`, Lint, Typecheck,
+Prettier. Im laufenden Browser, hell und dunkel: im Zuordnen-Dialog setzt der Klick auf „260,00 €"
+und auf „noch offen 100,00 €" den jeweiligen Wert ins Feld, Tab erreicht beide Griffe, Enter
+übernimmt, der Fokusring (3 px) steht frei im Scroll-Container; in „Erstattung ändern" springt der
+Betrag von der gebuchten 100,00 € auf die vollen 260,00 €.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

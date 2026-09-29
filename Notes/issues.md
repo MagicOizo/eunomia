@@ -87,7 +87,7 @@
 	"Nicht gedeckt" ist eine Eigenschaft, die erst nach dem Anlegen festgelegt werden muss, sie braucht nicht im Anlegen, sondern nur im Bearbeiten-Dialog eingestellt werden können
 3.	Weitere-Behandlungstage nimmt zu viel Raum ein — Umgesetzt mit v0.15.0-slice.1
 	Die Funktion kommt nur bei ca. 10% der Rechnungen zum Einsatz. Sie sollte dezenter im Anlegen-Dialog enthalten sein. Der Rahmen mit fettem Label, Beschreibung und riesiger Schaltfläche sieht so aus, als wäre diese Angabe fast immer erforderlich
-4.	Betrag Übernehmen bei Zuordnung
+4.	Betrag Übernehmen bei Zuordnung — Umgesetzt mit v0.15.0-slice.2
 	Es wäre eine Erleichterung mit einem einfachen Klicke auf den Betrag in den Rechnungsdetails (oder einer dezenten Icon daneben) bei der Zuordnung diesen Betrag direkt in das Erstattung-Feld zu übernehmen.
 5.	GiroCode-Icon ändert Dialogbreite
 	Wenn ich eine Rechnung habe und das Zahlungsdatum setze, wo vorher keines gesetzt war, verschwindet das GiroCode Icon. Der Platz wird aber nicht reserviert (Unterschied zwischen hidden und visible), wodurch der ganze Dialog durch das Setzen des Zahlungsdatums schmaler wird. Das ist nicht schön. (Testsystem hat 1905 Displaybreite)

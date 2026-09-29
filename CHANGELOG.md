@@ -7,6 +7,16 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.15.0-slice.2 — 2026-09-29
+
+- **An amount is taken over with one click.** When invoices are booked onto a Leistungsabrechnung,
+  the amount that belongs in "Erstattung" is usually already on the card above the field — the full
+  invoice amount where the policy paid everything, the open one where an earlier billing paid part
+  of it — and was still typed by hand. Both now act as the way into the field of their own card: a
+  click, or Enter on the keyboard, writes the amount where it was going anyway. The same handle
+  sits on the invoice amount in "Erstattung ändern". Nothing is preset and nothing is sent
+  differently; what the numbers were before is what they still say.
+
 ## 0.15.0-slice.1 — 2026-09-29
 
 - **The create form asks only what a new invoice needs.** Three findings from using 0.13.0, all on

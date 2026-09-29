@@ -52,6 +52,15 @@ watch(
   { immediate: true },
 );
 
+/**
+ * The invoice amount named in the note goes into the field below it (issues.md
+ * 0.13.0-4), the same shortcut the Zuordnen dialog offers. What is too much for
+ * this one booking is caught on save, here as on the server.
+ */
+function takeInvoiceAmount(): void {
+  if (props.invoice) reimbursement.value = props.invoice.invoiceAmount;
+}
+
 function submit(): void {
   const allocation = props.allocation;
   if (!allocation) return;
@@ -80,8 +89,17 @@ function submit(): void {
   <EuDialog :open="open" title="Erstattung ändern" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <p v-if="allocation && invoice" class="eu-form__note">
-        Rechnung {{ invoice.invoiceNumber }} über {{ euro(invoice.invoiceAmount) }}, erstattet über
-        Abrechnung {{ allocation.billingNumber }} vom {{ germanDate(allocation.billingDate) }}.
+        Rechnung {{ invoice.invoiceNumber }} über
+        <button
+          type="button"
+          class="eu-alloc__take"
+          :aria-label="`Rechnungsbetrag ${euro(invoice.invoiceAmount)} in Erstattung übernehmen`"
+          :title="`${euro(invoice.invoiceAmount)} in Erstattung übernehmen`"
+          @click="takeInvoiceAmount"
+        >
+          {{ euro(invoice.invoiceAmount) }}</button
+        >, erstattet über Abrechnung {{ allocation.billingNumber }} vom
+        {{ germanDate(allocation.billingDate) }}.
       </p>
       <div class="eu-alloc__fields">
         <EuCurrencyField v-model="reimbursement" label="Erstattung" />
@@ -117,6 +135,27 @@ function submit(): void {
   margin: 0;
   color: var(--eu-color-error-fg);
   font-size: 0.9rem;
+}
+
+/* The amount in the note is also the way into the field under it (issues.md
+   0.13.0-4): text at rest, clickable on hover and focus — the same shortcut as in
+   the Zuordnen dialog. */
+.eu-alloc__take {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0.2em;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
+.eu-alloc__take:hover,
+.eu-alloc__take:focus-visible {
+  color: var(--eu-color-accent-text);
+  text-decoration-style: solid;
 }
 
 .eu-alloc__fields {
