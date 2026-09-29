@@ -7,6 +7,35 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.15.0 — 2026-09-29
+
+Everything from the three `0.15.0-slice.N` previews below, as one release. It answers the five
+findings that came out of using 0.13.0 on real data — all of them polish on masks that are opened
+many times a day, none of them touching the database, the API or anything already recorded.
+
+- **The create form asks only what a new invoice needs.** Three of the findings sat on the form that
+  is filled in more often than any other mask. The sentence that appeared under
+  "Direkt-/Barzahlung" is gone: what a direct payment does to the due date and the payment date is
+  the API's rule, and the fields it talked about leave the form in the same moment the switch is on.
+  "Nicht gedeckt" is gone as well — a bill is marked as uncovered once it exists, not while it is
+  being written down, so the mark lives in the detail mask alone. And the further treatment days,
+  which about one bill in ten has, no longer sit in a bordered group with a heading, a standing
+  sentence and a full-size button that made them look all but required: under "Behandlungsdatum"
+  there is now a quiet add action, and the rows — with their own labels and remove actions — appear
+  above it as soon as it is used.
+- **An amount is taken over with one click.** When invoices are booked onto a Leistungsabrechnung,
+  the amount that belongs in "Erstattung" is usually already on the card above the field — the full
+  invoice amount where the policy paid everything, the open one where an earlier billing paid part
+  of it — and was still typed by hand. Both now act as the way into the field of their own card: a
+  click, or Enter on the keyboard, writes the amount where it was going anyway. The same handle
+  sits on the invoice amount in "Erstattung ändern". Nothing is preset and nothing is sent
+  differently; what the numbers were before is what they still say.
+- **The GiroCode no longer gives up its place.** Entering a payment date takes the code away — there
+  is nothing left to transfer — and the button simply disappeared with it. The detail mask sizes
+  itself to its content, so on a wide screen the whole dialog jumped narrower mid-entry. The button
+  now keeps its place when it goes: hidden rather than removed, out of the tab order and out of a
+  screen reader's way, but with its space held, so the row and the dialog stay put.
+
 ## 0.15.0-slice.3 — 2026-09-29
 
 - **The GiroCode no longer gives up its place.** Entering a payment date takes the code away — there
