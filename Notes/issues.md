@@ -81,11 +81,11 @@
 	Wenn durch Tarifliche Eigenbeteiligung oder Selbstbeteilung nicht die Volle Rechnungssumme ersetzt wurde, soll die Erstattungssumme in der Rechnungsübersicht rot geschrieben werden, damit der Unterschied direkt auffällt.
 ## Version 0.13.0
 ### Date 20260928
-1.	Unnötige Meldung bei Direktzahlung
+1.	Unnötige Meldung bei Direktzahlung — Umgesetzt mit v0.15.0-slice.1
 	Meldung "Zahlungsziel und Zahlungsdatum werden auf das Rechnungsdatum gesetzt." muss nicht im Dialog stehen, wenn auf Direktzahlung geschaltet wird. Das nimmt nur Platz weg.
-2.	"Nicht gedeckt" nicht im Anlegen-Dialog
+2.	"Nicht gedeckt" nicht im Anlegen-Dialog — Umgesetzt mit v0.15.0-slice.1
 	"Nicht gedeckt" ist eine Eigenschaft, die erst nach dem Anlegen festgelegt werden muss, sie braucht nicht im Anlegen, sondern nur im Bearbeiten-Dialog eingestellt werden können
-3.	Weitere-Behandlungstage nimmt zu viel Raum ein
+3.	Weitere-Behandlungstage nimmt zu viel Raum ein — Umgesetzt mit v0.15.0-slice.1
 	Die Funktion kommt nur bei ca. 10% der Rechnungen zum Einsatz. Sie sollte dezenter im Anlegen-Dialog enthalten sein. Der Rahmen mit fettem Label, Beschreibung und riesiger Schaltfläche sieht so aus, als wäre diese Angabe fast immer erforderlich
 4.	Betrag Übernehmen bei Zuordnung
 	Es wäre eine Erleichterung mit einem einfachen Klicke auf den Betrag in den Rechnungsdetails (oder einer dezenten Icon daneben) bei der Zuordnung diesen Betrag direkt in das Erstattung-Feld zu übernehmen.

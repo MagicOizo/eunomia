@@ -15,7 +15,6 @@ import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { useAgencyAccountPicker } from './agency-account-picker';
 import type { InvoiceDto } from './api';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
-import { reasonRequiredMessage } from './not-covered';
 import {
   differentYearsMessage,
   furtherDays,
@@ -61,11 +60,6 @@ const extraDays = ref<string[]>([]);
 // directPayment = the bill was already paid directly, e.g. cash at a pharmacy —
 // so there is nothing left for the user to transfer.
 const directPayment = ref(false);
-// notCovered = the insurance covers this treatment at no policy, so the invoice
-// is never submitted and counts towards no deductible (Slice 42). The reason is
-// what makes the mark readable later, and is therefore mandatory with it.
-const notCovered = ref(false);
-const notCoveredReason = ref('');
 const localError = ref<string | null>(null);
 
 // Local option copies so an ad-hoc-created entity can be appended and selected
@@ -145,8 +139,6 @@ watch(
     };
     extraDays.value = e ? furtherDays(e) : [];
     directPayment.value = e ? e.directPayment === 1 : false;
-    notCovered.value = e?.notCovered ?? false;
-    notCoveredReason.value = e?.notCoveredReason ?? '';
   },
   { immediate: true },
 );
@@ -176,12 +168,6 @@ function submit(): void {
     return;
   }
 
-  const reason = notCoveredReason.value.trim();
-  if (notCovered.value && reason === '') {
-    localError.value = reasonRequiredMessage();
-    return;
-  }
-
   const dp = directPayment.value;
   const payload: Record<string, unknown> = {
     invoiceNumber: f.invoiceNumber.trim(),
@@ -190,9 +176,6 @@ function submit(): void {
     treatmentDates: days,
     invoiceAmount: f.invoiceAmount,
     directPayment: dp,
-    notCovered: notCovered.value,
-    // Cleared with the mark, the way the API stores it.
-    notCoveredReason: notCovered.value ? reason : null,
     facilityUID: f.facilityUID || null,
     documentLink: f.documentLink.trim() || null,
     // When paid directly there is no transfer, so these are cleared — the API
@@ -220,13 +203,11 @@ function submit(): void {
       <EuTextField v-model="form.invoiceDate" label="Rechnungsdatum" type="date" />
       <EuTextField v-model="form.treatmentDate" label="Behandlungsdatum" type="date" />
 
-      <!-- One bill of a practice often covers several appointments (Slice 41).
-           The first day stays the field above; the rest are rows here. -->
-      <fieldset class="eu-form__group">
-        <legend>Weitere Behandlungstage</legend>
-        <p v-if="extraDays.length === 0" class="eu-form__hint">
-          Nur ein Behandlungstag. Alle Tage müssen im selben Kalenderjahr liegen.
-        </p>
+      <!-- One bill of a practice often covers several appointments (Slice 41),
+           but only about one in ten: the first day stays the field above, the
+           rest are rows that appear behind a quiet add action instead of a
+           bordered group that reads like a required entry (issues.md 0.13.0-3). -->
+      <div class="eu-form__days">
         <div v-for="(day, index) in extraDays" :key="index" class="eu-form__day">
           <EuTextField
             :model-value="day"
@@ -242,10 +223,13 @@ function submit(): void {
             @click="removeDay(index)"
           />
         </div>
-        <EuButton variant="secondary" :icon="faPlus" @click="addDay"
+        <p v-if="extraDays.length > 0" class="eu-form__hint">
+          Alle Behandlungstage müssen im selben Kalenderjahr liegen.
+        </p>
+        <EuButton class="eu-form__add-day" variant="ghost" :icon="faPlus" @click="addDay"
           >Behandlungstag hinzufügen</EuButton
         >
-      </fieldset>
+      </div>
       <EuEntityPicker
         :model-value="form.facilityUID || null"
         label="Leistungserbringer"
@@ -257,19 +241,10 @@ function submit(): void {
       />
       <EuCurrencyField v-model="form.invoiceAmount" label="Betrag" />
 
+      <!-- What a direct payment does to the two dates is the API's rule
+           (Slice 43) and needs no sentence here: the fields it would talk
+           about are gone from the form the moment the switch is on. -->
       <EuToggle v-model="directPayment" label="Direkt-/Barzahlung" />
-      <p v-if="directPayment" class="eu-form__hint">
-        Zahlungsziel und Zahlungsdatum werden auf das Rechnungsdatum gesetzt.
-      </p>
-
-      <!-- Not covered by the insurance at all (Slice 42): never submitted, and
-           out of every deductible. The reason goes with the mark. -->
-      <EuToggle v-model="notCovered" label="Nicht gedeckt (wird nie eingereicht)" />
-      <EuTextField
-        v-if="notCovered"
-        v-model="notCoveredReason"
-        label="Begründung (z. B. kosmetische Behandlung)"
-      />
 
       <template v-if="!directPayment">
         <EuTextField v-model="form.transferUntilDate" label="Zahlungsziel" type="date" />
@@ -349,25 +324,27 @@ function submit(): void {
   font-size: 0.9rem;
 }
 
-.eu-form__group {
-  border: 1px solid var(--eu-color-border);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin: 0;
-}
-
-.eu-form__group legend {
-  font-family: var(--eu-font-heading);
-  padding: 0 0.4rem;
-}
-
 .eu-form__hint {
   margin: 0;
   color: var(--eu-color-text-muted);
   font-size: 0.9rem;
+}
+
+/* The extra days hang under the treatment date, closer to it than a form row
+   would be: they belong to that field rather than standing beside it. */
+.eu-form__days {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: -0.6rem;
+}
+
+/* Quiet by design: smaller than a form button and without a frame, so an entry
+   that is the exception does not look like one that is expected. */
+.eu-form__add-day {
+  align-self: flex-start;
+  font-size: 0.9rem;
+  padding: 0.35em 0.6em;
 }
 
 /* The remove action sits at the field's baseline, next to it (create mode puts

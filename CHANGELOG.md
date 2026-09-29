@@ -7,6 +7,18 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.15.0-slice.1 — 2026-09-29
+
+- **The create form asks only what a new invoice needs.** Three findings from using 0.13.0, all on
+  the same form. The sentence that appeared under "Direkt-/Barzahlung" is gone: what a direct
+  payment does to the due date and the payment date is the API's rule, and the fields it talked
+  about are no longer on the form the moment the switch is on. "Nicht gedeckt" is gone as well — a
+  bill is marked as uncovered once it exists, not while it is being written down, so the mark lives
+  in the detail mask alone. And the further treatment days, which about one bill in ten has, no
+  longer sit in a bordered group with a heading, a standing sentence and a full-size button that
+  made them look all but required: under "Behandlungsdatum" there is now a quiet add action, and
+  the rows — with their own labels and remove actions — appear above it as soon as it is used.
+
 ## 0.14.0 — 2026-09-29
 
 Everything from the three `0.14.0-slice.N` previews below, as one release. It answers the two

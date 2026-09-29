@@ -1851,6 +1851,47 @@ clientWidth`), im Anlegen-Dialog wie in der Anzeigemaske; bei 430 px Fensterbrei
 Zusatz unter die IBAN und wird abgekürzt, die IBAN bleibt ganz. Fokusring per Tastatur am Feld
 „Kontoverbindung" — 3 px, unbeschnitten.
 
+## Slice 47 — Der Anlegen-Dialog fragt nur, was eine neue Rechnung braucht (umgesetzt 2026-09-29)
+**Anlass:** issues.md 0.13.0-1, -2 und -3, drei Befunde aus der Nutzung von 0.13.0 an ein und
+demselben Formular. Es wird häufiger ausgefüllt als jede andere Maske der App, und jede Zeile, die
+nur manchmal gebraucht wird, kostet dort dauerhaft Platz und Aufmerksamkeit.
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Der Satz zur Direktzahlung entfällt ersatzlos.** „Zahlungsziel und Zahlungsdatum werden auf das
+  Rechnungsdatum gesetzt" erschien genau dann, wenn der Schalter umgelegt wurde, und schob den Rest
+  des Formulars nach unten. Die Regel selbst steht in der API (`nextDirectPayment()`, Slice 43),
+  nicht in diesem Hinweis — und die Felder, von denen er spricht, verschwinden im selben Moment
+  ohnehin aus dem Formular.
+- **„Nicht gedeckt" fliegt ganz aus dem Anlegen-Dialog, nicht nur hinter ein `v-if`.** Die Marke
+  wird einer Rechnung angesehen, nachdem sie existiert; gepflegt wird sie in der Anzeigemaske. Der
+  Payload lässt `notCovered`/`notCoveredReason` beim Anlegen weg — beide sind im Create-Schema
+  optional (`flag.optional()`), die Spalte hat `DEFAULT 0`. `not-covered.ts` bleibt unverändert:
+  Anzeigemaske und Rechnungsliste arbeiten weiter damit.
+- **Die weiteren Behandlungstage werden zur leisen Nebensache.** Rahmen, fette `legend`, der
+  Hinweissatz bei null Zusatztagen und die formatfüllende Schaltfläche ließen eine Angabe, die rund
+  jede zehnte Rechnung betrifft, wie eine Pflicht aussehen. Geblieben ist eine kleine
+  Ghost-Schaltfläche dicht unter „Behandlungsdatum"; die Zeilen erscheinen darüber, sobald man sie
+  benutzt, und der Jahres-Hinweis erst mit der ersten Zeile.
+
+**Befunde beim Bauen:**
+
+- **Das Formular ist faktisch reines Anlegen.** `editing` ist in `InvoiceWorkspaceView` immer
+  `null`, bearbeitet wird in der Anzeigemaske — deshalb war „nur ausblenden" kein Erhalt eines
+  Weges, sondern toter Code. Der `editing`-Pfad des Dialogs selbst bleibt unangetastet, er trägt
+  nur die drei entfernten Felder nicht mehr.
+- **Ein Test hing an der Reihenfolge der Schalter.** Der alte Block prüfte den zweiten
+  `.eu-toggle__input`; an seine Stelle treten drei Fälle, die das neue Formular beschreiben: kein
+  `notCovered` im Payload, genau ein Schalter, und die Tage ohne Rahmen samt Hinweis erst ab der
+  ersten Zeile.
+
+**Geprüft:** 260 API-Tests gegen `eunomia_test`, 285 Web-Tests, Lint, Typecheck, Prettier. Im
+laufenden Browser, hell und dunkel: der Anlegen-Dialog zeigt kein `fieldset`, keinen Hinweis und
+genau einen Schalter; Direktzahlung umzulegen fügt nichts mehr ein; ein Behandlungstag lässt sich
+hinzufügen, füllen und entfernen, und eine Rechnung mit zwei Tagen wurde angelegt (die Probe danach
+über Papierkorb → endgültig löschen wieder entfernt). Fokusring per Tastatur auf der leisen
+Schaltfläche — 3 px, 2 px Abstand, unbeschnitten.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.
