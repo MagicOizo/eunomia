@@ -90,21 +90,38 @@ const { floatingStyles } = useFloating(referenceRef, floatingRef, {
     flip(),
     shift({ padding: 8 }),
     size({
-      apply({ rects, elements }) {
-        elements.floating.style.width = `${rects.reference.width}px`;
+      padding: 8,
+      apply({ rects, elements, availableWidth }) {
+        // The field gives the minimum, the room left gives the maximum: an
+        // entry as long as an IBAN makes the list wider instead of scrolling
+        // sideways in it — a scrollbar that cannot even be grabbed, since the
+        // mousedown on it blurs the input and closes the list.
+        elements.floating.style.minWidth = `${rects.reference.width}px`;
+        elements.floating.style.maxWidth = `${Math.max(rects.reference.width, availableWidth)}px`;
       },
     }),
   ],
   whileElementsMounted: autoUpdate,
 });
 
-const normalizedQuery = computed(() => query.value.trim().toLowerCase());
+/**
+ * The form both sides of the search are compared in: lower case and without
+ * whitespace. A label printed in groups (an IBAN) is thereby found by the
+ * number typed in one go, and the other way round. It only ever matches more
+ * than the plain comparison did, never less.
+ */
+function searchable(value: string): string {
+  return value.replace(/\s+/g, '').toLowerCase();
+}
+
+const normalizedQuery = computed(() => searchable(query.value));
 
 const filtered = computed(() => {
   const q = normalizedQuery.value;
   if (q === '') return props.options;
   return props.options.filter(
-    (o) => o.label.toLowerCase().includes(q) || (o.hint?.toLowerCase().includes(q) ?? false),
+    (o) =>
+      searchable(o.label).includes(q) || (o.hint !== undefined && searchable(o.hint).includes(q)),
   );
 });
 
@@ -112,7 +129,7 @@ const showCreate = computed(
   () =>
     props.allowCreate &&
     query.value.trim() !== '' &&
-    !props.options.some((o) => o.label.toLowerCase() === normalizedQuery.value),
+    !props.options.some((o) => searchable(o.label) === normalizedQuery.value),
 );
 
 const itemCount = computed(() => (showCreate.value ? 1 : 0) + filtered.value.length);
@@ -434,6 +451,10 @@ function onKeydown(event: KeyboardEvent): void {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  /* Where even the widest the list may become is not enough, the hint drops
+     under the label and the label itself breaks — anything rather than a
+     horizontal scrollbar. */
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.4rem 0.6rem;
   border-radius: 0.25rem;
@@ -451,10 +472,18 @@ function onKeydown(event: KeyboardEvent): void {
   justify-content: flex-start;
 }
 
+.eu-picker__opt-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .eu-picker__opt-hint {
+  min-width: 0;
+  overflow: hidden;
   color: var(--eu-color-text-muted);
   font-size: 0.85em;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .eu-picker__empty {

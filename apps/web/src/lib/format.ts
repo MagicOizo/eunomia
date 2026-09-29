@@ -41,3 +41,14 @@ export function germanDateTime(value: unknown): string {
     `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`
   );
 }
+
+/**
+ * Groups an IBAN in fours (`DE89 3704 0044 0532 0130 00`) — the form it is
+ * printed in, and the only one a picker list can break. Display only: stored,
+ * submitted and QR-encoded, an IBAN stays compact (the API normalises it, and
+ * the GiroCode spells it without spaces).
+ */
+export function iban(value: string): string {
+  const compact = value.replace(/\s+/g, '').toUpperCase();
+  return compact.match(/.{1,4}/g)?.join(' ') ?? '';
+}

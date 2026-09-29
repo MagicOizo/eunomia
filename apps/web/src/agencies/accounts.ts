@@ -1,3 +1,5 @@
+import { iban } from '../lib/format';
+
 import type { AgencyAccountDto } from './api';
 
 /**
@@ -40,9 +42,13 @@ export function accountForInvoice<T extends { agencyAccountUID: string }>(
   return accountByUID(accounts, uid) ?? defaultAccount(accounts);
 }
 
-/** What identifies an account in a picker or a list: its IBAN. */
+/**
+ * What identifies an account in a picker or a list: its IBAN, grouped in fours
+ * so it reads as one and breaks where it may. What is stored and sent stays
+ * compact — this is the printed form.
+ */
 export function accountLabel(account: Pick<AgencyAccountDto, 'bankAccount'>): string {
-  return account.bankAccount;
+  return iban(account.bankAccount);
 }
 
 /**

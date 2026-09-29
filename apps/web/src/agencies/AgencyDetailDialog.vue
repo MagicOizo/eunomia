@@ -9,6 +9,7 @@ import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { describeError } from '../lib/errors';
+import { accountLabel } from './accounts';
 import {
   type AgencyAccountDto,
   type AgencyAccountInput,
@@ -188,7 +189,7 @@ const accounts = computed(() => agency.value?.accounts ?? []);
                      own; under it, neither of the two has to break mid-token to
                      fit the dialog. -->
                 <td class="eu-agency__account">
-                  {{ account.bankAccount }}
+                  {{ accountLabel(account) }}
                   <span v-if="account.bic" class="eu-agency__bic">{{ account.bic }}</span>
                 </td>
                 <td>{{ account.recipientName ?? '–' }}</td>
@@ -201,18 +202,18 @@ const accounts = computed(() => agency.value?.accounts ?? []);
                     variant="secondary"
                     icon-only
                     :icon="faPen"
-                    :aria-label="`Kontoverbindung ${account.bankAccount} bearbeiten`"
+                    :aria-label="`Kontoverbindung ${accountLabel(account)} bearbeiten`"
                     @click="openAccount(account)"
                   />
                   <EuButton
                     variant="secondary"
                     icon-only
                     :icon="faTrash"
-                    :aria-label="`Kontoverbindung ${account.bankAccount} löschen`"
+                    :aria-label="`Kontoverbindung ${accountLabel(account)} löschen`"
                     @click="
                       pendingDelete = {
                         uid: account.agencyAccountUID,
-                        label: `die Kontoverbindung ${account.bankAccount}`,
+                        label: `die Kontoverbindung ${accountLabel(account)}`,
                       }
                     "
                   />

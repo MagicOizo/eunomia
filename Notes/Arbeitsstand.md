@@ -16,3 +16,5 @@ Nach jeder umgesetzten Scheibe wandern drei Dinge zusammen: der Haken hier, der 
       v0.14.0-slice.1
 - [x] **Slice 45 — Rechnungsliste je Abrechnungsdienstleister** (issues.md 0.12.0-5), v0.14.0-slice.2
       — als Filter im Rechnungs-Picker, gleich mit für Leistungserbringer
+- [x] **Slice 46 — Die Vorschlagsliste erträgt lange Einträge** (issues.md 0.14.0-slice.2-1),
+      v0.14.0-slice.3 — die Liste darf breiter werden als ihr Feld, die IBAN steht in Vierergruppen

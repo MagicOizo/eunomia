@@ -13,7 +13,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
-import { accountForInvoice } from '../agencies/accounts';
+import { accountForInvoice, accountLabel } from '../agencies/accounts';
 import type { AgencyAccountDto } from '../agencies/api';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
@@ -101,7 +101,7 @@ const showQr = computed(
              entry for something that is not a value). -->
         <dd>
           <span class="eu-pay-grid__iban eu-pay-grid__mono">
-            <span>{{ account.bankAccount }}</span>
+            <span>{{ accountLabel(account) }}</span>
             <PaymentQrPopover
               v-if="showQr"
               :recipient="payee ?? ''"

@@ -89,3 +89,9 @@
 	Die Funktion kommt nur bei ca. 10% der Rechnungen zum Einsatz. Sie sollte dezenter im Anlegen-Dialog enthalten sein. Der Rahmen mit fettem Label, Beschreibung und riesiger Schaltfläche sieht so aus, als wäre diese Angabe fast immer erforderlich
 4.	Betrag Übernehmen bei Zuordnung
 	Es wäre eine Erleichterung mit einem einfachen Klicke auf den Betrag in den Rechnungsdetails (oder einer dezenten Icon daneben) bei der Zuordnung diesen Betrag direkt in das Erstattung-Feld zu übernehmen.
+5.	GiroCode-Icon ändert Dialogbreite
+	Wenn ich eine Rechnung habe und das Zahlungsdatum setze, wo vorher keines gesetzt war, verschwindet das GiroCode Icon. Der Platz wird aber nicht reserviert (Unterschied zwischen hidden und visible), wodurch der ganze Dialog durch das Setzen des Zahlungsdatums schmaler wird. Das ist nicht schön. (Testsystem hat 1905 Displaybreite)
+## Version 0.14.0-slice.2
+### Date 20260929
+1.	Vorschlagsliste zu schmal für die IBAN — Umgesetzt mit v0.14.0-slice.3
+	Bei der Auswahl der Kontoverbindung ist das Vorschlagsfeld nicht lang genug für die IBAN, es entsteht ein horizontaler Scrollbalken. Anklicken lässt er sich nicht, weil das Feld dabei direkt ausgeblendet wird, und schön ist er ohnehin nicht.

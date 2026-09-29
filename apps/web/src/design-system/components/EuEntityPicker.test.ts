@@ -198,3 +198,42 @@ describe('EuEntityPicker dismissing with Escape', () => {
     expect(event.defaultPrevented).toBe(false);
   });
 });
+
+describe('EuEntityPicker searching a label printed in groups', () => {
+  /** As the account picker offers them: the IBAN, grouped in fours. */
+  const ibans = [
+    { value: 'a-1', label: 'DE02 1203 0000 0000 2020 51' },
+    { value: 'a-2', label: 'DE89 3704 0044 0532 0130 00', hint: 'Zahlstelle Nord' },
+  ];
+
+  it('finds the grouped label from an IBAN typed in one go', async () => {
+    const wrapper = mountPicker({ options: ibans });
+    const input = wrapper.find('input');
+    await input.trigger('focus');
+    await input.setValue('DE89370400440532');
+
+    expect(optionLabels(wrapper)).toEqual(['DE89 3704 0044 0532 0130 00']);
+  });
+
+  it('finds it just as well from a partly spaced entry', async () => {
+    const wrapper = mountPicker({ options: ibans });
+    const input = wrapper.find('input');
+    await input.trigger('focus');
+    await input.setValue('de89 37040044');
+
+    expect(optionLabels(wrapper)).toEqual(['DE89 3704 0044 0532 0130 00']);
+  });
+
+  it('offers no create row for an entry that is already there, however it is typed', async () => {
+    const wrapper = mountPicker({
+      options: ibans,
+      allowCreate: true,
+      createNoun: 'Kontoverbindung',
+    });
+    const input = wrapper.find('input');
+    await input.trigger('focus');
+    await input.setValue('DE89370400440532013000');
+
+    expect(wrapper.find('.eu-picker__option--create').exists()).toBe(false);
+  });
+});

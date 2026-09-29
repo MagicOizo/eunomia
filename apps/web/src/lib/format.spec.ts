@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { germanDateTime, plural } from './format';
+import { germanDateTime, iban, plural } from './format';
 
 describe('plural', () => {
   it('uses the singular for exactly one', () => {
@@ -36,5 +36,19 @@ describe('germanDateTime', () => {
     for (const value of ['', 'irgendwas', null, undefined, 42]) {
       expect(germanDateTime(value)).toBe('–');
     }
+  });
+});
+
+describe('iban', () => {
+  it('groups in fours, the form an IBAN is printed in', () => {
+    expect(iban('DE89370400440532013000')).toBe('DE89 3704 0044 0532 0130 00');
+  });
+
+  it('regroups what already carries spaces, and upper-cases', () => {
+    expect(iban('de89 3704 00440532013000')).toBe('DE89 3704 0044 0532 0130 00');
+  });
+
+  it('leaves nothing standing for an empty value', () => {
+    expect(iban('')).toBe('');
   });
 });

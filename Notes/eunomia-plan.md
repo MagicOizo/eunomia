@@ -1810,6 +1810,47 @@ Zurück-Pfeil bringt genau diese Liste zurück; die Schaltfläche beim Leistungs
 zehn Rechnungen. Fokusring per Tastatur-Screenshot an allen vier Filterfeldern und an der
 Zeilenaktion am rechten Tabellenrand — nirgends beschnitten.
 
+## Slice 46 — Die Vorschlagsliste erträgt lange Einträge (umgesetzt 2026-09-29)
+**Anlass:** issues.md 0.14.0-slice.2-1, aufgefallen beim Test von Slice 44 in der Dev. Die
+Kontoverbindung wird durch ihre IBAN bezeichnet, und `EuEntityPicker` zwang seine Liste per
+floating-ui `size()` auf exakt die Feldbreite. Die IBAN ist ein einziges unbrechbares Wort, lief
+also über, und weil die Liste `overflow-y: auto` trägt, macht der Browser aus `overflow-x`
+ebenfalls `auto`: ein horizontaler Scrollbalken, den man nicht einmal greifen kann — der
+`mousedown` auf ihm nimmt dem Eingabefeld den Fokus, und `onBlur` schließt die Liste.
+
+**Entscheidungen (Planmodus, mit dem Autor geklärt):**
+
+- **Die Liste darf breiter werden als ihr Feld.** Die Feldbreite ist nur noch Mindestbreite, der
+  Platz bis zum Fensterrand die Höchstbreite (`availableWidth` aus derselben Middleware). Das ist
+  das übliche Verhalten einer Vorschlagsliste und hilft jedem Picker, nicht nur dem mit IBANs.
+- **Umbruch als Rückfallebene, nie ein Scrollbalken.** Reicht auch die Höchstbreite nicht (schmales
+  Fenster), bricht die Bezeichnung um und der Zusatz rutscht darunter statt daneben.
+- **Die IBAN wird in Vierergruppen angezeigt** — die gelesene Form, die nebenbei Umbruchstellen
+  schafft. Gespeichert, gesendet und in den GiroCode geschrieben bleibt sie kompakt; die API
+  normalisiert ohnehin (`ibanField`).
+- **Die Suche vergleicht ohne Leerzeichen.** Sonst fände eine durchgetippte IBAN die gruppierte
+  Bezeichnung nicht mehr. Die Regel gilt für alle Picker und kann nur mehr treffen als vorher, nie
+  weniger — dieselbe Normalisierung greift bei der Exaktprüfung, damit die Liste nicht
+  „‹IBAN› hinzufügen" anbietet, was schon dasteht.
+
+**Befunde beim Bauen:**
+
+- **Ein Formatierer, viele Anzeigeorte.** `iban()` steht bei den übrigen Anzeigeformen
+  (`lib/format.ts`), und weil `accountLabel()` ihn aufruft, erben Picker, Filterauswahl und
+  IBAN-Spalte der Rechnungsliste die Gruppierung von selbst. Von Hand nachgezogen wurden nur die
+  Kontoliste des Dienstleisters, die Zahlungsdetails und die Vorbelegung des Eingabefeldes.
+- **Die Formatierung ist Anzeige, kein Wert.** `AgencyAccountFormDialog` strippt beim Speichern
+  weiter (die lokale Konstante heißt jetzt `compact`, damit sie den Formatierer nicht verdeckt), und
+  der GiroCode bekommt unverändert `account.bankAccount`. Vier bestehende Tests erwarteten die
+  kompakte Form im gerenderten Text und wurden auf die gedruckte umgestellt.
+
+**Geprüft:** 260 API-Tests gegen `eunomia_test`, 285 Web-Tests, Lint, Typecheck, Prettier. Im
+laufenden Browser am geseedeten Dienstleister mit zwei Konten, hell und dunkel: die Liste misst 651
+statt 470 px und zeigt beide IBANs samt Zusatz ohne horizontalen Balken (`scrollWidth ===
+clientWidth`), im Anlegen-Dialog wie in der Anzeigemaske; bei 430 px Fensterbreite rutscht der
+Zusatz unter die IBAN und wird abgekürzt, die IBAN bleibt ganz. Fokusring per Tastatur am Feld
+„Kontoverbindung" — 3 px, unbeschnitten.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

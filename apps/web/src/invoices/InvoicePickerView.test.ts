@@ -154,7 +154,7 @@ describe('InvoicePickerView search', () => {
     const refs = wrapper.find('.eu-picker__refs').text();
     expect(refs).toContain('Praxis Süd');
     expect(refs).toContain('Inkasso Nord');
-    expect(refs).toContain('DE02120300000000202051');
+    expect(refs).toContain('DE02 1203 0000 0000 2020 51');
   });
 
   it('searches for the agency the URL names, without a number', async () => {

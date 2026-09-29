@@ -4,6 +4,7 @@ import { ref, watch } from 'vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import { iban } from '../lib/format';
 import type { AgencyAccountDto, AgencyAccountInput } from './api';
 
 /** Create/edit form for one bank account (Kontoverbindung) of an agency. */
@@ -28,7 +29,8 @@ watch(
   ([open, entry]) => {
     if (!open) return;
     localError.value = null;
-    bankAccount.value = entry?.bankAccount ?? '';
+    // Shown grouped, as everywhere else; submit strips the spaces again.
+    bankAccount.value = iban(entry?.bankAccount ?? '');
     bic.value = entry?.bic ?? '';
     recipientName.value = entry?.recipientName ?? '';
     note.value = entry?.note ?? '';
@@ -38,13 +40,13 @@ watch(
 
 function submit(): void {
   localError.value = null;
-  const iban = bankAccount.value.replace(/\s+/g, '').toUpperCase();
-  if (iban === '') {
+  const compact = bankAccount.value.replace(/\s+/g, '').toUpperCase();
+  if (compact === '') {
     localError.value = 'Bitte eine IBAN angeben.';
     return;
   }
   emit('submit', {
-    bankAccount: iban,
+    bankAccount: compact,
     bic: bic.value.replace(/\s+/g, '').toUpperCase() || null,
     recipientName: recipientName.value.trim() || null,
     note: note.value.trim() || null,

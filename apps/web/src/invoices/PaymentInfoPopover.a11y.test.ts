@@ -111,7 +111,7 @@ describe('PaymentInfoPopover account resolution', () => {
 
     const values = wrapper.findAll('dd').map((dd) => dd.text());
     expect(values).toContain('Zahlstelle Beispiel Inkasso');
-    expect(values.some((value) => value.includes('DE89370400440532013000'))).toBe(true);
+    expect(values.some((value) => value.includes('DE89 3704 0044 0532 0130 00'))).toBe(true);
     wrapper.unmount();
   });
 
@@ -121,7 +121,7 @@ describe('PaymentInfoPopover account resolution', () => {
     });
 
     const values = wrapper.findAll('dd').map((dd) => dd.text());
-    expect(values.some((value) => value.includes('DE02120300000000202051'))).toBe(true);
+    expect(values.some((value) => value.includes('DE02 1203 0000 0000 2020 51'))).toBe(true);
     // That account names no beneficiary, so the agency carries the line.
     expect(values).toContain('Beispiel Inkasso GmbH');
     wrapper.unmount();

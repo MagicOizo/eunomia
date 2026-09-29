@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { accountForInvoice, accountHint, defaultAccount } from './accounts';
+import { accountForInvoice, accountHint, accountLabel, defaultAccount } from './accounts';
 
 /**
  * The suggestion rule of Slice 44. Its twin lives in
@@ -48,5 +48,13 @@ describe('accountHint', () => {
 
   it('stays undefined where there is nothing to add', () => {
     expect(accountHint({ recipientName: null, note: null })).toBeUndefined();
+  });
+});
+
+describe('accountLabel', () => {
+  it('prints the IBAN in groups of four, the form it is read in', () => {
+    expect(accountLabel({ bankAccount: 'DE89370400440532013000' })).toBe(
+      'DE89 3704 0044 0532 0130 00',
+    );
   });
 });

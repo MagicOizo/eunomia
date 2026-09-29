@@ -7,6 +7,19 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.14.0-slice.3 — 2026-09-29
+
+- **A suggestion list is no longer too narrow for what it offers.** Picking a bank account showed
+  the IBAN in a list pinned to the width of its field, so it scrolled sideways — on a scrollbar that
+  could not even be grabbed, since reaching for it closed the list. The list now takes the field's
+  width as its minimum and grows with its content up to the room the window leaves; where even that
+  is not enough, an entry breaks and its second line drops underneath instead of running off the
+  edge. Every picker in the app is the better for it, not just the one holding IBANs.
+- **An IBAN is printed the way it is read.** Grouped in fours — `DE89 3704 0044 0532 0130 00` — in
+  the picker, the agency's account list, the payment details and the invoice list. What is stored,
+  sent and encoded into the GiroCode stays compact, and the search ignores spaces, so an IBAN typed
+  in one go still finds the entry it belongs to.
+
 ## 0.14.0-slice.2 — 2026-09-29
 
 - **The invoice list can be asked who bills it.** Which invoices go through this collection agency,

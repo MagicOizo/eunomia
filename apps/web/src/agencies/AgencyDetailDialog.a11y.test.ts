@@ -59,8 +59,8 @@ describe('AgencyDetailDialog', () => {
     const wrapper = await openDialog();
 
     expect(rows(wrapper)).toHaveLength(2);
-    expect(rows(wrapper)[0]).toContain('DE02120300000000202051');
-    expect(rows(wrapper)[1]).toContain('DE89370400440532013000');
+    expect(rows(wrapper)[0]).toContain('DE02 1203 0000 0000 2020 51');
+    expect(rows(wrapper)[1]).toContain('DE89 3704 0044 0532 0130 00');
     expect(rows(wrapper)[1]).toContain('Zahlstelle Beispiel Inkasso');
 
     wrapper.unmount();
