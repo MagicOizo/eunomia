@@ -20,16 +20,14 @@ import EuToggle from '../design-system/components/EuToggle.vue';
 import { describeError } from '../lib/errors';
 import { germanDateTime } from '../lib/format';
 import { settingLabel } from '../lib/field-labels';
+import { loadUpdateStatus, refreshUpdateStatus, updateStatus } from '../lib/update-status';
 import {
   type MailStatus,
   type PublicSetting,
   type ReminderRunResult,
   type SettingWrite,
   type SettingsSnapshot,
-  type UpdateStatus,
   loadSettings,
-  loadUpdateStatus,
-  refreshUpdateStatus,
   runReminders,
   saveSettings,
   sendTestMail,
@@ -45,7 +43,8 @@ import {
 const loading = ref(true);
 const loadError = ref<string | null>(null);
 const snapshot = ref<SettingsSnapshot | null>(null);
-const update = ref<UpdateStatus | null>(null);
+// Shared with the footer's notice, so a check on this page reaches it at once.
+const update = updateStatus;
 
 const mailBusy = ref(false);
 const mailError = ref<string | null>(null);
@@ -132,7 +131,7 @@ onMounted(async () => {
   // Separate request, separate failure: a GitHub hiccup must not hide the
   // settings form.
   try {
-    update.value = await loadUpdateStatus();
+    await loadUpdateStatus();
   } catch (error) {
     updateError.value = describeError(error);
   }
@@ -219,7 +218,7 @@ async function saveToken(): Promise<void> {
     applySnapshot(await saveSettings({ 'updateCheck.token': token.value }));
     tokenSaved.value = true;
     // A fresh token deserves a fresh answer instead of the cached failure.
-    update.value = await refreshUpdateStatus();
+    await refreshUpdateStatus();
   } catch (error) {
     updateError.value = describeError(error);
   } finally {
@@ -232,7 +231,7 @@ async function clearToken(): Promise<void> {
   updateError.value = null;
   try {
     applySnapshot(await saveSettings({ 'updateCheck.token': null }));
-    update.value = await refreshUpdateStatus();
+    await refreshUpdateStatus();
   } catch (error) {
     updateError.value = describeError(error);
   } finally {
@@ -244,7 +243,7 @@ async function checkNow(): Promise<void> {
   updateBusy.value = true;
   updateError.value = null;
   try {
-    update.value = await refreshUpdateStatus();
+    await refreshUpdateStatus();
   } catch (error) {
     updateError.value = describeError(error);
   } finally {

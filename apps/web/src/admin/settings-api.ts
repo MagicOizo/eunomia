@@ -30,18 +30,6 @@ export interface SettingsSnapshot {
   mailStatus: MailStatus;
 }
 
-/** Mirrors the API's UpdateStatus (apps/api/src/lib/update-check.ts). */
-export interface UpdateStatus {
-  current: string;
-  latest: string | null;
-  updateAvailable: boolean;
-  releaseUrl: string | null;
-  checkedAt: string | null;
-  status: 'ok' | 'disabled' | 'unavailable';
-  reason?:
-    'no_token_private' | 'not_found' | 'network' | 'rate_limited' | 'unauthorized' | 'no_release';
-}
-
 /** What a reminder run reports back (apps/api/src/reminders/runner.ts). */
 export interface ReminderRunResult {
   ranAt: string;
@@ -95,13 +83,5 @@ export async function runReminders(dryRun: boolean): Promise<ReminderRunResult> 
   );
 }
 
-export async function loadUpdateStatus(): Promise<UpdateStatus> {
-  return unwrap(await apiFetch<{ data: UpdateStatus }>('/update-check'));
-}
-
-/** Asks GitHub now instead of reusing the cached answer (the "check now" button). */
-export async function refreshUpdateStatus(): Promise<UpdateStatus> {
-  return unwrap(
-    await apiFetch<{ data: UpdateStatus }>('/update-check/refresh', { method: 'POST' }),
-  );
-}
+// The update check has no function here: its answer is shared with the footer,
+// so it lives in lib/update-status.ts (issues.md 0.13.0-6).

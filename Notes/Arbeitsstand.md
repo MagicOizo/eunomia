@@ -9,3 +9,8 @@ Eintrag im Plan oder im Changelog. Was Bestand hat, steht in [issues.md](issues.
 
 Nach jeder umgesetzten Scheibe wandern drei Dinge zusammen: der Haken hier, der Vermerk
 `Umgesetzt mit vX.Y.Z-slice.N` am Punkt in `issues.md`, und der Eintrag im `CHANGELOG.md`.
+
+## Paket: Nachlese 0.13.0 (der letzte offene Befund)
+
+- [x] **Slice 50 — Die manuelle Versionsprüfung erreicht die Fußzeile** (issues.md 0.13.0-6),
+      v0.16.0-slice.1

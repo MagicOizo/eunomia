@@ -7,6 +7,15 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.16.0-slice.1 — 2026-09-29
+
+- **A version check reaches the footer.** The button in the system settings asks GitHub on the spot,
+  and its answer used to stop at the card it was pressed on: the footer kept the answer from the page
+  load and only caught up on a reload. Both read one shared state now, so a check made in the
+  settings shows up in the footer in the same moment — in both directions, so the notice appears when
+  a release is found and goes when the instance turns out to be the latest itself. It no longer
+  outlives the session either: signing out takes it with it.
+
 ## 0.15.0 — 2026-09-29
 
 Everything from the three `0.15.0-slice.N` previews below, as one release. It answers the five

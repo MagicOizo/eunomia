@@ -1964,6 +1964,39 @@ Typecheck, Prettier. Im laufenden Browser bei 1905 px, hell und dunkel: Zahlungs
 die Dialogbreite bei 608 px, der Platz des Knopfes bleibt 24,8 px breit, `visibility` wechselt auf
 `hidden` und der Knopf ist nicht mehr per Tab erreichbar.
 
+## Slice 50 — Die manuelle Versionsprüfung erreicht die Fußzeile (umgesetzt 2026-09-29)
+**Anlass:** issues.md 0.13.0-6. Die Prüfung in System > Einstellungen meldete die neue Version, die
+Fußzeile blieb stumm. Nicht der Cache der API: `POST /update-check/refresh` läuft mit `force` und
+schreibt in denselben Cache, aus dem `GET /update-check` antwortet. Es lag an der SPA — Fußzeile und
+Einstellungsseite hielten je ein eigenes `ref` mit demselben Status, und die Fußzeile fragte genau
+einmal, im `watch` auf `auth.isAdmin`. Ohne Reload konnte sie nichts Neues erfahren.
+
+**Entscheidung (Planmodus):** ein geteilter Modulzustand in `apps/web/src/lib/update-status.ts`,
+das Geschwister von `app-info.ts` (das die Version zwischen Fußzeile und Browsertitel teilt), nur
+reaktiv statt nur memoisiert. Beide Masken lesen dasselbe `computed`; `loadUpdateStatus()` und
+`refreshUpdateStatus()` schreiben es. Kein Pinia-Store: der Zustand hat keine Sitzung und keine
+Actions. Kein Nachfragen bei jedem Routenwechsel: Requests ohne Anlass, und den Fall „Prüfung auf der
+offenen Einstellungsseite" träfe es trotzdem nicht.
+
+**Befunde beim Bauen:**
+
+- **Der Rückweg zählt genauso.** Nach dem Upgrade meldet die Prüfung „aktuell" — auch das muss den
+  Hinweis nehmen, nicht nur setzen. Dieselbe Mechanik, ein zweiter Test.
+- **Ein Hinweis darf die Sitzung nicht überleben.** Der geteilte Zustand liegt im Modul, nicht in der
+  Komponente, also überdauert er eine Abmeldung im selben Tab. `clearUpdateStatus()` hängt deshalb am
+  `watch` auf `auth.isAdmin` und zählt eine Epoche hoch, damit auch eine Antwort, die erst danach
+  eintrifft, verworfen wird statt den Hinweis wiederzubeleben.
+- **Ein Fehlschlag löscht nichts.** Wirft die Anfrage (kein Netz, 403), bleibt die letzte Antwort
+  stehen und der Aufrufer meldet die Ursache — die Einstellungsseite benennt sie, die Fußzeile
+  schweigt wie bisher.
+
+**Geprüft:** 301 Web-Tests (neun neue: sechs für das Modul, drei für die Fußzeile — Übernahme einer
+anderswo gemachten Prüfung, der Rückweg, das Vergessen beim Abmelden), 260 API-Tests gegen
+`eunomia_test`, Lint, Typecheck, Prettier, Build. Im laufenden Browser bei 1905 px, hell und dunkel,
+gegen eine eigene Instanz mit `UPDATE_CHECK_REPO` auf einem öffentlichen Repository: Fußzeile nach
+dem Laden stumm, nach „Jetzt prüfen" steht `v3.5.43 verfügbar` darin — ohne Reload, bei unveränderter
+Adresse —, eine zweite Prüfung ohne Fund nimmt ihn wieder weg, und nach dem Abmelden ist er fort.
+
 ## Backlog aus der Produktionsnutzung
 
 - **Bonus-Staffel aus einer Faktoren-Regel der Versicherung ableiten** (Rückmeldung des Autors, 2026-09-24, nach der ersten Eingabe echter Staffeln in der Produktion — die Maske aus Slice 18/29 hat dabei gut funktioniert, das hier ist eine Erleichterung, keine Korrektur): In allen bisher erfassten Fällen ist die Staffel keine Liste freier Beträge, sondern eine **feste Regel der Versicherung**, ausgedrückt in Monatsbeiträgen statt in Euro — z. B. Jahr 1–2: 1 Monatsbeitrag, Jahr 3–4: 1,5, Jahr 5: 2, Jahr 6: 2,5, Jahr 7: 3, Jahr 8: 3,5, Jahr 9: 4. Die Regel unterscheidet sich je Versicherung, nicht je Police.

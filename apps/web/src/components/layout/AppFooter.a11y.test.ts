@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiFetch } from '../../lib/api';
 import { resetAppInfo } from '../../lib/app-info';
 import { request } from '../../lib/http';
+import { clearUpdateStatus, refreshUpdateStatus } from '../../lib/update-status';
 import { useAuthStore } from '../../stores/auth';
 import AppFooter from './AppFooter.vue';
 
@@ -41,6 +42,9 @@ describe('AppFooter', () => {
     // The version request is shared with the browser title and answered once
     // per page load, so each case has to start from an unasked state.
     resetAppInfo();
+    // The update status is shared with the settings page and lives in its
+    // module, so it outlasts a single case unless it is dropped here.
+    clearUpdateStatus();
     requestMock.mockResolvedValue({ version: '0.9.0', environment: 'production' });
   });
 
@@ -117,6 +121,62 @@ describe('AppFooter', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Backend v0.9.0');
+    expect(wrapper.find('a').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  /*
+   * issues.md 0.13.0-6: the footer used to keep its own copy of the answer and
+   * asked only once, so the manual check in the system settings — which is a
+   * check of the very same thing — left it as it was until the page reloaded.
+   */
+  it('takes over what a check made elsewhere found', async () => {
+    apiFetchMock.mockResolvedValue(updateResponse({ latest: '0.9.0', updateAvailable: false }));
+    signInAsAdmin();
+
+    const wrapper = mount(AppFooter);
+    await flushPromises();
+    expect(wrapper.find('a').exists()).toBe(false);
+
+    // What pressing "Jetzt prüfen" on the settings page does, without this
+    // component being remounted or even knowing about it.
+    apiFetchMock.mockResolvedValue(updateResponse());
+    await refreshUpdateStatus();
+    await flushPromises();
+
+    expect(wrapper.get('a').text()).toContain('v1.0.0 verfügbar');
+    wrapper.unmount();
+  });
+
+  it('drops the notice when a later check finds nothing new', async () => {
+    apiFetchMock.mockResolvedValue(updateResponse());
+    signInAsAdmin();
+
+    const wrapper = mount(AppFooter);
+    await flushPromises();
+    expect(wrapper.find('a').exists()).toBe(true);
+
+    // The same way round: after the update the instance is the latest itself.
+    apiFetchMock.mockResolvedValue(updateResponse({ latest: '1.0.0', updateAvailable: false }));
+    await refreshUpdateStatus();
+    await flushPromises();
+
+    expect(wrapper.find('a').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('forgets what it knew when the admin session ends', async () => {
+    apiFetchMock.mockResolvedValue(updateResponse());
+    signInAsAdmin();
+
+    const wrapper = mount(AppFooter);
+    await flushPromises();
+    expect(wrapper.find('a').exists()).toBe(true);
+
+    // Signing out: the notice must not stay in the tab for whoever comes next.
+    useAuthStore().permissions = { global: [], perAccount: [] };
+    await flushPromises();
+
     expect(wrapper.find('a').exists()).toBe(false);
     wrapper.unmount();
   });

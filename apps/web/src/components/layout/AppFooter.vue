@@ -3,23 +3,13 @@ import { faArrowUp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, onMounted, ref, watch } from 'vue';
 
-import { apiFetch } from '../../lib/api';
 import { loadAppInfo } from '../../lib/app-info';
+import { clearUpdateStatus, loadUpdateStatus, updateStatus } from '../../lib/update-status';
 import { useAuthStore } from '../../stores/auth';
-
-/** Mirrors the API's UpdateStatus (apps/api/src/lib/update-check.ts). */
-interface UpdateStatus {
-  current: string;
-  latest: string | null;
-  updateAvailable: boolean;
-  releaseUrl: string | null;
-  status: 'ok' | 'disabled' | 'unavailable';
-}
 
 const auth = useAuthStore();
 const year = new Date().getFullYear();
 const version = ref<string | null>(null);
-const update = ref<UpdateStatus | null>(null);
 
 // The backend version comes from the public version endpoint (Slice 0). Shown
 // in the footer per Notes/eunomia-plan.md, Slice 6. Shared with the browser
@@ -34,23 +24,30 @@ onMounted(async () => {
  * is already mounted while that request is still in flight. Any failure (no
  * permission, no network, GitHub unreachable) leaves the notice off: knowing
  * about a new release is a convenience, never something to complain about.
+ *
+ * The answer itself lives in lib/update-status.ts, shared with the update card
+ * in the system settings: a check triggered there reaches this footer at once,
+ * instead of leaving it on the state of this page load (issues.md 0.13.0-6).
  */
 watch(
   () => auth.isAdmin,
-  async (isAdmin) => {
-    if (!isAdmin) return;
+  async (isAdmin, wasAdmin) => {
+    if (!isAdmin) {
+      // Signed out: what that session learned must not outlive it in this tab.
+      if (wasAdmin) clearUpdateStatus();
+      return;
+    }
     try {
-      const res = await apiFetch<{ data: UpdateStatus }>('/update-check');
-      update.value = res.data;
+      await loadUpdateStatus();
     } catch {
-      update.value = null;
+      // Silent on purpose — see above.
     }
   },
   { immediate: true },
 );
 
 const availableUpdate = computed(() => {
-  const status = update.value;
+  const status = updateStatus.value;
   if (!status || status.status !== 'ok' || !status.updateAvailable) return null;
   if (!status.latest || !status.releaseUrl) return null;
   return { version: status.latest, url: status.releaseUrl };

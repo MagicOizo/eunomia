@@ -2,28 +2,28 @@ import { flushPromises, mount } from '@vue/test-utils';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-  ReminderRunResult,
-  SettingWrite,
-  SettingsSnapshot,
-  UpdateStatus,
-} from './settings-api';
+import { apiFetch } from '../lib/api';
+import { type UpdateStatus, clearUpdateStatus } from '../lib/update-status';
+import type { ReminderRunResult, SettingWrite, SettingsSnapshot } from './settings-api';
 
 const loadSettings = vi.fn<() => Promise<SettingsSnapshot>>();
 const saveSettings = vi.fn<(values: SettingWrite) => Promise<SettingsSnapshot>>();
 const sendTestMail = vi.fn();
-const loadUpdateStatus = vi.fn<() => Promise<UpdateStatus>>();
-const refreshUpdateStatus = vi.fn<() => Promise<UpdateStatus>>();
 const runReminders = vi.fn<(dryRun: boolean) => Promise<ReminderRunResult>>();
 
 vi.mock('./settings-api', () => ({
   loadSettings: (): Promise<SettingsSnapshot> => loadSettings(),
   saveSettings: (values: SettingWrite): Promise<SettingsSnapshot> => saveSettings(values),
   sendTestMail: (): Promise<unknown> => sendTestMail(),
-  loadUpdateStatus: (): Promise<UpdateStatus> => loadUpdateStatus(),
-  refreshUpdateStatus: (): Promise<UpdateStatus> => refreshUpdateStatus(),
   runReminders: (dryRun: boolean): Promise<ReminderRunResult> => runReminders(dryRun),
 }));
+
+// The update check is not mocked away: its state is shared with the footer
+// (lib/update-status.ts), and this card has to render from that shared state.
+// Only the HTTP call below it is replaced.
+vi.mock('../lib/api', () => ({ apiFetch: vi.fn() }));
+
+const apiFetchMock = vi.mocked(apiFetch);
 
 const { default: SettingsView } = await import('./SettingsView.vue');
 
@@ -179,8 +179,9 @@ describe('SettingsView', () => {
     vi.clearAllMocks();
     loadSettings.mockResolvedValue(snapshot());
     saveSettings.mockImplementation(async () => snapshot());
-    loadUpdateStatus.mockResolvedValue(privateRepo);
-    refreshUpdateStatus.mockResolvedValue(privateRepo);
+    // The shared update state outlives a single case, so each one starts unasked.
+    clearUpdateStatus();
+    apiFetchMock.mockResolvedValue({ data: privateRepo });
     runReminders.mockResolvedValue(dryRunResult());
   });
 

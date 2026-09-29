@@ -91,6 +91,8 @@
 	Es wäre eine Erleichterung mit einem einfachen Klicke auf den Betrag in den Rechnungsdetails (oder einer dezenten Icon daneben) bei der Zuordnung diesen Betrag direkt in das Erstattung-Feld zu übernehmen.
 5.	GiroCode-Icon ändert Dialogbreite — Umgesetzt mit v0.15.0-slice.3
 	Wenn ich eine Rechnung habe und das Zahlungsdatum setze, wo vorher keines gesetzt war, verschwindet das GiroCode Icon. Der Platz wird aber nicht reserviert (Unterschied zwischen hidden und visible), wodurch der ganze Dialog durch das Setzen des Zahlungsdatums schmaler wird. Das ist nicht schön. (Testsystem hat 1905 Displaybreite)
+6.	Abweichende Versionskontrolle — Umgesetzt mit v0.16.0-slice.1
+	Obwohl die manuell angestoßene Versionsüberprüfung (System>Einstellungen>Version und Aktualisierung) bei 0.13.0 anzeigt, dass es schon 0.15.0 gibt, zeigt die Fußzeile noch keine neuere Version an (weil Timeout noch nicht gelaufen?). Die manuelle Prüfung sollte auch den Status in der Fußzeile beeinflussen.
 ## Version 0.14.0-slice.2
 ### Date 20260929
 1.	Vorschlagsliste zu schmal für die IBAN — Umgesetzt mit v0.14.0-slice.3
