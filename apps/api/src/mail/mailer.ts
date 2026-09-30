@@ -92,15 +92,15 @@ function readMailConfig(
   settings: Record<SettingKey, SettingValue>,
 ): { ok: true; config: MailConfig } | { ok: false; reason: string } {
   if (settings['mail.enabled'] !== true) {
-    return { ok: false, reason: 'Der E-Mail-Versand ist in den Einstellungen nicht aktiviert.' };
+    return { ok: false, reason: 'Mail delivery is not enabled in the settings' };
   }
   const host = settings['mail.host'];
   if (typeof host !== 'string' || host === '') {
-    return { ok: false, reason: 'Es ist kein Mailserver eingetragen.' };
+    return { ok: false, reason: 'No mail server is configured' };
   }
   const fromAddress = settings['mail.fromAddress'];
   if (typeof fromAddress !== 'string' || fromAddress === '') {
-    return { ok: false, reason: 'Es ist keine Absenderadresse eingetragen.' };
+    return { ok: false, reason: 'No sender address is configured' };
   }
   const user = typeof settings['mail.user'] === 'string' ? settings['mail.user'] : null;
   const password = typeof settings['mail.password'] === 'string' ? settings['mail.password'] : null;
@@ -109,7 +109,7 @@ function readMailConfig(
     // settings repository has already logged which of the two it was.
     return {
       ok: false,
-      reason: 'Für den Mailserver ist ein Benutzer, aber kein lesbares Passwort hinterlegt.',
+      reason: 'The mail server has a user but no readable password',
     };
   }
 

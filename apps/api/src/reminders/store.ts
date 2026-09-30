@@ -133,7 +133,14 @@ export function createReminderStore(pool: Pool, encryptionKey: EncryptionKey): R
      * clause that has to agree with it.
      */
     listPayableInvoices: async (): Promise<PayableInvoiceRow[]> => {
-      const rows = await pool.query<Array<Omit<PayableInvoiceRow, 'payee'> & PayeeSources>>(
+      // The driver hands the TINYINT back as 0/1, so the flag is turned into a
+      // boolean here — the rule and the web's traffic light both read it as one.
+      const rows = await pool.query<
+        Array<
+          Omit<PayableInvoiceRow, 'payee' | 'directPayment'> &
+            PayeeSources & { directPayment: number }
+        >
+      >(
         `SELECT i.invoiceUID, i.invoiceNumber, i.accountUID,
                 i.invoiceAmount AS amount, i.transferDate, i.transferUntilDate, i.directPayment,
                 ag.agencyName, gb.recipientName, f.facilityName,
@@ -150,6 +157,7 @@ export function createReminderStore(pool: Pool, encryptionKey: EncryptionKey): R
       );
       return rows.map(({ recipientName, agencyName, facilityName, ...invoice }) => ({
         ...invoice,
+        directPayment: Boolean(invoice.directPayment),
         payee: recipientName ?? agencyName ?? facilityName,
       }));
     },

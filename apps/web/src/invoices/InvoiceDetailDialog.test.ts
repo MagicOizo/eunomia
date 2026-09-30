@@ -23,7 +23,7 @@ function invoice(overrides: Partial<InvoiceDto> = {}): InvoiceDto {
     documentLink: null,
     agencyUID: null,
     agencyAccountUID: null,
-    directPayment: 0,
+    directPayment: false,
     reimbursementClosed: false,
     notCovered: false,
     notCoveredReason: null,
@@ -94,7 +94,7 @@ describe('InvoiceDetailDialog direct payment', () => {
   });
 
   it('frees both dates again, empty, when it is switched off', async () => {
-    const wrapper = open(invoice({ directPayment: 1, transferUntilDate: '2025-02-01' }));
+    const wrapper = open(invoice({ directPayment: true, transferUntilDate: '2025-02-01' }));
     await setDirectPayment(wrapper, false);
 
     expect(row(wrapper, 'Zahlungsziel')?.props('modelValue')).toBeNull();
@@ -106,7 +106,7 @@ describe('InvoiceDetailDialog direct payment', () => {
   it('leaves an invoice from before the rule untouched when it is merely opened', async () => {
     // A direct payment entered before Slice 43 carries no dates at all. Opening
     // it must not look like an edit — the mask would offer a change nobody made.
-    const wrapper = open(invoice({ directPayment: 1, transferUntilDate: null }));
+    const wrapper = open(invoice({ directPayment: true, transferUntilDate: null }));
     await nextTick();
 
     expect(row(wrapper, 'Zahlungsziel')?.props('modelValue')).toBeNull();

@@ -125,7 +125,7 @@ const showQr = computed(
       </template>
 
       <dt><EuIconLabel :icon="faCoins" label="Barzahlung" /></dt>
-      <dd>{{ invoice.directPayment === 1 ? 'Ja' : 'Nein' }}</dd>
+      <dd>{{ invoice.directPayment ? 'Ja' : 'Nein' }}</dd>
     </dl>
   </EuPopover>
 </template>

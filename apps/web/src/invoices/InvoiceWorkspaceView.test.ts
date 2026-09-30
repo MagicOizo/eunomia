@@ -89,7 +89,7 @@ function invoice(uid: string, number: string, treatmentDate: string) {
     transferSubject: null,
     documentLink: null,
     agencyUID: null,
-    directPayment: 0,
+    directPayment: false,
     reimbursementClosed: false,
     notCovered: false,
     notCoveredReason: null,

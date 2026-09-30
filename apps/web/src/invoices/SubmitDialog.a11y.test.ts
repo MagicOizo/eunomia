@@ -22,7 +22,7 @@ function invoice(invoiceUID: string, treatmentDate: string, ...more: string[]): 
     documentLink: null,
     agencyUID: null,
     agencyAccountUID: null,
-    directPayment: 0,
+    directPayment: false,
     reimbursementClosed: false,
     notCovered: false,
     notCoveredReason: null,

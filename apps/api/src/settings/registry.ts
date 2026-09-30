@@ -209,6 +209,18 @@ export function serializeValue(value: SettingValue): string | null {
 }
 
 /**
+ * Rejects control characters in the text settings. `mail.fromName` goes into the
+ * From header of every mail the app sends, and a line break there is the header
+ * injection nobody wants to rely on nodemailer to encode away; the mail
+ * password travels the same protocol. No setting has a use for a tab or a line
+ * break either, so the check is the same for all of them — `trim()` only takes
+ * the edges.
+ */
+function hasControlCharacter(value: string): boolean {
+  return /\p{Cc}/u.test(value);
+}
+
+/**
  * Validates an incoming write and returns the key together with the value to
  * store. `null` always means "clear this setting" (and for a secret: forget the
  * stored password); a key the caller must not write, or a value of the wrong
@@ -261,12 +273,14 @@ export function validateIncoming(key: string, value: unknown): [SettingKey, Sett
       ];
     case 'secret': {
       if (typeof value !== 'string') return invalid('a string');
+      if (hasControlCharacter(value)) return invalid('free of control characters');
       // An empty secret is a clear, not a stored empty password — otherwise a
       // form that submits every field would silently blank the password.
       return [key, value.trim() === '' ? null : value];
     }
     default: {
       if (typeof value !== 'string') return invalid('a string');
+      if (hasControlCharacter(value)) return invalid('free of control characters');
       const trimmed = value.trim();
       if (def.maxLength !== undefined && trimmed.length > def.maxLength) {
         return invalid(`at most ${def.maxLength} characters long`);

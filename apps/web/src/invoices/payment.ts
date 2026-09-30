@@ -48,7 +48,7 @@ export function calcPaymentState(
   invoice: Pick<InvoiceDto, 'transferDate' | 'transferUntilDate' | 'directPayment'>,
   today: Date = new Date(),
 ): PaymentState {
-  if (invoice.transferDate !== null || invoice.directPayment === 1) return 'paid';
+  if (invoice.transferDate !== null || invoice.directPayment) return 'paid';
   if (invoice.transferUntilDate === null) return 'due';
 
   const days = daysUntil(invoice.transferUntilDate, today);

@@ -19,6 +19,7 @@ import {
 import { conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
+import { likeTerm } from '../lib/like.js';
 import { allocationEntriesSchema, createAllocationsForBilling } from './allocations.js';
 import { accountForBilling, accountForContract, authorizeAccount } from './workflow-access.js';
 
@@ -72,7 +73,7 @@ const updateSchema = base.omit({ contractUID: true }).extend(objection.shape).pa
 const listQuery = z.object({
   contractUID: z.string().trim().min(1).optional(),
   /** Free text over billing number, policy number, insured person and invoice numbers. */
-  q: z.string().trim().min(1).optional(),
+  q: z.string().trim().min(1).max(50).optional(),
   from: z.string().date().optional(),
   to: z.string().date().optional(),
   /** 'true' keeps only billings without a reimbursement booked on them yet. */
@@ -116,6 +117,33 @@ function toBillingDto(row: Row | null): Row | null {
 }
 
 /**
+ * The invoice numbers booked on each of the given billings, ready for the list
+ * column, in one query for all of them. Deleted invoices stay out, as they did
+ * while a join fed the column.
+ */
+async function invoiceNumbersFor(pool: Pool, billingUIDs: string[]): Promise<Map<string, string>> {
+  const numbers = new Map<string, string>();
+  if (billingUIDs.length === 0) return numbers;
+  const rows = await pool.query<Array<{ billingUID: string; invoiceNumber: string }>>(
+    `SELECT al.billingUID, inv.invoiceNumber
+       FROM Allocations al
+       JOIN Invoices inv ON inv.invoiceUID = al.invoiceUID AND inv.invoiceStatus <> -1
+      WHERE al.allocationStatus <> -1
+        AND al.billingUID IN (${billingUIDs.map(() => '?').join(', ')})
+      ORDER BY inv.invoiceNumber`,
+    billingUIDs,
+  );
+  for (const row of rows) {
+    const seen = numbers.get(row.billingUID);
+    numbers.set(
+      row.billingUID,
+      seen === undefined ? row.invoiceNumber : `${seen}, ${row.invoiceNumber}`,
+    );
+  }
+  return numbers;
+}
+
+/**
  * Router for service billings (Leistungsabrechnungen), attached to a policy.
  * Which submissions one answers follows from its allocations — the insurer
  * regularly settles invoices submitted on different days in one letter.
@@ -154,15 +182,15 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     if (filters.q !== undefined) {
       // The invoice numbers are matched through their own EXISTS rather than
       // the joined rows, so the free text never changes the aggregates below.
-      where.push(`(b.billingNumber LIKE ? OR c.contractNumber LIKE ?
-                   OR CONCAT_WS(' ', acc.firstname, acc.surname) LIKE ?
+      where.push(`(b.billingNumber LIKE ? ESCAPE '!' OR c.contractNumber LIKE ? ESCAPE '!'
+                   OR CONCAT_WS(' ', acc.firstname, acc.surname) LIKE ? ESCAPE '!'
                    OR EXISTS (
                         SELECT 1 FROM Allocations qa
                           JOIN Invoices qi ON qi.invoiceUID = qa.invoiceUID AND qi.invoiceStatus <> -1
                          WHERE qa.billingUID = b.billingUID AND qa.allocationStatus <> -1
-                           AND qi.invoiceNumber LIKE ?
+                           AND qi.invoiceNumber LIKE ? ESCAPE '!'
                       ))`);
-      const like = `%${filters.q}%`;
+      const like = likeTerm(filters.q);
       params.push(like, like, like, like);
     }
     if (filters.from !== undefined) {
@@ -190,27 +218,40 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     // Safe to inline: zod has narrowed it to an integer within range.
     const limit = filters.limit === undefined ? '' : ` LIMIT ${filters.limit}`;
 
-    const rows = await pool.query<Row[]>(
+    const rows = await pool.query<Array<Row & { billingUID: string }>>(
       `SELECT b.billingUID, b.billingDate, b.billingNumber, b.documentLink,
               b.contractUID, b.forfeitsBonus, b.objectionDate, b.objectionResolvedDate,
               b.objectionNote, b.billingStatus,
               c.accountUID, c.contractNumber, c.bonusForfeitRule,
               CONCAT_WS(' ', acc.firstname, acc.surname) AS personName,
               COALESCE(SUM(al.reimbursement), 0) AS reimbursedTotal,
-              COUNT(al.allocationID) AS invoiceCount,
-              GROUP_CONCAT(inv.invoiceNumber ORDER BY inv.invoiceNumber SEPARATOR ', ') AS invoiceNumbers
+              COUNT(al.allocationID) AS invoiceCount
          FROM ServiceBillings b
          JOIN Contracts c ON c.contractUID = b.contractUID
          JOIN Accounts acc ON acc.accountUID = c.accountUID
          LEFT JOIN Allocations al ON al.billingUID = b.billingUID AND al.allocationStatus <> -1
-         LEFT JOIN Invoices inv ON inv.invoiceUID = al.invoiceUID AND inv.invoiceStatus <> -1
         WHERE ${where.join(' AND ')}
         GROUP BY b.billingID
         ${having.length > 0 ? `HAVING ${having.join(' AND ')}` : ''}
         ORDER BY b.billingDate DESC, b.billingUID${limit}`,
       [...params, ...havingParams],
     );
-    sendData(res, rows.map(toBillingDto));
+
+    // The invoice numbers come as their own query rather than a GROUP_CONCAT:
+    // that function truncates at group_concat_max_len (1 KB by default) without
+    // saying so, and a billing that silently lost the tail of its list would
+    // look like a correct answer.
+    const numbers = await invoiceNumbersFor(
+      pool,
+      rows.map((row) => row.billingUID),
+    );
+    sendData(
+      res,
+      rows.map((row) => ({
+        ...toBillingDto(row),
+        invoiceNumbers: numbers.get(row.billingUID) ?? null,
+      })),
+    );
   });
 
   router.get('/:uid', requireAuth, async (req, res) => {

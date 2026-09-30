@@ -59,7 +59,7 @@ export interface InvoiceDto {
   agencyUID: string | null;
   /** Which bank account of that agency the invoice goes to (Slice 44). */
   agencyAccountUID: string | null;
-  directPayment: number;
+  directPayment: boolean;
   /** Marked as billed by hand although the reimbursements do not cover the amount. */
   reimbursementClosed: boolean;
   /**

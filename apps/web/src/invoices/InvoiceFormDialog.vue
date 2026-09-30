@@ -138,7 +138,7 @@ watch(
       documentLink: e?.documentLink ?? '',
     };
     extraDays.value = e ? furtherDays(e) : [];
-    directPayment.value = e ? e.directPayment === 1 : false;
+    directPayment.value = e ? e.directPayment : false;
   },
   { immediate: true },
 );

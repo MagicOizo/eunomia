@@ -205,24 +205,37 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
       where.push(`c.accountUID IN (${scope.accountUIDs.map(() => '?').join(', ')})`);
       params.push(...scope.accountUIDs);
     }
-    const rows = await pool.query(
+    const rows = await pool.query<Array<{ submissionUID: string }>>(
       `SELECT s.submissionUID, s.contractUID, s.submittedDate,
-              s.submissionStatus, c.accountUID,
-              GROUP_CONCAT(si.invoiceUID ORDER BY si.invoiceUID) AS invoiceUIDs
+              s.submissionStatus, c.accountUID
          FROM Submissions s
          JOIN Contracts c ON c.contractUID = s.contractUID
-         LEFT JOIN SubmissionInvoices si ON si.submissionUID = s.submissionUID
         WHERE ${where.join(' AND ')}
-        GROUP BY s.submissionID
         ORDER BY s.submittedDate DESC, s.submissionUID`,
       params,
     );
+
+    // The invoice IDs come as their own query rather than a GROUP_CONCAT: that
+    // function truncates at group_concat_max_len (1 KB by default, about 78 IDs)
+    // without saying so, and a submission that lost half its invoices on the way
+    // out would look like a correct answer. The detail route reads them the same
+    // way.
+    const invoiceUIDs = new Map(rows.map((row) => [row.submissionUID, [] as string[]]));
+    if (rows.length > 0) {
+      const uids = rows.map((row) => row.submissionUID);
+      const links = await pool.query<Array<{ submissionUID: string; invoiceUID: string }>>(
+        `SELECT submissionUID, invoiceUID
+           FROM SubmissionInvoices
+          WHERE submissionUID IN (${uids.map(() => '?').join(', ')})
+          ORDER BY invoiceUID`,
+        uids,
+      );
+      for (const link of links) invoiceUIDs.get(link.submissionUID)?.push(link.invoiceUID);
+    }
+
     sendData(
       res,
-      rows.map((row: { invoiceUIDs: string | null }) => ({
-        ...row,
-        invoiceUIDs: row.invoiceUIDs === null ? [] : row.invoiceUIDs.split(','),
-      })),
+      rows.map((row) => ({ ...row, invoiceUIDs: invoiceUIDs.get(row.submissionUID) ?? [] })),
     );
   });
 

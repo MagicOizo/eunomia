@@ -122,17 +122,13 @@ export function createSettingsRouter(
     const result = await reminderRunner.run({ dryRun });
 
     if (result.skipped === 'disabled') {
-      throw new ApiError(
-        409,
-        ERROR_CODES.REMINDERS_DISABLED,
-        'Zahlungserinnerungen sind ausgeschaltet.',
-      );
+      throw new ApiError(409, ERROR_CODES.REMINDERS_DISABLED, 'Payment reminders are switched off');
     }
     if (result.skipped === 'mail_not_configured') {
       throw new ApiError(
         409,
         ERROR_CODES.MAIL_NOT_CONFIGURED,
-        'Der E-Mail-Versand ist ausgeschaltet oder unvollständig eingerichtet.',
+        'Mail delivery is switched off or incompletely configured',
       );
     }
 

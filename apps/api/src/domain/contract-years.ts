@@ -160,9 +160,13 @@ export function createContractYearsRouter(pool: Pool, config: AppConfig): Router
       pathParam(req, 'uid'),
       PERMISSIONS.MANAGE_CONTRACTS,
     );
+    const year = Number(pathParam(req, 'year'));
+    // The same check as the PUT: without it a year outside the term — or one
+    // that is not a number at all — answers 204 for a deletion that never was.
+    assertYearWithinContract(contract, year);
     await pool.query('DELETE FROM ContractYears WHERE contractUID = ? AND year = ?', [
       contract.contractUID,
-      Number(pathParam(req, 'year')),
+      year,
     ]);
     res.status(204).end();
   });

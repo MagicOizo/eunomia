@@ -61,7 +61,11 @@ function limiter(windowMs: number, max: number) {
  */
 export function createApp(deps?: AppDependencies): Express {
   const app = express();
-  app.use(express.json());
+  // Written out rather than left to the default: 100 kB is what Express 5 uses
+  // today, and the only body that comes close is a settings write or a billing
+  // with its allocations. A major upgrade must not be able to move the limit
+  // without anyone noticing.
+  app.use(express.json({ limit: '100kb' }));
 
   if (deps) {
     const { config } = deps;

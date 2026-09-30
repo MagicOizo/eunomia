@@ -50,6 +50,23 @@ test('an empty secret clears it rather than storing an empty password', () => {
   assert.deepEqual(validateIncoming('mail.password', ' hunter2 '), ['mail.password', ' hunter2 ']);
 });
 
+test('control characters are rejected in text settings and secrets', () => {
+  // The sender name goes into the From header of every mail; a line break there
+  // is a header injection we do not want to leave to nodemailer's encoding.
+  rejects(
+    'mail.fromName',
+    'Eunomia\r\nBcc: someone@example.com',
+    ERROR_CODES.SETTING_INVALID_VALUE,
+  );
+  rejects('mail.host', 'smtp.example.com\n', ERROR_CODES.SETTING_INVALID_VALUE);
+  rejects('mail.password', 'hunter2\r\n', ERROR_CODES.SETTING_INVALID_VALUE);
+  // An ordinary value with spaces and umlauts stays welcome.
+  assert.deepEqual(validateIncoming('mail.fromName', 'Eunomia Rechnungen'), [
+    'mail.fromName',
+    'Eunomia Rechnungen',
+  ]);
+});
+
 test('strings are trimmed, length-checked and empty means unset', () => {
   assert.deepEqual(validateIncoming('mail.host', '  smtp.example.com '), [
     'mail.host',

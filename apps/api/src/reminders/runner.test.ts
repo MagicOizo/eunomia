@@ -41,7 +41,7 @@ function invoice(overrides: Partial<PayableInvoiceRow> = {}): PayableInvoiceRow 
     amount: 128.4,
     transferDate: null,
     transferUntilDate: '2026-09-29',
-    directPayment: 0,
+    directPayment: false,
     ...overrides,
   };
 }
@@ -161,7 +161,7 @@ test('paid, cash-paid and not-yet-due invoices are never mentioned', async () =>
   const { store } = stubStore({
     invoices: [
       invoice({ invoiceUID: 'inv_paid', transferDate: '2026-09-20' }),
-      invoice({ invoiceUID: 'inv_cash', directPayment: 1 }),
+      invoice({ invoiceUID: 'inv_cash', directPayment: true }),
       invoice({ invoiceUID: 'inv_far', transferUntilDate: '2026-12-01' }),
     ],
   });

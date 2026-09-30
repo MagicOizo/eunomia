@@ -712,7 +712,9 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       })
     ).body.data.billingUID as string;
 
-    const billings = async (query: string): Promise<Array<{ billingUID: string }>> =>
+    const billings = async (
+      query: string,
+    ): Promise<Array<{ billingUID: string; invoiceNumbers: string | null }>> =>
       (await request(app).get(`/api/v1/billings?contractUID=${contractB}&${query}`).set(admin)).body
         .data;
 
@@ -798,7 +800,13 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         [billingB],
         'the free text also matches the invoice numbers behind the billing',
       );
+      assert.deepEqual(
+        byInvoiceNumber[0]?.invoiceNumbers,
+        'R-B1, R-B2',
+        'the invoice numbers come from their own query now, not a GROUP_CONCAT',
+      );
       assert.deepEqual(await billings('q=gibtesnicht'), []);
+      assert.deepEqual(await billings('q=%25'), [], 'the wildcards are escaped here too');
 
       assert.equal((await billings('from=2024-08-10&to=2024-08-10')).length, 1);
       assert.deepEqual(await billings('from=2024-08-11'), []);
@@ -894,6 +902,15 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(
         (await request(app).get('/api/v1/invoices?q=Bea').set(admin)).body.data.length,
         0,
+      );
+
+      // The LIKE wildcards are escaped: a '%' searches for a percent sign, and
+      // a '_' for an underscore — not for everything and every single character.
+      assert.deepEqual((await request(app).get('/api/v1/invoices?q=%25').set(admin)).body.data, []);
+      assert.deepEqual(
+        (await request(app).get('/api/v1/invoices?q=R_2019-XYZ').set(admin)).body.data,
+        [],
+        'the underscore is a character, not a one-character wildcard',
       );
 
       // An account still narrows it, and so does the year.
@@ -1254,6 +1271,11 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(created.status, 201);
       assert.equal(created.body.data.transferUntilDate, '2024-10-05');
       assert.equal(created.body.data.transferDate, '2024-10-05');
+      // The flag leaves the API as a boolean, like its two siblings on the same
+      // row — it used to be the only one that came back as the raw 0/1.
+      assert.equal(created.body.data.directPayment, true);
+      assert.equal(created.body.data.notCovered, false);
+      assert.equal(created.body.data.reimbursementClosed, false);
       const uid = created.body.data.invoiceUID as string;
 
       // A corrected invoice date takes both dates with it.
@@ -1272,6 +1294,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         .set(admin)
         .send({ directPayment: false });
       assert.equal(freed.status, 200);
+      assert.equal(freed.body.data.directPayment, false);
       assert.equal(freed.body.data.transferUntilDate, null);
       assert.equal(freed.body.data.transferDate, null);
     });

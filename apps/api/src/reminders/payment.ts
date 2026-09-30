@@ -22,7 +22,7 @@ export type PaymentState = 'paid' | 'uncritical' | ReminderStage;
 export interface PayableInvoice {
   transferDate: string | null;
   transferUntilDate: string | null;
-  directPayment: number;
+  directPayment: boolean;
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -48,7 +48,7 @@ export function daysUntil(date: string, today: string): number {
  * - uncritical: unpaid but the due date is still comfortably ahead
  */
 export function calcPaymentState(invoice: PayableInvoice, today: string): PaymentState {
-  if (invoice.transferDate !== null || invoice.directPayment === 1) return 'paid';
+  if (invoice.transferDate !== null || invoice.directPayment) return 'paid';
   if (invoice.transferUntilDate === null) return 'due';
 
   const days = daysUntil(invoice.transferUntilDate, today);

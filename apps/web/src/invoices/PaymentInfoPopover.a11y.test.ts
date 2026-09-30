@@ -19,7 +19,7 @@ const invoice: InvoiceDto = {
   documentLink: null,
   agencyUID: 'c-1',
   agencyAccountUID: 'g-2',
-  directPayment: 0,
+  directPayment: false,
   reimbursementClosed: false,
   notCovered: false,
   notCoveredReason: null,

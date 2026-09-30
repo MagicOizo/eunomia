@@ -267,6 +267,8 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     typeof d.reason === 'string'
       ? `Der Mailserver hat den Versand abgelehnt: ${d.reason}`
       : 'Der Versand über den eingetragenen Mailserver ist fehlgeschlagen.',
+  REMINDERS_DISABLED: () =>
+    'Die Zahlungserinnerungen sind ausgeschaltet. Ohne sie verschickt ein Lauf nichts.',
 };
 
 /** The German sentence for an error code, or null if the code is unknown here. */

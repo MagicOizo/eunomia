@@ -19,6 +19,7 @@ import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
+import { likeTerm } from '../lib/like.js';
 import {
   STATUS_FILTERS,
   type WorkflowStatus,
@@ -359,6 +360,7 @@ async function present(db: Queryable, rows: InvoiceRow[]): Promise<Record<string
     return {
       ...row,
       treatmentDates: (treatmentDays.get(row.invoiceUID) ?? []).map((day) => day.treatmentDate),
+      directPayment: Boolean(row.directPayment),
       reimbursementClosed: Boolean(row.reimbursementClosed),
       notCovered: Boolean(row.notCovered),
       hasOpenObjection: Boolean(Number(row.hasOpenObjection)),
@@ -683,8 +685,8 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     }
 
     if (filters.q !== undefined) {
-      where.push('i.invoiceNumber LIKE ?');
-      params.push(`%${filters.q}%`);
+      where.push("i.invoiceNumber LIKE ? ESCAPE '!'");
+      params.push(likeTerm(filters.q));
     }
 
     // The reference filters, one block each — the pattern a further one copies.

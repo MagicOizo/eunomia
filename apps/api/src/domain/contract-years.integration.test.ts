@@ -314,6 +314,11 @@ test('bonus scale and claim-free years', async (t) => {
     await t.test('a year outside the contract term is rejected', async () => {
       assert.equal((await send('put', `${base}/years/2019`, { actualBonus: 1 })).status, 400);
       assert.equal((await send('put', `${base}/years/2025`, { actualBonus: 1 })).status, 400);
+      // The DELETE checks the same year the PUT does: it used to hand whatever
+      // Number() made of the path straight to the query, so /years/abc deleted
+      // nothing and answered 204 as though it had.
+      assert.equal((await send('delete', `${base}/years/2019`)).status, 400);
+      assert.equal((await send('delete', `${base}/years/abc`)).status, 400);
     });
 
     await t.test('only users with access to the account may record years', async () => {

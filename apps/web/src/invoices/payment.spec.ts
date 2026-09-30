@@ -6,12 +6,12 @@ import { DUE_SOON_DAYS, calcPaymentState } from './payment';
 function invoice(overrides: {
   transferDate?: string | null;
   transferUntilDate?: string | null;
-  directPayment?: number;
-}): { transferDate: string | null; transferUntilDate: string | null; directPayment: number } {
+  directPayment?: boolean;
+}): { transferDate: string | null; transferUntilDate: string | null; directPayment: boolean } {
   return {
     transferDate: null,
     transferUntilDate: null,
-    directPayment: 0,
+    directPayment: false,
     ...overrides,
   };
 }
@@ -36,7 +36,7 @@ describe('calcPaymentState', () => {
 
   it('is "paid" for direct/cash payment even without a transfer date', () => {
     expect(
-      calcPaymentState(invoice({ directPayment: 1, transferUntilDate: dueIn(-30) }), today),
+      calcPaymentState(invoice({ directPayment: true, transferUntilDate: dueIn(-30) }), today),
     ).toBe('paid');
   });
 

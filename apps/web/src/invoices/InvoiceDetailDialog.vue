@@ -173,7 +173,7 @@ watch(
       treatmentDate: inv.treatmentDate,
       facilityUID: inv.facilityUID,
       invoiceAmount: inv.invoiceAmount,
-      directPayment: inv.directPayment === 1,
+      directPayment: inv.directPayment,
       transferUntilDate: inv.transferUntilDate,
       transferDate: inv.transferDate,
       transferSubject: inv.transferSubject,

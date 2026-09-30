@@ -131,9 +131,9 @@ je Punkt in [Sicherheits-Review.md](Sicherheits-Review.md), dort unter der genan
 	Abgelaufene und widerrufene Zeilen bleiben für immer stehen; jede Anmeldung und jede Rotation legt eine neue an. Im täglichen Erinnerungs-Tick mit aufräumen.
 15.	Unbegrenzte Listen in drei Schemata (SEC-11)
 	Die Buchungseinträge einer Leistungsabrechnung sowie Rollen und Konto-Grants eines Nutzers haben keine Obergrenze; jeder Eintrag wird als eigenes INSERT in einer Transaktion geschrieben, bei den Buchungen zusätzlich unter Sperren auf allen betroffenen Rechnungen. Begrenzt wird das heute nur durch die Größe des Request-Bodys. Je eine fachlich sinnvolle Obergrenze setzen.
-16.	Steuerzeichen in Text-Einstellungen nicht abgewiesen (SEC-16)
+16.	Steuerzeichen in Text-Einstellungen nicht abgewiesen (SEC-16) — Umgesetzt mit v0.16.0-slice.3
 	Der Absendername geht ungeprüft in den From-Header der Mails; geprüft werden nur Länge und teils ein Format, nicht aber Zeilenumbrüche. Nodemailer kodiert Anzeigenamen, weshalb daraus voraussichtlich nichts folgt — wir verlassen uns damit aber auf eine Bibliothekseigenschaft statt auf eine eigene Grenze. Steuerzeichen für alle Text-Einstellungen abweisen.
-17.	Körpergrenze des JSON-Parsers nicht ausgeschrieben (SEC-12)
+17.	Körpergrenze des JSON-Parsers nicht ausgeschrieben (SEC-12) — Umgesetzt mit v0.16.0-slice.3
 	Der JSON-Parser läuft ohne Optionen und damit auf dem Standardwert von 100 kB. Es besteht kein Loch, aber die Grenze steht nirgends im Projekt und hinge an einem Standardwert, den ein Major-Upgrade ändern könnte. Ausschreiben und den Grund dazu vermerken.
 ## Version 0.16.0-slice.2
 ### Date 20260929
@@ -152,7 +152,7 @@ Code-Reviews.
 	Dieselbe Funktion mit demselben Kommentar in `apps/api/src/domain/agency-accounts.ts` und `apps/web/src/agencies/accounts.ts`; beide nennen einander „the twin of“. Der Inhalt ist eine Zeile, aber es ist die Regel, welches Konto vorgeschlagen wird — und die hat sich in Slice 44 schon einmal geändert. Mit CR-01 in das geteilte Paket.
 5.	Deutsche Formatierung doppelt, mit unterschiedlichem Leerverhalten (CR-05)
 	`germanDate`/`germanMoney` in `apps/api/src/lib/german.ts` gegen `germanDate`/`euro` in `apps/web/src/lib/format.ts`. Die API-Fassung prüft ihre Eingabe nicht: `germanDate('')` liefert `undefined.undefined.undefined`. Erreichbar wäre das über den Papierkorb, dort aber nur bei einem Geburtsdatum, das die Datenbank als NOT NULL ausschließt. Zusammenlegen und die Web-Fassung nehmen, die den Dash kennt.
-6.	`directPayment` verlässt die API als 0/1, die anderen beiden Flags als boolean (CR-06)
+6.	`directPayment` verlässt die API als 0/1, die anderen beiden Flags als boolean (CR-06) — Umgesetzt mit v0.16.0-slice.3
 	`present()` in `domain/invoices.ts` wandelt `reimbursementClosed` und `notCovered` in `Boolean`, lässt `directPayment` aber als TINYINT stehen. Das Web schreibt deshalb `directPayment: number` in seine DTO und vergleicht an drei Stellen gegen `=== 1`. Drei Flags derselben Zeile, zwei Darstellungen — und wer die dritte behandelt wie die ersten beiden, bekommt nur zufällig das Richtige. In `present()` mitwandeln, die `=== 1`-Vergleiche entfernen.
 7.	Kontoskopierung siebenmal von Hand ausgeschrieben (CR-07)
 	Sieben Listen-Endpunkte lösen dieselbe Frage mit demselben zwölf- bis zwanzigzeiligen Block: `getAccessibleAccounts`, `scope.all` abfangen, leere Liste abfangen, `IN (…)` bauen (invoices zweimal, submissions, allocations, billings, contracts, accounts). Die Fassungen sind bereits leicht verschieden, und SEC-04 ist genau die achte Stelle, an der der Block fehlt. Einen Helfer neben `getAccessibleAccounts` und die sieben Stellen darauf ziehen — gehört in dieselbe Scheibe wie SEC-04.
@@ -164,11 +164,11 @@ Code-Reviews.
 	Neun Stellen benutzen den Helfer, drei nicht: Einreichung anlegen, Leistungsabrechnung löschen, Police anlegen. In `submissions.ts` liegt das `sendData(…)` dabei innerhalb des `try`-Blocks nach dem `commit()` — wirft es, läuft ein `rollback()` auf einer bestätigten Transaktion. Die drei auf `withTransaction` ziehen, die Antwort nach außen.
 11.	Parameter werden mal geprüft, mal roh gelesen (CR-11)
 	Vier Endpunkte gehen an `parseQuery`/`pathParam` vorbei: `invoices.ts` `/years` liest `req.query.accountUID` roh, `allocations.ts` liest zwei Filter ungeprüft und ist damit die einzige Liste ohne `limit`, `reimbursement-plan.ts` prüft das Jahr in drei Zeilen von Hand, und `auth/admin-routes.ts` nimmt `req.params.uuid` durchgehend roh. Kein Loch (alle Werte werden gebunden), aber eine andere Fehlermeldung und eine fehlende Obergrenze. Ergänzt SEC-11.
-12.	API antwortet an drei Stellen deutsch statt englisch (CR-12)
+12.	API antwortet an drei Stellen deutsch statt englisch (CR-12) — Umgesetzt mit v0.16.0-slice.3
 	`lib/error-codes.ts` legt fest: die API antwortet englisch, das Web übersetzt über den Code. `settings/routes.ts` antwortet zweimal deutsch, `mail/mailer.ts` liefert alle `reason`-Texte deutsch. Das hat eine Folge: `REMINDERS_DISABLED` ist der einzige von 51 Codes ohne deutschen Satz in `error-messages.ts` — der Nutzer sieht deshalb „Die Aktion ist fehlgeschlagen.“, wenn er den Erinnerungslauf bei ausgeschalteten Erinnerungen anstößt. Meldungen auf Englisch ziehen, den Code nachtragen.
-13.	`GROUP_CONCAT` ohne Längengrenze kürzt still (CR-13)
+13.	`GROUP_CONCAT` ohne Längengrenze kürzt still (CR-13) — Umgesetzt mit v0.16.0-slice.3
 	Die Einreichungsliste fasst ihre Rechnungs-IDs und die Abrechnungsliste ihre Rechnungsnummern mit `GROUP_CONCAT` zusammen, ohne `group_concat_max_len` zu setzen; der MariaDB-Standard ist 1024 Byte. Ab etwa 78 Rechnungen je Einreichung fällt der Rest stillschweigend weg — keine Warnung, nur eine kürzere Liste. Bei den Einreichungen stattdessen eine zweite Abfrage (wie es die Detailroute bereits tut).
-14.	Suchtext maskiert `%` und `_` nicht (CR-14)
+14.	Suchtext maskiert `%` und `_` nicht (CR-14) — Umgesetzt mit v0.16.0-slice.3
 	Alle Freitextsuchen bauen `%${q}%` für `LIKE`. Wer `%` eingibt, findet alles; wer `_` eingibt, jeden Einzelzeichen-Treffer. Zusätzlich hat `q` in der Abrechnungssuche keine Längengrenze, während dasselbe Feld in der Rechnungssuche auf 50 Zeichen begrenzt ist. Kein Sicherheitsproblem (der Wert ist gebunden), aber ein leises Verhaltensrätsel. Ein Helfer `likeTerm(q)` und dieselbe Grenze in beiden Schemata.
 15.	`invoices.ts` trägt fünf Rollen in 940 Zeilen (CR-15)
 	Die größte Quelldatei des Projekts enthält Tabellenbeschreibung, Schemata, Abfrage- und Präsentationsschicht, fünf Fachregeln als reine Funktionen und den Router mit sieben Endpunkten. Die Regelfunktionen sind das Wertvollste darin und haben keinen Unit-Test, weil man nur über den Router und eine Datenbank an sie herankommt. Dreiteilen: `invoices/rules.ts`, `invoices/queries.ts`, `invoices.ts`. Gehört vor die SEC-Scheiben, die dieselbe Datei anfassen (SEC-01, SEC-11).
@@ -184,7 +184,7 @@ Code-Reviews.
 	`account` heißt im Code der Versicherte, die Kontoverbindung eines Abrechnungsdienstleisters und das Benutzerkonto. Zwei Module exportieren beide ein `accountsTable`, weshalb der Papierkorb eines davon beim Import umbenennen muss; dazu gibt es zwei `accountForInvoice` mit verschiedener Bedeutung. Noch kein Fehler, aber Zeitverlust beim Lesen und eine Falle bei jeder Umbenennung per Suche. Die Bankverbindung durchgängig `bankAccount` nennen — nur im Code, nicht in Spalten oder API-Feldern.
 21.	ID-Muster erlaubt ein Zeichen, das der Generator nie erzeugt (CR-21) — Umgesetzt mit v0.16.0-slice.2
 	`ID_ALPHABET` lässt `0`, `O`, `1`, `I` und `l` bewusst weg, das Prüfmuster `entityIdPattern` erlaubt mit `a-z` aber `l`. Kein Loch, aber die Doku sagt etwas anderes als der Code, und das Muster ist genau dafür da, das Alphabet durchzusetzen. Das Muster aus dem Alphabet ableiten oder `a-km-z` schreiben.
-22.	Jahr im DELETE der Vertragsjahre ungeprüft (CR-22)
+22.	Jahr im DELETE der Vertragsjahre ungeprüft (CR-22) — Umgesetzt mit v0.16.0-slice.3
 	`PUT /contracts/:uid/years/:year` prüft das Jahr samt `NaN`, `DELETE` prüft gar nicht und gibt `Number(…)` direkt in die Abfrage — bei `/years/abc` also `NaN`, was nichts löscht und trotzdem 204 antwortet. Dieselbe Prüfung auch im DELETE.
 23.	Eindeutigkeitsprüfung im PATCH außerhalb der Transaktion (CR-23)
 	Beim Anlegen eines Beitragsstands oder einer Konditionen-Zeile läuft `assertValidityFree` innerhalb der Transaktion, beim Ändern davor gegen den Pool. Zwei gleichzeitige Änderungen könnten beide bestehen und dasselbe Gültigkeitsdatum schreiben; ein UNIQUE-Index fängt das nicht ab, weil es keinen gibt. In einem Haushalt theoretisch, die Asymmetrie zur POST-Route nicht. Prüfung in die Transaktion ziehen; der Index wäre eine eigene Entscheidung (Migration).

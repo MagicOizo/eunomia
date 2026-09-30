@@ -7,7 +7,7 @@ const TODAY = '2026-09-24';
 
 /** An unpaid invoice with the given due date. */
 function invoice(transferUntilDate: string | null, overrides = {}) {
-  return { transferDate: null, transferUntilDate, directPayment: 0, ...overrides };
+  return { transferDate: null, transferUntilDate, directPayment: false, ...overrides };
 }
 
 test('the threshold matches the traffic light in the invoice list', () => {
@@ -20,7 +20,7 @@ test('a transferred or cash-paid invoice is done', () => {
     calcPaymentState(invoice('2026-09-01', { transferDate: '2026-09-02' }), TODAY),
     'paid',
   );
-  assert.equal(calcPaymentState(invoice('2026-09-01', { directPayment: 1 }), TODAY), 'paid');
+  assert.equal(calcPaymentState(invoice('2026-09-01', { directPayment: true }), TODAY), 'paid');
 });
 
 test('the due date decides between uncritical, due and overdue', () => {

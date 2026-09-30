@@ -7,6 +7,39 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.16.0-slice.3 — 2026-09-30
+
+Seven small corrections to the API, from both reviews: three of them change what an answer contains,
+four close a gap between what the code says and what it does. No migration, no field moves.
+
+- **A flag that was a number is a flag.** `directPayment` left the API as `0`/`1` while the two
+  other flags of the same row came as `true`/`false`, so the web compared it against `1` in three
+  places and wrote `number` into its own type. It is a boolean now, everywhere it is read — the
+  payment traffic light included, which is the one place where treating it like its two neighbours
+  would quietly have given the right answer only by accident.
+- **Long lists are no longer cut off in silence.** A submission's invoice IDs and a billing's
+  invoice numbers were collected with `GROUP_CONCAT`, whose default limit is 1024 bytes — from about
+  78 invoices on, the rest simply went missing, with no warning. Both lists come from a query of
+  their own now, the way the detail route has always done it.
+- **A search for `%` searches for a percent sign.** Every free-text search built its `LIKE` term by
+  hand, so `%` matched everything and `_` matched any single character. The term goes through one
+  helper that escapes both, and the billing search gets the same 50-character limit the invoice
+  search already had.
+- **Deleting a contract year checks the year.** `DELETE /contracts/:uid/years/:year` passed the year
+  on unchecked, so `/years/abc` answered 204 for a deletion that never happened. It runs the same
+  check as the write.
+- **The API answers in English.** Two messages in the settings routes and every `reason` the mailer
+  returns were German, against the rule that the API answers in English and the web translates by
+  code. One consequence was visible: starting the reminder run with reminders switched off showed
+  "Die Aktion ist fehlgeschlagen." instead of a sentence about reminders, because
+  `REMINDERS_DISABLED` was the only one of the 51 codes without a German text. It has one now.
+- **Control characters are refused in the text settings.** `mail.fromName` goes into the From header
+  of every mail the app sends, and a line break there is header injection nobody should have to
+  trust a library to encode away. No setting has a use for a tab or a line break, so all of them
+  reject one now.
+- **The request body limit is written out.** `express.json()` was left to its default. The limit is
+  spelled out as 100 kB — the same value, but a major upgrade can no longer move it unnoticed.
+
 ## 0.16.0-slice.2 — 2026-09-29
 
 First of the slices that work off the two reviews before 1.0.0, and the smallest: five findings that
