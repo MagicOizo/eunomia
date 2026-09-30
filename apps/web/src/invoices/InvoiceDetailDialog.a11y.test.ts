@@ -86,7 +86,7 @@ const props = {
   accountName: 'John Doe',
   facilities: [],
   agencies: [],
-  agencyAccounts: {},
+  agencyPaymentDetails: {},
   contracts: [
     { value: 'x', label: 'X-1 · PKV', contractBegin: '2020-01-01', contractEnd: null },
     { value: 'y', label: 'Y-1 · Zusatz', contractBegin: '2020-01-01', contractEnd: null },

@@ -9,24 +9,24 @@ import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { describeError } from '../lib/errors';
-import { accountLabel } from './accounts';
+import { paymentDetailLabel } from './payment-details';
 import {
-  type AgencyAccountDto,
-  type AgencyAccountInput,
+  type AgencyPaymentDetailDto,
+  type AgencyPaymentDetailInput,
   type AgencyDto,
-  deleteAgencyAccount,
+  deleteAgencyPaymentDetail,
   getAgency,
-  saveAgencyAccount,
+  saveAgencyPaymentDetail,
   updateAgency,
 } from './api';
-import AgencyAccountFormDialog from './AgencyAccountFormDialog.vue';
+import PaymentDetailFormDialog from './PaymentDetailFormDialog.vue';
 
 /**
  * View/edit a collection agency as a display mask (see dialog-design.md), plus
- * its bank accounts: an agency holds several side by side, and every invoice
+ * its payment details: an agency holds several side by side, and every invoice
  * names the one it goes to (Slice 44). Opened by ResourceView via
  * ResourceConfig.detailDialog; creating an agency stays the classic form, which
- * records its first account.
+ * records its first set.
  */
 const props = defineProps<{
   open: boolean;
@@ -97,31 +97,31 @@ async function saveMask(): Promise<void> {
   }
 }
 
-// --- Bank accounts ----------------------------------------------------------
+// --- Payment details --------------------------------------------------------
 
-const accountDialog = reactive({ open: false, entry: null as AgencyAccountDto | null });
+const detailDialog = reactive({ open: false, entry: null as AgencyPaymentDetailDto | null });
 const entrySaving = ref(false);
 const entryError = ref<string | null>(null);
 const pendingDelete = ref<{ uid: string; label: string } | null>(null);
 const deleteError = ref<string | null>(null);
 
-function openAccount(entry: AgencyAccountDto | null): void {
+function openPaymentDetail(entry: AgencyPaymentDetailDto | null): void {
   entryError.value = null;
-  accountDialog.entry = entry;
-  accountDialog.open = true;
+  detailDialog.entry = entry;
+  detailDialog.open = true;
 }
 
-async function saveEntry(payload: AgencyAccountInput): Promise<void> {
+async function saveEntry(payload: AgencyPaymentDetailInput): Promise<void> {
   if (!agency.value) return;
   entrySaving.value = true;
   entryError.value = null;
   try {
-    await saveAgencyAccount(
+    await saveAgencyPaymentDetail(
       agency.value.agencyUID,
-      accountDialog.entry?.agencyAccountUID ?? null,
+      detailDialog.entry?.agencyAccountUID ?? null,
       payload,
     );
-    accountDialog.open = false;
+    detailDialog.open = false;
     await load();
     emit('changed');
   } catch (error) {
@@ -135,7 +135,7 @@ async function confirmDelete(): Promise<void> {
   if (!agency.value || !pendingDelete.value) return;
   deleteError.value = null;
   try {
-    await deleteAgencyAccount(agency.value.agencyUID, pendingDelete.value.uid);
+    await deleteAgencyPaymentDetail(agency.value.agencyUID, pendingDelete.value.uid);
     pendingDelete.value = null;
     await load();
     emit('changed');
@@ -145,7 +145,7 @@ async function confirmDelete(): Promise<void> {
 }
 
 /** All of them, in the order the API hands them out: as they were recorded. */
-const accounts = computed(() => agency.value?.accounts ?? []);
+const paymentDetails = computed(() => agency.value?.accounts ?? []);
 </script>
 
 <template>
@@ -163,10 +163,10 @@ const accounts = computed(() => agency.value?.accounts ?? []);
       </EuDetailMask>
       <p v-if="saveError" class="eu-agency__error" role="alert">{{ saveError }}</p>
 
-      <section class="eu-agency__block" aria-labelledby="eu-agency-accounts">
+      <section class="eu-agency__block" aria-labelledby="eu-agency-payment-details">
         <div class="eu-agency__block-head">
-          <h3 id="eu-agency-accounts">Kontoverbindungen</h3>
-          <EuButton variant="secondary" :icon="faPlus" @click="openAccount(null)"
+          <h3 id="eu-agency-payment-details">Kontoverbindungen</h3>
+          <EuButton variant="secondary" :icon="faPlus" @click="openPaymentDetail(null)"
             >Kontoverbindung hinzufügen</EuButton
           >
         </div>
@@ -184,17 +184,17 @@ const accounts = computed(() => agency.value?.accounts ?? []);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="account in accounts" :key="account.agencyAccountUID">
+              <tr v-for="detail in paymentDetails" :key="detail.agencyAccountUID">
                 <!-- The BIC belongs to the IBAN and is rarely looked at on its
                      own; under it, neither of the two has to break mid-token to
                      fit the dialog. -->
-                <td class="eu-agency__account">
-                  {{ accountLabel(account) }}
-                  <span v-if="account.bic" class="eu-agency__bic">{{ account.bic }}</span>
+                <td class="eu-agency__iban">
+                  {{ paymentDetailLabel(detail) }}
+                  <span v-if="detail.bic" class="eu-agency__bic">{{ detail.bic }}</span>
                 </td>
-                <td>{{ account.recipientName ?? '–' }}</td>
+                <td>{{ detail.recipientName ?? '–' }}</td>
                 <td class="eu-agency__note">
-                  <EuIconLabel v-if="account.note" :icon="faCommentDots" :label="account.note" />
+                  <EuIconLabel v-if="detail.note" :icon="faCommentDots" :label="detail.note" />
                   <template v-else>–</template>
                 </td>
                 <td class="eu-agency__actions">
@@ -202,18 +202,18 @@ const accounts = computed(() => agency.value?.accounts ?? []);
                     variant="secondary"
                     icon-only
                     :icon="faPen"
-                    :aria-label="`Kontoverbindung ${accountLabel(account)} bearbeiten`"
-                    @click="openAccount(account)"
+                    :aria-label="`Kontoverbindung ${paymentDetailLabel(detail)} bearbeiten`"
+                    @click="openPaymentDetail(detail)"
                   />
                   <EuButton
                     variant="secondary"
                     icon-only
                     :icon="faTrash"
-                    :aria-label="`Kontoverbindung ${accountLabel(account)} löschen`"
+                    :aria-label="`Kontoverbindung ${paymentDetailLabel(detail)} löschen`"
                     @click="
                       pendingDelete = {
-                        uid: account.agencyAccountUID,
-                        label: `die Kontoverbindung ${accountLabel(account)}`,
+                        uid: detail.agencyAccountUID,
+                        label: `die Kontoverbindung ${paymentDetailLabel(detail)}`,
                       }
                     "
                   />
@@ -233,12 +233,12 @@ const accounts = computed(() => agency.value?.accounts ?? []);
     </template>
   </EuDialog>
 
-  <AgencyAccountFormDialog
-    :open="accountDialog.open"
-    :entry="accountDialog.entry"
+  <PaymentDetailFormDialog
+    :open="detailDialog.open"
+    :entry="detailDialog.entry"
     :submitting="entrySaving"
     :error="entryError"
-    @close="accountDialog.open = false"
+    @close="detailDialog.open = false"
     @submit="saveEntry"
   />
   <EuDialog
@@ -318,7 +318,7 @@ const accounts = computed(() => agency.value?.accounts ?? []);
    buttons behind the dialog's edge. `break-word`, not `anywhere`: the latter
    also shrinks the column to min-content, which wraps the IBAN even when the
    dialog has room for it. */
-.eu-agency__table .eu-agency__account {
+.eu-agency__table .eu-agency__iban {
   overflow-wrap: break-word;
 }
 

@@ -3,7 +3,7 @@ import { conflict } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { germanDate, germanMoney } from '../lib/german.js';
 import { ENTITY_PREFIX, type EntityName } from '../lib/ids.js';
-import { accountsTable as agencyAccountsTable } from './agency-accounts.js';
+import { paymentDetailsTable } from './agency-payment-details.js';
 import { allocationsTable } from './allocations.js';
 import { agenciesTable } from './collection-agencies.js';
 import { contractsTable } from './contract-access.js';
@@ -237,7 +237,7 @@ export const TRASH_ENTITIES: TrashEntity[] = [
   {
     key: 'agencyAccount',
     entity: 'agencyAccount',
-    table: agencyAccountsTable,
+    table: paymentDetailsTable,
     singular: 'Kontoverbindung',
     plural: 'Kontoverbindungen',
     alias: 'ga',

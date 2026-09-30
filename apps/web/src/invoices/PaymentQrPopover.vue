@@ -20,7 +20,7 @@ import { buildGirocode } from './girocode';
  * nobody looks at.
  */
 const props = defineProps<{
-  /** Beneficiary — the name the transfer is addressed to (see agencies/accounts.ts). */
+  /** Beneficiary — the name the transfer is addressed to (see agencies/payment-details.ts). */
   recipient: string;
   iban: string;
   /** Optional in the scheme; an account without one still yields a valid code. */

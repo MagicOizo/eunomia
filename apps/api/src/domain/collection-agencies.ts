@@ -19,26 +19,26 @@ import {
 import { withTransaction } from '../db/transaction.js';
 import { notFound } from '../lib/api-error.js';
 import {
-  ACCOUNT_COLUMNS,
-  type AgencyAccount,
+  PAYMENT_DETAIL_COLUMNS,
+  type AgencyPaymentDetail,
   bicField,
-  defaultAccount,
+  defaultPaymentDetail,
   ibanField,
-  insertAccount,
-  listAccounts,
+  insertPaymentDetail,
+  listPaymentDetails,
   recipientNameField,
-} from './agency-accounts.js';
+} from './agency-payment-details.js';
 
 /**
  * Collection agencies (Inkasso). Not the generic master-data router any more:
- * the bank account is a table of its own (`AgencyBankAccounts`, see
- * domain/agency-accounts.ts), and since Slice 44 an agency holds several
- * accounts at once — so an agency is read with all of them and created
- * together with its first one.
+ * the payment details are a table of their own (`AgencyBankAccounts`, see
+ * domain/agency-payment-details.ts), and since Slice 44 an agency holds several
+ * sets of them at once — so an agency is read with all of them and created
+ * together with its first.
  *
- * Every read also carries that first account, flattened as `bankAccount`,
- * `bic` and `recipientName`: it is the one an invoice is suggested, and it
- * keeps the lists and pickers of the UI working on plain fields.
+ * Every read also carries that first set, flattened as `bankAccount`, `bic` and
+ * `recipientName`: it is the one an invoice is suggested, and it keeps the lists
+ * and pickers of the UI working on plain fields.
  */
 
 export const agenciesTable: CrudTable = {
@@ -52,9 +52,9 @@ export const agenciesTable: CrudTable = {
 const nameField = z.string().trim().min(1).max(100);
 
 /**
- * Creating an agency carries its first bank account — an agency without one
- * could not be paid, and being the first it is the one every invoice of that
- * agency is suggested. Further accounts are added through /:uid/accounts.
+ * Creating an agency carries its first payment details — an agency without them
+ * could not be paid, and being the first they are what every invoice of that
+ * agency is suggested. Further ones are added through /:uid/accounts.
  */
 const createSchema = z.object({
   agencyName: nameField,
@@ -63,18 +63,21 @@ const createSchema = z.object({
   recipientName: recipientNameField.nullish(),
 });
 
-/** Only the agency's own field: accounts are changed through /:uid/accounts. */
+/** Only the agency's own field: payment details change through /:uid/accounts. */
 const updateSchema = z.object({ agencyName: nameField }).partial();
 
-/** The agency row plus its accounts and, flattened, the first of them. */
-function withAccounts(agency: Row, accounts: AgencyAccount[]): Row {
-  const first = defaultAccount(accounts);
+/**
+ * The agency row plus its payment details and, flattened, the first of them. The
+ * field stays `accounts`: it is what the web reads (see §2.8 on the vocabulary).
+ */
+function withPaymentDetails(agency: Row, details: AgencyPaymentDetail[]): Row {
+  const first = defaultPaymentDetail(details);
   return {
     ...agency,
     bankAccount: first?.bankAccount ?? null,
     bic: first?.bic ?? null,
     recipientName: first?.recipientName ?? null,
-    accounts,
+    accounts: details,
   };
 }
 
@@ -86,20 +89,22 @@ export function createCollectionAgenciesRouter(pool: Pool, config: AppConfig): R
 
   router.get('/', requireAuth, async (_req, res) => {
     const agencies = await listRows(pool, agenciesTable);
-    // One query for all accounts instead of one per agency: the set is small,
-    // and the list is the page's own query.
-    const accounts = await pool.query<Array<AgencyAccount & { agencyUID: string }>>(
-      `SELECT agencyUID, ${ACCOUNT_COLUMNS} FROM AgencyBankAccounts
+    // One query for all payment details instead of one per agency: the set is
+    // small, and the list is the page's own query.
+    const details = await pool.query<Array<AgencyPaymentDetail & { agencyUID: string }>>(
+      `SELECT agencyUID, ${PAYMENT_DETAIL_COLUMNS} FROM AgencyBankAccounts
         WHERE agencyAccountStatus <> -1
         ORDER BY agencyAccountID`,
     );
-    const byAgency = new Map<string, AgencyAccount[]>();
-    for (const { agencyUID, ...account } of accounts) {
-      byAgency.set(agencyUID, [...(byAgency.get(agencyUID) ?? []), account]);
+    const byAgency = new Map<string, AgencyPaymentDetail[]>();
+    for (const { agencyUID, ...detail } of details) {
+      byAgency.set(agencyUID, [...(byAgency.get(agencyUID) ?? []), detail]);
     }
     sendData(
       res,
-      agencies.map((agency) => withAccounts(agency, byAgency.get(String(agency.agencyUID)) ?? [])),
+      agencies.map((agency) =>
+        withPaymentDetails(agency, byAgency.get(String(agency.agencyUID)) ?? []),
+      ),
     );
   });
 
@@ -107,17 +112,21 @@ export function createCollectionAgenciesRouter(pool: Pool, config: AppConfig): R
     const uid = pathParam(req, 'uid');
     const agency = await getRow(pool, agenciesTable, uid);
     if (!agency) throw notFound('Collection agency');
-    sendData(res, withAccounts(agency, await listAccounts(pool, uid)));
+    sendData(res, withPaymentDetails(agency, await listPaymentDetails(pool, uid)));
   });
 
   router.post('/', requireAuth, requireManage, async (req, res) => {
-    const { agencyName, ...account } = createSchema.parse(req.body);
+    const { agencyName, ...detail } = createSchema.parse(req.body);
     const created = await withTransaction(pool, async (conn) => {
       const agency = await insertRow(conn, agenciesTable, { agencyName });
-      await insertAccount(conn, String(agency.agencyUID), account);
+      await insertPaymentDetail(conn, String(agency.agencyUID), detail);
       return agency;
     });
-    sendData(res, withAccounts(created, await listAccounts(pool, String(created.agencyUID))), 201);
+    sendData(
+      res,
+      withPaymentDetails(created, await listPaymentDetails(pool, String(created.agencyUID))),
+      201,
+    );
   });
 
   router.patch('/:uid', requireAuth, requireManage, async (req, res) => {
@@ -125,7 +134,7 @@ export function createCollectionAgenciesRouter(pool: Pool, config: AppConfig): R
     const data = updateSchema.parse(req.body);
     const updated = await updateRow(pool, agenciesTable, uid, data);
     if (!updated) throw notFound('Collection agency');
-    sendData(res, withAccounts(updated, await listAccounts(pool, uid)));
+    sendData(res, withPaymentDetails(updated, await listPaymentDetails(pool, uid)));
   });
 
   router.delete('/:uid', requireAuth, requireManage, async (req, res) => {

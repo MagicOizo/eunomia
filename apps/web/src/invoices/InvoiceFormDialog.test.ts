@@ -1,19 +1,19 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import AgencyAccountFormDialog from '../agencies/AgencyAccountFormDialog.vue';
+import PaymentDetailFormDialog from '../agencies/PaymentDetailFormDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import { differentYearsMessage } from './treatment-days';
 
-const { saveAgencyAccount } = vi.hoisted(() => ({ saveAgencyAccount: vi.fn() }));
+const { saveAgencyPaymentDetail } = vi.hoisted(() => ({ saveAgencyPaymentDetail: vi.fn() }));
 
 vi.mock('../agencies/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../agencies/api')>()),
-  saveAgencyAccount,
+  saveAgencyPaymentDetail,
 }));
 
-beforeEach(() => saveAgencyAccount.mockReset());
+beforeEach(() => saveAgencyPaymentDetail.mockReset());
 
 /** The create form with the minimum a save needs, minus the treatment days. */
 function mountForm() {
@@ -24,7 +24,7 @@ function mountForm() {
       accountUID: 'a-1',
       facilities: [],
       agencies: [],
-      agencyAccounts: {},
+      agencyPaymentDetails: {},
       submitting: false,
       error: null,
     },
@@ -163,7 +163,7 @@ describe('InvoiceFormDialog bank account', () => {
     { value: 'c-1', label: 'Inkasso Eins' },
     { value: 'c-2', label: 'Inkasso Zwei' },
   ];
-  const agencyAccounts = {
+  const agencyPaymentDetails = {
     'c-1': [
       { agencyAccountUID: 'g-1', bankAccount: 'DE01', bic: null, recipientName: null, note: null },
       {
@@ -187,7 +187,7 @@ describe('InvoiceFormDialog bank account', () => {
         accountUID: 'a-1',
         facilities: [],
         agencies,
-        agencyAccounts,
+        agencyPaymentDetails,
         submitting: false,
         error: null,
       },
@@ -209,10 +209,10 @@ describe('InvoiceFormDialog bank account', () => {
     await picker(wrapper, 'Abrechnungsdienstleister')!.setValue('c-1');
     await flushPromises();
 
-    const accountPicker = picker(wrapper, 'Kontoverbindung')!;
-    expect(accountPicker.props('modelValue')).toBe('g-1');
+    const paymentDetailPicker = picker(wrapper, 'Kontoverbindung')!;
+    expect(paymentDetailPicker.props('modelValue')).toBe('g-1');
     // Beneficiary and note tell two IBANs of one agency apart.
-    expect(accountPicker.props('options')).toEqual([
+    expect(paymentDetailPicker.props('options')).toEqual([
       { value: 'g-1', label: 'DE01', hint: undefined },
       { value: 'g-2', label: 'DE02', hint: 'Zahlstelle · Radiologie' },
     ]);
@@ -240,7 +240,7 @@ describe('InvoiceFormDialog bank account', () => {
   });
 
   it('selects an account added from the picker right away', async () => {
-    saveAgencyAccount.mockResolvedValue({
+    saveAgencyPaymentDetail.mockResolvedValue({
       agencyAccountUID: 'g-neu',
       bankAccount: 'DE77',
       bic: null,
@@ -253,7 +253,7 @@ describe('InvoiceFormDialog bank account', () => {
 
     picker(wrapper, 'Kontoverbindung')!.vm.$emit('create', 'DE77');
     await flushPromises();
-    const form = wrapper.findComponent(AgencyAccountFormDialog);
+    const form = wrapper.findComponent(PaymentDetailFormDialog);
     expect(form.props('open')).toBe(true);
     form.vm.$emit('submit', {
       bankAccount: 'DE77',
@@ -263,15 +263,15 @@ describe('InvoiceFormDialog bank account', () => {
     });
     await flushPromises();
 
-    expect(saveAgencyAccount).toHaveBeenCalledWith('c-1', null, {
+    expect(saveAgencyPaymentDetail).toHaveBeenCalledWith('c-1', null, {
       bankAccount: 'DE77',
       bic: null,
       recipientName: null,
       note: null,
     });
-    const accountPicker = picker(wrapper, 'Kontoverbindung')!;
-    expect(accountPicker.props('modelValue')).toBe('g-neu');
-    expect(accountPicker.props('options')).toHaveLength(3);
+    const paymentDetailPicker = picker(wrapper, 'Kontoverbindung')!;
+    expect(paymentDetailPicker.props('modelValue')).toBe('g-neu');
+    expect(paymentDetailPicker.props('options')).toHaveLength(3);
 
     wrapper.unmount();
   });

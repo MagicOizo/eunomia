@@ -13,8 +13,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
-import { accountForInvoice, accountLabel } from '../agencies/accounts';
-import type { AgencyAccountDto } from '../agencies/api';
+import { invoicePaymentDetail, paymentDetailLabel } from '../agencies/payment-details';
+import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
 import { euro, germanDate } from '../lib/format';
@@ -27,30 +27,32 @@ const props = defineProps<{
   facilityName: string | null;
   agencyName: string | null;
   /**
-   * The agency's bank accounts, all of them: the invoice names the one it goes
+   * The agency's payment details, all of them: the invoice names the one it goes
    * to, so the lookup happens here rather than at every call site.
    */
-  accounts?: AgencyAccountDto[];
+  paymentDetails?: AgencyPaymentDetailDto[];
 }>();
 
 const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.invoice)]})`);
 
 /**
- * The account the money went to (or is going to): the one the invoice names
+ * The details the money went to (or is going to): the ones the invoice names
  * (Slice 44). An invoice that names none — one from before the choice existed,
- * or one whose account was deleted — falls back to the agency's first.
+ * or one whose details were deleted — falls back to the agency's first.
  */
-const account = computed(() =>
-  accountForInvoice(props.accounts ?? [], props.invoice.agencyAccountUID),
+const paymentDetail = computed(() =>
+  invoicePaymentDetail(props.paymentDetails ?? [], props.invoice.agencyAccountUID),
 );
-/** Where the account names a beneficiary of its own, that name is the payee. */
-const payee = computed(() => account.value?.recipientName ?? props.agencyName);
+/** Where the details name a beneficiary of their own, that name is the payee. */
+const payee = computed(() => paymentDetail.value?.recipientName ?? props.agencyName);
 
 // Nothing left to transfer, nothing to scan: a paid or cash-settled invoice
 // gets no GiroCode. Reuses the traffic light's rule rather than repeating it.
 const showQr = computed(
   () =>
-    account.value !== null && payee.value !== null && calcPaymentState(props.invoice) !== 'paid',
+    paymentDetail.value !== null &&
+    payee.value !== null &&
+    calcPaymentState(props.invoice) !== 'paid',
 );
 </script>
 
@@ -94,19 +96,19 @@ const showQr = computed(
         <dd>{{ payee }}</dd>
       </template>
 
-      <template v-if="account">
+      <template v-if="paymentDetail">
         <dt><EuIconLabel :icon="faMoneyCheckDollar" label="IBAN" /></dt>
         <!-- The GiroCode belongs to the IBAN, so it hangs off that row instead
              of claiming one of its own (which would also mean a label column
              entry for something that is not a value). -->
         <dd>
           <span class="eu-pay-grid__iban eu-pay-grid__mono">
-            <span>{{ accountLabel(account) }}</span>
+            <span>{{ paymentDetailLabel(paymentDetail) }}</span>
             <PaymentQrPopover
               v-if="showQr"
               :recipient="payee ?? ''"
-              :iban="account.bankAccount"
-              :bic="account.bic"
+              :iban="paymentDetail.bankAccount"
+              :bic="paymentDetail.bic"
               :amount="invoice.invoiceAmount"
               :subject="invoice.transferSubject"
             />
@@ -114,9 +116,9 @@ const showQr = computed(
         </dd>
       </template>
 
-      <template v-if="account?.bic">
+      <template v-if="paymentDetail?.bic">
         <dt><EuIconLabel :icon="faLandmark" label="BIC" /></dt>
-        <dd class="eu-pay-grid__mono">{{ account.bic }}</dd>
+        <dd class="eu-pay-grid__mono">{{ paymentDetail.bic }}</dd>
       </template>
 
       <template v-if="invoice.transferSubject">

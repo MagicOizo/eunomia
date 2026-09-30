@@ -2,9 +2,9 @@
 import { faBan, faPaperPlane, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, nextTick, reactive, ref, toRef, watch } from 'vue';
 
-import AgencyAccountFormDialog from '../agencies/AgencyAccountFormDialog.vue';
-import { accountForInvoice } from '../agencies/accounts';
-import type { AgencyAccountDto } from '../agencies/api';
+import PaymentDetailFormDialog from '../agencies/PaymentDetailFormDialog.vue';
+import { invoicePaymentDetail } from '../agencies/payment-details';
+import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import type { DetailValue } from '../design-system/components/EuDetailField.vue';
@@ -33,7 +33,7 @@ import {
 import { type BillingAllocationPayload, saveBillingAllocations } from './billing-actions';
 import AllocationDialog from './AllocationDialog.vue';
 import BillingDialog from './BillingDialog.vue';
-import { useAgencyAccountPicker } from './agency-account-picker';
+import { usePaymentDetailPicker } from './payment-detail-picker';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import { type ContractOption, policyLabel, submittableContracts } from './eligibility';
 import { reasonRequiredMessage } from './not-covered';
@@ -70,8 +70,8 @@ const props = defineProps<{
   accountName: string;
   facilities: SelectOption[];
   agencies: SelectOption[];
-  /** agencyUID → its bank accounts, to pick the one the invoice goes to. */
-  agencyAccounts: Record<string, AgencyAccountDto[]>;
+  /** agencyUID → its payment details, to pick the ones the invoice goes to. */
+  agencyPaymentDetails: Record<string, AgencyPaymentDetailDto[]>;
   /** All policies of the insured person, for the submit and exclusion pickers. */
   contracts: ContractOption[];
   /** The optimizer's advice for this invoice, shown per policy card. */
@@ -129,26 +129,28 @@ const {
     values.facilityUID = option.value;
   } else {
     localAgencies.value = [...localAgencies.value, option];
-    // A new agency is created with its first account; that one is the pick.
-    accountPicker.remember(option.value, (row.accounts ?? []) as AgencyAccountDto[]);
+    // A new agency is created with its first details; those are the pick.
+    paymentDetailPicker.remember(option.value, (row.accounts ?? []) as AgencyPaymentDetailDto[]);
     values.agencyUID = option.value;
   }
   emit('entityCreated');
 });
 
-// The bank account of the picked agency (Slice 44), with its own ad-hoc create.
-const accountPicker = useAgencyAccountPicker(toRef(props, 'agencyAccounts'));
+// The payment details of the picked agency (Slice 44), with their ad-hoc create.
+const paymentDetailPicker = usePaymentDetailPicker(toRef(props, 'agencyPaymentDetails'));
 watch(
-  () => props.agencyAccounts,
-  (map) => accountPicker.refresh(map),
+  () => props.agencyPaymentDetails,
+  (map) => paymentDetailPicker.refresh(map),
 );
-const accountOptions = computed(() =>
-  typeof values.agencyUID === 'string' ? accountPicker.optionsOf(values.agencyUID) : [],
+const paymentDetailOptions = computed(() =>
+  typeof values.agencyUID === 'string' ? paymentDetailPicker.optionsOf(values.agencyUID) : [],
 );
 
-/** The account added from the picker is selected right away. */
-async function onAccountCreate(payload: Parameters<typeof accountPicker.submit>[0]): Promise<void> {
-  const uid = await accountPicker.submit(payload);
+/** What was added from the picker is selected right away. */
+async function onPaymentDetailCreate(
+  payload: Parameters<typeof paymentDetailPicker.submit>[0],
+): Promise<void> {
+  const uid = await paymentDetailPicker.submit(payload);
   if (uid !== null) values.agencyAccountUID = uid;
 }
 
@@ -225,9 +227,9 @@ watch(
 );
 
 /**
- * Moving the invoice to another agency takes its bank account along: the old
+ * Moving the invoice to another agency takes its payment details along: the old
  * one belongs to the old agency, and the new agency's first is the suggestion.
- * The API applies the same rule to every write (`nextAgencyAccount`); this is
+ * The API applies the same rule to every write (`nextPaymentDetail`); this is
  * what the mask shows meanwhile.
  */
 watch(
@@ -235,7 +237,7 @@ watch(
   (now) => {
     if (seeding.value) return;
     values.agencyAccountUID =
-      typeof now === 'string' && now !== '' ? accountPicker.suggestionFor(now) || null : null;
+      typeof now === 'string' && now !== '' ? paymentDetailPicker.suggestionFor(now) || null : null;
   },
 );
 
@@ -268,23 +270,23 @@ const statusDisplay = computed(() =>
 const directPayment = computed(() => values.directPayment === true);
 const notCovered = computed(() => values.notCovered === true);
 /**
- * The account the mask names, not the saved one: picking another says at once
+ * The details the mask names, not the saved ones: picking others says at once
  * where the money will go. Falls back to the agency's first, for an invoice
  * that names none.
  */
-const accountForSelected = computed(() => {
+const paymentDetailForSelected = computed(() => {
   const uid = values.agencyUID;
   if (typeof uid !== 'string' || uid === '') return null;
   const picked = typeof values.agencyAccountUID === 'string' ? values.agencyAccountUID : null;
-  return accountForInvoice(accountPicker.accountsOf(uid), picked);
+  return invoicePaymentDetail(paymentDetailPicker.paymentDetailsOf(uid), picked);
 });
-const ibanForSelected = computed(() => accountForSelected.value?.bankAccount ?? '');
+const ibanForSelected = computed(() => paymentDetailForSelected.value?.bankAccount ?? '');
 const agencyNameForSelected = computed(() => {
   const uid = values.agencyUID;
   const agency = localAgencies.value.find((option) => option.value === uid)?.label ?? '';
-  // Where the account names a beneficiary of its own, the transfer is addressed
+  // Where the details name a beneficiary of their own, the transfer is addressed
   // to that name — that is what belongs in the GiroCode.
-  return accountForSelected.value?.recipientName ?? agency;
+  return paymentDetailForSelected.value?.recipientName ?? agency;
 });
 // The GiroCode follows the mask, not the saved invoice: it sits next to the
 // IBAN row, which already shows the agency currently picked, and what you scan
@@ -617,7 +619,7 @@ function submit(): void {
         create-noun="Abrechnungsdienstleister"
         @create="openCreate('agency', $event)"
       />
-      <!-- An agency holds several accounts at once, and the invoice names the
+      <!-- An agency holds several sets at once, and the invoice names the
            one it goes to (Slice 44). The GiroCode hangs off this row, because
            what you scan is what this row says. -->
       <EuDetailField
@@ -625,11 +627,11 @@ function submit(): void {
         :saved-value="saved.agencyAccountUID"
         label="Kontoverbindung"
         type="select"
-        :options="accountOptions"
+        :options="paymentDetailOptions"
         :disabled="directPayment || !values.agencyUID"
         allow-create
         create-noun="Kontoverbindung"
-        @create="accountPicker.start(String(values.agencyUID ?? ''))"
+        @create="paymentDetailPicker.start(String(values.agencyUID ?? ''))"
       >
         <template #after>
           <!-- Always rendered, only hidden: the wide dialog measures itself
@@ -641,7 +643,7 @@ function submit(): void {
             <PaymentQrPopover
               :recipient="agencyNameForSelected"
               :iban="ibanForSelected"
-              :bic="accountForSelected?.bic"
+              :bic="paymentDetailForSelected?.bic"
               :amount="amountForQr"
               :subject="subjectForQr"
             />
@@ -786,14 +788,14 @@ function submit(): void {
     </template>
   </EuDialog>
 
-  <!-- Adding a bank account to the picked agency, from its picker in the mask. -->
-  <AgencyAccountFormDialog
-    :open="accountPicker.dialogOpen.value"
+  <!-- Adding payment details to the picked agency, from its picker in the mask. -->
+  <PaymentDetailFormDialog
+    :open="paymentDetailPicker.dialogOpen.value"
     :entry="null"
-    :submitting="accountPicker.busy.value"
-    :error="accountPicker.error.value"
-    @close="accountPicker.dialogOpen.value = false"
-    @submit="onAccountCreate"
+    :submitting="paymentDetailPicker.busy.value"
+    :error="paymentDetailPicker.error.value"
+    @close="paymentDetailPicker.dialogOpen.value = false"
+    @submit="onPaymentDetailCreate"
   />
 
   <!-- Ad-hoc create for the entity picked in the mask, prefilled with the typed name. -->

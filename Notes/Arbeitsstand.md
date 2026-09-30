@@ -41,8 +41,11 @@ ausdrücklich vor einer anderen steht.
       aus CR-36 — es bekommt in Scheibe 4 Aufrufer statt gelöscht zu werden.
 - [x] **2 — Kleine Korrekturen an der API.** CR-06, CR-12, CR-13, CR-14, CR-22 (★), SEC-12, SEC-16.
       Umgesetzt mit v0.16.0-slice.3 (Slice 52).
-- [ ] **3 — Ein Name für die Kontoverbindung.** CR-20 (★). Mechanisch, quer durch beide Apps,
+- [x] **3 — Ein Name für die Kontoverbindung.** CR-20 (★). Mechanisch, quer durch beide Apps,
       ohne Migration. Muss vor den größeren Umbauten liegen, sonst kollidiert sie mit ihnen.
+      Umgesetzt mit v0.16.0-slice.4 (Slice 53) — als `paymentDetail` statt `bankAccount`, auf
+      Wunsch des Autors ein möglichst anderes Wort. Die Spalten und API-Felder bleiben; das
+      Vokabular steht jetzt in §2.8 des Plans.
 - [ ] **4 — Die Helfer durchsetzen.** CR-08, CR-09, CR-10, CR-11, CR-23 (★).
 - [ ] **5 — Das geteilte Paket.** CR-01, CR-02, CR-03, CR-04 (★), CR-05 (★).
 

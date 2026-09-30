@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceWorkspaceView from './InvoiceWorkspaceView.vue';
+import PaymentInfoPopover from './PaymentInfoPopover.vue';
 
 const { apiFetch, listResource, listInvoices, listInvoiceYears, reimbursementPlan } = vi.hoisted(
   () => ({
@@ -161,6 +162,70 @@ describe('InvoiceWorkspaceView arriving from the invoice-number search', () => {
     await flushPromises();
 
     expect(wrapper.findAll('tbody tr.is-found')).toHaveLength(0);
+    wrapper.unmount();
+  });
+});
+
+/**
+ * The agency's payment details are read in three places at once — the popover of
+ * every row, the create form and the display mask — and each gets them as a prop
+ * from here. Those props are optional or loosely typed at the mount boundary, so
+ * a wrong name would not fail the compiler: the popover would simply show no
+ * IBAN, and the pickers would offer nothing. Hence a test that names all three.
+ */
+describe('InvoiceWorkspaceView hands the payment details down', () => {
+  const details = [
+    {
+      agencyAccountUID: 'g-1',
+      bankAccount: 'DE02120300000000202051',
+      bic: null,
+      recipientName: null,
+      note: null,
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiFetch.mockResolvedValue({ data: { firstname: 'Anna', surname: 'Muster' } });
+    listResource.mockImplementation((path: string) =>
+      Promise.resolve(
+        path === '/agencies'
+          ? [{ agencyUID: 'agy-1', agencyName: 'Inkasso Nord', accounts: details }]
+          : [],
+      ),
+    );
+    listInvoiceYears.mockResolvedValue([2026]);
+    listInvoices.mockResolvedValue([
+      { ...invoice('inv-1', 'R-2026-1', '2026-01-05'), agencyUID: 'agy-1' },
+    ]);
+    reimbursementPlan.mockResolvedValue(null);
+  });
+
+  it("gives the row popover the details of that invoice's agency", async () => {
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+
+    expect(wrapper.findComponent(PaymentInfoPopover).props('paymentDetails')).toEqual(details);
+    wrapper.unmount();
+  });
+
+  it('gives both masks the map of every agency, for their pickers', async () => {
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+
+    const expected = { 'agy-1': details };
+    expect(wrapper.findComponent(InvoiceFormDialog).props('agencyPaymentDetails')).toEqual(
+      expected,
+    );
+    expect(wrapper.findComponent(InvoiceDetailDialog).props('agencyPaymentDetails')).toEqual(
+      expected,
+    );
     wrapper.unmount();
   });
 });

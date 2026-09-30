@@ -32,8 +32,8 @@ const invoice: InvoiceDto = {
   hasOpenObjection: false,
 };
 
-/** Two accounts side by side; the invoice above goes to the second. */
-const accounts = [
+/** Two sets side by side; the invoice above goes to the second. */
+const paymentDetails = [
   {
     agencyAccountUID: 'g-1',
     bankAccount: 'DE02120300000000202051',
@@ -54,7 +54,7 @@ const props = {
   invoice,
   facilityName: 'Hausarztpraxis Dr. Beispiel',
   agencyName: 'Beispiel Inkasso GmbH',
-  accounts,
+  paymentDetails,
 };
 
 /** Mounts with a trigger and clicks it, so the bubble's content is rendered. */
@@ -102,11 +102,11 @@ describe('PaymentInfoPopover labels', () => {
 });
 
 /**
- * Which account applies is what the invoice names, not a rule about dates (see
- * agencies/accounts.ts).
+ * Which payment details apply is what the invoice names, not a rule about dates
+ * (see agencies/payment-details.ts).
  */
-describe('PaymentInfoPopover account resolution', () => {
-  it('names the beneficiary of the chosen account, not the agency', async () => {
+describe('PaymentInfoPopover payment-detail resolution', () => {
+  it('names the beneficiary of the chosen details, not the agency', async () => {
     const wrapper = await openPopover();
 
     const values = wrapper.findAll('dd').map((dd) => dd.text());
@@ -115,20 +115,20 @@ describe('PaymentInfoPopover account resolution', () => {
     wrapper.unmount();
   });
 
-  it('falls back to the first account while the invoice names none', async () => {
+  it('falls back to the first set while the invoice names none', async () => {
     const wrapper = await openPopover({
       invoice: { ...invoice, agencyAccountUID: null },
     });
 
     const values = wrapper.findAll('dd').map((dd) => dd.text());
     expect(values.some((value) => value.includes('DE02 1203 0000 0000 2020 51'))).toBe(true);
-    // That account names no beneficiary, so the agency carries the line.
+    // That set names no beneficiary, so the agency carries the line.
     expect(values).toContain('Beispiel Inkasso GmbH');
     wrapper.unmount();
   });
 
-  it('leaves out IBAN and BIC for an agency without any account', async () => {
-    const wrapper = await openPopover({ accounts: [] });
+  it('leaves out IBAN and BIC for an agency without any payment details', async () => {
+    const wrapper = await openPopover({ paymentDetails: [] });
 
     const labels = wrapper.findAll('dt').map((dt) => dt.text());
     expect(labels).not.toContain('IBAN');

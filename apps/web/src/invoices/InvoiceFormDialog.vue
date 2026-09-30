@@ -2,8 +2,8 @@
 import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { computed, ref, toRef, watch } from 'vue';
 
-import AgencyAccountFormDialog from '../agencies/AgencyAccountFormDialog.vue';
-import type { AgencyAccountDto } from '../agencies/api';
+import PaymentDetailFormDialog from '../agencies/PaymentDetailFormDialog.vue';
+import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -12,7 +12,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
-import { useAgencyAccountPicker } from './agency-account-picker';
+import { usePaymentDetailPicker } from './payment-detail-picker';
 import type { InvoiceDto } from './api';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import {
@@ -29,8 +29,8 @@ const props = defineProps<{
   accountUID: string;
   facilities: SelectOption[];
   agencies: SelectOption[];
-  /** agencyUID → its bank accounts, to pick the one the invoice goes to. */
-  agencyAccounts: Record<string, AgencyAccountDto[]>;
+  /** agencyUID → its payment details, to pick the ones the invoice goes to. */
+  agencyPaymentDetails: Record<string, AgencyPaymentDetailDto[]>;
   submitting: boolean;
   error: string | null;
 }>();
@@ -77,18 +77,18 @@ watch(
   { immediate: true },
 );
 
-// The bank account of the picked agency (Slice 44), with its own ad-hoc create.
-const accountPicker = useAgencyAccountPicker(toRef(props, 'agencyAccounts'));
+// The payment details of the picked agency (Slice 44), with their ad-hoc create.
+const paymentDetailPicker = usePaymentDetailPicker(toRef(props, 'agencyPaymentDetails'));
 watch(
-  () => props.agencyAccounts,
-  (map) => accountPicker.refresh(map),
+  () => props.agencyPaymentDetails,
+  (map) => paymentDetailPicker.refresh(map),
 );
-const accountOptions = computed(() => accountPicker.optionsOf(form.value.agencyUID));
+const paymentDetailOptions = computed(() => paymentDetailPicker.optionsOf(form.value.agencyUID));
 
-/** Picking an agency suggests its first account; clearing it takes both. */
+/** Picking an agency suggests its first details; clearing it takes both. */
 function pickAgency(uid: string | null): void {
   form.value.agencyUID = uid ?? '';
-  form.value.agencyAccountUID = uid === null ? '' : accountPicker.suggestionFor(uid);
+  form.value.agencyAccountUID = uid === null ? '' : paymentDetailPicker.suggestionFor(uid);
 }
 
 // Ad-hoc create ("‹typed name› hinzufügen") — reuses the resource create form.
@@ -106,16 +106,18 @@ const {
     form.value.facilityUID = option.value;
   } else {
     localAgencies.value = [...localAgencies.value, option];
-    // A new agency is created with its first account; that one is the pick.
-    accountPicker.remember(option.value, (row.accounts ?? []) as AgencyAccountDto[]);
+    // A new agency is created with its first details; those are the pick.
+    paymentDetailPicker.remember(option.value, (row.accounts ?? []) as AgencyPaymentDetailDto[]);
     pickAgency(option.value);
   }
   emit('entityCreated');
 });
 
-/** The account added from the picker is selected right away. */
-async function onAccountCreate(payload: Parameters<typeof accountPicker.submit>[0]): Promise<void> {
-  const uid = await accountPicker.submit(payload);
+/** What was added from the picker is selected right away. */
+async function onPaymentDetailCreate(
+  payload: Parameters<typeof paymentDetailPicker.submit>[0],
+): Promise<void> {
+  const uid = await paymentDetailPicker.submit(payload);
   if (uid !== null) form.value.agencyAccountUID = uid;
 }
 
@@ -258,18 +260,18 @@ function submit(): void {
           @update:model-value="pickAgency($event)"
           @create="openCreate('agency', $event)"
         />
-        <!-- An agency holds several accounts at once, and the bill names the
+        <!-- An agency holds several sets at once, and the bill names the
              one it is to be paid on (Slice 44). Only once an agency is picked:
              without one there is nothing to choose between. -->
         <EuEntityPicker
           v-if="form.agencyUID"
           :model-value="form.agencyAccountUID || null"
           label="Kontoverbindung"
-          :options="accountOptions"
+          :options="paymentDetailOptions"
           allow-create
           create-noun="Kontoverbindung"
           @update:model-value="form.agencyAccountUID = $event ?? ''"
-          @create="accountPicker.start(form.agencyUID)"
+          @create="paymentDetailPicker.start(form.agencyUID)"
         />
       </template>
 
@@ -287,14 +289,14 @@ function submit(): void {
     </template>
   </EuDialog>
 
-  <!-- Adding a bank account to the picked agency, from its picker above. -->
-  <AgencyAccountFormDialog
-    :open="accountPicker.dialogOpen.value"
+  <!-- Adding payment details to the picked agency, from its picker above. -->
+  <PaymentDetailFormDialog
+    :open="paymentDetailPicker.dialogOpen.value"
     :entry="null"
-    :submitting="accountPicker.busy.value"
-    :error="accountPicker.error.value"
-    @close="accountPicker.dialogOpen.value = false"
-    @submit="onAccountCreate"
+    :submitting="paymentDetailPicker.busy.value"
+    :error="paymentDetailPicker.error.value"
+    @close="paymentDetailPicker.dialogOpen.value = false"
+    @submit="onPaymentDetailCreate"
   />
 
   <!-- Ad-hoc create for the entity picked above, prefilled with the typed name. -->

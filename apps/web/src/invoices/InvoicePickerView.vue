@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { accountLabel } from '../agencies/accounts';
+import { paymentDetailLabel } from '../agencies/payment-details';
 import type { AgencyDto } from '../agencies/api';
 import EuSelectField from '../components/resource/EuSelectField.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
@@ -32,7 +32,7 @@ import { treatmentDaysLabel } from './treatment-days';
 /**
  * The way into the invoices: either straight to an insured person, or through
  * the search — by invoice number (issues.md 6) and, since Slice 45, by the
- * agency an invoice is billed through, one of its bank accounts or the provider
+ * agency an invoice is billed through, one of its payment details or the provider
  * it came from (issues.md 0.12.0-5). Every search fills the same result list,
  * so a further filter is one more entry in `references` below.
  *
@@ -91,12 +91,14 @@ const agencyName = computed<Map<string, string>>(
 const facilityName = computed<Map<string, string>>(
   () => new Map(facilities.value.map((f) => [f.facilityUID, f.facilityName])),
 );
-/** Every bank account of every agency, so a hit can name the IBAN it goes to. */
-const ibanByAccount = computed<Map<string, string>>(
+/** The payment details of every agency, so a hit can name the IBAN it goes to. */
+const ibanByPaymentDetail = computed<Map<string, string>>(
   () =>
     new Map(
       agencies.value.flatMap((agency) =>
-        agency.accounts.map((entry) => [entry.agencyAccountUID, accountLabel(entry)] as const),
+        agency.accounts.map(
+          (entry) => [entry.agencyAccountUID, paymentDetailLabel(entry)] as const,
+        ),
       ),
     ),
 );
@@ -107,14 +109,14 @@ const agencyOptions = computed<SelectOption[]>(() =>
 const facilityOptions = computed<SelectOption[]>(() =>
   facilities.value.map((f) => ({ value: f.facilityUID, label: f.facilityName })),
 );
-/** The accounts of the chosen agency; without one there is nothing to choose from. */
-const agencyAccountOptions = computed<SelectOption[]>(() => {
+/** The details of the chosen agency; without one there is nothing to choose from. */
+const paymentDetailOptions = computed<SelectOption[]>(() => {
   const chosen = agencies.value.find((a) => a.agencyUID === filter.agencyUID);
   return (chosen?.accounts ?? []).map((entry) => ({
     value: entry.agencyAccountUID,
     label: entry.recipientName
-      ? `${accountLabel(entry)} · ${entry.recipientName}`
-      : accountLabel(entry),
+      ? `${paymentDetailLabel(entry)} · ${entry.recipientName}`
+      : paymentDetailLabel(entry),
   }));
 });
 
@@ -129,7 +131,7 @@ const references = computed(() => [
   {
     key: 'agencyAccountUID' as const,
     label: 'Kontoverbindung',
-    options: agencyAccountOptions.value,
+    options: paymentDetailOptions.value,
     disabled: filter.agencyUID === '',
   },
   {
@@ -148,10 +150,10 @@ const statusOptions = computed<SelectOption[]>(() =>
 );
 
 /**
- * A reference chosen in the filter row. Choosing another agency drops the bank
- * account with it — the old one belongs to the old agency. A filter that
- * arrives whole, from the URL or from the last search, keeps both: there the
- * account was meant for exactly that agency.
+ * A reference chosen in the filter row. Choosing another agency drops the payment
+ * details with it — the old ones belong to the old agency. A filter that arrives
+ * whole, from the URL or from the last search, keeps both: there the details were
+ * meant for exactly that agency.
  */
 function setReference(key: ReferenceKey, value: string): void {
   filter[key] = value;
@@ -165,10 +167,12 @@ function setStatus(value: string): void {
 
 /** The IBAN an invoice goes to, while it names one that is still known. */
 function ibanOf(invoice: InvoiceDto): string | undefined {
-  return invoice.agencyAccountUID ? ibanByAccount.value.get(invoice.agencyAccountUID) : undefined;
+  return invoice.agencyAccountUID
+    ? ibanByPaymentDetail.value.get(invoice.agencyAccountUID)
+    : undefined;
 }
 
-/** Provider, agency and account of a hit — the facts the filters ask about. */
+/** Provider, agency and payment details of a hit — what the filters ask about. */
 function referenceLine(invoice: InvoiceDto): string {
   return [
     invoice.facilityUID ? facilityName.value.get(invoice.facilityUID) : undefined,

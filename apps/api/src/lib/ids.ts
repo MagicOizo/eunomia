@@ -23,7 +23,7 @@ export const ENTITY_PREFIX = {
   contractTerms: 'k', // Konditionen (deductible/cap/rate) of a contract
   facility: 'f',
   agency: 'c', // Collection agency
-  agencyAccount: 'g', // Girokonto of a collection agency (dated bank account)
+  agencyAccount: 'g', // Girokonto: the payment details of a collection agency
   submission: 'e', // Einreichung (new in the rebuild)
   invoice: 'i',
   serviceBilling: 's',

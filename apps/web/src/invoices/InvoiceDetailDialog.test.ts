@@ -46,7 +46,7 @@ function open(inv: InvoiceDto): VueWrapper {
       accountName: 'John Doe',
       facilities: [],
       agencies: [],
-      agencyAccounts: {},
+      agencyPaymentDetails: {},
       contracts: [],
       planInvoice: null,
       submitting: false,
@@ -132,7 +132,7 @@ describe('InvoiceDetailDialog direct payment', () => {
  * width with it (issues.md 0.13.0-5).
  */
 describe('InvoiceDetailDialog GiroCode', () => {
-  const agencyAccounts = {
+  const agencyPaymentDetails = {
     'c-1': [
       {
         agencyAccountUID: 'g-1',
@@ -152,7 +152,7 @@ describe('InvoiceDetailDialog GiroCode', () => {
         accountName: 'John Doe',
         facilities: [],
         agencies: [{ value: 'c-1', label: 'Inkasso Eins' }],
-        agencyAccounts,
+        agencyPaymentDetails,
         contracts: [],
         planInvoice: null,
         submitting: false,
@@ -191,7 +191,7 @@ describe('InvoiceDetailDialog GiroCode', () => {
  * change of agency does to that choice.
  */
 describe('InvoiceDetailDialog bank account', () => {
-  const agencyAccounts = {
+  const agencyPaymentDetails = {
     'c-1': [
       { agencyAccountUID: 'g-1', bankAccount: 'DE01', bic: null, recipientName: null, note: null },
       {
@@ -218,7 +218,7 @@ describe('InvoiceDetailDialog bank account', () => {
           { value: 'c-1', label: 'Inkasso Eins' },
           { value: 'c-2', label: 'Inkasso Zwei' },
         ],
-        agencyAccounts,
+        agencyPaymentDetails,
         contracts: [],
         planInvoice: null,
         submitting: false,

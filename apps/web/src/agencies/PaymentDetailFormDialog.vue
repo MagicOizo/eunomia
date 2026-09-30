@@ -5,18 +5,18 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { iban } from '../lib/format';
-import type { AgencyAccountDto, AgencyAccountInput } from './api';
+import type { AgencyPaymentDetailDto, AgencyPaymentDetailInput } from './api';
 
-/** Create/edit form for one bank account (Kontoverbindung) of an agency. */
+/** Create/edit form for one set of an agency's payment details (Kontoverbindung). */
 const props = defineProps<{
   open: boolean;
-  /** The entry being edited, or null to add another account. */
-  entry: AgencyAccountDto | null;
+  /** The entry being edited, or null to add another set. */
+  entry: AgencyPaymentDetailDto | null;
   submitting: boolean;
   error: string | null;
 }>();
 
-const emit = defineEmits<{ close: []; submit: [payload: AgencyAccountInput] }>();
+const emit = defineEmits<{ close: []; submit: [payload: AgencyPaymentDetailInput] }>();
 
 const bankAccount = ref('');
 const bic = ref('');

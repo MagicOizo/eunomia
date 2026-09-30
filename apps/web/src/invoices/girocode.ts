@@ -30,7 +30,7 @@ export type GirocodeResult =
 export interface GirocodeInput {
   /**
    * Beneficiary — the name the transfer is addressed to: the agency's own, or
-   * the one its bank account names instead (see agencies/accounts.ts).
+   * the one its payment details name instead (see agencies/payment-details.ts).
    */
   recipient: string;
   iban: string;

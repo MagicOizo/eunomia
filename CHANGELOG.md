@@ -7,6 +7,28 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.16.0-slice.4 — 2026-09-30
+
+One word for one thing. Nothing about the app behaves differently — this is a rename in the code, and
+the database and the API are untouched.
+
+- **The billing agency's bank connection is no longer called an "account".** `account` meant three
+  things at once in the code: the insured person, a billing agency's bank connection, and the login.
+  Two modules exported a table description under the very same name, so one of them had to be
+  renamed on import, and two functions called `accountForInvoice` returned entirely different things.
+  The bank connection is now `paymentDetail` throughout — deliberately a different word rather than a
+  longer one, so that looking for `account` no longer finds it. The insured keeps the word, and the
+  login was never called that: it is `user` everywhere, so of the three meanings only two were real.
+  One case is worth naming: in the invoice write path an inner `account` shadowed an outer one with a
+  different meaning inside the same function. That is gone.
+- **The database and the API did not move.** Columns, fields (`agencyAccountUID`, `bankAccount`), the
+  routes and the response shapes are unchanged to the character, so no migration and nothing for a
+  client to adapt to. Renaming those would need a new API version; the vocabulary and the reason the
+  two sides differ are now written down in the project's naming conventions.
+- **Two "not found" messages are in German again.** Unrelated to the rename but found through it: a
+  missing bank connection and a missing trashed record had no German name, so instead of saying which
+  entry was not found the app fell back to "Der Eintrag wurde nicht gefunden."
+
 ## 0.16.0-slice.3 — 2026-09-30
 
 Seven small corrections to the API, from both reviews: three of them change what an answer contains,

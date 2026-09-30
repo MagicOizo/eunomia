@@ -14,7 +14,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, nextTick, ref, watch, watchEffect } from 'vue';
 
-import type { AgencyAccountDto } from '../agencies/api';
+import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -88,12 +88,14 @@ const contracts = ref<ContractRef[]>([]);
 const facilityOptions = ref<SelectOption[]>([]);
 const facilityNameById = ref<Map<string, string>>(new Map());
 const agencyOptions = ref<SelectOption[]>([]);
-const agencyById = ref<Map<string, { name: string; accounts: AgencyAccountDto[] }>>(new Map());
-/** agencyUID → its bank accounts, for the masks' account pickers and the GiroCode. */
-const agencyAccountMap = computed(() =>
+const agencyById = ref<Map<string, { name: string; accounts: AgencyPaymentDetailDto[] }>>(
+  new Map(),
+);
+/** agencyUID → its payment details, for the masks' pickers and the GiroCode. */
+const paymentDetailMap = computed(() =>
   Object.fromEntries([...agencyById.value].map(([uid, a]) => [uid, a.accounts])),
 );
-/** The agency's name and accounts for one invoice, or empty when it has none. */
+/** The agency's name and payment details for one invoice, or empty when none. */
 const agencyOf = (invoice: InvoiceDto) =>
   (invoice.agencyUID ? agencyById.value.get(invoice.agencyUID) : undefined) ?? {
     name: null,
@@ -254,12 +256,12 @@ async function loadLookups(): Promise<void> {
   facilityOptions.value = facilities.map((f) => ({ value: f.facilityUID, label: f.facilityName }));
   facilityNameById.value = new Map(facilities.map((f) => [f.facilityUID, f.facilityName]));
 
-  // Every account per agency, not just the first: an agency holds several and
-  // each invoice names the one it goes to (see agencies/accounts.ts).
+  // Every set per agency, not just the first: an agency holds several and each
+  // invoice names the one it goes to (see agencies/payment-details.ts).
   const agencies = await listResource<{
     agencyUID: string;
     agencyName: string;
-    accounts: AgencyAccountDto[];
+    accounts: AgencyPaymentDetailDto[];
   }>('/agencies');
   agencyOptions.value = agencies.map((a) => ({ value: a.agencyUID, label: a.agencyName }));
   agencyById.value = new Map(
@@ -682,7 +684,7 @@ function confirmDelete(): void {
                   :invoice="invoice"
                   :facility-name="facilityName(invoice)"
                   :agency-name="agencyOf(invoice).name"
-                  :accounts="agencyOf(invoice).accounts"
+                  :payment-details="agencyOf(invoice).accounts"
                 >
                   <template #trigger="{ expanded, panelId }">
                     <button
@@ -776,7 +778,7 @@ function confirmDelete(): void {
       :account-name="accountName"
       :facilities="facilityOptions"
       :agencies="agencyOptions"
-      :agency-accounts="agencyAccountMap"
+      :agency-payment-details="paymentDetailMap"
       :contracts="contractOptions"
       :plan-invoice="detailPlan"
       :submitting="dialogBusy"
@@ -792,7 +794,7 @@ function confirmDelete(): void {
       :account-u-i-d="accountUID"
       :facilities="facilityOptions"
       :agencies="agencyOptions"
-      :agency-accounts="agencyAccountMap"
+      :agency-payment-details="paymentDetailMap"
       :submitting="dialogBusy"
       :error="dialogError"
       @close="formOpen = false"

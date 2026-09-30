@@ -172,11 +172,11 @@ const facilities: ResourceConfig = {
 };
 
 /**
- * The IBAN column of an agency shows its first account — the one a new invoice
- * is suggested — and says how many others stand beside it (Slice 44). Which one
+ * The IBAN column of an agency shows its first payment details — the ones a new
+ * invoice is suggested — and says how many others stand beside them (Slice 44). Which
  * an invoice actually goes to is the invoice's own statement.
  */
-function agencyAccountCell(value: unknown, row: ResourceRow): string {
+function paymentDetailCell(value: unknown, row: ResourceRow): string {
   const iban = value === null || value === undefined ? '–' : String(value);
   const count = Array.isArray(row.accounts) ? row.accounts.length : 0;
   return count > 1 ? `${iban} (+${count - 1} weitere)` : iban;
@@ -189,7 +189,7 @@ const agencies: ResourceConfig = {
   idKey: 'agencyUID',
   columns: [
     { key: 'agencyName', label: 'Name' },
-    { key: 'bankAccount', label: 'IBAN', format: agencyAccountCell },
+    { key: 'bankAccount', label: 'IBAN', format: paymentDetailCell },
     { key: 'recipientName', label: 'Empfänger', wrap: true },
   ],
   fields: [

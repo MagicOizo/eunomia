@@ -100,9 +100,11 @@ function list(value: unknown): string {
 const RESOURCE_NAMES: Record<string, string> = {
   Account: 'Der Versicherte',
   Allocation: 'Die Erstattung',
+  'Bank account': 'Die Kontoverbindung',
   'Collection agency': 'Der Abrechnungsdienstleister',
   Contract: 'Die Police',
   'Contract terms': 'Die Konditionen',
+  'Deleted record': 'Der gelöschte Eintrag',
   Exclusion: 'Die Markierung',
   Facility: 'Der Leistungserbringer',
   'Insurance company': 'Die Versicherung',
