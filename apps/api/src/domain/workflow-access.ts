@@ -24,10 +24,7 @@ export async function accountForContract(
   return rows[0]?.accountUID ?? null;
 }
 
-export async function accountForSubmission(
-  db: Queryable,
-  submissionUID: string,
-): Promise<string | null> {
+async function accountForSubmission(db: Queryable, submissionUID: string): Promise<string | null> {
   const rows = await db.query<Array<{ accountUID: string }>>(
     `SELECT c.accountUID
        FROM Submissions s
@@ -39,7 +36,7 @@ export async function accountForSubmission(
   return rows[0]?.accountUID ?? null;
 }
 
-export async function accountForBilling(db: Queryable, billingUID: string): Promise<string | null> {
+async function accountForBilling(db: Queryable, billingUID: string): Promise<string | null> {
   const rows = await db.query<Array<{ accountUID: string }>>(
     `SELECT c.accountUID
        FROM ServiceBillings b
@@ -51,10 +48,23 @@ export async function accountForBilling(db: Queryable, billingUID: string): Prom
   return rows[0]?.accountUID ?? null;
 }
 
-export async function accountForInvoice(db: Queryable, invoiceUID: string): Promise<string | null> {
+async function accountForInvoice(db: Queryable, invoiceUID: string): Promise<string | null> {
   const rows = await db.query<Array<{ accountUID: string }>>(
     'SELECT accountUID FROM Invoices WHERE invoiceUID = ? AND invoiceStatus <> -1 LIMIT 1',
     [invoiceUID],
+  );
+  return rows[0]?.accountUID ?? null;
+}
+
+/** The owning account of an allocation, via its invoice. */
+async function accountForAllocation(db: Queryable, allocationUID: string): Promise<string | null> {
+  const rows = await db.query<Array<{ accountUID: string }>>(
+    `SELECT i.accountUID
+       FROM Allocations a
+       JOIN Invoices i ON i.invoiceUID = a.invoiceUID
+      WHERE a.allocationUID = ? AND a.allocationStatus <> -1
+      LIMIT 1`,
+    [allocationUID],
   );
   return rows[0]?.accountUID ?? null;
 }
@@ -70,10 +80,11 @@ export async function authorizeAccount(
 }
 
 /**
- * Resolves an entity's owning account via `resolver`, 404s if it is missing,
- * then authorizes `permission` on it. Returns the account UID for reuse.
+ * 404 before 403, in that order: an account that could not be resolved means
+ * the entity is gone, which is answered before the permission on it is looked
+ * at. This is the only place the order is written down.
  */
-export async function requireEntityAccount(
+async function requireEntityAccount(
   db: Pool,
   userId: number,
   permission: PermissionKey,
@@ -84,3 +95,27 @@ export async function requireEntityAccount(
   await authorizeAccount(db, userId, permission, accountUID);
   return accountUID;
 }
+
+/**
+ * Builds the guard every single-entity endpoint needs: resolve the owning
+ * account, 404, authorize, and hand the account UID back for reuse. The
+ * resource name lives here once instead of at every call site.
+ */
+function entityAccess(
+  resolve: (db: Pool, uid: string) => Promise<string | null>,
+  resource: string,
+) {
+  return async (
+    db: Pool,
+    userId: number,
+    permission: PermissionKey,
+    uid: string,
+  ): Promise<string> =>
+    requireEntityAccount(db, userId, permission, resource, await resolve(db, uid));
+}
+
+export const requireContractAccount = entityAccess(accountForContract, 'Contract');
+export const requireSubmissionAccount = entityAccess(accountForSubmission, 'Submission');
+export const requireBillingAccount = entityAccess(accountForBilling, 'Service billing');
+export const requireInvoiceAccount = entityAccess(accountForInvoice, 'Invoice');
+export const requireAllocationAccount = entityAccess(accountForAllocation, 'Allocation');

@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
+import { z } from 'zod';
 
 import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
 import { PERMISSIONS } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
-import { pathParam } from '../crud/params.js';
-import { badRequest, notFound } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
+import { parseQuery, pathParam } from '../crud/params.js';
+import { notFound } from '../lib/api-error.js';
 import type { BonusYear } from './bonus-timeline.js';
 import type { ContractRow } from './contract-access.js';
 import { termsForYear } from './contract-history.js';
@@ -45,6 +45,11 @@ function bonusFor(entry: BonusYear | undefined): {
   return { mode: 'forfeited', amount: 0, status: 'none' };
 }
 
+/** The treatment year to plan for; defaults to the current one. */
+const planQuery = z.object({
+  year: z.coerce.number().int().min(1900).max(2999).optional(),
+});
+
 /**
  * GET /accounts/:accountUID/reimbursement-plan?year= — the reimbursement
  * optimizer (reimbursement-optimizer.ts) for one insured person and treatment
@@ -68,13 +73,7 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
     if (!account) throw notFound('Account');
 
     const currentYear = new Date().getFullYear();
-    let year = currentYear;
-    if (req.query.year !== undefined) {
-      year = Number(req.query.year);
-      if (!Number.isInteger(year) || year < 1900 || year > 2999) {
-        throw badRequest('The year must be a whole number', { code: ERROR_CODES.INVALID_YEAR });
-      }
-    }
+    const year = parseQuery(req, planQuery).year ?? currentYear;
 
     const contracts = await pool.query<Array<ContractRow & { companyName: string }>>(
       `SELECT c.*, v.companyName

@@ -27,7 +27,7 @@ import {
   deriveSubmissionStatus,
   matchesStatus,
 } from './invoice-status.js';
-import { accountForContract, accountForInvoice, authorizeAccount } from './workflow-access.js';
+import { accountForContract, authorizeAccount, requireInvoiceAccount } from './workflow-access.js';
 
 export const invoicesTable: CrudTable = {
   table: 'Invoices',
@@ -128,6 +128,9 @@ const listQuery = z.object({
   status: z.enum(STATUS_FILTERS).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
+
+/** The year tabs take the account filter of `listQuery` and nothing else. */
+const yearsQuery = listQuery.pick({ accountUID: true });
 
 /**
  * How many rows a status-filtered list reads before narrowing them down. The
@@ -733,8 +736,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const where: string[] = ['invoiceStatus <> -1'];
     const params: unknown[] = [];
 
-    const requestedAccount =
-      typeof req.query.accountUID === 'string' ? req.query.accountUID : undefined;
+    const { accountUID: requestedAccount } = parseQuery(req, yearsQuery);
     if (requestedAccount !== undefined) {
       if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_INVOICES, requestedAccount))) {
         throw forbidden();
@@ -811,9 +813,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
   router.patch('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForInvoice(pool, uid);
-    if (account === null) throw notFound('Invoice');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await requireInvoiceAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
     const data = updateSchema.parse(req.body);
 
     await withTransaction(pool, async (conn) => {
@@ -872,9 +872,12 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
   router.post('/:uid/exclusions', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForInvoice(pool, uid);
-    if (account === null) throw notFound('Invoice');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    const account = await requireInvoiceAccount(
+      pool,
+      user.userId,
+      PERMISSIONS.MANAGE_INVOICES,
+      uid,
+    );
     const data = exclusionSchema.parse(req.body);
 
     const contractAccount = await accountForContract(pool, data.contractUID);
@@ -920,9 +923,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
   router.delete('/:uid/exclusions/:contractUID', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForInvoice(pool, uid);
-    if (account === null) throw notFound('Invoice');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await requireInvoiceAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
     const result = (await pool.query(
       'DELETE FROM InvoiceExclusions WHERE invoiceUID = ? AND contractUID = ?',
       [uid, pathParam(req, 'contractUID')],
@@ -934,9 +935,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
   router.delete('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForInvoice(pool, uid);
-    if (account === null) throw notFound('Invoice');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await requireInvoiceAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
     await softDeleteRow(pool, invoicesTable, uid);
     res.status(204).end();
   });

@@ -16,12 +16,13 @@ import {
   insertRow,
   updateRow,
 } from '../crud/repository.js';
+import { withTransaction } from '../db/transaction.js';
 import { conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { likeTerm } from '../lib/like.js';
 import { allocationEntriesSchema, createAllocationsForBilling } from './allocations.js';
-import { accountForBilling, accountForContract, authorizeAccount } from './workflow-access.js';
+import { requireBillingAccount, requireContractAccount } from './workflow-access.js';
 
 export const billingsTable: CrudTable = {
   table: 'ServiceBillings',
@@ -162,9 +163,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
 
     const { contractUID } = filters;
     if (contractUID !== undefined) {
-      const account = await accountForContract(pool, contractUID);
-      if (account === null) throw notFound('Contract');
-      await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
+      await requireContractAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, contractUID);
       where.push('c.contractUID = ?');
       params.push(contractUID);
     } else {
@@ -257,18 +256,14 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
   router.get('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForBilling(pool, uid);
-    if (account === null) throw notFound('Service billing');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
+    await requireBillingAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, uid);
     sendData(res, toBillingDto(await getRow(pool, billingsTable, uid)));
   });
 
   router.post('/', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const data = base.parse(req.body);
-    const account = await accountForContract(pool, data.contractUID);
-    if (account === null) throw notFound('Contract');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await requireContractAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, data.contractUID);
     await assertBillingNumberFree(pool, data.contractUID, data.billingNumber);
     sendData(res, toBillingDto(await insertRow(pool, billingsTable, data)), 201);
   });
@@ -286,9 +281,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
   router.patch('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForBilling(pool, uid);
-    if (account === null) throw notFound('Service billing');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await requireBillingAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
     const patch = updateSchema.parse(req.body);
     if (patch.billingNumber !== undefined) {
       const current = (await getRow(pool, billingsTable, uid)) as { contractUID: string } | null;
@@ -302,9 +295,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
   router.delete('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForBilling(pool, uid);
-    if (account === null) throw notFound('Service billing');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await requireBillingAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
 
     // Cascade: detach the reimbursements first, so every invoice billed through
     // this Leistungsabrechnung falls back to "eingereicht" (the derived status
@@ -314,9 +305,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     // Billing and allocations are stamped with the SAME deletedAt: that shared
     // moment is what marks them as one deletion batch, so the trash brings the
     // reimbursements back together with the letter they belong to (Slice 39).
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
+    await withTransaction(pool, async (conn) => {
       const at = await deletionTimestamp(conn);
       await conn.query(
         `UPDATE Allocations SET allocationStatus = -1, deletedAt = ?
@@ -328,13 +317,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
           WHERE billingUID = ? AND billingStatus <> -1`,
         [at, uid],
       );
-      await conn.commit();
-    } catch (error) {
-      await conn.rollback();
-      throw error;
-    } finally {
-      conn.release();
-    }
+    });
     res.status(204).end();
   });
 

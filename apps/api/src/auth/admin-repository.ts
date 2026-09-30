@@ -1,5 +1,7 @@
 import type { Pool } from 'mariadb';
 
+import { withTransaction } from '../db/transaction.js';
+
 /**
  * Data access for the admin user/role management API (Slice 9). Public UUIDs
  * are used at the boundary; the numeric userID stays internal (resolved via
@@ -127,9 +129,7 @@ export async function setGlobalRoles(
   userId: number,
   roleUIDs: string[],
 ): Promise<void> {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
+  await withTransaction(pool, async (conn) => {
     await conn.query('DELETE FROM UserRoles WHERE userID = ?', [userId]);
     for (const roleUID of roleUIDs) {
       await conn.query(
@@ -137,13 +137,7 @@ export async function setGlobalRoles(
         [userId, roleUID],
       );
     }
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
+  });
 }
 
 /** Replaces a user's account-scoped grants (UserAccountRoles). */
@@ -152,9 +146,7 @@ export async function setAccountRoles(
   userId: number,
   grants: Array<{ accountUID: string; roleUID: string }>,
 ): Promise<void> {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
+  await withTransaction(pool, async (conn) => {
     await conn.query('DELETE FROM UserAccountRoles WHERE userID = ?', [userId]);
     for (const grant of grants) {
       await conn.query(
@@ -163,13 +155,7 @@ export async function setAccountRoles(
         [userId, grant.accountUID, grant.roleUID],
       );
     }
-    await conn.commit();
-  } catch (error) {
-    await conn.rollback();
-    throw error;
-  } finally {
-    conn.release();
-  }
+  });
 }
 
 /** Lists all roles with their permission keys (read-only for the UI). */

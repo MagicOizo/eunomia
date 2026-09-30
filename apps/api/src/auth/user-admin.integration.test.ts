@@ -176,6 +176,14 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
       assert.equal((await request(app).get('/api/v1/users').set(clerk)).status, 403);
     });
 
+    // CR-11: a path segment that is not a UUID is a malformed call, so it is
+    // answered as one instead of being looked up and reported as missing.
+    await t.test('a user id that is not a UUID is a 400', async () => {
+      const res = await request(app).get('/api/v1/users/kein-uuid').set(admin);
+      assert.equal(res.status, 400);
+      assert.match(res.body.error.message, /uuid/);
+    });
+
     await t.test('safety guards protect the last admin', async () => {
       assert.equal(
         (await request(app).patch(`/api/v1/users/${adminUuid}`).set(admin).send({ status: 0 }))

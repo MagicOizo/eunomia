@@ -6,7 +6,7 @@ import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
 import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
-import { pathParam } from '../crud/params.js';
+import { parseQuery, pathParam } from '../crud/params.js';
 import {
   type CrudTable,
   type Queryable,
@@ -20,7 +20,7 @@ import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
-import { authorizeAccount } from './workflow-access.js';
+import { authorizeAccount, requireAllocationAccount } from './workflow-access.js';
 
 export const allocationsTable: CrudTable = {
   table: 'Allocations',
@@ -250,6 +250,16 @@ export async function updateAllocation(
   });
 }
 
+/**
+ * Filters of the allocations list: the two sides a reimbursement hangs
+ * between, plus the same optional `limit` the other lists take.
+ */
+const listQuery = z.object({
+  invoiceUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.invoice)).optional(),
+  billingUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.serviceBilling)).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+
 /** Router for allocations: mapping a service billing's reimbursement to an invoice. */
 export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
   const router = Router();
@@ -257,15 +267,15 @@ export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
 
   router.get('/', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
+    const filters = parseQuery(req, listQuery);
     const where = ['a.allocationStatus <> -1'];
     const params: unknown[] = [];
 
-    for (const [key, column] of [
-      ['invoiceUID', 'a.invoiceUID'],
-      ['billingUID', 'a.billingUID'],
+    for (const [value, column] of [
+      [filters.invoiceUID, 'a.invoiceUID'],
+      [filters.billingUID, 'a.billingUID'],
     ] as const) {
-      const value = req.query[key];
-      if (typeof value === 'string') {
+      if (value !== undefined) {
         where.push(`${column} = ?`);
         params.push(value);
       }
@@ -286,8 +296,8 @@ export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
          FROM Allocations a
          JOIN Invoices i ON i.invoiceUID = a.invoiceUID
         WHERE ${where.join(' AND ')}
-        ORDER BY a.allocationUID`,
-      params,
+        ORDER BY a.allocationUID${filters.limit === undefined ? '' : ' LIMIT ?'}`,
+      filters.limit === undefined ? params : [...params, filters.limit],
     );
     sendData(res, rows);
   });
@@ -295,9 +305,7 @@ export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
   router.get('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForAllocation(pool, uid);
-    if (account === null) throw notFound('Allocation');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
+    await requireAllocationAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, uid);
     sendData(res, await getRow(pool, allocationsTable, uid));
   });
 
@@ -311,25 +319,10 @@ export function createAllocationsRouter(pool: Pool, config: AppConfig): Router {
   router.delete('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForAllocation(pool, uid);
-    if (account === null) throw notFound('Allocation');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await requireAllocationAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
     await softDeleteRow(pool, allocationsTable, uid);
     res.status(204).end();
   });
 
   return router;
-}
-
-/** The owning account of an allocation, via its invoice. */
-async function accountForAllocation(pool: Pool, allocationUID: string): Promise<string | null> {
-  const rows = await pool.query<Array<{ accountUID: string }>>(
-    `SELECT i.accountUID
-       FROM Allocations a
-       JOIN Invoices i ON i.invoiceUID = a.invoiceUID
-      WHERE a.allocationUID = ? AND a.allocationStatus <> -1
-      LIMIT 1`,
-    [allocationUID],
-  );
-  return rows[0]?.accountUID ?? null;
 }

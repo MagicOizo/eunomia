@@ -46,7 +46,14 @@ ausdrücklich vor einer anderen steht.
       Umgesetzt mit v0.16.0-slice.4 (Slice 53) — als `paymentDetail` statt `bankAccount`, auf
       Wunsch des Autors ein möglichst anderes Wort. Die Spalten und API-Felder bleiben; das
       Vokabular steht jetzt in §2.8 des Plans.
-- [ ] **4 — Die Helfer durchsetzen.** CR-08, CR-09, CR-10, CR-11, CR-23 (★).
+- [x] **4 — Die Helfer durchsetzen.** CR-08, CR-09, CR-10, CR-11, CR-23 (★).
+      Umgesetzt mit v0.16.0-slice.5 (Slice 54). Zwei Dinge gingen über den Review hinaus: der Review
+      hat bei CR-10 nur die Routen gezählt — `setGlobalRoles` und `setAccountRoles` in
+      `auth/admin-repository.ts` rollten dieselbe Transaktion auch von Hand, sie gingen mit, und
+      jetzt steht `getConnection()` nur noch in `db/transaction.ts`. Und `ERROR_CODES.INVALID_YEAR`
+      hatte genau einen Werfer, die handgeschriebene Jahresprüfung aus CR-11; mit dem zod-Schema ist
+      der Code tot und samt seinem deutschen Satz entfallen. `requireEntityAccount` aus CR-36 hat
+      damit Aufrufer.
 - [ ] **5 — Das geteilte Paket.** CR-01, CR-02, CR-03, CR-04 (★), CR-05 (★).
 
 ### Block II — Sitzung und Sichtbarkeit (Release 0.17.0)

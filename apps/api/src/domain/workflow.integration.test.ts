@@ -1510,6 +1510,24 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         .set(admin);
       assert.equal(bad.status, 400);
     });
+    // CR-11: the two query readers that used to work by hand. A filter id that
+    // is none is named instead of quietly ignored, the list takes the same
+    // optional `limit` as its neighbours, and the plan year is a schema.
+    await t.test('list filters and the plan year are checked by schema', async () => {
+      const badFilter = await request(app).get('/api/v1/allocations?invoiceUID=quatsch').set(admin);
+      assert.equal(badFilter.status, 400);
+      assert.match(badFilter.body.error.message, /invoiceUID/);
+
+      const all = await request(app).get('/api/v1/allocations').set(admin);
+      assert.equal(all.status, 200);
+      assert.ok(all.body.data.length > 1);
+      const capped = await request(app).get('/api/v1/allocations?limit=1').set(admin);
+      assert.deepEqual(capped.body.data, all.body.data.slice(0, 1));
+
+      const badYear = await plan(accountA, 'year=abc');
+      assert.equal(badYear.status, 400);
+      assert.match(badYear.body.error.message, /year/);
+    });
   } finally {
     await pool.end();
   }

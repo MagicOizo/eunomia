@@ -7,6 +7,38 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.16.0-slice.5 — 2026-09-30
+
+Four helpers this project already had, now used everywhere they belong. Nothing a user can see
+changes: the same answers, the same fields, the same status codes — except for four query and path
+parameters that used to be read unchecked and now say what is wrong with them.
+
+- **One way to check who may see a record.** Resolving the owning account, answering "not found",
+  then checking the permission on it — three lines that stood, written out by hand, at fifteen
+  endpoints, with the resource name retyped at each one. They now go through one guard per entity
+  (`requireInvoiceAccount`, `requireBillingAccount`, …), so "404 before 403" is a property of the
+  helper instead of a habit, and the name of the thing that was not found is stated once.
+- **One way to answer.** The user administration wrote its response envelope by hand six times
+  instead of using the helper that exists for it. The bytes on the wire are unchanged. The three
+  routes that deliberately answer without an envelope — the version check and the two session
+  routes — are now named as the exceptions they are, so a bare response is a decision, not an
+  oversight.
+- **One way to run a transaction.** Five places opened a connection and did their own
+  commit/rollback/release: creating a submission, deleting a service billing, creating a policy and
+  the two role assignments. Creating a submission wrote its response _inside_ the transaction after
+  the commit, so a failure while writing it would have rolled back an already committed
+  transaction. All five use the helper now, and the response is written after it.
+- **One way to read a parameter.** Four endpoints read query and path parameters raw: the year tabs,
+  the reimbursements list, the reimbursement plan's year and every user id in the administration. A
+  malformed value is now a 400 that names the parameter instead of a filter that is quietly ignored
+  or a lookup that can only end in 404. The reimbursements list also accepts the optional `limit`
+  its neighbours already took.
+- **A uniqueness check that ran too early.** Changing a premium or a set of terms checked that no
+  other entry claims the same start date _before_ opening its transaction, while creating one
+  checked inside it. Two simultaneous edits could therefore both pass the check and then write the
+  same date, which no database index would have caught. The check now runs inside the transaction
+  it guards.
+
 ## 0.16.0-slice.4 — 2026-09-30
 
 One word for one thing. Nothing about the app behaves differently — this is a rename in the code, and

@@ -12,7 +12,7 @@ import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { withTransaction } from '../db/transaction.js';
 import { ENTITY_PREFIX, entityIdPattern, generateEntityId } from '../lib/ids.js';
-import { accountForContract, accountForSubmission, authorizeAccount } from './workflow-access.js';
+import { requireContractAccount, requireSubmissionAccount } from './workflow-access.js';
 
 /**
  * A submission is written by hand here (its invoices come with it, in one
@@ -131,14 +131,14 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
     const user = getAuthUser(res);
     const input = createSchema.parse(req.body);
 
-    const contractAccount = await accountForContract(pool, input.contractUID);
-    if (contractAccount === null) throw notFound('Contract');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, contractAccount);
+    const contractAccount = await requireContractAccount(
+      pool,
+      user.userId,
+      PERMISSIONS.MANAGE_INVOICES,
+      input.contractUID,
+    );
 
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
-
+    const submissionUID = await withTransaction(pool, async (conn) => {
       const placeholders = input.invoiceUIDs.map(() => '?').join(', ');
       await conn.query(
         `SELECT invoiceUID FROM Invoices WHERE invoiceUID IN (${placeholders}) FOR UPDATE`,
@@ -162,34 +162,29 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
       );
       assertInvoicesSubmittable(candidates, input.invoiceUIDs, contractAccount);
 
-      const submissionUID = generateEntityId('submission');
+      const uid = generateEntityId('submission');
       await conn.query(
         'INSERT INTO Submissions (submissionUID, contractUID, submittedDate) VALUES (?, ?, ?)',
-        [submissionUID, input.contractUID, input.submittedDate],
+        [uid, input.contractUID, input.submittedDate],
       );
       await conn.batch(
         'INSERT INTO SubmissionInvoices (submissionUID, invoiceUID, contractUID) VALUES (?, ?, ?)',
-        input.invoiceUIDs.map((invoiceUID) => [submissionUID, invoiceUID, input.contractUID]),
+        input.invoiceUIDs.map((invoiceUID) => [uid, invoiceUID, input.contractUID]),
       );
+      return uid;
+    });
 
-      await conn.commit();
-      sendData(
-        res,
-        {
-          submissionUID,
-          contractUID: input.contractUID,
-          submittedDate: input.submittedDate,
-          accountUID: contractAccount,
-          invoiceUIDs: input.invoiceUIDs,
-        },
-        201,
-      );
-    } catch (error) {
-      await conn.rollback();
-      throw error;
-    } finally {
-      conn.release();
-    }
+    sendData(
+      res,
+      {
+        submissionUID,
+        contractUID: input.contractUID,
+        submittedDate: input.submittedDate,
+        accountUID: contractAccount,
+        invoiceUIDs: input.invoiceUIDs,
+      },
+      201,
+    );
   });
 
   router.get('/', requireAuth, async (_req, res) => {
@@ -242,9 +237,12 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
   router.get('/:uid', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
-    const account = await accountForSubmission(pool, uid);
-    if (account === null) throw notFound('Submission');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, account);
+    const account = await requireSubmissionAccount(
+      pool,
+      user.userId,
+      PERMISSIONS.VIEW_INVOICES,
+      uid,
+    );
 
     const [submission] = await pool.query(
       `SELECT submissionUID, contractUID, submittedDate, submissionStatus
@@ -288,9 +286,7 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
     const invoiceUID = pathParam(req, 'invoiceUID');
-    const account = await accountForSubmission(pool, uid);
-    if (account === null) throw notFound('Submission');
-    await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, account);
+    await requireSubmissionAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
 
     await withTransaction(pool, async (conn) => {
       await conn.query('SELECT submissionUID FROM Submissions WHERE submissionUID = ? FOR UPDATE', [

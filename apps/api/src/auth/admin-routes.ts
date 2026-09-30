@@ -1,9 +1,11 @@
 import { Router } from 'express';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import type { AppConfig } from '../config/env.js';
+import { sendData } from '../crud/envelope.js';
+import { pathParam } from '../crud/params.js';
 import { badRequest, notFound } from '../lib/api-error.js';
 import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
@@ -47,6 +49,19 @@ const accountRolesSchema = z.object({
   grants: z.array(z.object({ accountUID: accountRef, roleUID: roleRef })),
 });
 
+/**
+ * The user id in the path. Users are addressed by their UUID (migration 002),
+ * so a path segment that is not one is a malformed call, not a missing user —
+ * 400 rather than a lookup that can only end in 404.
+ */
+function userUuid(req: Request): string {
+  const uuid = pathParam(req, 'uuid');
+  if (!z.string().uuid().safeParse(uuid).success) {
+    throw badRequest("Invalid path parameter 'uuid': must be a UUID");
+  }
+  return uuid;
+}
+
 /** Admin user/role management, gated globally by MANAGE_USERS (see Slice 9). */
 export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
   const router = Router();
@@ -84,13 +99,13 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
   }
 
   router.get('/users', async (_req, res) => {
-    res.json({ data: await listUsers(pool) });
+    sendData(res, await listUsers(pool));
   });
 
   router.get('/users/:uuid', async (req, res) => {
-    const user = await getUser(pool, req.params.uuid);
+    const user = await getUser(pool, userUuid(req));
     if (!user) throw notFound('User');
-    res.json({ data: user });
+    sendData(res, user);
   });
 
   router.post('/users', async (req, res) => {
@@ -101,11 +116,11 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
       surname: input.surname ?? null,
       passwordHash: await hashPassword(input.password),
     });
-    res.status(201).json({ data: await getUser(pool, created.uuidText) });
+    sendData(res, await getUser(pool, created.uuidText), 201);
   });
 
   router.patch('/users/:uuid', async (req, res) => {
-    const uuid = req.params.uuid;
+    const uuid = userUuid(req);
     const input = updateUserSchema.parse(req.body);
     await requireUserId(uuid);
 
@@ -121,11 +136,11 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
       status: input.status,
       passwordHash: input.password ? await hashPassword(input.password) : undefined,
     });
-    res.json({ data: await getUser(pool, uuid) });
+    sendData(res, await getUser(pool, uuid));
   });
 
   router.delete('/users/:uuid', async (req, res) => {
-    const uuid = req.params.uuid;
+    const uuid = userUuid(req);
     await requireUserId(uuid);
     assertNotSelf(res, uuid);
     await assertKeepsAnAdmin(uuid, false);
@@ -135,7 +150,7 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
   });
 
   router.put('/users/:uuid/global-roles', async (req, res) => {
-    const uuid = req.params.uuid;
+    const uuid = userUuid(req);
     const { roleUIDs } = globalRolesSchema.parse(req.body);
     const userId = await requireUserId(uuid);
 
@@ -151,19 +166,19 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
     await assertKeepsAnAdmin(uuid, willRemainAdmin);
 
     await setGlobalRoles(pool, userId, roleUIDs);
-    res.json({ data: await getUser(pool, uuid) });
+    sendData(res, await getUser(pool, uuid));
   });
 
   router.put('/users/:uuid/account-roles', async (req, res) => {
-    const uuid = req.params.uuid;
+    const uuid = userUuid(req);
     const { grants } = accountRolesSchema.parse(req.body);
     const userId = await requireUserId(uuid);
     await setAccountRoles(pool, userId, grants);
-    res.json({ data: await getUser(pool, uuid) });
+    sendData(res, await getUser(pool, uuid));
   });
 
   router.get('/roles', async (_req, res) => {
-    res.json({ data: await listRoles(pool) });
+    sendData(res, await listRoles(pool));
   });
 
   return router;

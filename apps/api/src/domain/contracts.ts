@@ -9,6 +9,7 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { type Row, insertRow, softDeleteRow, updateRow } from '../crud/repository.js';
+import { withTransaction } from '../db/transaction.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { type ContractRow, contractsTable, loadAuthorizedContract } from './contract-access.js';
@@ -137,13 +138,11 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
     );
     if (!allowed) throw forbidden();
 
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
-      const contract = (await insertRow(conn, contractsTable, data)) as ContractRow;
+    const contract = await withTransaction(pool, async (conn) => {
+      const created = (await insertRow(conn, contractsTable, data)) as ContractRow;
       if (initialMonthlyPremium !== undefined) {
-        await insertHistoryEntry(conn, 'premiums', contract, {
-          validFrom: contract.contractBegin,
+        await insertHistoryEntry(conn, 'premiums', created, {
+          validFrom: created.contractBegin,
           monthlyPremium: initialMonthlyPremium,
         });
       }
@@ -152,8 +151,8 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
         (initialReimbursementCap !== undefined && initialReimbursementCap !== null) ||
         initialReimbursementRate !== undefined;
       if (hasInitialTerms) {
-        await insertHistoryEntry(conn, 'terms', contract, {
-          validFromYear: Number(contract.contractBegin.slice(0, 4)),
+        await insertHistoryEntry(conn, 'terms', created, {
+          validFromYear: Number(created.contractBegin.slice(0, 4)),
           deductible: initialDeductible ?? 0,
           reimbursementCap: initialReimbursementCap ?? null,
           ...(initialReimbursementRate !== undefined && {
@@ -161,14 +160,9 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
           }),
         });
       }
-      await conn.commit();
-      sendData(res, contract, 201);
-    } catch (error) {
-      await conn.rollback();
-      throw error;
-    } finally {
-      conn.release();
-    }
+      return created;
+    });
+    sendData(res, contract, 201);
   });
 
   router.patch('/:uid', requireAuth, async (req, res) => {

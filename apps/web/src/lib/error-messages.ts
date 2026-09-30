@@ -230,7 +230,6 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     return sentence(prefix, 'Für dieses Datum gibt es bereits einen Beitragsstand.') + suffix;
   },
   YEAR_OUTSIDE_CONTRACT: () => 'Das Jahr liegt außerhalb der Vertragslaufzeit.',
-  INVALID_YEAR: () => 'Bitte ein gültiges Jahr angeben.',
 
   // Papierkorb
   PARENT_IN_TRASH: (d) => {

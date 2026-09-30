@@ -239,9 +239,12 @@ function createHistoryRouter(pool: Pool, config: AppConfig, spec: HistorySpec): 
     const data = spec.schema.partial().parse(req.body);
     const validity = (data[spec.validityColumn] ?? entry[spec.validityColumn]) as string | number;
     spec.assertWithinContract(contract, validity);
-    await assertValidityFree(pool, spec, contract.contractUID, validity, entryUID);
     // The schema has no contractUID, so an entry can never move between contracts.
     const updated = await withTransaction(pool, async (conn) => {
+      // Inside the transaction, as on the POST path (via insertHistoryEntry):
+      // no UNIQUE index backs this rule, so the check and the write it guards
+      // have to be the same transaction or two concurrent edits both pass.
+      await assertValidityFree(conn, spec, contract.contractUID, validity, entryUID);
       const row = await updateRow(conn, spec.table, entryUID, data);
       if (!row) throw notFound(spec.label);
       await spec.saveChildren?.(conn, entryUID, data);

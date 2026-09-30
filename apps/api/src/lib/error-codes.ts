@@ -66,7 +66,6 @@ export const ERROR_CODES = {
   HISTORY_AFTER_CONTRACT: 'HISTORY_AFTER_CONTRACT',
   HISTORY_START_EXISTS: 'HISTORY_START_EXISTS',
   YEAR_OUTSIDE_CONTRACT: 'YEAR_OUTSIDE_CONTRACT',
-  INVALID_YEAR: 'INVALID_YEAR',
 
   // Papierkorb (see domain/trash.ts). Every failure of a restore additionally
   // carries `details.entry` — the record it hung on, which may be a child of
