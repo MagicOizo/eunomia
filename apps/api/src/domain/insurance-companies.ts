@@ -5,9 +5,9 @@ import { z } from 'zod';
 
 import type { AppConfig } from '../config/env.js';
 import { createMasterDataRouter } from '../crud/master-data-router.js';
-import type { CrudTable } from '../crud/repository.js';
+import { crudTable } from '../crud/repository.js';
 
-export const companiesTable: CrudTable = {
+export const companiesTable = crudTable({
   table: 'InsuranceCompanies',
   uidColumn: 'companyUID',
   statusColumn: 'companyStatus',
@@ -20,7 +20,7 @@ export const companiesTable: CrudTable = {
     'serviceHotline',
     'url',
   ],
-};
+});
 
 const base = z.object({
   companyName: z.string().trim().min(1).max(100),

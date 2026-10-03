@@ -1,4 +1,4 @@
-import { PERMISSIONS } from '@eunomia/shared';
+import { CONTRACT_KINDS, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -8,6 +8,7 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';
 import { notFound } from '../lib/api-error.js';
+import { oneOf } from '../lib/one-of.js';
 import type { BonusYear } from './bonus-timeline.js';
 import type { ContractRow } from './contract-access.js';
 import { termsInForce } from './bonus-timeline.js';
@@ -17,7 +18,6 @@ import {
   type InvoicePolicyState,
   type OptimizerInvoice,
   type OptimizerPolicy,
-  type PolicyKind,
   optimizeReimbursement,
 } from './reimbursement-optimizer.js';
 import { authorizeAccount } from './workflow-access.js';
@@ -100,8 +100,8 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
       const bonus = bonusFor(entry);
       const policy: OptimizerPolicy = {
         contractUID: contract.contractUID,
-        contractNumber: String(contract.contractNumber),
-        kind: contract.contractKind as PolicyKind,
+        contractNumber: contract.contractNumber,
+        kind: oneOf(CONTRACT_KINDS, contract.contractKind, 'Contracts.contractKind'),
         deductible: Number(terms?.deductible ?? 0),
         reimbursementCap: terms?.reimbursementCap == null ? null : Number(terms.reimbursementCap),
         reimbursementRate: Number(terms?.reimbursementRate ?? 100),

@@ -1,6 +1,7 @@
 import type { Pool } from 'mariadb';
 
 import { loadDatabaseConfig } from '../config/env.js';
+import { execute } from '../crud/repository.js';
 import { runMigrations } from '../db/migrate.js';
 import { createPool, waitForDatabase } from '../db/pool.js';
 import { hashPassword } from '../lib/password.js';
@@ -675,10 +676,11 @@ async function seedDevAdmin(pool: Pool): Promise<void> {
   );
   let userId = existing[0]?.userID;
   if (userId === undefined) {
-    const result = (await pool.query(
+    const result = await execute(
+      pool,
       'INSERT INTO Users (email, firstname, surname, passwordHash) VALUES (?, ?, ?, ?)',
       [email, 'Dev', 'Admin', await hashPassword(password)],
-    )) as { insertId: number };
+    );
     userId = result.insertId;
   }
 

@@ -5,15 +5,15 @@ import { z } from 'zod';
 
 import type { AppConfig } from '../config/env.js';
 import { createMasterDataRouter } from '../crud/master-data-router.js';
-import type { CrudTable } from '../crud/repository.js';
+import { crudTable } from '../crud/repository.js';
 
-export const facilitiesTable: CrudTable = {
+export const facilitiesTable = crudTable({
   table: 'Facilities',
   uidColumn: 'facilityUID',
   statusColumn: 'facilityStatus',
   entity: 'facility',
   columns: ['facilityName', 'distanceKm'],
-};
+});
 
 const base = z.object({
   facilityName: z.string().trim().min(1).max(100),

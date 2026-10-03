@@ -186,7 +186,31 @@ ausdrücklich vor einer anderen steht.
       Endpunkte (Plan für drei Jahre, Policenliste, sechs Police-Details, die ganze
       Papierkorb-Seite) sind gegen die Entwicklungsdatenbank vor und nach dem Umbau zeichengleich;
       dazu Arbeitsbereich, Jahreswechsel, Erstattungsplan und Papierkorb im Browser.
-- [ ] **14 — Typen statt Zusicherungen.** CR-19.
+- [x] **14 — Typen statt Zusicherungen.** CR-19.
+      Umgesetzt mit v0.18.0-slice.6 (Slice 64). Weiter als der Review empfiehlt, auf Entscheidung
+      des Autors: kein Helfer `rowAs<T>()`, sondern Typen an der Quelle, Enum-Spalten beim Lesen
+      geprüft und die Settings-Kette mit. Von 45 Zusicherungen sind 11 geblieben, jede an einer
+      Fremd-API-Grenze (Express `res.locals`, `promisify`, nodemailer, `require` der package.json,
+      zod über `ZodObject<ZodRawShape>`, der Akkumulator in `getSettings`) und jede mit einem Satz,
+      warum. Der Ertrag ist nicht die Zahl, sondern die Prüfung: die Spaltenliste einer Tabelle
+      läuft gegen `keyof R`, ein Tippfehler darin und eine einseitig umbenannte Spalte brechen den
+      Build (beides rot geprüft). Gewarnt sei vor der Stelle, an der der Zeilentyp hängt — er steht
+      als Feld `row?: R` in der Beschreibung und nicht als `keyof R` in `columns`, weil `keyof`
+      `CrudTable<R>` kontravariant macht und eine getypte Tabelle dann keine `CrudTable<Row>` mehr
+      wäre; der Papierkorb hält alle elf in einer Liste. Vier Dinge gingen über den Review hinaus:
+      (1) `present()` behält keine `Record<string, unknown>`-Annotation, sein DTO-Typ wird inferiert
+      (`PresentedInvoice`), womit der Status-Cast in der Listenroute von selbst entfiel;
+      (2) `isSqlError` ist aus `lib/error-handler.ts` exportiert, weil `trash.ts` denselben
+      errno-Wächter nachgebaut hatte; (3) `nextTreatmentDays` hat eine Overload für den
+      Anlege-Pfad, wo das Schema `treatmentDate` verpflichtend macht; (4) ein unbekanntes
+      `contractKind` antwortet jetzt 500 mit greppbarem Log statt lautlos falsch zu rechnen — die
+      einzige Verhaltensänderung der Scheibe, von Hand geprüft. Gegengeprobt: 53 Antworten der
+      Entwicklungsdatenbank vor und nach dem Umbau zeichengleich, dazu alle Schreibwege von Hand
+      (Rechnung, Einreichung, Abrechnung, Papierkorb, Nutzerverwaltung, Passwortwechsel,
+      Einstellungen) und 321 Integrationstests gegen `eunomia_test`. Im Browser: Arbeitsbereich mit
+      Jahreswechsel und Erstattungsplan, Rechnungsliste, Policen, Papierkorb und die
+      Einstellungsseite samt Mail- und Erinnerungsstatus und dem Testmail-Pfad ohne Konfiguration
+      (409, derselbe deutsche Satz) — ohne eine einzige Fehlermeldung in der Konsole.
 
 ### Block IV — Betrieb und Nachweis (Release 0.19.0)
 

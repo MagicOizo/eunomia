@@ -108,8 +108,8 @@ async function assertReimbursementFits(db: Queryable, row: Row): Promise<void> {
     [row.invoiceUID],
   );
   if (!sums) return;
-  const cents = (value: number): number => Math.round(Number(value) * 100);
-  if (cents(sums.allocated) + cents(row.reimbursement as number) > cents(sums.invoiceAmount)) {
+  const cents = (value: unknown): number => Math.round(Number(value) * 100);
+  if (cents(sums.allocated) + cents(row.reimbursement) > cents(sums.invoiceAmount)) {
     throw conflict('The reimbursements would exceed the invoice amount', {
       code: ERROR_CODES.REIMBURSEMENT_EXCEEDS_INVOICE,
       details: { invoices: [sums.invoiceNumber] },
@@ -342,7 +342,7 @@ export const TRASH_ENTITIES: TrashEntity[] = [
 
 const byTable = new Map(TRASH_ENTITIES.map((entity) => [entity.table.table, entity]));
 const byPrefix = new Map<string, TrashEntity>(
-  TRASH_ENTITIES.map((entity) => [ENTITY_PREFIX[entity.entity] as string, entity]),
+  TRASH_ENTITIES.map((entity) => [ENTITY_PREFIX[entity.entity], entity]),
 );
 
 /** The entity a table belongs to, or undefined for a link table the trash ignores. */

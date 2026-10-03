@@ -7,6 +7,7 @@ import { logEvent } from '../lib/log.js';
 import { SecretBoxError, decryptSecret, encryptSecret } from '../lib/secret-box.js';
 import {
   SETTING_KEYS,
+  type ResolvedSettings,
   type SettingKey,
   type SettingValue,
   fallbackOf,
@@ -30,9 +31,6 @@ import {
 
 /** The encryption key, or null when CONFIG_ENCRYPTION_KEY is not configured. */
 export type EncryptionKey = Buffer | null;
-
-/** All settings as typed values, secrets in plaintext — for application code only. */
-export type ResolvedSettings = Record<SettingKey, SettingValue>;
 
 /** What the API hands to the UI: a secret appears as `isSet`, never as its value. */
 export interface PublicSetting {
@@ -75,7 +73,7 @@ async function readRows(pool: Pool): Promise<Map<SettingKey, string | null>> {
  */
 export async function getSettings(pool: Pool, key: EncryptionKey): Promise<ResolvedSettings> {
   const stored = await readRows(pool);
-  const resolved = {} as ResolvedSettings;
+  const resolved: Record<string, SettingValue> = {};
 
   for (const settingKey of SETTING_KEYS) {
     const raw = stored.get(settingKey) ?? null;
@@ -107,7 +105,11 @@ export async function getSettings(pool: Pool, key: EncryptionKey): Promise<Resol
     }
   }
 
-  return resolved;
+  // The one place the settings are claimed rather than checked: the loop above
+  // runs over every key of the registry and writes each one the value its own
+  // definition prescribes — which is what the compiler cannot follow through
+  // the key union. It used to cost a claim at every reader instead.
+  return resolved as ResolvedSettings;
 }
 
 /** The settings as the UI may see them: values for everything but secrets. */

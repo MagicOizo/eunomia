@@ -1,6 +1,6 @@
 import type { Pool } from 'mariadb';
 
-import type { SettingKey, SettingValue } from '../settings/registry.js';
+import type { ResolvedSettings, SettingKey, SettingValue } from '../settings/registry.js';
 import { type EncryptionKey, getSettings, setApplicationValues } from '../settings/repository.js';
 import type { MailSendStatus, MailSettingsStore } from './mailer.js';
 
@@ -15,7 +15,7 @@ export function createMailSettingsStore(
   encryptionKey: EncryptionKey,
 ): MailSettingsStore {
   return {
-    read: async (): Promise<Record<SettingKey, SettingValue>> => getSettings(pool, encryptionKey),
+    read: async (): Promise<ResolvedSettings> => getSettings(pool, encryptionKey),
     writeStatus: async (status: MailSendStatus): Promise<void> => {
       await setApplicationValues(
         pool,

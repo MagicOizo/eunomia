@@ -9,7 +9,14 @@ interface SqlErrorLike {
   errno: number;
 }
 
-function isSqlError(err: unknown): err is SqlErrorLike {
+/**
+ * The one place that asks the question: whatever the driver threw, does it
+ * carry an error number? Exported because the trash asks it too, about the
+ * unique violation a restore can run into.
+ */
+export function isSqlError(err: unknown): err is SqlErrorLike {
+  // The assertion is the question itself: whether the field is there is what
+  // the next line measures.
   return typeof err === 'object' && err !== null && typeof (err as SqlErrorLike).errno === 'number';
 }
 

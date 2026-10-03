@@ -152,6 +152,25 @@ export const SETTINGS = {
  */
 export { SETTING_KEYS, type SettingKey };
 
+/** The value a `type` resolves to: everything that is not a flag or a number is text. */
+type BaseValue<T> = T extends 'bool' ? boolean : T extends 'int' ? number : string;
+
+/**
+ * Every setting with the type its own definition prescribes — `mail.port` is a
+ * number, `reminders.timeZone` a string, `mail.enabled` a boolean.
+ *
+ * Read off the table above rather than written down a second time, so adding a
+ * setting still means one entry and nothing else. `null` is added exactly where
+ * the fallback may be null, which is where "not configured" is a possible
+ * answer: for any other fallback `… & null` is `never` and nothing is added.
+ * Before this, every reader of a setting had to claim the type of its key
+ * afterwards, and five of them did (CR-19).
+ */
+export type ResolvedSettings = {
+  [K in SettingKey]:
+    BaseValue<(typeof SETTINGS)[K]['type']> | ((typeof SETTINGS)[K]['fallback'] & null);
+};
+
 /** Narrowing helper: the definitions are `as const`, the checks need the wide type. */
 function definition(key: SettingKey): SettingDefinition {
   return SETTINGS[key] as SettingDefinition;

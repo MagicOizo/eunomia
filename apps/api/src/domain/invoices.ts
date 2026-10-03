@@ -5,13 +5,7 @@
  * `invoice-queries.ts`.
  */
 
-import {
-  ERROR_CODES,
-  isHttpUrl,
-  PERMISSIONS,
-  STATUS_FILTERS,
-  type WorkflowStatus,
-} from '@eunomia/shared';
+import { ERROR_CODES, isHttpUrl, PERMISSIONS, STATUS_FILTERS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -22,26 +16,25 @@ import { accountFilter, hasPermission } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';
-import { insertRow, softDeleteRow, updateRow } from '../crud/repository.js';
+import { execute, insertRow, softDeleteRow, updateRow } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { likeTerm } from '../lib/like.js';
 import {
-  type InvoiceRow,
   getInvoice,
   invoicesTable,
   notCoveredOf,
   present,
   presentOne,
   queryInvoices,
+  requireInvoice,
   resolvePaymentDetail,
   submissionCount,
   treatmentDaysOf,
   writeTreatmentDays,
 } from './invoice-queries.js';
 import {
-  type TreatmentDays,
   assertOneYear,
   nextNotCovered,
   nextPaymentDates,
@@ -217,9 +210,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       sendData(res, presented);
       return;
     }
-    const matching = presented.filter((invoice) =>
-      matchesStatus(invoice.workflowStatus as WorkflowStatus, status),
-    );
+    const matching = presented.filter((invoice) => matchesStatus(invoice.workflowStatus, status));
     sendData(res, filters.limit === undefined ? matching : matching.slice(0, filters.limit));
   });
 
@@ -268,12 +259,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const user = getAuthUser(res);
     const invoice = await getInvoice(pool, pathParam(req, 'uid'));
     if (!invoice) throw notFound('Invoice');
-    await authorizeAccount(
-      pool,
-      user.userId,
-      PERMISSIONS.VIEW_INVOICES,
-      invoice.accountUID as string,
-    );
+    await authorizeAccount(pool, user.userId, PERMISSIONS.VIEW_INVOICES, invoice.accountUID);
     sendData(res, await presentOne(pool, invoice));
   });
 
@@ -282,7 +268,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const data = base.parse(req.body);
     await authorizeAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, data.accountUID);
     // `treatmentDate` is mandatory here, so there is always a day to write.
-    const days = nextTreatmentDays(data, []) as TreatmentDays;
+    const days = nextTreatmentDays(data, []);
     assertOneYear(days);
     // A new invoice is submitted nowhere, so only the reason rule can bite.
     const mark = nextNotCovered(data, { notCovered: 0, notCoveredReason: null });
@@ -301,11 +287,10 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
         ...(paymentDetail ?? {}),
         treatmentDate: days[0],
       });
-      await writeTreatmentDays(conn, row.invoiceUID as string, days);
+      await writeTreatmentDays(conn, row.invoiceUID, days);
       return row;
     });
-    const enriched = await getInvoice(pool, created.invoiceUID as string);
-    sendData(res, await presentOne(pool, enriched as InvoiceRow), 201);
+    sendData(res, await presentOne(pool, await requireInvoice(pool, created.invoiceUID)), 201);
   });
 
   router.patch('/:uid', requireAuth, async (req, res) => {
@@ -318,7 +303,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       // Locks the invoice row so a concurrent allocation cannot slip in
       // between the checks and the update (the allocation path locks it too).
       await conn.query('SELECT invoiceUID FROM Invoices WHERE invoiceUID = ? FOR UPDATE', [uid]);
-      const current = (await getInvoice(conn, uid)) as InvoiceRow;
+      const current = await requireInvoice(conn, uid);
       if (
         data.invoiceAmount !== undefined &&
         Math.round(data.invoiceAmount * 100) < Math.round(current.reimbursedTotal * 100)
@@ -345,10 +330,10 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       }
       const paid = nextPaymentDates(data, {
         directPayment: Number(current.directPayment),
-        invoiceDate: current.invoiceDate as string,
+        invoiceDate: current.invoiceDate,
       });
       const paymentDetail = await resolvePaymentDetail(conn, data, {
-        agencyUID: (current.agencyUID as string | null) ?? null,
+        agencyUID: current.agencyUID,
         directPayment: Number(current.directPayment),
       });
       const patch = { ...data, ...(mark ?? {}), ...(paid ?? {}), ...(paymentDetail ?? {}) };
@@ -362,7 +347,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       }
     });
 
-    sendData(res, await presentOne(pool, (await getInvoice(pool, uid)) as InvoiceRow));
+    sendData(res, await presentOne(pool, await requireInvoice(pool, uid)));
   });
 
   // "Not reimbursable under this policy" marks. Keyed by (invoice, policy),
@@ -415,17 +400,18 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       );
     });
 
-    sendData(res, await presentOne(pool, (await getInvoice(pool, uid)) as InvoiceRow), 201);
+    sendData(res, await presentOne(pool, await requireInvoice(pool, uid)), 201);
   });
 
   router.delete('/:uid/exclusions/:contractUID', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
     const uid = pathParam(req, 'uid');
     await requireInvoiceAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
-    const result = (await pool.query(
+    const result = await execute(
+      pool,
       'DELETE FROM InvoiceExclusions WHERE invoiceUID = ? AND contractUID = ?',
       [uid, pathParam(req, 'contractUID')],
-    )) as { affectedRows: number };
+    );
     if (result.affectedRows === 0) throw notFound('Exclusion');
     res.status(204).end();
   });

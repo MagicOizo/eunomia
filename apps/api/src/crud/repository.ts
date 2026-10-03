@@ -1,4 +1,4 @@
-import type { Pool, PoolConnection } from 'mariadb';
+import type { Pool, PoolConnection, UpsertResult } from 'mariadb';
 
 import { type EntityName, generateEntityId } from '../lib/ids.js';
 
@@ -7,14 +7,29 @@ import { type EntityName, generateEntityId } from '../lib/ids.js';
  * auto-increment key is never listed and never selected — only the public
  * `uidColumn`, the writable business `columns`, and the `statusColumn` leave
  * the database.
+ *
+ * `R` is the shape of a row of this table. A description is written with
+ * `crudTable()`, which is where that shape is checked against the column list;
+ * from there on the helpers below hand `R` to the driver's type parameter
+ * instead of casting their result (CR-19). A table whose rows nobody reads
+ * field by field leaves `R` out and keeps the untyped `Row`.
  */
-export interface CrudTable {
+export interface CrudTable<R extends Row = Row> {
   table: string;
   uidColumn: string;
   statusColumn: string;
   entity: EntityName;
   /** Writable business columns (excludes the numeric key, the UID and status). */
-  columns: string[];
+  readonly columns: readonly string[];
+  /**
+   * The row shape, so that `getRow` and its siblings can read it off the
+   * description. It exists in the type only: `crudTable()` does not write it
+   * and nothing ever reads it. It has to be a field the table *has* rather
+   * than `keyof R` inside `columns`, because only then is the description of a
+   * typed table also one of an untyped `Row` — which the trash needs, holding
+   * all eleven of them in one list.
+   */
+  readonly row?: R;
 }
 
 export type Row = Record<string, unknown>;
@@ -36,12 +51,7 @@ const STATUS_ACTIVE = 1;
  */
 const DELETED_AT = 'deletedAt';
 
-interface InsertResult {
-  insertId: number;
-  affectedRows: number;
-}
-
-function outputColumns(t: CrudTable): string {
+function outputColumns(t: CrudTable<Row>): string {
   return [t.uidColumn, ...t.columns, t.statusColumn].join(', ');
 }
 
@@ -54,9 +64,60 @@ export function placeholders(values: readonly unknown[]): string {
   return values.map(() => '?').join(', ');
 }
 
+/**
+ * Writes a table description, with its row type if it has one.
+ *
+ * This is the one place where the shape of a row is claimed, and the claim is
+ * checked here: `columns` may only name keys of `R`, so a column the row type
+ * does not know — a typo, or a rename done on one side only — does not
+ * compile. Without a type argument `R` stays `Row` and the check is vacuous,
+ * which is what a table nobody reads field by field wants.
+ *
+ * A row type has to be written as a type alias, not an interface: TypeScript
+ * gives an implicit index signature to an object type literal and not to an
+ * interface, and only with one does a row count as a `Row`.
+ */
+export function crudTable<R extends Row = Row>(t: {
+  table: string;
+  uidColumn: string;
+  statusColumn: string;
+  entity: EntityName;
+  columns: ReadonlyArray<keyof R & string>;
+}): CrudTable<R> {
+  return t;
+}
+
+/**
+ * What a write answers: how many rows it changed, and the key it created.
+ *
+ * The driver's own `UpsertResult` spells `insertId` as `number | bigint`
+ * because it does not know the pool's settings; ours runs on
+ * `bigIntAsNumber` (see db/pool.ts), so the number here is a conversion of
+ * what arrived, not an assertion about it.
+ */
+export interface WriteResult {
+  affectedRows: number;
+  insertId: number;
+}
+
+/**
+ * Runs a write statement (INSERT/UPDATE/DELETE) and returns its result. The
+ * point is the type: `query` without a type parameter answers `any`, and a
+ * dozen places used to pull the two fields they wanted back out of it with an
+ * assertion (CR-19).
+ */
+export async function execute(
+  db: Queryable,
+  sql: string,
+  params: unknown[] = [],
+): Promise<WriteResult> {
+  const result = await db.query<UpsertResult>(sql, params);
+  return { affectedRows: result.affectedRows, insertId: Number(result.insertId) };
+}
+
 /** Keeps only entries whose key is a known writable column of the table. */
 function pickColumns(
-  t: CrudTable,
+  t: CrudTable<Row>,
   data: Record<string, unknown>,
 ): [columns: string[], values: unknown[]] {
   const columns: string[] = [];
@@ -71,22 +132,30 @@ function pickColumns(
 }
 
 /** Lists non-deleted rows, optionally narrowed by an account-scope filter. */
-export async function listRows(pool: Queryable, t: CrudTable, filter?: Filter): Promise<Row[]> {
+export async function listRows<R extends Row>(
+  pool: Queryable,
+  t: CrudTable<R>,
+  filter?: Filter,
+): Promise<R[]> {
   const where = [`${t.statusColumn} <> ?`];
   const params: unknown[] = [STATUS_DELETED];
   if (filter) {
     where.push(filter.clause);
     params.push(...filter.params);
   }
-  return pool.query<Row[]>(
+  return pool.query<R[]>(
     `SELECT ${outputColumns(t)} FROM ${t.table} WHERE ${where.join(' AND ')} ORDER BY ${t.uidColumn}`,
     params,
   );
 }
 
 /** Fetches a single non-deleted row by its UID, or null. */
-export async function getRow(pool: Queryable, t: CrudTable, uid: string): Promise<Row | null> {
-  const rows = await pool.query<Row[]>(
+export async function getRow<R extends Row>(
+  pool: Queryable,
+  t: CrudTable<R>,
+  uid: string,
+): Promise<R | null> {
+  const rows = await pool.query<R[]>(
     `SELECT ${outputColumns(t)} FROM ${t.table} WHERE ${t.uidColumn} = ? AND ${t.statusColumn} <> ? LIMIT 1`,
     [uid, STATUS_DELETED],
   );
@@ -94,11 +163,11 @@ export async function getRow(pool: Queryable, t: CrudTable, uid: string): Promis
 }
 
 /** Inserts a row (generating its UID) and returns the created row. */
-export async function insertRow(
+export async function insertRow<R extends Row>(
   pool: Queryable,
-  t: CrudTable,
+  t: CrudTable<R>,
   data: Record<string, unknown>,
-): Promise<Row> {
+): Promise<R> {
   const uid = generateEntityId(t.entity);
   const [columns, values] = pickColumns(t, data);
   const allColumns = [t.uidColumn, ...columns];
@@ -129,11 +198,11 @@ export async function insertRow(
  * Atomicity is the caller's, exactly as with `insertRow`: pass the connection of
  * an open transaction, not the pool, when all the rows have to land together.
  */
-export async function insertManyRows(
+export async function insertManyRows<R extends Row>(
   pool: Queryable,
-  t: CrudTable,
+  t: CrudTable<R>,
   rows: Array<Record<string, unknown>>,
-): Promise<Row[]> {
+): Promise<R[]> {
   if (rows.length === 0) return [];
 
   const columns = t.columns.filter((column) =>
@@ -146,7 +215,7 @@ export async function insertManyRows(
     rows.map((row, index) => [uids[index], ...columns.map((column) => row[column] ?? null)]),
   );
 
-  const created = await pool.query<Row[]>(
+  const created = await pool.query<R[]>(
     `SELECT ${outputColumns(t)} FROM ${t.table}
       WHERE ${t.uidColumn} IN (${placeholders(uids)})`,
     uids,
@@ -163,12 +232,12 @@ export async function insertManyRows(
  * Updates the given columns of a non-deleted row. Returns the updated row, or
  * null if no such row exists (so the caller can answer 404).
  */
-export async function updateRow(
+export async function updateRow<R extends Row>(
   pool: Queryable,
-  t: CrudTable,
+  t: CrudTable<R>,
   uid: string,
   data: Record<string, unknown>,
-): Promise<Row | null> {
+): Promise<R | null> {
   const [columns, values] = pickColumns(t, data);
   if (columns.length > 0) {
     const assignments = columns.map((c) => `${c} = ?`).join(', ');
@@ -206,27 +275,28 @@ export async function deletionTimestamp(pool: Queryable): Promise<string> {
  */
 export async function softDeleteRow(
   pool: Queryable,
-  t: CrudTable,
+  t: CrudTable<Row>,
   uid: string,
   at?: string,
 ): Promise<boolean> {
-  const result = (await pool.query(
+  const result = await execute(
+    pool,
     `UPDATE ${t.table} SET ${t.statusColumn} = ?, ${DELETED_AT} = ${at === undefined ? 'NOW(6)' : '?'}
       WHERE ${t.uidColumn} = ? AND ${t.statusColumn} <> ?`,
     at === undefined
       ? [STATUS_DELETED, uid, STATUS_DELETED]
       : [STATUS_DELETED, at, uid, STATUS_DELETED],
-  )) as InsertResult;
+  );
   return result.affectedRows > 0;
 }
 
 /** Fetches a single DELETED row by its UID, or null — the trash's counterpart to `getRow`. */
-export async function getDeletedRow(
+export async function getDeletedRow<R extends Row>(
   pool: Queryable,
-  t: CrudTable,
+  t: CrudTable<R>,
   uid: string,
-): Promise<Row | null> {
-  const rows = await pool.query<Row[]>(
+): Promise<R | null> {
+  const rows = await pool.query<R[]>(
     `SELECT ${outputColumns(t)}, ${DELETED_AT} FROM ${t.table}
       WHERE ${t.uidColumn} = ? AND ${t.statusColumn} = ? LIMIT 1`,
     [uid, STATUS_DELETED],
@@ -240,12 +310,17 @@ export async function getDeletedRow(
  * the only state a row can return to. Returns false when there was no deleted
  * row under that UID.
  */
-export async function restoreRow(pool: Queryable, t: CrudTable, uid: string): Promise<boolean> {
-  const result = (await pool.query(
+export async function restoreRow(
+  pool: Queryable,
+  t: CrudTable<Row>,
+  uid: string,
+): Promise<boolean> {
+  const result = await execute(
+    pool,
     `UPDATE ${t.table} SET ${t.statusColumn} = ?, ${DELETED_AT} = NULL
       WHERE ${t.uidColumn} = ? AND ${t.statusColumn} = ?`,
     [STATUS_ACTIVE, uid, STATUS_DELETED],
-  )) as InsertResult;
+  );
   return result.affectedRows > 0;
 }
 
@@ -253,10 +328,15 @@ export async function restoreRow(pool: Queryable, t: CrudTable, uid: string): Pr
  * Removes a row for good. Only ever a deleted one: the status condition makes
  * it impossible for a bug in a caller to hard-delete a live record.
  */
-export async function hardDeleteRow(pool: Queryable, t: CrudTable, uid: string): Promise<boolean> {
-  const result = (await pool.query(
+export async function hardDeleteRow(
+  pool: Queryable,
+  t: CrudTable<Row>,
+  uid: string,
+): Promise<boolean> {
+  const result = await execute(
+    pool,
     `DELETE FROM ${t.table} WHERE ${t.uidColumn} = ? AND ${t.statusColumn} = ?`,
     [uid, STATUS_DELETED],
-  )) as InsertResult;
+  );
   return result.affectedRows > 0;
 }

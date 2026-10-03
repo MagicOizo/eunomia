@@ -7,6 +7,36 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.18.0-slice.6 — 2026-10-03
+
+Nothing in the app looks different after this release, and the eleven endpoints that were measured
+answer character for character what they answered before. What changed is how much of the code the
+compiler checks: the database driver hands out untyped rows, and in 45 places the code took the type
+back with an assertion — a promise the compiler then stops checking. Eleven of those are left, each
+at a boundary to a foreign library and each with a sentence saying why it stays.
+
+- **A table says what its rows look like.** The description of a table — its name, its UID column,
+  its columns — now carries the shape of a row as well, and the column list is checked against it:
+  a typo in the list, or a column renamed on one side only, no longer compiles. Reading a policy,
+  an invoice or a service billing therefore needs no assertion, and a dozen field accesses that
+  used to name their own type (`row.invoiceDate as string`) simply have one.
+- **A write says what it answers.** Twelve places asked the driver to run an UPDATE or a DELETE and
+  then fished the number of affected rows out of an `any`. There is one helper for it now, and the
+  one value that needed converting — the generated key, which the driver types as possibly a
+  BigInt — is converted rather than claimed.
+- **An unknown value in a policy column is now noticed.** Whether a policy is full cover and when
+  its bonus is forfeited are stored as plain text; only the API ever writes them, and it checks
+  them, but the column itself would take anything. These two are now checked where they are read,
+  so a record holding something else answers with an error naming the column and the value, instead
+  of quietly calculating with it. Nothing in the seeded or production data changes hands here.
+- **Every setting has the type its definition gives it.** `mail.port` is a number, `mail.enabled` a
+  boolean, `reminders.timeZone` a string — read off the settings catalog instead of claimed anew by
+  each of the five readers. Several defensive checks around the mail configuration fall away with
+  it, because the type now proves what they were asking.
+- **Four places no longer talk a null away.** The invoice after a write, the presented invoice, and
+  two lookups in a map were typed as "certainly there" by assertion; they now say it as a check, at
+  the one spot where it cannot happen.
+
 ## 0.18.0-slice.5 — 2026-10-03
 
 Nothing in the app looks different after this release. Three places asked the database a number of

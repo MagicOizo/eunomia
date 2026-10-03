@@ -1,6 +1,6 @@
 import type { Pool } from 'mariadb';
 
-import { type Queryable, placeholders } from '../crud/repository.js';
+import { type Queryable, execute, placeholders } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 
 /**
@@ -108,19 +108,21 @@ export async function updateUser(
     }
   }
   if (columns.length === 0) return 0;
-  const result = (await pool.query(
+  const result = await execute(
+    pool,
     `UPDATE Users SET ${columns.join(', ')} WHERE uuidText = ? AND userStatus <> -1`,
     [...values, uuid],
-  )) as { affectedRows: number };
+  );
   return result.affectedRows;
 }
 
 /** Soft-deletes a user (userStatus = -1). Returns rows affected. */
 export async function softDeleteUser(pool: Pool, uuid: string): Promise<number> {
-  const result = (await pool.query(
+  const result = await execute(
+    pool,
     `UPDATE Users SET userStatus = -1 WHERE uuidText = ? AND userStatus <> -1`,
     [uuid],
-  )) as { affectedRows: number };
+  );
   return result.affectedRows;
 }
 

@@ -9,6 +9,7 @@ import { pathParam } from '../crud/params.js';
 import { type Queryable, hardDeleteRow, restoreRow, softDeleteRow } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { ApiError, conflict, notFound } from '../lib/api-error.js';
+import { isSqlError } from '../lib/error-handler.js';
 import { linksFrom, linksTo } from './trash-references.js';
 import { type TrashEntry, TRASH_ENTITIES, entityOfTable, entityOfUid } from './trash-registry.js';
 import {
@@ -117,7 +118,7 @@ function blame(error: unknown, located: Located): unknown {
     });
   }
   // A unique violation no check caught first — never let the driver's error out.
-  if (typeof error === 'object' && error !== null && (error as { errno?: number }).errno === 1062) {
+  if (isSqlError(error) && error.errno === 1062) {
     return conflict('Restoring the record would duplicate a unique value', {
       code: ERROR_CODES.RESTORE_CONFLICT,
       details: { entry },

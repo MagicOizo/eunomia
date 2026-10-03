@@ -1,5 +1,7 @@
 import type { Pool } from 'mariadb';
 
+import { execute } from '../crud/repository.js';
+
 /**
  * Data access for authentication. Every read here selects the internal numeric
  * `userID` for use as a join key inside the process, and the public `uuidText`
@@ -17,11 +19,6 @@ export interface AuthUser {
 
 interface UserWithHash extends AuthUser {
   passwordHash: string;
-}
-
-interface InsertResult {
-  insertId: number;
-  affectedRows: number;
 }
 
 const USER_COLUMNS = `userID AS userId, uuidText, email, firstname, surname, userStatus`;
@@ -77,10 +74,11 @@ export async function createUser(
   pool: Pool,
   user: { email: string; firstname: string; surname: string | null; passwordHash: string },
 ): Promise<AuthUser> {
-  const result = (await pool.query(
+  const result = await execute(
+    pool,
     `INSERT INTO Users (email, firstname, surname, passwordHash) VALUES (?, ?, ?, ?)`,
     [user.email, user.firstname, user.surname, user.passwordHash],
-  )) as InsertResult;
+  );
 
   const rows = await pool.query<AuthUser[]>(`SELECT ${USER_COLUMNS} FROM Users WHERE userID = ?`, [
     result.insertId,
@@ -96,11 +94,12 @@ export async function assignGlobalRole(
   userId: number,
   roleName: string,
 ): Promise<boolean> {
-  const result = (await pool.query(
+  const result = await execute(
+    pool,
     `INSERT INTO UserRoles (userID, roleID)
      SELECT ?, roleID FROM Roles WHERE roleName = ?`,
     [userId, roleName],
-  )) as InsertResult;
+  );
   return result.affectedRows > 0;
 }
 
@@ -188,10 +187,11 @@ export async function deleteActiveRefreshTokens(
 ): Promise<number> {
   const spare = exceptTokenHash === undefined ? '' : ' AND tokenHash <> ?';
   const values: unknown[] = exceptTokenHash === undefined ? [userId] : [userId, exceptTokenHash];
-  const result = (await pool.query(
+  const result = await execute(
+    pool,
     `DELETE FROM RefreshTokens WHERE userID = ? AND revokedAt IS NULL${spare}`,
     values,
-  )) as { affectedRows: number };
+  );
   return result.affectedRows;
 }
 
@@ -211,11 +211,12 @@ export async function deleteStaleRefreshTokens(
   now: Date,
   revokedBefore: Date,
 ): Promise<number> {
-  const result = (await pool.query(
+  const result = await execute(
+    pool,
     `DELETE FROM RefreshTokens
       WHERE (revokedAt IS NOT NULL AND revokedAt < ?)
          OR (revokedAt IS NULL AND expiresAt < ?)`,
     [revokedBefore, now],
-  )) as { affectedRows: number };
+  );
   return result.affectedRows;
 }

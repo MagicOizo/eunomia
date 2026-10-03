@@ -54,11 +54,15 @@ export function createMasterDataRouter(
   });
 
   router.post('/', requireAuth, requireManage, async (req, res) => {
+    // The router takes any `ZodObject`, and parsing one answers `{}` rather
+    // than a record; which columns it carries is the schema's business, and
+    // `insertRow` keeps only those the table knows anyway.
     const data = createSchema.parse(req.body) as Record<string, unknown>;
     sendData(res, await insertRow(pool, table, data), 201);
   });
 
   router.patch('/:uid', requireAuth, requireManage, async (req, res) => {
+    // As on the create path above.
     const data = updateSchema.parse(req.body) as Record<string, unknown>;
     const updated = await updateRow(pool, table, pathParam(req, 'uid'), data);
     if (!updated) throw notFound(resource);

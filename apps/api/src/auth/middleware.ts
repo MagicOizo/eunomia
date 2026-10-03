@@ -12,6 +12,8 @@ const AUTH_USER_KEY = 'authUser';
 
 /** Retrieves the authenticated user attached by requireAuth (throws if absent). */
 export function getAuthUser(res: Response): AuthUser {
+  // Express types `res.locals` as a bag of `any`, so this is the one place
+  // that says what lives under the key — and the only reader of it.
   const user = res.locals[AUTH_USER_KEY] as AuthUser | undefined;
   if (!user) throw new Error('getAuthUser called without requireAuth in the chain');
   return user;

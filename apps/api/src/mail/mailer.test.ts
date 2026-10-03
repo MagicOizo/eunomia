@@ -4,7 +4,7 @@ import test from 'node:test';
 import { ERROR_CODES } from '@eunomia/shared';
 
 import { ApiError } from '../lib/api-error.js';
-import type { SettingKey, SettingValue } from '../settings/registry.js';
+import { type ResolvedSettings, SETTING_KEYS, fallbackOf } from '../settings/registry.js';
 import {
   type MailSendStatus,
   type MailTransport,
@@ -12,7 +12,17 @@ import {
   createMailer,
 } from './mailer.js';
 
-type Settings = Partial<Record<SettingKey, SettingValue>>;
+type Settings = Partial<ResolvedSettings>;
+
+/**
+ * Every setting at its documented default with the test's own on top — the
+ * shape `getSettings` always answers. A test that "takes a piece away" sets it
+ * to null and gets what an unconfigured instance has, not a missing key.
+ */
+function settingsOf(overrides: Settings): ResolvedSettings {
+  const defaults = Object.fromEntries(SETTING_KEYS.map((key) => [key, fallbackOf(key)]));
+  return { ...defaults, ...overrides } as ResolvedSettings;
+}
 
 /** A working configuration; individual tests take pieces away from it. */
 const configured: Settings = {
@@ -32,8 +42,7 @@ function stubStore(settings: Settings) {
   const written: MailSendStatus[] = [];
   return {
     store: {
-      read: async (): Promise<Record<SettingKey, SettingValue>> =>
-        state as Record<SettingKey, SettingValue>,
+      read: async (): Promise<ResolvedSettings> => settingsOf(state),
       writeStatus: async (status: MailSendStatus): Promise<void> => {
         written.push(status);
         state['mail.lastSendAt'] = status.lastSendAt;

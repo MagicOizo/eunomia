@@ -14,6 +14,7 @@ interface PackageJson {
  * depth relative to the package root.
  */
 export function readAppVersion(): string {
+  // `require` answers `any`; the two fields we read are asserted here.
   const packageJson = require('../../package.json') as PackageJson;
   return packageJson.version;
 }

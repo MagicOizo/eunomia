@@ -9,6 +9,7 @@ import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import {
   type CrudTable,
+  crudTable,
   type Queryable,
   type Row,
   getRow,
@@ -30,21 +31,21 @@ import { type ContractRow, loadAuthorizedContract } from './contract-access.js';
 
 const money = z.number().min(0).max(999999.99);
 
-const premiumsTable: CrudTable = {
+const premiumsTable = crudTable({
   table: 'ContractPremiums',
   uidColumn: 'premiumUID',
   statusColumn: 'premiumStatus',
   entity: 'premium',
   columns: ['contractUID', 'validFrom', 'monthlyPremium', 'note'],
-};
+});
 
-const termsTable: CrudTable = {
+const termsTable = crudTable({
   table: 'ContractTerms',
   uidColumn: 'termsUID',
   statusColumn: 'termsStatus',
   entity: 'contractTerms',
   columns: ['contractUID', 'validFromYear', 'deductible', 'reimbursementCap', 'reimbursementRate'],
-};
+});
 
 export const premiumSchema = z.object({
   validFrom: z.string().date(),
@@ -84,8 +85,13 @@ export interface HistorySpec {
   schema: z.ZodObject<z.ZodRawShape>;
   /** Column whose value must be unique among a contract's active entries. */
   validityColumn: 'validFrom' | 'validFromYear';
-  /** Rejects an entry whose validity key lies outside the contract's term. */
-  assertWithinContract: (contract: ContractRow, validity: string | number) => void;
+  /**
+   * Rejects an entry whose validity key lies outside the contract's term. The
+   * value comes out of a parsed schema under a column name the spec supplies,
+   * so it arrives untyped — each spec converts it itself, a date with
+   * `String()` and a year with `Number()`.
+   */
+  assertWithinContract: (contract: ContractRow, validity: unknown) => void;
   /** Stores data kept outside the entry's own row, in the same transaction. */
   saveChildren?: (db: Queryable, entryUID: string, data: Record<string, unknown>) => Promise<void>;
 }
@@ -137,6 +143,8 @@ export const termsSpec: HistorySpec = {
     }
   },
   saveChildren: async (db, termsUID, data) => {
+    // Checked by `termsSchema.parse` before it got here; the shape cannot be
+    // read off the generic spec, whose schema is any `ZodObject`.
     const tiers = data.bonusTiers as BonusTierInput[] | undefined;
     if (tiers !== undefined) await replaceBonusTiers(db, termsUID, tiers);
   },
@@ -169,7 +177,7 @@ export async function assertValidityFree(
   db: Queryable,
   spec: HistorySpec,
   contractUID: string,
-  validity: string | number,
+  validity: unknown,
   ownUID: string | null,
 ): Promise<void> {
   const { table, uidColumn, statusColumn } = spec.table;
@@ -194,7 +202,7 @@ export async function insertHistoryEntry(
   data: Record<string, unknown>,
 ): Promise<Row> {
   const spec = segment === 'premiums' ? premiumSpec : termsSpec;
-  const validity = data[spec.validityColumn] as string | number;
+  const validity = data[spec.validityColumn];
   spec.assertWithinContract(contract, validity);
   await assertValidityFree(db, spec, contract.contractUID, validity, null);
   const entry = await insertRow(db, spec.table, { ...data, contractUID: contract.contractUID });
@@ -240,7 +248,7 @@ function createHistoryRouter(pool: Pool, config: AppConfig, spec: HistorySpec): 
     const entryUID = pathParam(req, 'entryUID');
     const entry = await loadEntry(contract.contractUID, entryUID);
     const data = spec.schema.partial().parse(req.body);
-    const validity = (data[spec.validityColumn] ?? entry[spec.validityColumn]) as string | number;
+    const validity = data[spec.validityColumn] ?? entry[spec.validityColumn];
     spec.assertWithinContract(contract, validity);
     // The schema has no contractUID, so an entry can never move between contracts.
     const updated = await withTransaction(pool, async (conn) => {

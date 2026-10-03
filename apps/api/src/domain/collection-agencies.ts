@@ -8,7 +8,7 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import {
-  type CrudTable,
+  crudTable,
   type Row,
   getRow,
   insertRow,
@@ -40,13 +40,13 @@ import {
  * and pickers of the UI working on plain fields.
  */
 
-export const agenciesTable: CrudTable = {
+export const agenciesTable = crudTable({
   table: 'CollectionAgencies',
   uidColumn: 'agencyUID',
   statusColumn: 'agencyStatus',
   entity: 'agency',
   columns: ['agencyName'],
-};
+});
 
 const nameField = z.string().trim().min(1).max(100);
 

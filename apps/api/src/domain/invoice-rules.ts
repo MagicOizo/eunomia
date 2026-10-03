@@ -34,7 +34,19 @@ function asDays(days: string[]): TreatmentDays {
  *    "the treatment date changed" has always meant, and a client that knows
  *    nothing of several days cannot drop one by accident;
  *  - neither (update only): `null`, the days are left alone.
+ *
+ * The first signature is for the create path, where the schema makes
+ * `treatmentDate` mandatory: there is always a day, so the answer is never
+ * `null` — which used to be said with an assertion at the call site.
  */
+export function nextTreatmentDays(
+  data: { treatmentDate: string; treatmentDates?: string[] },
+  current: string[],
+): TreatmentDays;
+export function nextTreatmentDays(
+  data: { treatmentDate?: string; treatmentDates?: string[] },
+  current: string[],
+): TreatmentDays | null;
 export function nextTreatmentDays(
   data: { treatmentDate?: string; treatmentDates?: string[] },
   current: string[],

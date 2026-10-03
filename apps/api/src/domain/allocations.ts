@@ -9,7 +9,7 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';
 import {
-  type CrudTable,
+  crudTable,
   type Queryable,
   type Row,
   getRow,
@@ -23,13 +23,13 @@ import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { authorizeAccount, requireAllocationAccount } from './workflow-access.js';
 
-export const allocationsTable: CrudTable = {
+export const allocationsTable = crudTable({
   table: 'Allocations',
   uidColumn: 'allocationUID',
   statusColumn: 'allocationStatus',
   entity: 'allocation',
   columns: ['invoiceUID', 'billingUID', 'receiptNumber', 'reimbursement'],
-};
+});
 
 /**
  * One reimbursement to book. Several of them are created in one request, so a
@@ -141,14 +141,17 @@ function assertEntriesBookable(candidates: CandidateInvoice[], entries: Allocati
   }
   // No enrichment ("Bereicherungsverbot"): all reimbursements of an invoice,
   // over every policy, together never exceed its amount.
-  const exceeding = entries
-    .filter((entry) => {
-      const candidate = byUid.get(entry.invoiceUID) as CandidateInvoice;
-      const totalCents =
-        Math.round(Number(candidate.allocated) * 100) + Math.round(entry.reimbursement * 100);
-      return totalCents > Math.round(Number(candidate.invoiceAmount) * 100);
-    })
-    .map((e) => byUid.get(e.invoiceUID)?.invoiceNumber);
+  const exceeding = entries.flatMap((entry) => {
+    // An entry without a candidate was rejected as unknown above; saying so
+    // here rather than asserting it keeps one lookup instead of two.
+    const candidate = byUid.get(entry.invoiceUID);
+    if (candidate === undefined) return [];
+    const totalCents =
+      Math.round(Number(candidate.allocated) * 100) + Math.round(entry.reimbursement * 100);
+    return totalCents > Math.round(Number(candidate.invoiceAmount) * 100)
+      ? [candidate.invoiceNumber]
+      : [];
+  });
   if (exceeding.length > 0) {
     throw conflict(`The reimbursements would exceed the invoice amount: ${exceeding.join(', ')}`, {
       code: ERROR_CODES.REIMBURSEMENT_EXCEEDS_INVOICE,

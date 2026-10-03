@@ -1,4 +1,4 @@
-import { type BonusForfeitRule, ERROR_CODES, PERMISSIONS } from '@eunomia/shared';
+import { BONUS_FORFEIT_RULES, ERROR_CODES, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { pathParam } from '../crud/params.js';
 import { type Queryable, placeholders } from '../crud/repository.js';
 import { badRequest } from '../lib/api-error.js';
 import { addTo } from '../lib/group.js';
+import { oneOf } from '../lib/one-of.js';
 import {
   type BonusClaim,
   type BonusYear,
@@ -100,13 +101,12 @@ export function bonusTimelineFrom(
   rows: BonusRows,
   currentYear = new Date().getFullYear(),
 ): BonusYear[] {
-  const counting = contract.claimFreeCountingFromYear;
   const endYear = contract.contractEnd === null ? null : yearOf(contract.contractEnd);
 
   return computeBonusTimeline({
-    rule: contract.bonusForfeitRule as BonusForfeitRule,
-    claimFreeYearsAtStart: Number(contract.claimFreeYearsAtStart),
-    countingFromYear: typeof counting === 'number' ? counting : yearOf(contract.contractBegin),
+    rule: oneOf(BONUS_FORFEIT_RULES, contract.bonusForfeitRule, 'Contracts.bonusForfeitRule'),
+    claimFreeYearsAtStart: contract.claimFreeYearsAtStart,
+    countingFromYear: contract.claimFreeCountingFromYear ?? yearOf(contract.contractBegin),
     lastYear: endYear === null ? currentYear : Math.min(endYear, currentYear),
     currentYear,
     claims: rows.claims.get(contract.contractUID) ?? [],

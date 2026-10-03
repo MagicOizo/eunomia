@@ -13,7 +13,7 @@ import { type Row, insertRow, softDeleteRow, updateRow } from '../crud/repositor
 import { withTransaction } from '../db/transaction.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
-import { type ContractRow, contractsTable, loadAuthorizedContract } from './contract-access.js';
+import { contractsTable, loadAuthorizedContract } from './contract-access.js';
 import { insertHistoryEntry, listPremiumsWithValidity, withValidity } from './contract-history.js';
 import { bonusTimelineFrom, loadBonusRows } from './contract-years.js';
 
@@ -165,7 +165,7 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
     if (!allowed) throw forbidden();
 
     const contract = await withTransaction(pool, async (conn) => {
-      const created = (await insertRow(conn, contractsTable, data)) as ContractRow;
+      const created = await insertRow(conn, contractsTable, data);
       if (initialMonthlyPremium !== undefined) {
         await insertHistoryEntry(conn, 'premiums', created, {
           validFrom: created.contractBegin,

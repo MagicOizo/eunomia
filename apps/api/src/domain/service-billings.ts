@@ -9,9 +9,9 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';
 import {
-  type CrudTable,
   type Queryable,
   type Row,
+  crudTable,
   deletionTimestamp,
   getRow,
   insertRow,
@@ -25,7 +25,22 @@ import { likeTerm } from '../lib/like.js';
 import { allocationEntriesSchema, createAllocationsForBilling } from './allocations.js';
 import { requireBillingAccount, requireContractAccount } from './workflow-access.js';
 
-export const billingsTable: CrudTable = {
+/** A row of the service-billing table, in the types the database guarantees. */
+export type BillingRow = {
+  billingUID: string;
+  contractUID: string;
+  billingDate: string;
+  billingNumber: string;
+  documentLink: string | null;
+  /** TINYINT(1), and nullable: null follows the policy's `bonusForfeitRule`. */
+  forfeitsBonus: number | null;
+  objectionDate: string | null;
+  objectionResolvedDate: string | null;
+  objectionNote: string | null;
+  billingStatus: number;
+};
+
+export const billingsTable = crudTable<BillingRow>({
   table: 'ServiceBillings',
   uidColumn: 'billingUID',
   statusColumn: 'billingStatus',
@@ -40,7 +55,7 @@ export const billingsTable: CrudTable = {
     'objectionResolvedDate',
     'objectionNote',
   ],
-};
+});
 
 const base = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
@@ -290,7 +305,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
     await requireBillingAccount(pool, user.userId, PERMISSIONS.MANAGE_INVOICES, uid);
     const patch = updateSchema.parse(req.body);
     if (patch.billingNumber !== undefined) {
-      const current = (await getRow(pool, billingsTable, uid)) as { contractUID: string } | null;
+      const current = await getRow(pool, billingsTable, uid);
       if (current === null) throw notFound('Service billing');
       await assertBillingNumberFree(pool, current.contractUID, patch.billingNumber, uid);
     }

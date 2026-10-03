@@ -31,7 +31,7 @@ async function derive(
   salt: Buffer,
   params: { N: number; r: number; p: number },
 ): Promise<Buffer> {
-  return (await scryptAsync(password, salt, KEY_LENGTH, { ...params, maxmem: MAX_MEM })) as Buffer;
+  return await scryptAsync(password, salt, KEY_LENGTH, { ...params, maxmem: MAX_MEM });
 }
 
 /** Hashes a plaintext password into the self-describing stored form. */

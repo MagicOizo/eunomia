@@ -11,8 +11,8 @@
 
 import { ERROR_CODES } from '@eunomia/shared';
 
-import { type CrudTable, type Queryable, placeholders } from '../crud/repository.js';
-import { conflict } from '../lib/api-error.js';
+import { type Queryable, crudTable, placeholders } from '../crud/repository.js';
+import { conflict, notFound } from '../lib/api-error.js';
 import { groupBy } from '../lib/group.js';
 import {
   type NotCovered,
@@ -22,7 +22,35 @@ import {
 } from './invoice-rules.js';
 import { deriveInvoiceStatus, deriveSubmissionStatus } from './invoice-status.js';
 
-export const invoicesTable: CrudTable = {
+/**
+ * A row of the invoice table, in the types the database guarantees: `DATE` and
+ * `VARCHAR` arrive as strings (the pool runs on `dateStrings`), `DECIMAL` as a
+ * number (`decimalAsNumber`), and the three flags as the TINYINT(1) they are —
+ * they become booleans only in the DTO, where `present()` turns them.
+ */
+export type InvoiceColumns = {
+  invoiceUID: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  /** The earliest of the days the invoice bills (see InvoiceTreatmentDays). */
+  treatmentDate: string;
+  accountUID: string;
+  facilityUID: string | null;
+  invoiceAmount: number;
+  transferUntilDate: string | null;
+  transferDate: string | null;
+  transferSubject: string | null;
+  documentLink: string | null;
+  agencyUID: string | null;
+  agencyAccountUID: string | null;
+  directPayment: number;
+  reimbursementClosed: number;
+  notCovered: number;
+  notCoveredReason: string | null;
+  invoiceStatus: number;
+};
+
+export const invoicesTable = crudTable<InvoiceColumns>({
   table: 'Invoices',
   uidColumn: 'invoiceUID',
   statusColumn: 'invoiceStatus',
@@ -47,7 +75,7 @@ export const invoicesTable: CrudTable = {
     'notCovered',
     'notCoveredReason',
   ],
-};
+});
 
 /**
  * The invoice's own columns for the enriched query, prefixed for its `i` alias.
@@ -59,12 +87,11 @@ const INVOICE_COLUMNS = ['invoiceUID', ...invoicesTable.columns, 'invoiceStatus'
   .map((c) => `i.${c}`)
   .join(', ');
 
-export type InvoiceRow = Record<string, unknown> & {
-  invoiceUID: string;
-  invoiceAmount: number;
-  transferDate: string | null;
-  reimbursementClosed: number;
-  notCovered: number;
+/**
+ * What the enriched query answers: the invoice's own columns plus the three
+ * figures it aggregates over every policy.
+ */
+export type InvoiceRow = InvoiceColumns & {
   reimbursedTotal: number;
   allocationCount: number;
   hasOpenObjection: number;
@@ -163,10 +190,7 @@ function byInvoicePolicy(rows: InvoiceAllocationRow[]): Map<string, InvoiceAlloc
  * exclusions and the derived status to enriched invoice rows. Batched queries
  * instead of widening the aggregated main query, which would multiply its joins.
  */
-export async function present(
-  db: Queryable,
-  rows: InvoiceRow[],
-): Promise<Record<string, unknown>[]> {
+export async function present(db: Queryable, rows: InvoiceRow[]) {
   if (rows.length === 0) return [];
   const uids = rows.map((row) => row.invoiceUID);
 
@@ -279,14 +303,37 @@ export async function present(
   });
 }
 
-export async function presentOne(db: Queryable, row: InvoiceRow): Promise<Record<string, unknown>> {
+/**
+ * The invoice as the API hands it out: the row, its flags as booleans, its
+ * derived status, and the per-policy submissions with their bookings. Taken
+ * from what `present()` builds rather than written down a second time — a DTO
+ * declared beside the code that fills it is a second place to keep in step
+ * (the web's own ~20 DTO shapes stay what they are, see CR-01).
+ */
+export type PresentedInvoice = Awaited<ReturnType<typeof present>>[number];
+
+export async function presentOne(db: Queryable, row: InvoiceRow): Promise<PresentedInvoice> {
   const [presented] = await present(db, [row]);
-  return presented as Record<string, unknown>;
+  // `present` answers one entry per row, so this cannot happen — said as a
+  // check rather than as an assertion, which is what it used to be.
+  if (!presented) throw new Error(`Presenting invoice ${row.invoiceUID} produced nothing`);
+  return presented;
 }
 
 export async function getInvoice(db: Queryable, uid: string): Promise<InvoiceRow | null> {
   const rows = await queryInvoices(db, 'i.invoiceUID = ? AND i.invoiceStatus <> -1', [uid]);
   return rows[0] ?? null;
+}
+
+/**
+ * The invoice, or a 404 — for the paths that have already established it is
+ * there (a write that just happened, a row locked FOR UPDATE) and used to say
+ * so with an assertion that stripped the null away.
+ */
+export async function requireInvoice(db: Queryable, uid: string): Promise<InvoiceRow> {
+  const row = await getInvoice(db, uid);
+  if (!row) throw notFound('Invoice');
+  return row;
 }
 
 /** The treatment days of an invoice, earliest first. */
@@ -302,7 +349,7 @@ export async function treatmentDaysOf(db: Queryable, invoiceUID: string): Promis
 export function notCoveredOf(row: InvoiceRow): NotCovered {
   return {
     notCovered: Number(row.notCovered),
-    notCoveredReason: (row.notCoveredReason as string | null) ?? null,
+    notCoveredReason: row.notCoveredReason,
   };
 }
 

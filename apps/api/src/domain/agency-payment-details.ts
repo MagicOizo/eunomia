@@ -8,7 +8,7 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import {
-  type CrudTable,
+  crudTable,
   type Queryable,
   type Row,
   getRow,
@@ -38,7 +38,7 @@ import { notFound } from '../lib/api-error.js';
  * (`defaultPaymentDetail` in @eunomia/shared).
  */
 
-export const paymentDetailsTable: CrudTable = {
+export const paymentDetailsTable = crudTable({
   table: 'AgencyBankAccounts',
   uidColumn: 'agencyAccountUID',
   statusColumn: 'agencyAccountStatus',
@@ -46,7 +46,7 @@ export const paymentDetailsTable: CrudTable = {
   // — every stored ID carries it.
   entity: 'agencyAccount',
   columns: ['agencyUID', 'bankAccount', 'bic', 'recipientName', 'note'],
-};
+});
 
 /** IBAN — a loose length/charset check, not a checksum validation (as before). */
 export const ibanField = z

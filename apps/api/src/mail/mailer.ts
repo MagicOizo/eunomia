@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 
 import { ApiError } from '../lib/api-error.js';
 import { logEvent } from '../lib/log.js';
-import type { SettingKey, SettingValue } from '../settings/registry.js';
+import type { ResolvedSettings } from '../settings/registry.js';
 
 /**
  * Sending mail through the SMTP account configured in the system settings
@@ -36,7 +36,7 @@ export interface MailMessage {
 
 /** The settings the mailer needs, and the one thing it writes back. */
 export interface MailSettingsStore {
-  read(): Promise<Record<SettingKey, SettingValue>>;
+  read(): Promise<ResolvedSettings>;
   writeStatus(status: MailSendStatus): Promise<void>;
 }
 
@@ -89,21 +89,21 @@ interface MailConfig {
  * failed" — only the second one is a failed send.
  */
 function readMailConfig(
-  settings: Record<SettingKey, SettingValue>,
+  settings: ResolvedSettings,
 ): { ok: true; config: MailConfig } | { ok: false; reason: string } {
-  if (settings['mail.enabled'] !== true) {
+  if (!settings['mail.enabled']) {
     return { ok: false, reason: 'Mail delivery is not enabled in the settings' };
   }
   const host = settings['mail.host'];
-  if (typeof host !== 'string' || host === '') {
+  if (host === null || host === '') {
     return { ok: false, reason: 'No mail server is configured' };
   }
   const fromAddress = settings['mail.fromAddress'];
-  if (typeof fromAddress !== 'string' || fromAddress === '') {
+  if (fromAddress === null || fromAddress === '') {
     return { ok: false, reason: 'No sender address is configured' };
   }
-  const user = typeof settings['mail.user'] === 'string' ? settings['mail.user'] : null;
-  const password = typeof settings['mail.password'] === 'string' ? settings['mail.password'] : null;
+  const user = settings['mail.user'];
+  const password = settings['mail.password'];
   if (user !== null && password === null) {
     // Either the password was never stored, or it could not be decrypted — the
     // settings repository has already logged which of the two it was.
@@ -113,17 +113,16 @@ function readMailConfig(
     };
   }
 
-  const port = settings['mail.port'];
   return {
     ok: true,
     config: {
       host,
-      port: typeof port === 'number' ? port : 587,
-      secure: settings['mail.secure'] === true,
+      port: settings['mail.port'],
+      secure: settings['mail.secure'],
       user,
       password,
       fromAddress,
-      fromName: typeof settings['mail.fromName'] === 'string' ? settings['mail.fromName'] : null,
+      fromName: settings['mail.fromName'],
     },
   };
 }
@@ -140,6 +139,9 @@ export interface Mailer {
 export function createMailer(store: MailSettingsStore, deps: MailerDeps = {}): Mailer {
   const createTransport =
     deps.createTransport ??
+    // `MailTransport` is the slice of nodemailer's transport this app uses, and
+    // the two shapes do not meet structurally — hence the double step. What is
+    // actually relied on is the one method the interface names.
     ((options: MailTransportOptions): MailTransport =>
       nodemailer.createTransport(options) as unknown as MailTransport);
   const now = deps.now ?? ((): Date => new Date());
@@ -160,12 +162,12 @@ export function createMailer(store: MailSettingsStore, deps: MailerDeps = {}): M
   async function readStatus(): Promise<MailSendStatus> {
     const settings = await store.read();
     const result = settings['mail.lastSendResult'];
-    const at = settings['mail.lastSendAt'];
-    const error = settings['mail.lastSendError'];
     return {
-      lastSendAt: typeof at === 'string' ? at : null,
+      lastSendAt: settings['mail.lastSendAt'],
+      // The mailer writes only these two words; anything else in the column is
+      // a row edited by hand, and a status nobody can read is simply no status.
       lastSendResult: result === 'ok' || result === 'error' ? result : null,
-      lastSendError: typeof error === 'string' ? error : null,
+      lastSendError: settings['mail.lastSendError'],
     };
   }
 
@@ -250,6 +252,8 @@ export function createMailer(store: MailSettingsStore, deps: MailerDeps = {}): M
 /** Pulls the useful parts out of whatever nodemailer threw. */
 function describeTransportError(error: unknown): { code: string | undefined; message: string } {
   if (error instanceof Error) {
+    // nodemailer hangs its `code` ('ECONNREFUSED', 'EAUTH') on an ordinary
+    // Error, where the type system does not know about it.
     const code = (error as Error & { code?: unknown }).code;
     return { code: typeof code === 'string' ? code : undefined, message: error.message };
   }

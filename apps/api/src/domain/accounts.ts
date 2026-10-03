@@ -9,7 +9,7 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { optionalPathParam, pathParam } from '../crud/params.js';
 import {
-  type CrudTable,
+  crudTable,
   getRow,
   insertRow,
   listRows,
@@ -19,13 +19,13 @@ import {
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 
-export const accountsTable: CrudTable = {
+export const accountsTable = crudTable({
   table: 'Accounts',
   uidColumn: 'accountUID',
   statusColumn: 'accountStatus',
   entity: 'account',
   columns: ['surname', 'firstname', 'middlename', 'birthDate', 'leadAccountUID'],
-};
+});
 
 const accountRef = z.string().regex(entityIdPattern(ENTITY_PREFIX.account));
 

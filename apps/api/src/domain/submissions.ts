@@ -8,7 +8,7 @@ import { accountFilter } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
-import { type CrudTable, placeholders } from '../crud/repository.js';
+import { crudTable, execute, placeholders } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern, generateEntityId } from '../lib/ids.js';
@@ -20,13 +20,13 @@ import { requireContractAccount, requireSubmissionAccount } from './workflow-acc
  * trash needs its table spec like every other entity's, so it lives here
  * rather than in the registry.
  */
-export const submissionsTable: CrudTable = {
+export const submissionsTable = crudTable({
   table: 'Submissions',
   uidColumn: 'submissionUID',
   statusColumn: 'submissionStatus',
   entity: 'submission',
   columns: ['contractUID', 'submittedDate', 'documentLink'],
-};
+});
 
 const createSchema = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
@@ -76,7 +76,9 @@ function assertInvoicesSubmittable(
   // the list, and what the UI puts into its message (see @eunomia/shared).
   const failing = (predicate: (c: CandidateInvoice) => boolean): string[] =>
     requested
-      .map((uid) => byUid.get(uid) as CandidateInvoice)
+      // `?? []` drops a UID without a candidate — unknown invoices are
+      // rejected before any predicate runs, so there is none to drop.
+      .flatMap((uid) => byUid.get(uid) ?? [])
       .filter(predicate)
       .map((c) => c.invoiceNumber);
 
@@ -219,7 +221,7 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
     // without saying so, and a submission that lost half its invoices on the way
     // out would look like a correct answer. The detail route reads them the same
     // way.
-    const invoiceUIDs = new Map(rows.map((row) => [row.submissionUID, [] as string[]]));
+    const invoiceUIDs = new Map<string, string[]>(rows.map((row) => [row.submissionUID, []]));
     if (rows.length > 0) {
       const uids = rows.map((row) => row.submissionUID);
       const links = await pool.query<Array<{ submissionUID: string; invoiceUID: string }>>(
@@ -311,10 +313,11 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
           code: ERROR_CODES.INVOICE_HAS_REIMBURSEMENT,
         });
       }
-      const removed = (await conn.query(
+      const removed = await execute(
+        conn,
         'DELETE FROM SubmissionInvoices WHERE submissionUID = ? AND invoiceUID = ?',
         [uid, invoiceUID],
-      )) as { affectedRows: number };
+      );
       if (removed.affectedRows === 0) throw notFound('Invoice in submission');
 
       const [left] = await conn.query<Array<{ n: number }>>(

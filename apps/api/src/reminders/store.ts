@@ -90,22 +90,26 @@ export function createReminderStore(pool: Pool, encryptionKey: EncryptionKey): R
     readSettings: async (): Promise<ReminderSettings> => {
       const settings = await getSettings(pool, encryptionKey);
       return {
-        enabled: settings['reminders.enabled'] === true,
-        mailEnabled: settings['mail.enabled'] === true,
-        hour: Number(settings['reminders.hour']),
-        timeZone: String(settings['reminders.timeZone']),
-        repeatDays: Number(settings['reminders.repeatDays']),
-        appUrl: (settings['reminders.appUrl'] as string | null) ?? null,
+        enabled: settings['reminders.enabled'],
+        mailEnabled: settings['mail.enabled'],
+        hour: settings['reminders.hour'],
+        timeZone: settings['reminders.timeZone'],
+        repeatDays: settings['reminders.repeatDays'],
+        appUrl: settings['reminders.appUrl'],
       };
     },
 
     readStatus: async (): Promise<StoredRunStatus> => {
       const settings = await getSettings(pool, encryptionKey);
+      const result = settings['reminders.lastRunResult'];
       return {
-        lastRunAt: (settings['reminders.lastRunAt'] as string | null) ?? null,
-        lastRunResult: (settings['reminders.lastRunResult'] as 'ok' | 'error' | null) ?? null,
-        lastRunError: (settings['reminders.lastRunError'] as string | null) ?? null,
-        lastRunSent: (settings['reminders.lastRunSent'] as number | null) ?? null,
+        lastRunAt: settings['reminders.lastRunAt'],
+        // Only the runner writes this column, and only these two words; as with
+        // the mail status, anything else is a row edited by hand and reads as
+        // "no status" rather than taking the settings page down.
+        lastRunResult: result === 'ok' || result === 'error' ? result : null,
+        lastRunError: settings['reminders.lastRunError'],
+        lastRunSent: settings['reminders.lastRunSent'],
       };
     },
 
