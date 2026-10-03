@@ -91,8 +91,11 @@ begründet ändern — sie sind nicht Beschreibung, sondern Vorgabe.
 
 **I-2 Jeder Zugriff auf Falldaten ist kontogeprüft.** Wer eine Rechnung, Police, Einreichung,
 Leistungsabrechnung oder Buchung liest oder schreibt, hält die Berechtigung **auf deren Konto** —
-über `authorizeAccount`/`loadAuthorizedContract` bei Einzelzugriff, über `getAccessibleAccounts`
-als `WHERE`-Einschränkung bei Listen. Eine Liste ohne Kontofilter ist ein Fehler, kein Sonderfall.
+über `authorizeAccount`/`loadAuthorizedContract` bei Einzelzugriff, über `accountFilter`
+(auf `getAccessibleAccounts`) als `WHERE`-Einschränkung bei Listen. Eine Liste ohne Kontofilter ist
+ein Fehler, kein Sonderfall. Die **einzige** Ausnahme ist abschließend benannt und begründet: der
+Papierkorb hinter dem instanzweiten `MANAGE_TRASH` (siehe SEC-04 und §2.4 des Plans) — ein
+gelöschter Eintrag kann den Verweis auf seinen Versicherten selbst verloren haben.
 
 **I-3 `accountUID` ist unveränderlich.** Rechnung und Police lassen sich nicht zwischen Versicherten
 verschieben; die Update-Schemata nehmen das Feld ausdrücklich heraus. Ein Verschieben bräuchte eine
@@ -260,6 +263,13 @@ sobald `MANAGE_TRASH` an eine Aufräum-Rolle geht, ist er es nicht mehr.
 Rechte-Modell dokumentieren, dass `MANAGE_TRASH` eine instanzweite Berechtigung wie `MANAGE_USERS`
 ist und nur an Administratoren gehört. Die zweite Variante ist billiger und ehrlich, verlangt aber
 den Eintrag in 2.4 des Plans.
+
+**Entschieden (Autor, 2026-10-03, Scheibe 8 — v0.17.0-slice.3).** Die zweite Variante. `MANAGE_TRASH`
+ist ein instanzweites Administratorrecht; der Papierkorb bleibt kontoübergreifend und steht als
+benannte Ausnahme in I-2. Festgeschrieben in §2.4 des Plans, zusammen mit den übrigen instanzweiten
+Rechten. Kein Code hat sich geändert — der Befund ist durch eine Festlegung geschlossen, nicht durch
+einen Filter. Dass eine kontobezogene Vergabe instanzweiter Rechte wirkungslos ist, wird mit SEC-17
+(Scheibe 16) prüfbar gemacht; heute ist es Zusage.
 
 ### SEC-05 — Passwortänderung widerruft bestehende Sitzungen nicht
 

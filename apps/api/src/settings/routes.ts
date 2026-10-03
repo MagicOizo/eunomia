@@ -4,13 +4,17 @@ import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { createRequireAuth, createRequirePermission, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS } from '../auth/permissions.js';
+import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { ApiError } from '../lib/api-error.js';
 import { type Mailer, type MailerDeps, createMailer } from '../mail/mailer.js';
 import { createMailSettingsStore } from '../mail/store.js';
-import { type ReminderRunner, createReminderRunner } from '../reminders/runner.js';
+import {
+  type ReminderPreview,
+  type ReminderRunner,
+  createReminderRunner,
+} from '../reminders/runner.js';
 import { createReminderStore } from '../reminders/store.js';
 import { type SettingKey, type SettingValue, validateIncoming } from './registry.js';
 import { getPublicSettings, setSettings } from './repository.js';
@@ -108,6 +112,28 @@ export function createSettingsRouter(
   });
 
   /**
+   * What of a dry run's preview this caller may read (SEC-03): a rendered mail
+   * names invoice numbers, the treated person, the payee and the amount, and
+   * MANAGE_SETTINGS says nothing about reading invoices. A text is shown only
+   * when the caller holds VIEW_INVOICES on EVERY account it speaks about —
+   * all or nothing per recipient, because a shortened text would show a mail
+   * that is never sent that way. The rest are counted, not shown.
+   */
+  async function readableBy(
+    userId: number,
+    preview: ReminderPreview[],
+  ): Promise<{ shown: Array<{ email: string; subject: string; text: string }>; hidden: number }> {
+    const scope = await getAccessibleAccounts(pool, userId, PERMISSIONS.VIEW_INVOICES);
+    const readable = preview.filter(
+      (entry) => scope.all || entry.accountUIDs.every((uid) => scope.accountUIDs.includes(uid)),
+    );
+    return {
+      shown: readable.map(({ email, subject, text }) => ({ email, subject, text })),
+      hidden: preview.length - readable.length,
+    };
+  }
+
+  /**
    * Runs the payment reminders now instead of waiting for the daily schedule.
    * `dryRun` renders everything and sends nothing, which is how an admin sees
    * what would go out before it goes out.
@@ -134,7 +160,11 @@ export function createSettingsRouter(
 
     // The rendered texts are only interesting for a preview; a real run has
     // already delivered them.
-    sendData(res, { ...result, preview: dryRun === true ? result.preview : [] });
+    const preview =
+      dryRun === true
+        ? await readableBy(getAuthUser(res).userId, result.preview)
+        : { shown: [], hidden: 0 };
+    sendData(res, { ...result, preview: preview.shown, previewHidden: preview.hidden });
   });
 
   return router;

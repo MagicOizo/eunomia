@@ -33,7 +33,19 @@ export interface ReminderRunResult {
   failed: number;
   dryRun: boolean;
   /** Per recipient, what they would get — the settings page shows this for a preview. */
-  preview: Array<{ email: string; subject: string; text: string }>;
+  preview: ReminderPreview[];
+}
+
+/**
+ * One recipient's rendered mail. `accountUIDs` says whose case data the text
+ * speaks about, so the route can withhold a text from a caller who may not read
+ * those accounts (SEC-03) — the run itself needs no caller and asks no one.
+ */
+export interface ReminderPreview {
+  email: string;
+  subject: string;
+  text: string;
+  accountUIDs: string[];
 }
 
 export interface ReminderRunOptions {
@@ -117,6 +129,7 @@ export function createReminderRunner(
 
         const entries: ReminderEntry[] = [];
         const records: ReminderRecord[] = [];
+        const accountUIDs = new Set<string>();
         for (const invoice of visible) {
           const previous = history.find(
             (record) =>
@@ -125,6 +138,7 @@ export function createReminderRunner(
           const stage = stageFor(invoice, previous, today, settings.repeatDays);
           if (stage === null) continue;
 
+          accountUIDs.add(invoice.accountUID);
           entries.push({
             invoiceUID: invoice.invoiceUID,
             invoiceNumber: invoice.invoiceNumber,
@@ -147,7 +161,12 @@ export function createReminderRunner(
           today,
           appUrl: settings.appUrl,
         });
-        preview.push({ email: recipient.email, subject: mail.subject, text: mail.text });
+        preview.push({
+          email: recipient.email,
+          subject: mail.subject,
+          text: mail.text,
+          accountUIDs: [...accountUIDs],
+        });
         if (dryRun) continue;
 
         try {

@@ -85,7 +85,18 @@ ausdrücklich vor einer anderen steht.
       hängt nicht am Erinnerungs-Tick, der bei abgeschalteten Erinnerungen sofort aussteigt,
       sondern an einem eigenen Timer. (3) Ein neuer Fehlercode `INVALID_CURRENT_PASSWORD` antwortet
       403 statt 401, damit `apiFetch` nicht eine sinnlose Rotation darauf verwendet.
-- [ ] **8 — Kontotrennung an einem Ort.** CR-07, SEC-03, SEC-04.
+- [x] **8 — Kontotrennung an einem Ort.** CR-07, SEC-03, SEC-04.
+      Umgesetzt mit v0.17.0-slice.3 (Slice 58). SEC-04 ist mit einer Festlegung geschlossen statt mit
+      Code, auf Wunsch des Autors: `MANAGE_TRASH` ist ein instanzweites Administratorrecht, der
+      Papierkorb bleibt kontoübergreifend und steht jetzt als benannte Ausnahme zu I-2 in §2.4 des
+      Plans — vier der elf Papierkorb-Entitäten haben überhaupt kein Konto. Der Helfer aus CR-07
+      (`accountFilter`) gibt die vorhandene `Filter`-Form zurück, bei globalem Grant mit `TRUE` und
+      bei keinem Grant `null`; damit sind aus drei Fällen zwei geworden und alle sieben Stellen
+      lesen dieselben drei Zeilen. Zwei Dinge gingen über den Review hinaus: die Vorschau der
+      Erinnerungen zählt die zurückgehaltenen Empfänger (`previewHidden`) statt sie zu verschweigen,
+      damit eine fehlende Mail nicht wie ein Fehler aussieht; und `/submissions`, `/allocations` und
+      `/billings` hatten überhaupt keine Zusicherung zur Kontotrennung — die sieben Listen haben
+      jetzt einen gemeinsamen Test, samt der Anmeldung ohne jeden Grant.
 
 ### Block III — Struktur (Release 0.18.0)
 

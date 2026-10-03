@@ -7,6 +7,30 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.17.0-slice.3 — 2026-10-03
+
+Account separation — the rule that decides who may see which insured person's case data — was
+written out by hand in seven places, and in two more it was not written at all. Nothing a user does
+changes; what changes is that there is now one place to get it right.
+
+- **The preview of the payment reminders shows only what you may read.** The settings page can
+  render the reminder mails before they go out, and it handed out every recipient's address and
+  full text — invoice numbers, the treated person, the payee, the amount — to anyone allowed to
+  change the settings, a permission that says nothing about reading invoices. A text now appears
+  only for someone who may read every account it speaks about; the rest are counted, with a
+  sentence saying why they are not shown. For an administrator the preview looks exactly as before.
+- **One rule, one place.** Seven list endpoints — invoices, treatment years, submissions,
+  reimbursements, service billings, policies, insured persons — asked "which accounts may this
+  person see?" with their own copy of the same twenty lines, and the copies had begun to drift
+  apart. They now share one helper. Every list answers exactly what it answered before, which is
+  what the new tests pin down: a login with no grant at all sees nothing anywhere, a login scoped
+  to one insured person sees that one.
+- **The trash is an administrative view, and says so now.** It shows the deleted records of every
+  insured person and always did; that is a decision, not an oversight — a deleted record may have
+  lost the link to the person it belonged to, and a third of the trash holds master data that has
+  no person at all. The right to empty the trash is therefore an instance-wide administrator right,
+  like the right to manage users, and it is written down as one. Nothing moved in the app.
+
 ## 0.17.0-slice.2 — 2026-10-03
 
 Passwords and sessions. Until now a password could only be set by an administrator, who then knew

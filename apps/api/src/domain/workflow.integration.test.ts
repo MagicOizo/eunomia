@@ -7,6 +7,7 @@ import request from 'supertest';
 import { createApp } from '../app.js';
 import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
+import type { Row } from '../crud/repository.js';
 import { createPool, waitForDatabase } from '../db/pool.js';
 import { hashPassword } from '../lib/password.js';
 
@@ -104,6 +105,22 @@ async function scopedNutzer(
     insert.insertId,
     nutzer?.roleID,
     accountUID,
+  ]);
+  const login = await request(app).post('/api/v1/auth/login').send({ email, password });
+  return { Authorization: `Bearer ${login.body.accessToken}` };
+}
+
+/** A login with no role at all: authenticated, with nothing in scope. */
+async function userWithoutGrants(
+  pool: Pool,
+  app: ReturnType<typeof createApp>,
+  email: string,
+): Promise<Record<string, string>> {
+  const password = 'nograntuser1';
+  await pool.query('INSERT INTO Users (email, firstname, passwordHash) VALUES (?, ?, ?)', [
+    email,
+    'Ohne',
+    await hashPassword(password),
   ]);
   const login = await request(app).post('/api/v1/auth/login').send({ email, password });
   return { Authorization: `Bearer ${login.body.accessToken}` };
@@ -874,6 +891,72 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
         user,
       );
       assert.equal(foreign.status, 403);
+    });
+
+    /*
+     * CR-07: all seven list endpoints ask the same question through the same
+     * `accountFilter`, so its two ends are worth one test instead of seven. A
+     * login without any grant sees nothing anywhere — the branch that answers
+     * without asking the database at all — and a login scoped to account A sees
+     * A's rows and none of B's.
+     */
+    await t.test('every list endpoint honours the one account rule', async () => {
+      const lists = [
+        '/api/v1/accounts',
+        '/api/v1/contracts',
+        '/api/v1/invoices',
+        '/api/v1/invoices/years',
+        '/api/v1/submissions',
+        '/api/v1/allocations',
+        '/api/v1/billings',
+      ];
+
+      const nobody = await userWithoutGrants(pool, app, 'nobody@example.com');
+      for (const path of lists) {
+        const res = await request(app).get(path).set(nobody);
+        assert.equal(res.status, 200, `${path}: ${JSON.stringify(res.body)}`);
+        assert.deepEqual(res.body.data, [], `${path} answers empty without a grant`);
+      }
+
+      const scoped = await scopedNutzer(pool, app, 'lists-scope@example.com', accountA);
+      const rowsFor = async (path: string, headers = scoped): Promise<Row[]> => {
+        const res = await request(app).get(path).set(headers);
+        assert.equal(res.status, 200, `${path}: ${JSON.stringify(res.body)}`);
+        return res.body.data as Row[];
+      };
+
+      // Five of the lists carry the account on every row.
+      for (const path of [
+        '/api/v1/accounts',
+        '/api/v1/contracts',
+        '/api/v1/invoices',
+        '/api/v1/submissions',
+        '/api/v1/billings',
+      ]) {
+        const rows = await rowsFor(path);
+        assert.ok(rows.length > 0, `${path} still answers for a scoped user`);
+        assert.deepEqual(
+          [...new Set(rows.map((row) => row.accountUID))],
+          [accountA],
+          `${path} shows account A only`,
+        );
+        // The filter has something to exclude: the admin sees more.
+        assert.ok(
+          (await rowsFor(path, admin)).length > rows.length,
+          `${path} hides B's rows from the scoped user`,
+        );
+      }
+
+      // Allocations name no account of their own; B's booking is the proof.
+      const allocations = await rowsFor('/api/v1/allocations');
+      assert.ok(allocations.length > 0);
+      assert.ok(
+        !allocations.some((row) => row.invoiceUID === invB1),
+        "B's reimbursement is not in the scoped list",
+      );
+      assert.ok(
+        (await rowsFor('/api/v1/allocations', admin)).some((row) => row.invoiceUID === invB1),
+      );
     });
 
     // Slice 36: finding an invoice by its number alone (issues.md 6).

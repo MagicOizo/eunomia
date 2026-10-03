@@ -11,6 +11,7 @@ import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
 import { createPool, waitForDatabase } from '../db/pool.js';
 import { ApiError } from '../lib/api-error.js';
+import { generateEntityId } from '../lib/ids.js';
 import { hashPassword } from '../lib/password.js';
 import type { MailMessage, MailSendStatus, Mailer } from '../mail/mailer.js';
 import { createReminderRunner } from './runner.js';
@@ -89,6 +90,10 @@ async function resetData(pool: Pool): Promise<void> {
     'DELETE FROM RefreshTokens',
     'DELETE FROM Users',
     'DELETE FROM Accounts',
+    // A role built by a test (see the preview test below); the seeded system
+    // roles stay, because the migration owns them.
+    'DELETE FROM RolePermissions WHERE roleID IN (SELECT roleID FROM Roles WHERE isSystem = 0)',
+    'DELETE FROM Roles WHERE isSystem = 0',
   ]) {
     await pool.query(stmt);
   }
@@ -318,6 +323,103 @@ test('payment reminders: gating, dry run, delivery and the quiet second run', as
       const adminMail = preview.find((entry) => entry.email === 'admin@example.com');
       assert.ok(adminMail, 'a global grant reaches every account');
       assert.match(adminMail.text, /R-OTHER/);
+      // A global VIEW_INVOICES withholds nothing: the preview is complete.
+      assert.equal(res.body.data.previewHidden, 0);
+    });
+
+    /*
+     * SEC-03: the preview is the one place that hands out rendered case data —
+     * invoice numbers, the treated person, the payee, the amount — and it hangs
+     * on MANAGE_SETTINGS, which says nothing about reading invoices. A text is
+     * shown only to a caller who may read EVERY account it speaks about; the
+     * rest are counted. Two callers prove both halves.
+     */
+    await t.test('the preview shows only the mails the caller may read', async () => {
+      // A role that may change the settings and read no invoice anywhere — the
+      // "Aufräum-Rolle" the review warns about, built here because no seeded
+      // role separates the two.
+      const insertRole = (await pool.query(
+        'INSERT INTO Roles (roleUID, roleName, description) VALUES (?, ?, ?)',
+        [generateEntityId('role'), 'Hausmeister', 'Settings only, no access to any invoice'],
+      )) as { insertId: number };
+      await pool.query(
+        `INSERT INTO RolePermissions (roleID, permissionID)
+         SELECT ?, permissionID FROM Permissions WHERE permissionKey = 'MANAGE_SETTINGS'`,
+        [insertRole.insertId],
+      );
+
+      /** A user holding the settings role instance-wide, optionally scoped to one account. */
+      const caretaker = async (
+        email: string,
+        accountUID?: string,
+      ): Promise<Record<string, string>> => {
+        const password = 'caretaker1';
+        const user = (await pool.query(
+          'INSERT INTO Users (email, firstname, passwordHash) VALUES (?, ?, ?)',
+          [email, 'Haus', await hashPassword(password)],
+        )) as { insertId: number };
+        await pool.query('INSERT INTO UserRoles (userID, roleID) VALUES (?, ?)', [
+          user.insertId,
+          insertRole.insertId,
+        ]);
+        if (accountUID !== undefined) {
+          await pool.query(
+            'INSERT INTO UserAccountRoles (userID, roleID, accountUID) VALUES (?, ?, ?)',
+            [user.insertId, nutzer?.roleID, accountUID],
+          );
+        }
+        const login = await request(app).post('/api/v1/auth/login').send({ email, password });
+        return { Authorization: `Bearer ${login.body.accessToken}` };
+      };
+
+      const dryRun = async (headers: Record<string, string>) =>
+        request(app).post('/api/v1/settings/reminders/run').set(headers).send({ dryRun: true });
+
+      const blind = await dryRun(await caretaker('caretaker@example.com'));
+      assert.equal(blind.status, 200, JSON.stringify(blind.body));
+      // The counts are still the truth — they name no one and no invoice.
+      assert.equal(blind.body.data.recipients, 2);
+      assert.deepEqual(blind.body.data.preview, []);
+      assert.equal(blind.body.data.previewHidden, 2);
+
+      /*
+       * Reading Anna's invoices is enough for the mail that speaks only of her,
+       * and not enough for the admin's, which speaks of Bea as well. Granting
+       * that read makes this caller a recipient themselves — so the run now
+       * finds three, and two of the three texts are theirs to read.
+       */
+      const partial = await dryRun(await caretaker('caretaker-anna@example.com', mine));
+      assert.equal(partial.status, 200, JSON.stringify(partial.body));
+      assert.equal(partial.body.data.recipients, 3);
+      const shown = partial.body.data.preview as Array<{ email: string; text: string }>;
+      assert.deepEqual(shown.map((entry) => entry.email).sort(), [
+        'caretaker-anna@example.com',
+        'scoped@example.com',
+      ]);
+      for (const entry of shown) assert.match(entry.text, /R-OVERDUE/);
+      assert.ok(!shown.some((entry) => entry.text.includes('R-OTHER')));
+      assert.equal(partial.body.data.previewHidden, 1);
+      // Nothing was stamped by any of these runs.
+      assert.equal(await countReminders(pool), 0);
+
+      /*
+       * The second caretaker holds VIEW_INVOICES on Anna, which makes them a
+       * reminder recipient — and the delivering tests below count recipients,
+       * mails and stamped rows. The fixture is therefore removed again: it
+       * belongs to this test, not to the suite.
+       */
+      const emails = ['caretaker@example.com', 'caretaker-anna@example.com'];
+      const placeholders = emails.map(() => '?').join(', ');
+      for (const table of ['UserAccountRoles', 'UserRoles']) {
+        await pool.query(
+          `DELETE FROM ${table}
+            WHERE userID IN (SELECT userID FROM Users WHERE email IN (${placeholders}))`,
+          emails,
+        );
+      }
+      await pool.query(`DELETE FROM Users WHERE email IN (${placeholders})`, emails);
+      await pool.query('DELETE FROM RolePermissions WHERE roleID = ?', [insertRole.insertId]);
+      await pool.query('DELETE FROM Roles WHERE roleID = ?', [insertRole.insertId]);
     });
 
     /*

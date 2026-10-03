@@ -3,7 +3,7 @@ import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { createRequireAuth, createRequirePermission, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
+import { PERMISSIONS, accountFilter } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { optionalPathParam, pathParam } from '../crud/params.js';
@@ -53,21 +53,17 @@ export function createAccountsRouter(pool: Pool, config: AppConfig): Router {
 
   router.get('/', requireAuth, async (_req, res) => {
     const user = getAuthUser(res);
-    const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_ACCOUNTS);
-    if (scope.all) {
-      sendData(res, await listRows(pool, accountsTable));
-      return;
-    }
-    if (scope.accountUIDs.length === 0) {
+    const accountScope = await accountFilter(
+      pool,
+      user.userId,
+      PERMISSIONS.VIEW_ACCOUNTS,
+      'accountUID',
+    );
+    if (accountScope === null) {
       sendData(res, []);
       return;
     }
-    const placeholders = scope.accountUIDs.map(() => '?').join(', ');
-    const rows = await listRows(pool, accountsTable, {
-      clause: `accountUID IN (${placeholders})`,
-      params: scope.accountUIDs,
-    });
-    sendData(res, rows);
+    sendData(res, await listRows(pool, accountsTable, accountScope));
   });
 
   router.get('/:uid', requireAuth, canView, async (req, res) => {

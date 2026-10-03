@@ -1,5 +1,7 @@
 import type { Pool } from 'mariadb';
 
+import type { Filter } from '../crud/repository.js';
+
 /**
  * Permission keys the application code checks against. They mirror rows in the
  * `Permissions` catalog table, which is seeded by migrations — the migration
@@ -104,6 +106,33 @@ export async function getAccessibleAccounts(
     [userId, permission],
   );
   return { all: false, accountUIDs: rows.map((row) => row.accountUID) };
+}
+
+/**
+ * The `WHERE` restriction that keeps a list inside the accounts the caller may
+ * exercise `permission` on — invariant I-2, in one place instead of once per
+ * list endpoint. `column` names the column holding the account UID in the
+ * caller's query (`i.accountUID`, `c.accountUID`, …).
+ *
+ * `null` means the caller may see nothing at all: the route answers with an
+ * empty list and asks the database nothing. A global grant yields the constant
+ * `TRUE`, so the three kinds of grant collapse into two cases and every call
+ * site reads the same three lines — there is no "did you handle `all`?" left to
+ * get wrong.
+ */
+export async function accountFilter(
+  pool: Pool,
+  userId: number,
+  permission: PermissionKey,
+  column: string,
+): Promise<Filter | null> {
+  const scope = await getAccessibleAccounts(pool, userId, permission);
+  if (scope.all) return { clause: 'TRUE', params: [] };
+  if (scope.accountUIDs.length === 0) return null;
+  return {
+    clause: `${column} IN (${scope.accountUIDs.map(() => '?').join(', ')})`,
+    params: scope.accountUIDs,
+  };
 }
 
 /** A user who may exercise a permission, and on which accounts. */

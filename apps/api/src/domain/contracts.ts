@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { forbidden } from '../auth/errors.js';
 import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS, getAccessibleAccounts, hasPermission } from '../auth/permissions.js';
+import { PERMISSIONS, accountFilter, hasPermission } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
@@ -87,21 +87,21 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
 
   router.get('/', requireAuth, async (_req, res) => {
     const user = getAuthUser(res);
-    const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_CONTRACTS);
-    if (scope.all) {
-      sendData(res, await pool.query<Row[]>(`${LIST_SELECT} ORDER BY c.contractUID`));
-      return;
-    }
-    if (scope.accountUIDs.length === 0) {
+    const accountScope = await accountFilter(
+      pool,
+      user.userId,
+      PERMISSIONS.VIEW_CONTRACTS,
+      'c.accountUID',
+    );
+    if (accountScope === null) {
       sendData(res, []);
       return;
     }
-    const placeholders = scope.accountUIDs.map(() => '?').join(', ');
     sendData(
       res,
       await pool.query<Row[]>(
-        `${LIST_SELECT} AND c.accountUID IN (${placeholders}) ORDER BY c.contractUID`,
-        scope.accountUIDs,
+        `${LIST_SELECT} AND ${accountScope.clause} ORDER BY c.contractUID`,
+        accountScope.params,
       ),
     );
   });

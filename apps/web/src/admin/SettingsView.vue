@@ -373,6 +373,20 @@ const runSentence = computed(() => {
   const failed = result.failed > 0 ? `, ${result.failed} fehlgeschlagen` : '';
   return `${plural(result.sent, 'Erinnerung', '|en')} versendet${failed}.`;
 });
+
+/**
+ * Why the preview shows fewer mails than there are recipients: the API withholds
+ * a text whose invoices the viewer may not read. Said plainly, so a missing text
+ * does not look like a bug.
+ */
+const hiddenSentence = computed(() => {
+  const hidden = reminderRun.value?.previewHidden ?? 0;
+  if (hidden === 0) return null;
+  const who = plural(hidden, 'Empfänger', '|');
+  const verb = hidden === 1 ? 'wird' : 'werden';
+  const whose = hidden === 1 ? 'dessen' : 'deren';
+  return `${who} ${verb} nicht angezeigt: für ${whose} Rechnungen fehlt die Leseberechtigung.`;
+});
 </script>
 
 <template>
@@ -639,12 +653,17 @@ const runSentence = computed(() => {
             Meldung beim letzten Lauf: {{ reminderStatus.lastRunError }}
           </p>
 
-          <template v-if="reminderRun?.dryRun && reminderRun.preview.length > 0">
-            <p class="eu-settings__hint">Das würde versendet:</p>
-            <div v-for="mailPreview in reminderRun.preview" :key="mailPreview.email">
-              <p class="eu-settings__hint">An {{ mailPreview.email }}: {{ mailPreview.subject }}</p>
-              <pre class="eu-settings__preview">{{ mailPreview.text }}</pre>
-            </div>
+          <template v-if="reminderRun?.dryRun">
+            <template v-if="reminderRun.preview.length > 0">
+              <p class="eu-settings__hint">Das würde versendet:</p>
+              <div v-for="mailPreview in reminderRun.preview" :key="mailPreview.email">
+                <p class="eu-settings__hint">
+                  An {{ mailPreview.email }}: {{ mailPreview.subject }}
+                </p>
+                <pre class="eu-settings__preview">{{ mailPreview.text }}</pre>
+              </div>
+            </template>
+            <p v-if="hiddenSentence" class="eu-settings__hint">{{ hiddenSentence }}</p>
           </template>
         </form>
       </EuCollapsibleSection>

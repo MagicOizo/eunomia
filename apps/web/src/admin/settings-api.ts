@@ -42,6 +42,11 @@ export interface ReminderRunResult {
   dryRun: boolean;
   /** Filled for a dry run only — a real run has already delivered these. */
   preview: Array<{ email: string; subject: string; text: string }>;
+  /**
+   * Recipients whose mail is withheld because the caller may not read the
+   * invoices it speaks about (API: SEC-03). Counted, never shown.
+   */
+  previewHidden: number;
 }
 
 export type SettingWrite = Record<string, string | number | boolean | null>;

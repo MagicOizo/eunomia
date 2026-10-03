@@ -44,9 +44,12 @@ import {
  *    refused only while something ACTIVE still points at it, and then the
  *    answer says what.
  *
- * Not account-scoped: it is an administrative view behind `MANAGE_TRASH`. A
- * deleted record's own account link may be deleted too, so there is nothing
- * left to scope by.
+ * Not account-scoped, and that is a rule rather than a gap: `MANAGE_TRASH` is an
+ * instance-wide permission like `MANAGE_USERS` (see Notes/eunomia-plan.md 2.4,
+ * and SEC-04 of the security review, which names this the one exception to
+ * invariant I-2). A deleted record's own account link may be deleted too, so
+ * there would be nothing left to scope by — and four of the entities below have
+ * no account at all. The permission therefore belongs to administrators only.
  */
 
 /** Rows that are not records of their own but go with the record they belong to. */

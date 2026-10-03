@@ -155,6 +155,7 @@ function dryRunResult(): ReminderRunResult {
         text: 'Hallo Max,\n\nFällig:\n- Rechnung 2026-0042',
       },
     ],
+    previewHidden: 0,
   };
 }
 
@@ -290,6 +291,30 @@ describe('SettingsView', () => {
     expect(runReminders).toHaveBeenCalledWith(true);
     expect(wrapper.text()).toContain('Es wurde nichts versendet');
     expect(wrapper.find('pre').text()).toContain('Rechnung 2026-0042');
+    expect(wrapper.text()).not.toContain('Leseberechtigung');
+    wrapper.unmount();
+  });
+
+  /* A viewer who may change the settings but not read every account's invoices
+     gets counts instead of texts (API: SEC-03) — and a sentence saying why, so
+     the gap between "2 Empfänger" and one shown mail is not read as a bug. */
+  it('says why a withheld mail is not shown', async () => {
+    runReminders.mockResolvedValueOnce({
+      ...dryRunResult(),
+      recipients: 2,
+      preview: [],
+      previewHidden: 2,
+    });
+    const wrapper = await mountView();
+    const preview = wrapper.findAll('button').find((button) => button.text().includes('Vorschau'));
+
+    await preview!.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('pre').exists()).toBe(false);
+    expect(wrapper.text()).toContain(
+      '2 Empfänger werden nicht angezeigt: für deren Rechnungen fehlt die Leseberechtigung.',
+    );
     wrapper.unmount();
   });
 

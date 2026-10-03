@@ -4,7 +4,7 @@ import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
+import { PERMISSIONS, accountFilter } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';
@@ -167,15 +167,18 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
       where.push('c.contractUID = ?');
       params.push(contractUID);
     } else {
-      const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_INVOICES);
-      if (!scope.all) {
-        if (scope.accountUIDs.length === 0) {
-          sendData(res, []);
-          return;
-        }
-        where.push(`c.accountUID IN (${scope.accountUIDs.map(() => '?').join(', ')})`);
-        params.push(...scope.accountUIDs);
+      const accountScope = await accountFilter(
+        pool,
+        user.userId,
+        PERMISSIONS.VIEW_INVOICES,
+        'c.accountUID',
+      );
+      if (accountScope === null) {
+        sendData(res, []);
+        return;
       }
+      where.push(accountScope.clause);
+      params.push(...accountScope.params);
     }
 
     if (filters.q !== undefined) {

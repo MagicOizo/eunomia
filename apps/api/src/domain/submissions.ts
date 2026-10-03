@@ -4,7 +4,7 @@ import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS, getAccessibleAccounts } from '../auth/permissions.js';
+import { PERMISSIONS, accountFilter } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
@@ -189,17 +189,18 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
 
   router.get('/', requireAuth, async (_req, res) => {
     const user = getAuthUser(res);
-    const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_INVOICES);
-    const where = ['s.submissionStatus <> -1'];
-    const params: unknown[] = [];
-    if (!scope.all) {
-      if (scope.accountUIDs.length === 0) {
-        sendData(res, []);
-        return;
-      }
-      where.push(`c.accountUID IN (${scope.accountUIDs.map(() => '?').join(', ')})`);
-      params.push(...scope.accountUIDs);
+    const accountScope = await accountFilter(
+      pool,
+      user.userId,
+      PERMISSIONS.VIEW_INVOICES,
+      'c.accountUID',
+    );
+    if (accountScope === null) {
+      sendData(res, []);
+      return;
     }
+    const where = ['s.submissionStatus <> -1', accountScope.clause];
+    const params: unknown[] = [...accountScope.params];
     const rows = await pool.query<Array<{ submissionUID: string }>>(
       `SELECT s.submissionUID, s.contractUID, s.submittedDate,
               s.submissionStatus, c.accountUID

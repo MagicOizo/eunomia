@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { forbidden } from '../auth/errors.js';
 import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS, getAccessibleAccounts, hasPermission } from '../auth/permissions.js';
+import { PERMISSIONS, accountFilter, hasPermission } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';
@@ -665,15 +665,18 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     } else {
       // Without an account the search runs over everything the user may see —
       // the same scoping the billings search uses (service-billings.ts).
-      const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_INVOICES);
-      if (!scope.all) {
-        if (scope.accountUIDs.length === 0) {
-          sendData(res, []);
-          return;
-        }
-        where.push(`i.accountUID IN (${scope.accountUIDs.map(() => '?').join(', ')})`);
-        params.push(...scope.accountUIDs);
+      const accountScope = await accountFilter(
+        pool,
+        user.userId,
+        PERMISSIONS.VIEW_INVOICES,
+        'i.accountUID',
+      );
+      if (accountScope === null) {
+        sendData(res, []);
+        return;
       }
+      where.push(accountScope.clause);
+      params.push(...accountScope.params);
     }
 
     if (filters.year !== undefined) {
@@ -738,15 +741,18 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
       where.push('accountUID = ?');
       params.push(requestedAccount);
     } else {
-      const scope = await getAccessibleAccounts(pool, user.userId, PERMISSIONS.VIEW_INVOICES);
-      if (!scope.all) {
-        if (scope.accountUIDs.length === 0) {
-          sendData(res, []);
-          return;
-        }
-        where.push(`accountUID IN (${scope.accountUIDs.map(() => '?').join(', ')})`);
-        params.push(...scope.accountUIDs);
+      const accountScope = await accountFilter(
+        pool,
+        user.userId,
+        PERMISSIONS.VIEW_INVOICES,
+        'accountUID',
+      );
+      if (accountScope === null) {
+        sendData(res, []);
+        return;
       }
+      where.push(accountScope.clause);
+      params.push(...accountScope.params);
     }
 
     const rows = await pool.query<Array<{ year: number }>>(
