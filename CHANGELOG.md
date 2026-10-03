@@ -7,6 +7,55 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.17.0 — 2026-10-03
+
+Everything from the nine previews below, as one release: the `0.16.0-slice.N` and
+`0.17.0-slice.N` series together. The number 0.16.0 is deliberately skipped — the two series are
+one body of work, the first two of four blocks working off the security and code reviews on the
+way to 1.0.0, and they are released together rather than separately.
+
+Almost nothing here is visible. Of the 54 findings the two reviews produced, these blocks close
+24, and exactly one of them was something a user could run into. The rest is the groundwork that
+has to be right before 1.0.0: one place for each rule instead of seven copies, contracts the
+compiler checks, and sessions that end when they are supposed to.
+
+- **A pause no longer costs you the page.** After a quarter of an hour, the first page that loaded
+  two lists at once could put you back on the login screen with the state of the page gone. The
+  browser now renews the session once, however many requests are waiting for it, and the waiting
+  ones go through on the new token. This is the one finding of the code review a user could
+  actually meet.
+- **Your own password, and the sessions a change ends.** A password could only be set by an
+  administrator, who then knew it; the sidebar's name now leads to "Mein Konto", which asks for the
+  old password before accepting a new one. A password change — yours or an administrator's reset —
+  ends every session of that account on every other device, which is the one case one changes a
+  password for. A refresh token shown a second time is taken as a stolen one and ends the whole
+  chain. And the session table, which only ever grew, is swept daily.
+- **Who may see which insured person, decided in one place.** Seven list endpoints each carried
+  their own copy of the same twenty lines, and the copies had begun to drift apart; two more
+  endpoints had no copy at all. They now share one helper, and a test pins down that a login with
+  no grant sees nothing anywhere. The dry run of the payment reminders, which handed out every
+  recipient's address and full mail text to anyone allowed to change the settings, now shows a text
+  only to someone who may read every account it speaks about.
+- **The package both apps were supposed to share.** Empty since the first slice, so every contract
+  between the API and the web was written down twice and kept in step by hand. It now holds the
+  status names, the error codes, the enum values and the payment-due rule. One consequence was
+  visible: five date fields took "today" from the UTC day, which in Berlin is yesterday until two
+  in the morning.
+- **Four helpers, used everywhere they belong.** One way to check who may see a record, one way to
+  answer, one way to run a transaction, one way to read a parameter — each existed already and each
+  was bypassed in a dozen places. A uniqueness check that ran outside its transaction now runs
+  inside it.
+- **Seven small corrections to the API.** A flag that left as a number now leaves as a flag; long
+  lists are no longer cut off in silence at 1024 bytes; a search for `%` searches for a percent
+  sign; deleting a contract year checks the year; the API answers in English and the interface
+  translates, as it was always supposed to.
+- **One word for one thing.** A collection agency's bank connection was called an "account", which
+  is what an insured person is called. It is `paymentDetail` in the code now. The database and the
+  API are untouched, so nothing about the app behaves differently.
+- **Dead paths are gone.** Two demo endpoints from the third slice that shipped in every release,
+  a collection file nothing imported, exported helpers without callers, and an ID check that
+  allowed characters the generator never hands out.
+
 ## 0.17.0-slice.3 — 2026-10-03
 
 Account separation — the rule that decides who may see which insured person's case data — was
