@@ -1,3 +1,4 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -18,7 +19,6 @@ import {
 } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import { type ContractRow, loadAuthorizedContract } from './contract-access.js';
 
 /**

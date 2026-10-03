@@ -1,5 +1,6 @@
+import { ERROR_CODES } from '@eunomia/shared';
+
 import { ApiError } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 
 /**
  * Auth failures are ApiErrors with auth-specific codes; the shared error

@@ -10,14 +10,14 @@ import EuBadge from '../design-system/components/EuBadge.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { useDebouncedCallback } from '../lib/debounce';
 import { describeError } from '../lib/errors';
-import { euro, germanDate } from '../lib/format';
+import { germanDate, germanMoney } from '../lib/format';
 import { listResource } from '../lib/resource';
 import { type InvoiceDto, searchInvoices } from './api';
 import {
   EMPTY_FILTER,
   type InvoiceFilter,
   type ReferenceKey,
-  STATUS_FILTERS,
+  STATUS_FILTER_ORDER,
   asStatus,
   filterFromQuery,
   hitTarget,
@@ -143,7 +143,7 @@ const references = computed(() => [
 ]);
 
 const statusOptions = computed<SelectOption[]>(() =>
-  STATUS_FILTERS.map((status) => ({
+  STATUS_FILTER_ORDER.map((status) => ({
     value: status,
     label: status === 'nicht-erledigt' ? 'Nicht erledigt' : STATUS_DISPLAY[status].label,
   })),
@@ -307,7 +307,7 @@ onMounted(async () => {
             <span class="eu-picker__meta">
               Rechnung vom {{ germanDate(invoice.invoiceDate) }} · Behandlung
               {{ treatmentDaysLabel(invoice.treatmentDates) }} ·
-              {{ euro(invoice.invoiceAmount) }}
+              {{ germanMoney(invoice.invoiceAmount) }}
             </span>
             <span v-if="referenceLine(invoice)" class="eu-picker__refs">{{
               referenceLine(invoice)

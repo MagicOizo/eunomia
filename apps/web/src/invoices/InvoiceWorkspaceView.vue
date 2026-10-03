@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { WORKFLOW_STATUSES } from '@eunomia/shared';
 import {
   faBan,
   faChevronLeft,
@@ -21,7 +22,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { apiFetch } from '../lib/api';
-import { euro, germanDate, plural } from '../lib/format';
+import { germanDate, germanMoney, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/table-sort';
@@ -57,8 +58,8 @@ import { reimbursementGap } from './reimbursement-gap';
 import SettleDialog from './SettleDialog.vue';
 import SubmitDialog from './SubmitDialog.vue';
 import { treatmentDaysLabel } from './treatment-days';
-import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, calcPaymentState } from './payment';
-import { STATUS_DISPLAY, STATUS_ORDER } from './status';
+import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, paymentState } from './payment';
+import { STATUS_DISPLAY } from './status';
 
 const props = withDefaults(
   defineProps<{
@@ -203,7 +204,7 @@ watchEffect(() => {
 function invoiceSortValue(inv: InvoiceDto, key: string): string | number {
   switch (key) {
     case 'status':
-      return STATUS_ORDER.indexOf(inv.workflowStatus); // sort by workflow order, not label
+      return WORKFLOW_STATUSES.indexOf(inv.workflowStatus); // sort by workflow order, not label
     case 'invoiceDate':
       return inv.invoiceDate;
     case 'treatmentDate':
@@ -271,7 +272,7 @@ async function loadLookups(): Promise<void> {
 
 /** Payment-status traffic light for a row: icon, colour and label in one bundle. */
 function paymentView(invoice: InvoiceDto) {
-  const state = calcPaymentState(invoice);
+  const state = paymentState(invoice);
   return {
     icon: PAYMENT_DISPLAY[state].icon,
     color: `var(${PAYMENT_COLOR_VAR[state]})`,
@@ -679,7 +680,7 @@ function confirmDelete(): void {
             </td>
             <td>
               <div class="eu-ws__amount">
-                <span>{{ euro(invoice.invoiceAmount) }}</span>
+                <span>{{ germanMoney(invoice.invoiceAmount) }}</span>
                 <PaymentInfoPopover
                   :invoice="invoice"
                   :facility-name="facilityName(invoice)"
@@ -714,7 +715,7 @@ function confirmDelete(): void {
               <span v-if="reimbursementGap(invoice)" class="eu-visually-hidden">
                 {{ reimbursementGap(invoice)?.label }}:
               </span>
-              {{ euro(invoice.reimbursedTotal) }}
+              {{ germanMoney(invoice.reimbursedTotal) }}
             </td>
             <td class="eu-ws__actions">
               <EuButton

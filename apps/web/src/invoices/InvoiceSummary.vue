@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { WORKFLOW_STATUSES } from '@eunomia/shared';
 import { faStar } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
-import { euro, plural } from '../lib/format';
+import { germanMoney, plural } from '../lib/format';
 import type { InvoiceDto, PlanPolicyDto, ReimbursementPlanDto } from './api';
 import {
   POLICY_STATUS_BADGE,
@@ -13,7 +14,7 @@ import {
   recommendationText,
   strategyLabel,
 } from './recommendation';
-import { STATUS_DISPLAY, STATUS_ORDER } from './status';
+import { STATUS_DISPLAY } from './status';
 
 const props = defineProps<{
   invoices: InvoiceDto[];
@@ -26,7 +27,7 @@ const totalSpend = computed(() =>
 );
 
 const distribution = computed(() =>
-  STATUS_ORDER.map((status) => ({
+  WORKFLOW_STATUSES.map((status) => ({
     status,
     display: STATUS_DISPLAY[status],
     count: props.invoices.filter((inv) => inv.workflowStatus === status).length,
@@ -80,14 +81,14 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
       >
         {{ entry.display.label }}: {{ entry.count }}
       </EuBadge>
-      <span class="eu-summary__spend">Gesamtausgaben: {{ euro(totalSpend) }}</span>
+      <span class="eu-summary__spend">Gesamtausgaben: {{ germanMoney(totalSpend) }}</span>
     </div>
 
     <p v-if="recommendation" class="eu-summary__recommendation">
       <strong>Empfehlung:</strong> {{ recommendation.text }} – Erstattungen und Boni zusammen
-      {{ euro(recommendation.total)
+      {{ germanMoney(recommendation.total)
       }}<template v-if="recommendation.advantage !== null && recommendation.advantage > 0"
-        >, {{ euro(recommendation.advantage) }} mehr als die nächstbeste Variante</template
+        >, {{ germanMoney(recommendation.advantage) }} mehr als die nächstbeste Variante</template
       >.
     </p>
 
@@ -116,7 +117,10 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
             <span class="eu-summary__label">Selbstbeteiligung</span>
             <span v-if="!policy.hasTerms">keine Konditionen</span>
             <span v-else-if="policy.deductible === 0">keine</span>
-            <span v-else>{{ euro(policy.deductibleUsed) }} von {{ euro(policy.deductible) }}</span>
+            <span v-else
+              >{{ germanMoney(policy.deductibleUsed) }} von
+              {{ germanMoney(policy.deductible) }}</span
+            >
           </div>
           <div v-if="policy.hasTerms && policy.deductible > 0" class="eu-bar" aria-hidden="true">
             <span
@@ -130,7 +134,8 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
           <div class="eu-summary__metric-head">
             <span class="eu-summary__label">Obergrenze</span>
             <span>
-              {{ euro(policy.expectedReimbursement) }} von {{ euro(policy.reimbursementCap) }}
+              {{ germanMoney(policy.expectedReimbursement) }} von
+              {{ germanMoney(policy.reimbursementCap) }}
             </span>
           </div>
           <div class="eu-bar" aria-hidden="true">
@@ -163,11 +168,11 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
         <dl class="eu-summary__grid">
           <div>
             <dt>Bereits erstattet</dt>
-            <dd>{{ euro(policy.actualReimbursement) }}</dd>
+            <dd>{{ germanMoney(policy.actualReimbursement) }}</dd>
           </div>
           <div>
             <dt>Erstattung laut Empfehlung</dt>
-            <dd>{{ euro(policy.expectedReimbursement) }}</dd>
+            <dd>{{ germanMoney(policy.expectedReimbursement) }}</dd>
           </div>
           <div v-if="policy.reimbursementRate !== 100">
             <dt>Erstattungssatz</dt>
@@ -206,10 +211,10 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
                   Empfohlen
                 </EuBadge>
               </th>
-              <td class="num">{{ euro(row.reimbursements) }}</td>
-              <td class="num">{{ euro(row.bonuses) }}</td>
-              <td class="num">{{ euro(row.total) }}</td>
-              <td class="num">{{ row.recommended ? '–' : euro(row.gap) }}</td>
+              <td class="num">{{ germanMoney(row.reimbursements) }}</td>
+              <td class="num">{{ germanMoney(row.bonuses) }}</td>
+              <td class="num">{{ germanMoney(row.total) }}</td>
+              <td class="num">{{ row.recommended ? '–' : germanMoney(row.gap) }}</td>
             </tr>
           </tbody>
         </table>

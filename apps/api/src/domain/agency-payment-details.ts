@@ -33,8 +33,9 @@ import { notFound } from '../lib/api-error.js';
  * the day the invoice was paid. Production said otherwise: an agency names
  * three on one bill and only the second of them on the next, without anything
  * having been replaced. So there is no rule that tells which one applies; the
- * invoice names it itself (`Invoices.agencyAccountUID`), and all this module
- * has to offer is a sensible suggestion for a new one.
+ * invoice names it itself (`Invoices.agencyAccountUID`), and the only thing left
+ * to decide is which one to suggest — that one rule is shared with the web
+ * (`defaultPaymentDetail` in @eunomia/shared).
  */
 
 export const paymentDetailsTable: CrudTable = {
@@ -79,16 +80,6 @@ export interface AgencyPaymentDetail {
   bic: string | null;
   recipientName: string | null;
   note: string | null;
-}
-
-/**
- * The payment details to suggest for an agency: the ones recorded first. Where
- * an agency lists several, the first is the one it is normally paid on — that is
- * the observation this slice started from. Only a suggestion: what counts is
- * what the invoice names. The twin of apps/web/src/agencies/payment-details.ts.
- */
-export function defaultPaymentDetail<T>(details: T[]): T | null {
-  return details[0] ?? null;
 }
 
 /** The columns of a payment-detail row, as every read hands them out. */

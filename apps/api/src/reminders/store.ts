@@ -1,10 +1,10 @@
+import type { PayableInvoice, ReminderStage } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
 import { PERMISSIONS, listUsersWithAccess } from '../auth/permissions.js';
 import { withTransaction } from '../db/transaction.js';
-import { type EncryptionKey, getSettings, setApplicationValues } from '../settings/repository.js';
 import type { SettingKey, SettingValue } from '../settings/registry.js';
-import type { PayableInvoice, ReminderStage } from './payment.js';
+import { type EncryptionKey, getSettings, setApplicationValues } from '../settings/repository.js';
 
 /**
  * Everything the reminder run touches in the database, behind one interface.

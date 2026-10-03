@@ -6,6 +6,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from '../contracts/api';
+import { todayIso } from '../lib/date-input';
 import { describeError } from '../lib/errors';
 import { type BillingDto, type BillingListDto, createBilling, updateBilling } from './api';
 import { usePresetToggle } from './forfeit-toggle';
@@ -53,7 +54,7 @@ watch(
     error.value = null;
     const billing = props.billing;
     billingNumber.value = billing?.billingNumber ?? props.presetNumber ?? '';
-    billingDate.value = billing?.billingDate ?? new Date().toISOString().slice(0, 10);
+    billingDate.value = billing?.billingDate ?? todayIso();
     documentLink.value = billing?.documentLink ?? '';
     forfeit.reset();
   },

@@ -1,7 +1,7 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import nodemailer from 'nodemailer';
 
 import { ApiError } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import { logEvent } from '../lib/log.js';
 import type { SettingKey, SettingValue } from '../settings/registry.js';
 

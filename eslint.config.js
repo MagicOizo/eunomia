@@ -14,7 +14,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
 
-  // Backend (Express/Node) and the shared-types package run on Node, not in a browser.
+  // Backend (Express/Node) and the shared package run on Node, not in a browser.
   {
     files: ['apps/api/**/*.ts', 'packages/*/**/*.ts'],
     languageOptions: {

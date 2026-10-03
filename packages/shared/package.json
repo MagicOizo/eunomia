@@ -1,0 +1,20 @@
+{
+  "name": "@eunomia/shared",
+  "version": "0.16.0-slice.6",
+  "private": true,
+  "description": "Rules and contracts shared between apps/api and apps/web.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsx --test --test-concurrency=1 'src/**/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

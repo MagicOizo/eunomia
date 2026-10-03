@@ -54,7 +54,15 @@ ausdrücklich vor einer anderen steht.
       hatte genau einen Werfer, die handgeschriebene Jahresprüfung aus CR-11; mit dem zod-Schema ist
       der Code tot und samt seinem deutschen Satz entfallen. `requireEntityAccount` aus CR-36 hat
       damit Aufrufer.
-- [ ] **5 — Das geteilte Paket.** CR-01, CR-02, CR-03, CR-04 (★), CR-05 (★).
+- [x] **5 — Das geteilte Paket.** CR-01, CR-02, CR-03, CR-04 (★), CR-05 (★).
+      Umgesetzt mit v0.16.0-slice.6 (Slice 55). Das Paket heißt jetzt `@eunomia/shared` statt
+      `shared-types`, weil es Regeln trägt und nicht nur Typen; `euro()` heißt im Web
+      `germanMoney()` wie sein Zwilling. Zwei Dinge gingen über den Review hinaus: die Fehlersatz-Tabelle des Webs
+      ist jetzt auf die Fehlercode-Liste getypt (ein Code ohne deutschen Satz bricht den Build), und
+      fünf Datumsfelder nahmen ihr „heute“ aus `toISOString()`, also den UTC-Tag — in Berlin bis
+      2 Uhr morgens der Vortag. Sie nehmen es jetzt aus `todayIso()`, demselben Tag, den die Ampel
+      liest. Nicht ins Paket gewandert sind die ~20 nachgeschriebenen DTO-Formen; sie bleiben, wie
+      der Review empfiehlt, Material für nach 1.0.
 
 ### Block II — Sitzung und Sichtbarkeit (Release 0.17.0)
 

@@ -2,16 +2,16 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 
+import { ERROR_CODES } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 import request from 'supertest';
 
 import { createApp } from '../app.js';
-import { hashPassword } from '../lib/password.js';
 import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
 import { createPool, waitForDatabase } from '../db/pool.js';
 import { ApiError } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
+import { hashPassword } from '../lib/password.js';
 import type { MailMessage, MailSendStatus, Mailer } from '../mail/mailer.js';
 import { createReminderRunner } from './runner.js';
 import { createReminderStore } from './store.js';

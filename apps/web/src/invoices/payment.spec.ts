@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { DUE_SOON_DAYS, calcPaymentState } from './payment';
+import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, paymentState } from './payment';
+
+/**
+ * The rule itself is tested in the shared package (payment-state.test.ts); what
+ * is web-side is the day the browser counts as today and the two display tables.
+ */
 
 /** Minimal invoice shape the traffic light cares about. */
 function invoice(overrides: {
@@ -16,55 +21,42 @@ function invoice(overrides: {
   };
 }
 
-const today = new Date(2026, 5, 15); // 2026-06-15, local time
-
-/** A due date `days` from `today`, formatted YYYY-MM-DD. */
+/** A due date `days` from today, as the local calendar day, formatted YYYY-MM-DD. */
 function dueIn(days: number): string {
-  const d = new Date(2026, 5, 15 + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now = new Date();
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+  const pad = (part: number): string => String(part).padStart(2, '0');
+  return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
 }
 
-describe('calcPaymentState', () => {
-  it('is "paid" once the invoice has been transferred', () => {
-    expect(
-      calcPaymentState(
-        invoice({ transferDate: '2026-06-10', transferUntilDate: dueIn(-5) }),
-        today,
-      ),
-    ).toBe('paid');
+describe('paymentState', () => {
+  it('reads the due date against the reader’s own calendar day', () => {
+    // Not the UTC day: in Berlin these two differ until 2 a.m., and the light
+    // would stand on red a day early.
+    expect(paymentState(invoice({ transferUntilDate: dueIn(0) }))).toBe('due');
+    expect(paymentState(invoice({ transferUntilDate: dueIn(-1) }))).toBe('overdue');
+    expect(paymentState(invoice({ transferUntilDate: dueIn(45) }))).toBe('uncritical');
   });
 
-  it('is "paid" for direct/cash payment even without a transfer date', () => {
-    expect(
-      calcPaymentState(invoice({ directPayment: true, transferUntilDate: dueIn(-30) }), today),
-    ).toBe('paid');
-  });
-
-  it('is "overdue" when unpaid and the due date has passed', () => {
-    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(-1) }), today)).toBe('overdue');
-  });
-
-  it('is "due" when unpaid and the due date is today (0 days)', () => {
-    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(0) }), today)).toBe('due');
-  });
-
-  it(`is "due" up to the day before the ${DUE_SOON_DAYS}-day threshold`, () => {
-    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(DUE_SOON_DAYS - 1) }), today)).toBe(
-      'due',
+  it('is "paid" once the invoice has been transferred or settled in cash', () => {
+    expect(paymentState(invoice({ transferDate: dueIn(-5), transferUntilDate: dueIn(-5) }))).toBe(
+      'paid',
     );
-  });
-
-  it(`is "uncritical" exactly at the ${DUE_SOON_DAYS}-day threshold`, () => {
-    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(DUE_SOON_DAYS) }), today)).toBe(
-      'uncritical',
+    expect(paymentState(invoice({ directPayment: true, transferUntilDate: dueIn(-30) }))).toBe(
+      'paid',
     );
-  });
-
-  it('is "uncritical" when the due date is comfortably ahead', () => {
-    expect(calcPaymentState(invoice({ transferUntilDate: dueIn(45) }), today)).toBe('uncritical');
   });
 
   it('is "due" when unpaid with no due date recorded (never silently ignored)', () => {
-    expect(calcPaymentState(invoice({ transferUntilDate: null }), today)).toBe('due');
+    expect(paymentState(invoice({ transferUntilDate: null }))).toBe('due');
+  });
+});
+
+describe('the display tables', () => {
+  it('cover every state, so no light is drawn without icon or colour', () => {
+    for (const state of ['paid', 'uncritical', 'due', 'overdue'] as const) {
+      expect(PAYMENT_DISPLAY[state].label).not.toBe('');
+      expect(PAYMENT_COLOR_VAR[state]).toMatch(/^--eu-color-/);
+    }
   });
 });

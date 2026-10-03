@@ -1,3 +1,4 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 
@@ -15,7 +16,7 @@ import {
 } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { ApiError, conflict, notFound } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
+import { linksFrom, linksTo } from './trash-references.js';
 import {
   BATCH_OF,
   type TrashEntity,
@@ -24,7 +25,6 @@ import {
   entityOfTable,
   entityOfUid,
 } from './trash-registry.js';
-import { linksFrom, linksTo } from './trash-references.js';
 
 /**
  * The Papierkorb (see Notes/eunomia-plan.md, Slice 39). Everything the app

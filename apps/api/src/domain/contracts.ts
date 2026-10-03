@@ -1,3 +1,4 @@
+import { BONUS_FORFEIT_RULES, CONTRACT_KINDS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -26,10 +27,10 @@ const base = z.object({
   contractNumber: z.string().trim().min(1).max(50),
   companyUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.company)),
   accountUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.account)),
-  contractKind: z.enum(['FULL', 'SUPPLEMENTARY']).optional(),
+  contractKind: z.enum(CONTRACT_KINDS).optional(),
   contractBegin: z.string().date(),
   contractEnd: z.string().date().nullish(),
-  bonusForfeitRule: z.enum(['ON_SUBMISSION', 'ON_REIMBURSEMENT']).optional(),
+  bonusForfeitRule: z.enum(BONUS_FORFEIT_RULES).optional(),
   claimFreeYearsAtStart: z.number().int().min(0).max(99).optional(),
   claimFreeCountingFromYear: z.number().int().min(1900).max(2999).nullish(),
 });

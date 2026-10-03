@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { germanMoney } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 import request from 'supertest';
 
@@ -8,7 +9,6 @@ import { createApp } from '../app.js';
 import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
 import { createPool, waitForDatabase } from '../db/pool.js';
-import { germanMoney } from '../lib/german.js';
 import { hashPassword } from '../lib/password.js';
 
 /**

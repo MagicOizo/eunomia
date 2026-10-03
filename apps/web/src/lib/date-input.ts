@@ -1,11 +1,12 @@
 /**
- * Pasting a date into a field.
+ * The ISO date text a date field speaks.
  *
  * Every date field in the app is a native `<input type="date">`, and those take
  * only ISO text. A `24.09.2026` copied out of Excel is dropped silently: the
  * browser fires the paste event, refuses the German notation and leaves the
  * field empty (measured in Chromium). So the fields catch the paste themselves
- * and hand the browser the ISO form instead.
+ * and hand the browser the ISO form instead — and where a form offers today as
+ * its default, it takes that day from here too.
  */
 
 /** Days per month, with February resolved by `isLeapYear`. */
@@ -50,4 +51,16 @@ export function isoFromGerman(text: string): string | null {
 export function pastedIsoDate(event: ClipboardEvent): string | null {
   const text = event.clipboardData?.getData('text');
   return text ? isoFromGerman(text) : null;
+}
+
+/**
+ * Today as `YYYY-MM-DD` in the reader's own zone — the calendar day they would
+ * write on a form. Not `toISOString().slice(0, 10)`, which is the UTC day: in
+ * Berlin that is still yesterday until 2 a.m., and the app would prefill a date
+ * nobody meant.
+ */
+export function todayIso(): string {
+  const now = new Date();
+  const pad = (part: number): string => String(part).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

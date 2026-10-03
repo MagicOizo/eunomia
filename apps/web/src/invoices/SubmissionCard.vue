@@ -12,7 +12,7 @@ import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
-import { euro, germanDate } from '../lib/format';
+import { germanDate, germanMoney } from '../lib/format';
 import type { InvoiceAllocationDto, InvoiceSubmissionDto, PlanInvoicePolicyAction } from './api';
 import { policyActionBadge } from './recommendation';
 import { SUBMISSION_STATUS_DISPLAY } from './status';
@@ -86,7 +86,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
         >
           <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
         </span>
-        <span class="eu-card__amount">{{ euro(allocation.reimbursement) }}</span>
+        <span class="eu-card__amount">{{ germanMoney(allocation.reimbursement) }}</span>
         <EuButton
           variant="secondary"
           icon-only
@@ -111,7 +111,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
     <footer class="eu-card__foot">
       <span class="eu-card__total">
         <span class="eu-card__sub">Erstattet</span>
-        {{ euro(submission.reimbursed) }}
+        {{ germanMoney(submission.reimbursed) }}
       </span>
       <div class="eu-card__actions">
         <EuButton

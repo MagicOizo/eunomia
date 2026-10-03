@@ -26,7 +26,7 @@
  *    announces new amounts each year.
  */
 
-export type BonusForfeitRule = 'ON_SUBMISSION' | 'ON_REIMBURSEMENT';
+import type { BonusForfeitRule } from '@eunomia/shared';
 
 export interface BonusClaim {
   /** Treatment year of the invoice. */

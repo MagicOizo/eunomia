@@ -9,7 +9,7 @@ import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, forfeitsByRule } from '../contracts/api';
-import { euro, germanDate, plural } from '../lib/format';
+import { germanDate, germanMoney, plural } from '../lib/format';
 import {
   type BillingDto,
   type BillingListDto,
@@ -165,7 +165,7 @@ const addOptions = computed(() =>
       value: invoice.invoiceUID,
       label: invoice.invoiceNumber,
       hint:
-        `${germanDate(invoice.invoiceDate)} · offen ${euro(invoice.remainingAmount)}` +
+        `${germanDate(invoice.invoiceDate)} · offen ${germanMoney(invoice.remainingAmount)}` +
         (day ? ` · eingereicht am ${germanDate(day)}` : ''),
     };
   }),
@@ -329,7 +329,7 @@ function submit(): void {
   );
   if (exceeding.length > 0) {
     localError.value = `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — zu viel bei: ${exceeding
-      .map((i) => `${i.invoiceNumber} (noch offen: ${euro(i.remainingAmount)})`)
+      .map((i) => `${i.invoiceNumber} (noch offen: ${germanMoney(i.remainingAmount)})`)
       .join(', ')}.`;
     return;
   }
@@ -416,21 +416,21 @@ function submit(): void {
               <button
                 type="button"
                 class="eu-bill__take"
-                :aria-label="`Rechnungsbetrag ${euro(invoice.invoiceAmount)} in Erstattung übernehmen`"
-                :title="`${euro(invoice.invoiceAmount)} in Erstattung übernehmen`"
+                :aria-label="`Rechnungsbetrag ${germanMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
+                :title="`${germanMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
                 @click="takeAmount(invoice.invoiceUID, invoice.invoiceAmount)"
               >
-                {{ euro(invoice.invoiceAmount) }}
+                {{ germanMoney(invoice.invoiceAmount) }}
               </button>
               · noch offen
               <button
                 type="button"
                 class="eu-bill__take"
-                :aria-label="`Offenen Betrag ${euro(invoice.remainingAmount)} in Erstattung übernehmen`"
-                :title="`${euro(invoice.remainingAmount)} in Erstattung übernehmen`"
+                :aria-label="`Offenen Betrag ${germanMoney(invoice.remainingAmount)} in Erstattung übernehmen`"
+                :title="`${germanMoney(invoice.remainingAmount)} in Erstattung übernehmen`"
                 @click="takeAmount(invoice.invoiceUID, invoice.remainingAmount)"
               >
-                {{ euro(invoice.remainingAmount) }}
+                {{ germanMoney(invoice.remainingAmount) }}
               </button>
               <template v-if="submittedAt(invoice, contractUID)">
                 · eingereicht am {{ germanDate(submittedAt(invoice, contractUID)!) }}

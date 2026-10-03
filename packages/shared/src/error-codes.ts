@@ -1,10 +1,10 @@
 /**
  * The error codes the API answers with. They are the contract the UI
- * translates: the messages here stay English (they are for API clients and
- * logs), while apps/web turns the code — together with the structured
- * `details` — into a German sentence. A new failure case therefore gets its
- * own code, not just a new sentence; without one the UI can only fall back to
- * a generic message.
+ * translates: the API's own messages stay English (they are for API clients and
+ * logs), while apps/web turns the code — together with the structured `details`
+ * — into a German sentence (lib/error-messages.ts). A new failure case
+ * therefore gets its own code here, and the web's table of sentences is keyed by
+ * this list: a code without a sentence does not compile.
  */
 export const ERROR_CODES = {
   // Generic and infrastructure

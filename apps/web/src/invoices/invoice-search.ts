@@ -1,5 +1,6 @@
+import type { StatusFilter as ApiStatusFilter } from '@eunomia/shared';
+
 import type { InvoiceDto } from './api';
-import type { WorkflowStatus } from './status';
 
 /**
  * The filter of the invoice search (Slice 45, issues.md 0.12.0-5): what is
@@ -20,8 +21,11 @@ export const REFERENCE_KEYS = ['agencyUID', 'agencyAccountUID', 'facilityUID'] a
 
 export type ReferenceKey = (typeof REFERENCE_KEYS)[number];
 
-/** The status the list may be narrowed to; '' is "every status". */
-export type StatusFilter = '' | 'nicht-erledigt' | WorkflowStatus;
+/**
+ * The status the list may be narrowed to; '' is "every status". The values are
+ * the API's own (@eunomia/shared), the empty one is this page's.
+ */
+export type StatusFilter = '' | ApiStatusFilter;
 
 export interface InvoiceFilter {
   /** Substring of the invoice number; below MIN_QUERY_LENGTH it asks nothing. */
@@ -56,8 +60,12 @@ export function isActive(filter: InvoiceFilter): boolean {
   );
 }
 
-/** The statuses the list may be narrowed to, in the order the picker offers them. */
-export const STATUS_FILTERS: Array<Exclude<StatusFilter, ''>> = [
+/**
+ * The statuses the list may be narrowed to, in the order the picker offers them
+ * — "nicht erledigt" first, because it is the question most often asked. The API
+ * has the same values in the ladder's order; the type keeps the two sets equal.
+ */
+export const STATUS_FILTER_ORDER: Array<Exclude<StatusFilter, ''>> = [
   'nicht-erledigt',
   'offen',
   'eingereicht',
@@ -99,7 +107,7 @@ function one(value: unknown): string {
 
 /** A status from the URL, or none — an unknown one is not passed on to the API. */
 export function asStatus(value: string): StatusFilter {
-  return (STATUS_FILTERS as string[]).includes(value) ? (value as StatusFilter) : '';
+  return (STATUS_FILTER_ORDER as string[]).includes(value) ? (value as StatusFilter) : '';
 }
 
 /**

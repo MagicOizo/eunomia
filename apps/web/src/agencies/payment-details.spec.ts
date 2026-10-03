@@ -1,32 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  defaultPaymentDetail,
-  invoicePaymentDetail,
-  paymentDetailHint,
-  paymentDetailLabel,
-} from './payment-details';
+import { invoicePaymentDetail, paymentDetailHint, paymentDetailLabel } from './payment-details';
 
 /**
- * The suggestion rule of Slice 44. Its twin lives in
- * apps/api/src/domain/agency-payment-details.test.ts — the create form, the
- * display mask and the reminder mail must name the same payment details.
+ * Picking a set out and writing it down (Slice 44). Which one is suggested is
+ * the shared rule and is tested with it (packages/shared, payment-details.test.ts).
  */
 
 const first = { agencyAccountUID: 'g1', bankAccount: 'DE00' };
 const second = { agencyAccountUID: 'g2', bankAccount: 'DE24' };
 /** As the API hands them out: in the order they were recorded. */
 const details = [first, second];
-
-describe('defaultPaymentDetail', () => {
-  it('suggests the details recorded first', () => {
-    expect(defaultPaymentDetail(details)?.bankAccount).toBe('DE00');
-  });
-
-  it('has nothing to suggest for an agency without any', () => {
-    expect(defaultPaymentDetail([])).toBeNull();
-  });
-});
 
 describe('invoicePaymentDetail', () => {
   it('takes the details the invoice names', () => {

@@ -1,3 +1,4 @@
+import { defaultPaymentDetail } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -22,7 +23,6 @@ import {
   PAYMENT_DETAIL_COLUMNS,
   type AgencyPaymentDetail,
   bicField,
-  defaultPaymentDetail,
   ibanField,
   insertPaymentDetail,
   listPaymentDetails,

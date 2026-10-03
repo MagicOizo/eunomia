@@ -18,7 +18,7 @@
  * "offen" and therefore falls outside this by itself.
  */
 
-import { euro } from '../lib/format';
+import { germanMoney } from '../lib/format';
 import type { InvoiceDto } from './api';
 
 export interface ReimbursementGap {
@@ -38,12 +38,12 @@ export function reimbursementGap(
     case 'erledigt':
       return {
         tone: 'short',
-        label: `Nicht vollständig erstattet – Eigenanteil ${euro(invoice.remainingAmount)}`,
+        label: `Nicht vollständig erstattet – Eigenanteil ${germanMoney(invoice.remainingAmount)}`,
       };
     case 'teilabgerechnet':
       return {
         tone: 'pending',
-        label: `Noch nicht vollständig erstattet – offen ${euro(invoice.remainingAmount)}`,
+        label: `Noch nicht vollständig erstattet – offen ${germanMoney(invoice.remainingAmount)}`,
       };
     default:
       return null;

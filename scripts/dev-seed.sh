@@ -23,4 +23,6 @@ if ! docker inspect -f '{{.State.Running}}' eunomia-dev-db >/dev/null 2>&1; then
   exit 1
 fi
 
+# The seed imports domain code, which imports the compiled @eunomia/shared.
+npm run build --workspace packages/shared
 npm run seed --workspace apps/api -- "$@"

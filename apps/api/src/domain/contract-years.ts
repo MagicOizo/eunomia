@@ -1,3 +1,4 @@
+import { type BonusForfeitRule, ERROR_CODES } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -9,10 +10,8 @@ import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import type { Queryable } from '../crud/repository.js';
 import { badRequest } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import {
   type BonusClaim,
-  type BonusForfeitRule,
   type BonusTerms,
   type BonusYear,
   type BonusYearRecord,

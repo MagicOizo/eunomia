@@ -20,7 +20,8 @@ import EuToggle from '../design-system/components/EuToggle.vue';
 import { type BonusForfeitRule } from '../contracts/api';
 import { apiFetch } from '../lib/api';
 import { useDebouncedCallback } from '../lib/debounce';
-import { euro, germanDate, plural } from '../lib/format';
+import { germanDate, germanMoney, plural } from '../lib/format';
+import { todayIso } from '../lib/date-input';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { listResource } from '../lib/resource';
@@ -98,8 +99,6 @@ const formNote = ref('');
 const bookOpen = ref(false);
 const bookBilling = ref<BillingDto | null>(null);
 
-const today = (): string => new Date().toISOString().slice(0, 10);
-
 function isOpenObjection(b: BillingListDto): boolean {
   return b.objectionDate !== null && b.objectionResolvedDate === null;
 }
@@ -171,7 +170,7 @@ function openDocument(b: BillingListDto): void {
 function openObjection(b: BillingListDto): void {
   selected.value = b;
   dialogError.value = null;
-  formDate.value = today();
+  formDate.value = todayIso();
   formNote.value = '';
   objectionOpen.value = true;
 }
@@ -215,7 +214,7 @@ function resolveObjection(): void {
   const billing = selected.value;
   if (!billing) return;
   void run(
-    () => updateBilling(billing.billingUID, { objectionResolvedDate: today() }),
+    () => updateBilling(billing.billingUID, { objectionResolvedDate: todayIso() }),
     () => (objectionOpen.value = false),
   );
 }
@@ -348,7 +347,7 @@ function confirmDelete(): void {
             <tr v-for="b in sort.sorted" :key="b.billingUID">
               <td>{{ b.billingNumber }}</td>
               <td>{{ germanDate(b.billingDate) }}</td>
-              <td class="eu-billings__num">{{ euro(b.reimbursedTotal) }}</td>
+              <td class="eu-billings__num">{{ germanMoney(b.reimbursedTotal) }}</td>
               <td>{{ b.invoiceNumbers ?? '–' }}</td>
               <td>
                 <span

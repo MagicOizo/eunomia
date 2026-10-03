@@ -37,6 +37,12 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' eunomia-dev-db 2>/dev/nu
 done
 echo " ✓"
 
+# The apps import @eunomia/shared as a compiled package; tsx and Vite resolve it
+# through its dist, and neither watches node_modules. So it is built once here —
+# whoever edits the package rebuilds it (see DEV.md).
+echo "▶ Geteiltes Paket bauen…"
+npm run build --workspace packages/shared
+
 echo "▶ Migration + Seed (inkl. Dev-Admin)…"
 npm run seed --workspace apps/api
 

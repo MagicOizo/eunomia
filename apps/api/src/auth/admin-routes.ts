@@ -1,3 +1,4 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Pool } from 'mariadb';
@@ -7,7 +8,6 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { badRequest, notFound } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { hashPassword } from '../lib/password.js';
 import {

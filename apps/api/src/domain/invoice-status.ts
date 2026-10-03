@@ -4,13 +4,13 @@
  * always computed from the invoice's submissions, the reimbursements
  * allocated to it across all policies, the "reimbursement closed" mark and
  * the payment date.
+ *
+ * Deriving it is the server's business; the names of the rungs are shared with
+ * the web, which writes them into its DTOs and keys its badges by them
+ * (@eunomia/shared).
  */
 
-export type WorkflowStatus =
-  'offen' | 'eingereicht' | 'teilabgerechnet' | 'abgerechnet' | 'erledigt';
-
-/** Status of one submission of the invoice (one policy). */
-export type SubmissionStatus = 'eingereicht' | 'abgerechnet';
+import type { StatusFilter, SubmissionStatus, WorkflowStatus } from '@eunomia/shared';
 
 export interface InvoiceStatusInput {
   invoiceAmount: number;
@@ -67,23 +67,6 @@ export function deriveInvoiceStatus(input: InvoiceStatusInput): InvoiceStatus {
 export function deriveSubmissionStatus(allocationCount: number): SubmissionStatus {
   return allocationCount > 0 ? 'abgerechnet' : 'eingereicht';
 }
-
-/**
- * What a status filter of the invoice list may ask for: one of the statuses, or
- * "everything that is not done yet" — the question behind most filtered views
- * ("was steht bei diesem Dienstleister noch offen?"). Leaving the filter out
- * means every status, so there is no 'alle' value here.
- */
-export const STATUS_FILTERS = [
-  'offen',
-  'eingereicht',
-  'teilabgerechnet',
-  'abgerechnet',
-  'erledigt',
-  'nicht-erledigt',
-] as const;
-
-export type StatusFilter = (typeof STATUS_FILTERS)[number];
 
 /**
  * Whether a derived status passes a status filter. The status is never stored

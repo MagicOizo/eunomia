@@ -1,3 +1,5 @@
+import type { ErrorCode } from '@eunomia/shared';
+
 import { FIELD_FORMATS, fieldLabel, settingLabel } from './field-labels';
 
 /**
@@ -7,8 +9,9 @@ import { FIELD_FORMATS, fieldLabel, settingLabel } from './field-labels';
  *
  * - `VALIDATION_ERROR` carries zod issues, which are turned into a sentence
  *   from the issue's `code` and the field's German label.
- * - Every other failure carries a specific error code (apps/api
- *   src/lib/error-codes.ts) plus the data its sentence needs in `details`.
+ * - Every other failure carries a specific error code (@eunomia/shared) plus the
+ *   data its sentence needs in `details`. The table below is keyed by that list,
+ *   so a new code without a German sentence does not compile.
  */
 
 /** The parts of a zod issue this translation uses (zod 3 shapes). */
@@ -142,7 +145,10 @@ const sentence = (prefix: string, rest: string): string =>
 /** Everything the trash refuses ends on this, because a restore is all or nothing. */
 const UNCHANGED = ' Es wurde nichts wiederhergestellt.';
 
-const CODE_MESSAGES: Record<string, (details: Details) => string> = {
+/** Every code but the one that carries zod issues, which is read field by field. */
+type SentenceCode = Exclude<ErrorCode, 'VALIDATION_ERROR'>;
+
+const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
   NOT_FOUND: (d) =>
     `${RESOURCE_NAMES[String(d.resource)] ?? 'Der Eintrag'} wurde nicht gefunden. Vielleicht ist der Eintrag inzwischen gelöscht.`,
   DUPLICATE_VALUE: () => 'Es gibt bereits einen Eintrag mit diesem Wert.',
@@ -272,9 +278,12 @@ const CODE_MESSAGES: Record<string, (details: Details) => string> = {
     'Die Zahlungserinnerungen sind ausgeschaltet. Ohne sie verschickt ein Lauf nichts.',
 };
 
-/** The German sentence for an error code, or null if the code is unknown here. */
+/**
+ * The German sentence for an error code, or null if the code is unknown here —
+ * which an older client can still see from a newer server.
+ */
 export function describeCode(code: string, details: unknown): string | null {
-  const build = CODE_MESSAGES[code];
+  const build = (CODE_MESSAGES as Record<string, ((details: Details) => string) | undefined>)[code];
   if (!build) return null;
   return build(typeof details === 'object' && details !== null ? (details as Details) : {});
 }

@@ -1,7 +1,7 @@
 {
   "name": "@eunomia/web",
   "private": true,
-  "version": "0.16.0-slice.5",
+  "version": "0.16.0-slice.6",
   "description": "Eunomia frontend SPA.",
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@eunomia/shared": "*",
     "@floating-ui/vue": "^2.0.1",
     "@fortawesome/fontawesome-svg-core": "^7.3.1",
     "@fortawesome/free-solid-svg-icons": "^7.3.1",

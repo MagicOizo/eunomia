@@ -16,7 +16,7 @@ import type { PickerOption } from '../design-system/components/EuEntityPicker.vu
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { describeError } from '../lib/errors';
-import { euro } from '../lib/format';
+import { germanMoney } from '../lib/format';
 import {
   type InvoiceAllocationDto,
   type InvoiceDto,
@@ -415,7 +415,7 @@ async function saveBilling(payload: BillingAllocationPayload): Promise<void> {
   const ok = await runBlock(
     () => saveBillingAllocations(payload),
     (m) => (billingError.value = m),
-    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${euro(inv.remainingAmount)}).`,
+    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${germanMoney(inv.remainingAmount)}).`,
   );
   if (ok) billingOpen.value = false;
 }
@@ -440,7 +440,7 @@ async function saveAllocation(payload: {
         receiptNumber: payload.receiptNumber,
       }),
     (m) => (allocationError.value = m),
-    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (Rechnungsbetrag: ${euro(inv.invoiceAmount)}).`,
+    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (Rechnungsbetrag: ${germanMoney(inv.invoiceAmount)}).`,
   );
   if (ok) editingAllocation.value = null;
 }
@@ -686,13 +686,13 @@ function submit(): void {
       <EuDetailField
         label="Erstattung"
         type="readonly"
-        :model-value="euro(invoice.reimbursedTotal)"
+        :model-value="germanMoney(invoice.reimbursedTotal)"
       />
       <template v-if="isSubmitted">
         <EuDetailField
           label="Noch nicht erstattet"
           type="readonly"
-          :model-value="euro(invoice.remainingAmount)"
+          :model-value="germanMoney(invoice.remainingAmount)"
         />
         <EuDetailField
           v-model="values.reimbursementClosed"
@@ -873,7 +873,7 @@ function submit(): void {
     @close="pendingAllocation = null"
   >
     <p v-if="pendingAllocation">
-      Die Erstattung von {{ euro(pendingAllocation.reimbursement) }} aus Abrechnung
+      Die Erstattung von {{ germanMoney(pendingAllocation.reimbursement) }} aus Abrechnung
       {{ pendingAllocation.billingNumber }} wirklich entfernen? Die Leistungsabrechnung selbst
       bleibt bestehen.
     </p>

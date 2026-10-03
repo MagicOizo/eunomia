@@ -11,7 +11,7 @@ FROM base AS deps
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
-COPY packages/shared-types/package.json ./packages/shared-types/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 RUN npm ci
 
 # ---------- Build the API and the SPA ----------
@@ -19,8 +19,11 @@ FROM deps AS build
 COPY tsconfig.base.json ./
 COPY apps/api ./apps/api
 COPY apps/web ./apps/web
-COPY packages/shared-types ./packages/shared-types
-RUN npm run build --workspace apps/api \
+COPY packages/shared ./packages/shared
+# The shared package first: both apps compile against its declarations, and the
+# API imports its compiled output at runtime (see packages/shared/src/index.ts).
+RUN npm run build --workspace packages/shared \
+  && npm run build --workspace apps/api \
   && npm run build --workspace apps/web
 
 # ---------- Production-only dependencies (API runtime) ----------
@@ -28,7 +31,7 @@ FROM base AS prod-deps
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
-COPY packages/shared-types/package.json ./packages/shared-types/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 RUN npm ci --omit=dev
 
 # ---------- Production image ----------
@@ -44,6 +47,10 @@ RUN apk add --no-cache mariadb-client
 COPY --from=prod-deps --chown=eunomia:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=eunomia:nodejs /app/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=eunomia:nodejs /app/apps/web/dist ./apps/web/dist
+# node_modules/@eunomia/shared is a symlink into packages/shared, so the package
+# has to be here too — its manifest for the resolver, its dist for the code.
+COPY --from=build --chown=eunomia:nodejs /app/packages/shared/dist ./packages/shared/dist
+COPY --chown=eunomia:nodejs packages/shared/package.json ./packages/shared/package.json
 COPY --chown=eunomia:nodejs apps/api/package.json ./apps/api/package.json
 COPY --chown=eunomia:nodejs package.json ./package.json
 COPY --chown=eunomia:nodejs scripts/backup.sh scripts/restore.sh ./scripts/

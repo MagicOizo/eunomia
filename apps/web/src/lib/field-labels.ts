@@ -1,3 +1,5 @@
+import type { SettingKey } from '@eunomia/shared';
+
 /**
  * German labels for the API's payload keys, so a validation error can name the
  * field the user sees ("Bitte „PLZ" ausfüllen.") instead of repeating the
@@ -117,8 +119,12 @@ export function fieldLabel(key: string): string {
  * German labels for the system settings (Slice 30). Kept here with the other
  * labels, because both the settings page and an error message about a rejected
  * value need the same words.
+ *
+ * Keyed by the shared list of setting keys, so a typo or a renamed setting shows
+ * up here. Not every key needs a label: the ones the application writes itself
+ * (the status of the last send or run) are shown as a sentence, not as a field.
  */
-export const SETTING_LABELS: Record<string, string> = {
+export const SETTING_LABELS: Partial<Record<SettingKey, string>> = {
   'mail.enabled': 'E-Mail-Versand aktiv',
   'mail.host': 'Mailserver',
   'mail.port': 'Port',
@@ -136,7 +142,11 @@ export const SETTING_LABELS: Record<string, string> = {
   'reminders.appUrl': 'URL dieser Instanz (für den Link in der Mail)',
 };
 
-/** The German label of a setting key, or the key itself if it has none yet. */
+/**
+ * The German label of a setting key, or the key itself if it has none — the key
+ * arrives as plain text from the server's `details`, so it may be one of the
+ * unlabelled ones, or one this version does not know.
+ */
 export function settingLabel(key: string): string {
-  return SETTING_LABELS[key] ?? key;
+  return (SETTING_LABELS as Record<string, string | undefined>)[key] ?? key;
 }

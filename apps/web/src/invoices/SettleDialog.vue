@@ -4,6 +4,7 @@ import { ref, watch } from 'vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import { todayIso } from '../lib/date-input';
 import type { InvoiceDto } from './api';
 
 const props = defineProps<{
@@ -23,7 +24,7 @@ watch(
   (open) => {
     if (!open) return;
     localError.value = null;
-    transferDate.value = props.invoice?.transferDate ?? new Date().toISOString().slice(0, 10);
+    transferDate.value = props.invoice?.transferDate ?? todayIso();
   },
   { immediate: true },
 );

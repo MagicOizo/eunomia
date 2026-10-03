@@ -8,7 +8,7 @@ import {
   type ContractKind,
 } from '../contracts/api';
 import ContractDetailDialog from '../contracts/ContractDetailDialog.vue';
-import { euro, germanDate } from '../lib/format';
+import { germanDate, germanMoney } from '../lib/format';
 import type { ResourceRow } from '../lib/resource';
 import type { ResourceConfig } from './config';
 
@@ -81,8 +81,8 @@ const contracts: ResourceConfig = {
       label: 'Art',
       format: (value) => CONTRACT_KIND_SHORT_LABEL[value as ContractKind] ?? '–',
     },
-    { key: 'currentMonthlyPremium', label: 'Beitrag aktuell', format: euro, align: 'right' },
-    { key: 'currentDeductible', label: 'SB aktuell', format: euro, align: 'right' },
+    { key: 'currentMonthlyPremium', label: 'Beitrag aktuell', format: germanMoney, align: 'right' },
+    { key: 'currentDeductible', label: 'SB aktuell', format: germanMoney, align: 'right' },
     {
       key: 'contractBegin',
       label: 'Laufzeit',

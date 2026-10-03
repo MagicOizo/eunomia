@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  type WorkflowStatus,
-  deriveInvoiceStatus,
-  deriveSubmissionStatus,
-  matchesStatus,
-} from './invoice-status.js';
+import { WORKFLOW_STATUSES } from '@eunomia/shared';
+
+import { deriveInvoiceStatus, deriveSubmissionStatus, matchesStatus } from './invoice-status.js';
 
 const base = {
   invoiceAmount: 100,
@@ -81,8 +78,8 @@ test('a status filter names exactly one status', () => {
 });
 
 test('"nicht-erledigt" keeps every status but the last one', () => {
-  const running: WorkflowStatus[] = ['offen', 'eingereicht', 'teilabgerechnet', 'abgerechnet'];
-  for (const status of running) {
+  // Read off the shared ladder, so a sixth rung is covered here by itself.
+  for (const status of WORKFLOW_STATUSES.filter((rung) => rung !== 'erledigt')) {
     assert.equal(matchesStatus(status, 'nicht-erledigt'), true, status);
   }
   assert.equal(matchesStatus('erledigt', 'nicht-erledigt'), false);

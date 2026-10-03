@@ -9,7 +9,14 @@ Node.js 24+ and Docker with Compose. The repo is an npm-workspaces monorepo:
 
 - `apps/api` — Node/TypeScript + Express backend (raw SQL via the `mariadb` driver, `umzug` migrations)
 - `apps/web` — Vue 3 + TypeScript + Vite SPA
-- `packages/shared-types` — types shared between the two
+- `packages/shared` (`@eunomia/shared`) — what both sides have to agree on: status names, error
+  codes, enum values, setting keys, the payment-due rule, the German number and date formats
+
+The shared package is compiled, and both apps resolve its `dist`, so it is built **first** — that is
+why `npm run typecheck`, `test` and `build` name the three workspaces in order instead of using
+`--workspaces`. The dev scripts build it once on start; editing it during a dev session needs
+`npm run build --workspace packages/shared`, since neither `tsx watch` nor Vite watches
+`node_modules`.
 
 ```bash
 npm install   # installs all workspace dependencies

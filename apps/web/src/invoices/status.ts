@@ -1,3 +1,4 @@
+import type { SubmissionStatus, WorkflowStatus } from '@eunomia/shared';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faCircleCheck,
@@ -7,12 +8,13 @@ import {
   faReceipt,
 } from '@fortawesome/free-solid-svg-icons';
 
-/** The derived invoice workflow status (see the backend's invoice-status.ts). */
-export type WorkflowStatus =
-  'offen' | 'eingereicht' | 'teilabgerechnet' | 'abgerechnet' | 'erledigt';
+/**
+ * How the invoice status ladder is shown. The names of the rungs are the API's
+ * (the status is derived there, never stored) and come from @eunomia/shared, so
+ * a new one cannot be labelled here and missed there, or the other way round.
+ */
 
-/** Status of one submission of an invoice, i.e. at one policy. */
-export type SubmissionStatus = 'eingereicht' | 'abgerechnet';
+export type { SubmissionStatus, WorkflowStatus };
 
 export interface StatusDisplay {
   /** Maps 1:1 to EuBadge tones. */
@@ -20,14 +22,6 @@ export interface StatusDisplay {
   label: string;
   icon: IconDefinition;
 }
-
-export const STATUS_ORDER: WorkflowStatus[] = [
-  'offen',
-  'eingereicht',
-  'teilabgerechnet',
-  'abgerechnet',
-  'erledigt',
-];
 
 export const STATUS_DISPLAY: Record<WorkflowStatus, StatusDisplay> = {
   offen: { tone: 'open', label: 'Offen', icon: faFileInvoice },

@@ -142,15 +142,15 @@ je Punkt in [Code-Review.md](Code-Review.md), dort unter der genannten CR-Nummer
 werden vor 1.0.0 umgesetzt (Entscheidung vom 20260929); besonders benannt wurden CR-04, CR-05,
 CR-20, CR-22, CR-23, CR-29, CR-30 und CR-31. Der Schnitt in Scheiben steht in Abschnitt 7 des
 Code-Reviews.
-1.	Geteilte Typen: `packages/shared-types` ist seit Slice 1 leer (CR-01)
+1.	Geteilte Typen: `packages/shared-types` ist seit Slice 1 leer (CR-01) — Umgesetzt mit v0.16.0-slice.6
 	Das Paket enthält nur `export type Placeholder = never`. Seitdem führen beide Apps dieselben Verträge doppelt: die Status-Unions, die 51 Fehlercodes, die Enum-Werte (`ContractKind`, `BonusForfeitRule`), die Settings-Schlüssel und rund zwanzig DTO-Formen, die im Web als Interface nachgeschrieben sind. Der Compiler prüft heute keine einzige dieser Zusagen; eine Spalte, die ihren Typ wechselt, fällt erst zur Laufzeit auf. Paket aufsetzen (Build-Reihenfolge, Vite-Alias, Image) und zuerst hineinlegen, was auseinanderlaufen kann: Status, Fehlercodes, Enums, Settings-Schlüssel. CR-02 bis CR-05 folgen dieser Scheibe.
-2.	Zahlungsampel zweimal implementiert, mit abweichender Datumsrechnung (CR-02)
+2.	Zahlungsampel zweimal implementiert, mit abweichender Datumsrechnung (CR-02) — Umgesetzt mit v0.16.0-slice.6
 	`calcPaymentState` und `DUE_SOON_DAYS = 10` stehen in `apps/api/src/reminders/payment.ts` und in `apps/web/src/invoices/payment.ts`, ausdrücklich als Zwilling dokumentiert. Die Datumsrechnung ist aber verschieden: die API vergleicht Kalendertage als UTC, das Web schneidet auf den lokalen Tagesanfang. In Europe/Berlin fällt beides zusammen, westlich von UTC nicht — dort stünde die Ampel einen Tag zu früh auf Rot, während die Erinnerung noch schwiege. Mit CR-01 zusammenlegen, die API-Fassung nehmen.
-3.	Status-Typen wörtlich doppelt (CR-03)
+3.	Status-Typen wörtlich doppelt (CR-03) — Umgesetzt mit v0.16.0-slice.6
 	`WorkflowStatus` und `SubmissionStatus` stehen zeichengleich in `apps/api/src/domain/invoice-status.ts` und `apps/web/src/invoices/status.ts`, dazu `ContractKind` und `BonusForfeitRule` in `apps/web/src/contracts/api.ts`. Ein sechster Status — die Leiter ist schon zweimal gewachsen — wird an zwei Orten gepflegt; fällt einer aus, rendert das Web einen leeren Badge-Ton. Erster Inhalt des geteilten Pakets.
-4.	`defaultAccount` doppelt (CR-04)
+4.	`defaultAccount` doppelt (CR-04) — Umgesetzt mit v0.16.0-slice.6
 	Dieselbe Funktion mit demselben Kommentar in `apps/api/src/domain/agency-accounts.ts` und `apps/web/src/agencies/accounts.ts`; beide nennen einander „the twin of“. Der Inhalt ist eine Zeile, aber es ist die Regel, welches Konto vorgeschlagen wird — und die hat sich in Slice 44 schon einmal geändert. Mit CR-01 in das geteilte Paket.
-5.	Deutsche Formatierung doppelt, mit unterschiedlichem Leerverhalten (CR-05)
+5.	Deutsche Formatierung doppelt, mit unterschiedlichem Leerverhalten (CR-05) — Umgesetzt mit v0.16.0-slice.6
 	`germanDate`/`germanMoney` in `apps/api/src/lib/german.ts` gegen `germanDate`/`euro` in `apps/web/src/lib/format.ts`. Die API-Fassung prüft ihre Eingabe nicht: `germanDate('')` liefert `undefined.undefined.undefined`. Erreichbar wäre das über den Papierkorb, dort aber nur bei einem Geburtsdatum, das die Datenbank als NOT NULL ausschließt. Zusammenlegen und die Web-Fassung nehmen, die den Dash kennt.
 6.	`directPayment` verlässt die API als 0/1, die anderen beiden Flags als boolean (CR-06) — Umgesetzt mit v0.16.0-slice.3
 	`present()` in `domain/invoices.ts` wandelt `reimbursementClosed` und `notCovered` in `Boolean`, lässt `directPayment` aber als TINYINT stehen. Das Web schreibt deshalb `directPayment: number` in seine DTO und vergleicht an drei Stellen gegen `=== 1`. Drei Flags derselben Zeile, zwei Darstellungen — und wer die dritte behandelt wie die ersten beiden, bekommt nur zufällig das Richtige. In `present()` mitwandeln, die `=== 1`-Vergleiche entfernen.

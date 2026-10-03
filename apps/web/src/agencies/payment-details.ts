@@ -1,5 +1,6 @@
-import { iban } from '../lib/format';
+import { defaultPaymentDetail } from '@eunomia/shared';
 
+import { iban } from '../lib/format';
 import type { AgencyPaymentDetailDto } from './api';
 
 /**
@@ -13,19 +14,16 @@ import type { AgencyPaymentDetailDto } from './api';
  *
  * Until Slice 44 they were a history and a rule said which one applied.
  * Production said otherwise — an agency names three on one bill and only the
- * second of them on the next — so the invoice names its own. What is left here
- * is how to suggest one and how to write one down.
+ * second of them on the next — so the invoice names its own. What is left here is
+ * how to pick one out and how to write one down.
  */
 
 /**
- * The payment details to suggest for an agency: the ones recorded first, which is
- * what an agency listing several is normally paid on. Only a suggestion — what
- * counts is what the invoice names. The twin of `defaultPaymentDetail` in
- * apps/api/src/domain/agency-payment-details.ts.
+ * Which set to suggest is the one rule both sides apply — the create form here
+ * and the flattened agency row in the API — so it lives in @eunomia/shared and is
+ * handed on from here, next to the pickers that use it.
  */
-export function defaultPaymentDetail<T>(details: T[]): T | null {
-  return details[0] ?? null;
-}
+export { defaultPaymentDetail };
 
 /** The payment details with the given UID, or null — for an invoice naming one. */
 export function paymentDetailByUID<T extends { agencyAccountUID: string }>(

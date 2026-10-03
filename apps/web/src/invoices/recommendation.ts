@@ -12,7 +12,7 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { euro, plural } from '../lib/format';
+import { germanMoney, plural } from '../lib/format';
 import type {
   PlanInvoiceDto,
   PlanInvoicePolicyAction,
@@ -51,7 +51,7 @@ const joinNumbers = (policies: Map<string, PlanPolicyDto>, entries: PlanEntry[])
 /** "bei X-1 (800,00 €)", or a hint when the invoice only fills the deductible there. */
 function submitPhrase(policies: Map<string, PlanPolicyDto>, entry: PlanEntry): string {
   const amount =
-    entry.reimbursement > 0 ? euro(entry.reimbursement) : 'zählt auf die Selbstbeteiligung';
+    entry.reimbursement > 0 ? germanMoney(entry.reimbursement) : 'zählt auf die Selbstbeteiligung';
   return `bei ${numberOf(policies, entry.contractUID)} (${amount})`;
 }
 
@@ -105,7 +105,7 @@ export function invoiceBadge(
         tone: 'partial',
         icon: faHourglassHalf,
         label: 'Abwarten',
-        tooltip: `Bei ${joinNumbers(policies, toWait)} erst einreichen, wenn das Jahr absehbar ist (möglich: ${euro(possible)}).`,
+        tooltip: `Bei ${joinNumbers(policies, toWait)} erst einreichen, wenn das Jahr absehbar ist (möglich: ${germanMoney(possible)}).`,
       };
     }
     case 'hold': {
@@ -178,7 +178,7 @@ export function bonusView(policy: PlanPolicyDto): BonusView {
           tone: 'submitted',
           icon: faTriangleExclamation,
           label: 'In Gefahr',
-          detail: `${euro(policy.bonusAmount)} erwartet${inherited} – geht mit der Einreichung verloren`,
+          detail: `${germanMoney(policy.bonusAmount)} erwartet${inherited} – geht mit der Einreichung verloren`,
         };
       }
       if (policy.pendingClaims > 0) {
@@ -186,14 +186,14 @@ export function bonusView(policy: PlanPolicyDto): BonusView {
           tone: 'submitted',
           icon: faTriangleExclamation,
           label: 'In Gefahr',
-          detail: `${euro(policy.bonusAmount)} erwartet${inherited} – ${plural(policy.pendingClaims, 'Einreichung', 'Einreichungen')} noch ohne Abrechnung`,
+          detail: `${germanMoney(policy.bonusAmount)} erwartet${inherited} – ${plural(policy.pendingClaims, 'Einreichung', 'Einreichungen')} noch ohne Abrechnung`,
         };
       }
       return {
         tone: 'done',
         icon: faShieldHalved,
         label: 'Sicher',
-        detail: `${euro(policy.bonusAmount)} erwartet${inherited}`,
+        detail: `${germanMoney(policy.bonusAmount)} erwartet${inherited}`,
       };
     }
     case 'paid':
@@ -201,7 +201,7 @@ export function bonusView(policy: PlanPolicyDto): BonusView {
         tone: 'done',
         icon: faCircleCheck,
         label: 'Erhalten',
-        detail: `${euro(policy.bonusAmount)} laut Versicherung`,
+        detail: `${germanMoney(policy.bonusAmount)} laut Versicherung`,
       };
     case 'forfeited':
       return {
@@ -244,13 +244,13 @@ export function policyVerdict(policy: PlanPolicyDto, plan: ReimbursementPlanDto)
       const above =
         policy.worthUsingAbove === null
           ? 'Das bleibt auch bei höheren Kosten so, weil die Obergrenze unter dem Bonus liegt.'
-          : `Einreichen lohnt sich erst, wenn mehr als ${euro(policy.worthUsingAbove)} weitere Kosten dazukommen.`;
+          : `Einreichen lohnt sich erst, wenn mehr als ${germanMoney(policy.worthUsingAbove)} weitere Kosten dazukommen.`;
       return `Der Bonus ist mehr wert als die mögliche Erstattung. ${above}`;
     }
     case 'wait':
-      return `Hier ließen sich ${euro(policy.expectedReimbursement)} erstatten. Kommen aber noch Kosten dazu, lohnt sich ${mayTip(plan)} – dann erstattet diese Police nur den Rest. Deshalb erst einreichen, wenn das Jahr absehbar ist.`;
+      return `Hier ließen sich ${germanMoney(policy.expectedReimbursement)} erstatten. Kommen aber noch Kosten dazu, lohnt sich ${mayTip(plan)} – dann erstattet diese Police nur den Rest. Deshalb erst einreichen, wenn das Jahr absehbar ist.`;
     case 'exhausted':
-      return `Die Obergrenze von ${euro(policy.reimbursementCap)} ist erreicht – keine weiteren Rechnungen hier einreichen.`;
+      return `Die Obergrenze von ${germanMoney(policy.reimbursementCap)} ist erreicht – keine weiteren Rechnungen hier einreichen.`;
     default:
       break;
   }

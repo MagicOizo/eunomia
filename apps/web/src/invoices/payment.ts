@@ -1,3 +1,4 @@
+import { type PaymentState, calcPaymentState } from '@eunomia/shared';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faCircleCheck,
@@ -6,55 +7,27 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
+import { todayIso } from '../lib/date-input';
 import type { InvoiceDto } from './api';
 
 /**
  * The payment-status "traffic light" for an invoice — driven by the money side
  * (has the user paid the facility/agency yet, and how close is the due date),
- * separate from the reimbursement workflowStatus. Mirrors the reference app's
- * calcPaymentDue (rechnungs-verwaltung): a paid invoice is done; otherwise the
- * due date drives the urgency, and a missing due date counts as "due" so it is
- * never silently ignored.
+ * separate from the reimbursement workflowStatus.
+ *
+ * The rule itself is @eunomia/shared's: the payment reminders decide by the same
+ * one, and a mail that disagreed with the light on screen would be a bug nobody
+ * could explain. What is left here is how the four states look, and which day
+ * counts as today in a browser.
  */
-export type PaymentState = 'paid' | 'uncritical' | 'due' | 'overdue';
 
-/**
- * Due within this many days (but not yet overdue) counts as "due". The payment
- * reminders apply the same rule server-side; keep both in step
- * (apps/api/src/reminders/payment.ts).
- */
-export const DUE_SOON_DAYS = 10;
+export { DUE_SOON_DAYS, type PaymentState } from '@eunomia/shared';
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-/** Midnight of the given date in local time, so comparisons are whole-day based. */
-function startOfDay(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-}
-
-/** Whole days from `today` until `date` (negative = in the past). */
-function daysUntil(date: string, today: Date): number {
-  return Math.round((startOfDay(new Date(date)) - startOfDay(today)) / MS_PER_DAY);
-}
-
-/**
- * Derives the payment state. `today` is injectable for testing.
- * - paid: already transferred, or settled directly in cash
- * - overdue: unpaid and the due date has passed
- * - due: unpaid and due within DUE_SOON_DAYS — or no due date recorded
- * - uncritical: unpaid but the due date is still comfortably ahead
- */
-export function calcPaymentState(
+/** The traffic light of an invoice, as of the reader's own calendar day. */
+export function paymentState(
   invoice: Pick<InvoiceDto, 'transferDate' | 'transferUntilDate' | 'directPayment'>,
-  today: Date = new Date(),
 ): PaymentState {
-  if (invoice.transferDate !== null || invoice.directPayment) return 'paid';
-  if (invoice.transferUntilDate === null) return 'due';
-
-  const days = daysUntil(invoice.transferUntilDate, today);
-  if (days < 0) return 'overdue';
-  if (days < DUE_SOON_DAYS) return 'due';
-  return 'uncritical';
+  return calcPaymentState(invoice, todayIso());
 }
 
 export interface PaymentDisplay {

@@ -1,8 +1,8 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
 import { withTransaction } from '../db/transaction.js';
 import { ApiError } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import { logEvent } from '../lib/log.js';
 import { SecretBoxError, decryptSecret, encryptSecret } from '../lib/secret-box.js';
 import {

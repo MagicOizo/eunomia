@@ -1,4 +1,4 @@
-import { ERROR_CODES, type ErrorCode, type ErrorDetails } from './error-codes.js';
+import { ERROR_CODES, type ErrorCode, type ErrorDetails } from '@eunomia/shared';
 
 /**
  * Base class for errors that map to a specific HTTP response. Handlers throw
@@ -6,7 +6,7 @@ import { ERROR_CODES, type ErrorCode, type ErrorDetails } from './error-codes.js
  * error middleware turns them into the uniform `{ error: { code, message } }`
  * envelope. AuthError extends this so the whole app shares one error shape.
  *
- * `code` is what the UI translates (see error-codes.ts), and `details` carries
+ * `code` is what the UI translates (see @eunomia/shared), and `details` carries
  * the data its sentence needs — the message repeats that data for API clients
  * and logs, but the UI never has to parse a sentence for it.
  */

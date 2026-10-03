@@ -21,7 +21,7 @@ import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { describeError } from '../lib/errors';
-import { euro, germanDate, plural } from '../lib/format';
+import { germanDate, germanMoney, plural } from '../lib/format';
 import {
   BONUS_FORFEIT_RULE_LABEL,
   type BonusTierDto,
@@ -270,7 +270,7 @@ const termsPeriod = (t: TermsDto): string =>
       : `${t.validFromYear} – ${t.validToYear}`;
 const percent = (value: number): string => `${new Intl.NumberFormat('de-DE').format(value)} %`;
 const tierLabel = (tier: BonusTierDto): string =>
-  `ab ${tier.claimFreeYears} J.: ${euro(tier.bonusAmount)}`;
+  `ab ${tier.claimFreeYears} J.: ${germanMoney(tier.bonusAmount)}`;
 
 // --- Year history (claim-free years & bonus) ---------------------------------
 
@@ -306,7 +306,7 @@ const scaleOutdated = (y: BonusYearDto): boolean =>
 function expectedLabel(y: BonusYearDto): string {
   if (y.expectedBonus === null) return 'keine Konditionen';
   if (!y.hasBonusScale) return 'kein Bonus';
-  return euro(y.expectedBonus);
+  return germanMoney(y.expectedBonus);
 }
 
 const yearDialog = reactive({ open: false, year: null as BonusYearDto | null });
@@ -432,7 +432,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     <EuIconLabel :icon="faCommentDots" :label="premium.note" />
                   </span>
                 </td>
-                <td class="eu-contract__num">{{ euro(premium.monthlyPremium) }}</td>
+                <td class="eu-contract__num">{{ germanMoney(premium.monthlyPremium) }}</td>
                 <td class="eu-contract__actions">
                   <EuButton
                     variant="secondary"
@@ -506,9 +506,11 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                 :key="terms.termsUID"
               >
                 <td class="eu-contract__period">{{ termsPeriod(terms) }}</td>
-                <td class="eu-contract__num">{{ euro(terms.deductible) }}</td>
+                <td class="eu-contract__num">{{ germanMoney(terms.deductible) }}</td>
                 <td class="eu-contract__num">
-                  {{ terms.reimbursementCap === null ? 'keine' : euro(terms.reimbursementCap) }}
+                  {{
+                    terms.reimbursementCap === null ? 'keine' : germanMoney(terms.reimbursementCap)
+                  }}
                 </td>
                 <td class="eu-contract__num">{{ percent(terms.reimbursementRate) }}</td>
                 <td>
@@ -608,7 +610,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                   </span>
                 </td>
                 <td class="eu-contract__num">
-                  {{ y.actualBonus === null ? '–' : euro(y.actualBonus) }}
+                  {{ y.actualBonus === null ? '–' : germanMoney(y.actualBonus) }}
                 </td>
                 <td class="eu-contract__actions">
                   <EuButton

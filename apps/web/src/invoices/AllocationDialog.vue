@@ -5,7 +5,7 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import { euro, germanDate } from '../lib/format';
+import { germanDate, germanMoney } from '../lib/format';
 import type { InvoiceAllocationDto, InvoiceDto } from './api';
 
 /**
@@ -72,7 +72,7 @@ function submit(): void {
   // Checked here as well as on the server, so a correction is not sent only to
   // come back rejected.
   if (Math.round(reimbursement.value * 100) > Math.round(maxReimbursement() * 100)) {
-    localError.value = `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — hier sind höchstens ${euro(
+    localError.value = `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — hier sind höchstens ${germanMoney(
       maxReimbursement(),
     )} möglich.`;
     return;
@@ -93,11 +93,11 @@ function submit(): void {
         <button
           type="button"
           class="eu-alloc__take"
-          :aria-label="`Rechnungsbetrag ${euro(invoice.invoiceAmount)} in Erstattung übernehmen`"
-          :title="`${euro(invoice.invoiceAmount)} in Erstattung übernehmen`"
+          :aria-label="`Rechnungsbetrag ${germanMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
+          :title="`${germanMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
           @click="takeInvoiceAmount"
         >
-          {{ euro(invoice.invoiceAmount) }}</button
+          {{ germanMoney(invoice.invoiceAmount) }}</button
         >, erstattet über Abrechnung {{ allocation.billingNumber }} vom
         {{ germanDate(allocation.billingDate) }}.
       </p>

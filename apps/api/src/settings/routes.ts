@@ -1,3 +1,4 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -7,7 +8,6 @@ import { PERMISSIONS } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { ApiError } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import { type Mailer, type MailerDeps, createMailer } from '../mail/mailer.js';
 import { createMailSettingsStore } from '../mail/store.js';
 import { type ReminderRunner, createReminderRunner } from '../reminders/runner.js';

@@ -46,7 +46,10 @@
  * All arithmetic runs in whole cents; inputs and outputs are euros.
  */
 
-export type PolicyKind = 'FULL' | 'SUPPLEMENTARY';
+import type { ContractKind } from '@eunomia/shared';
+
+/** The kind of cover, under this module's vocabulary (`contractKind` in the API). */
+export type PolicyKind = ContractKind;
 
 /**
  * Where a policy's bonus stands this year: `choice` = still at stake,

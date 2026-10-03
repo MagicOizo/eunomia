@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { ERROR_CODES } from '@eunomia/shared';
+
 import { ApiError } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import type { Mailer, MailMessage, MailSendStatus } from '../mail/mailer.js';
 import { createReminderRunner } from './runner.js';
 import type {

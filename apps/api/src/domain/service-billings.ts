@@ -1,3 +1,4 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -18,7 +19,6 @@ import {
 } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { conflict, notFound } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { likeTerm } from '../lib/like.js';
 import { allocationEntriesSchema, createAllocationsForBilling } from './allocations.js';

@@ -1,6 +1,6 @@
 {
   "name": "@eunomia/api",
-  "version": "0.16.0-slice.5",
+  "version": "0.16.0-slice.6",
   "private": true,
   "description": "Eunomia backend API.",
   "type": "module",
@@ -19,6 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@eunomia/shared": "*",
     "express": "^5.2.1",
     "express-rate-limit": "^7.5.1",
     "jose": "^5.10.0",

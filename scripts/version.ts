@@ -21,7 +21,7 @@ import { compareVersions, parseVersion, type ParsedVersion } from '../apps/api/s
 import { readChangelogSection } from './changelog.ts';
 
 /** Every workspace that carries the version; `''` is the repo root. */
-const WORKSPACES = ['', 'apps/api', 'apps/web', 'packages/shared-types'];
+const WORKSPACES = ['', 'apps/api', 'apps/web', 'packages/shared'];
 
 /** The pre-release identifier that marks a slice preview (§2.9). */
 const SLICE_ID = 'slice';

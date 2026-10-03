@@ -5,6 +5,7 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { germanDate } from '../lib/format';
+import { todayIso } from '../lib/date-input';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { type BillingDto, type InvoiceDto, searchBillings, updateBilling } from './api';
@@ -26,8 +27,6 @@ const busyUID = ref<string | null>(null);
 const error = ref<string | null>(null);
 /** Per-billing form state for filing a new objection. */
 const forms = reactive<Record<string, { date: string; note: string }>>({});
-
-const today = (): string => new Date().toISOString().slice(0, 10);
 
 function isOpen(billing: BillingDto): boolean {
   return billing.objectionDate !== null && billing.objectionResolvedDate === null;
@@ -59,7 +58,7 @@ async function load(): Promise<void> {
     );
     billings.value = lists.flat().filter((b) => booked.has(b.billingUID));
     for (const b of billings.value) {
-      forms[b.billingUID] ??= { date: today(), note: '' };
+      forms[b.billingUID] ??= { date: todayIso(), note: '' };
     }
   } catch (err) {
     error.value =
@@ -108,7 +107,7 @@ function file(billing: BillingDto): void {
 
 function resolve(billing: BillingDto): void {
   void run(billing.billingUID, () =>
-    updateBilling(billing.billingUID, { objectionResolvedDate: today() }),
+    updateBilling(billing.billingUID, { objectionResolvedDate: todayIso() }),
   );
 }
 </script>

@@ -1,7 +1,9 @@
+import type { BonusForfeitRule, ContractKind } from '@eunomia/shared';
+
 import { apiFetch } from '../lib/api';
 
-export type ContractKind = 'FULL' | 'SUPPLEMENTARY';
-export type BonusForfeitRule = 'ON_SUBMISSION' | 'ON_REIMBURSEMENT';
+/** The two enums are the API's, labelled here (see @eunomia/shared). */
+export type { BonusForfeitRule, ContractKind };
 
 export const CONTRACT_KIND_LABEL: Record<ContractKind, string> = {
   FULL: 'Vollversicherung',

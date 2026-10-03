@@ -1,5 +1,4 @@
-import { germanDate, germanMoney } from '../lib/german.js';
-import { type ReminderStage, daysUntil } from './payment.js';
+import { type ReminderStage, daysUntil, germanDate, germanMoney } from '@eunomia/shared';
 
 /**
  * The text of a payment reminder (see Notes/eunomia-plan.md, Slice 31).

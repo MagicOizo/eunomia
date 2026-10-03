@@ -1,12 +1,13 @@
-/** Shared display formatters. */
+/**
+ * Display formatters of the UI.
+ *
+ * Amounts and dates are formatted the same way on both sides — the reminder
+ * mails and the trash labels the API writes out have to read like the same
+ * values in a table here — so those two live in @eunomia/shared and are handed
+ * on from here, which keeps one door for the views.
+ */
 
-/** Formats an optional money value as EUR (numbers arrive from the API as plain numbers). */
-export function euro(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '–';
-  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(
-    Number(value),
-  );
-}
+export { germanDate, germanMoney } from '@eunomia/shared';
 
 /**
  * Counted noun with the matching German form: `plural(1, 'Rechnung',
@@ -16,13 +17,6 @@ export function euro(value: unknown): string {
  */
 export function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
-}
-
-/** Formats an ISO date string (YYYY-MM-DD) as DD.MM.YYYY. */
-export function germanDate(value: unknown): string {
-  if (typeof value !== 'string' || value === '') return '–';
-  const [year, month, day] = value.split('-');
-  return `${day}.${month}.${year}`;
 }
 
 /**

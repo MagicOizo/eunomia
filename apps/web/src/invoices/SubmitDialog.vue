@@ -6,6 +6,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
+import { todayIso } from '../lib/date-input';
 import { germanDate, plural } from '../lib/format';
 import type { InvoiceDto } from './api';
 import { type ContractOption, contractsCoveringPeriod, treatmentPeriod } from './eligibility';
@@ -74,7 +75,7 @@ watch(
     if (!open) return;
     localError.value = null;
     showAll.value = false;
-    submittedDate.value = new Date().toISOString().slice(0, 10);
+    submittedDate.value = todayIso();
     contractUID.value = offered.value.length === 1 ? offered.value[0].value : '';
   },
   { immediate: true },

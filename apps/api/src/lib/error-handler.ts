@@ -1,8 +1,8 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 
 import { ApiError } from './api-error.js';
-import { ERROR_CODES } from './error-codes.js';
 
 /** MariaDB driver error shape we care about (a subset of SqlError). */
 interface SqlErrorLike {

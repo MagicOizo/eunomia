@@ -7,6 +7,30 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.16.0-slice.6 — 2026-10-03
+
+The package both apps were supposed to share has been empty since the first slice, so every contract
+between them was written down twice and kept in step by hand. It now holds what cannot be allowed to
+drift: the status names, the error codes, the policy enums, the setting keys, the payment-due rule
+and the German number and date formats. Two things a user can notice changed with it.
+
+- **The payment-due rule is one rule now.** The traffic light in the invoice list and the payment
+  reminder mails each had their own copy — the same threshold, but not the same date arithmetic: the
+  server compared calendar days, the browser cut local midnight out of a UTC timestamp. West of UTC
+  the light would have turned red a day before the mail went out. Both sides now use the server's
+  version, which compares calendar days as calendar days.
+- **Today is the reader's today.** Five date fields offered "today" as their default and took
+  it from `toISOString()`, which is the UTC day: in Berlin, between midnight and 2 a.m., they
+  prefilled yesterday. They now use the reader's own calendar day — the one the light reads too.
+- **A contract the compiler checks.** The web's table of German error sentences is keyed by the
+  API's list of error codes, and its setting labels by the API's list of setting keys, so a new
+  code without a sentence or a renamed key no longer compiles. The status ladder, the two policy
+  enums and the rule for which payment details to suggest exist once instead of twice.
+- **The German formats no longer disagree about nothing.** `germanDate('')` wrote
+  "undefined.undefined.undefined" into a trash label on the server while the web printed a dash for
+  the same value; both print the dash now, and an amount that is not a number prints one too instead
+  of "NaN €". The web's `euro()` is called `germanMoney()` with its twin.
+
 ## 0.16.0-slice.5 — 2026-09-30
 
 Four helpers this project already had, now used everywhere they belong. Nothing a user can see

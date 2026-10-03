@@ -17,9 +17,9 @@ import { invoicePaymentDetail, paymentDetailLabel } from '../agencies/payment-de
 import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
-import { euro, germanDate } from '../lib/format';
+import { germanDate, germanMoney } from '../lib/format';
 import type { InvoiceDto } from './api';
-import { PAYMENT_COLOR_VAR, calcPaymentState } from './payment';
+import { PAYMENT_COLOR_VAR, paymentState } from './payment';
 import PaymentQrPopover from './PaymentQrPopover.vue';
 
 const props = defineProps<{
@@ -33,7 +33,7 @@ const props = defineProps<{
   paymentDetails?: AgencyPaymentDetailDto[];
 }>();
 
-const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[calcPaymentState(props.invoice)]})`);
+const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[paymentState(props.invoice)]})`);
 
 /**
  * The details the money went to (or is going to): the ones the invoice names
@@ -50,9 +50,7 @@ const payee = computed(() => paymentDetail.value?.recipientName ?? props.agencyN
 // gets no GiroCode. Reuses the traffic light's rule rather than repeating it.
 const showQr = computed(
   () =>
-    paymentDetail.value !== null &&
-    payee.value !== null &&
-    calcPaymentState(props.invoice) !== 'paid',
+    paymentDetail.value !== null && payee.value !== null && paymentState(props.invoice) !== 'paid',
 );
 </script>
 
@@ -84,7 +82,7 @@ const showQr = computed(
       </template>
 
       <dt><EuIconLabel :icon="faEuroSign" label="Rechnungssumme" /></dt>
-      <dd>{{ euro(invoice.invoiceAmount) }}</dd>
+      <dd>{{ germanMoney(invoice.invoiceAmount) }}</dd>
 
       <template v-if="invoice.documentLink">
         <dt><EuIconLabel :icon="faReceipt" label="Dokument" /></dt>

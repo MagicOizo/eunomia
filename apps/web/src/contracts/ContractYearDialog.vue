@@ -6,7 +6,7 @@ import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import { euro, plural } from '../lib/format';
+import { germanMoney, plural } from '../lib/format';
 import type { BonusYearDto, ContractYearInput } from './api';
 
 /**
@@ -60,7 +60,11 @@ function submit(): void {
     <form class="eu-form" @submit.prevent="submit">
       <p v-if="year" class="eu-form__note">
         Prognose:
-        {{ year.expectedBonus === null ? 'keine Konditionen erfasst' : euro(year.expectedBonus) }}
+        {{
+          year.expectedBonus === null
+            ? 'keine Konditionen erfasst'
+            : germanMoney(year.expectedBonus)
+        }}
         bei {{ plural(year.claimFreeStreak, 'leistungsfreien Jahr', 'leistungsfreien Jahren') }} in
         Folge.
       </p>

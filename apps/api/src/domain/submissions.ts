@@ -1,3 +1,4 @@
+import { ERROR_CODES } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -8,9 +9,8 @@ import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import type { CrudTable } from '../crud/repository.js';
-import { badRequest, conflict, notFound } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 import { withTransaction } from '../db/transaction.js';
+import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern, generateEntityId } from '../lib/ids.js';
 import { requireContractAccount, requireSubmissionAccount } from './workflow-access.js';
 
@@ -69,7 +69,7 @@ function assertInvoicesSubmittable(
 ): void {
   const byUid = new Map(candidates.map((c) => [c.invoiceUID, c]));
   // Failing invoices are named by their number — that is what the user sees in
-  // the list, and what the UI puts into its message (see lib/error-codes.ts).
+  // the list, and what the UI puts into its message (see @eunomia/shared).
   const failing = (predicate: (c: CandidateInvoice) => boolean): string[] =>
     requested
       .map((uid) => byUid.get(uid) as CandidateInvoice)

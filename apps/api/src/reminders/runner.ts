@@ -1,9 +1,10 @@
+import { type ReminderStage, calcPaymentState, daysUntil } from '@eunomia/shared';
+
 import { logEvent } from '../lib/log.js';
 import type { Mailer } from '../mail/mailer.js';
 import { type ReminderEntry, renderReminderMail } from './message.js';
-import { type ReminderStage, calcPaymentState, daysUntil } from './payment.js';
-import type { PayableInvoiceRow, ReminderRecord, ReminderStore } from './store.js';
 import { zonedNow } from './schedule.js';
+import type { PayableInvoiceRow, ReminderRecord, ReminderStore } from './store.js';
 
 /**
  * One run of the payment reminders (see Notes/eunomia-plan.md, Slice 31).

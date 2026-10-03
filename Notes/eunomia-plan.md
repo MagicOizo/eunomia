@@ -70,7 +70,7 @@ Ergänzung nach Durchsicht des ersten Umsetzungsversuchs (siehe 1.4) und Klärun
 
 | Bereich | Entscheidung | Begründung |
 |---|---|---|
-| Repo-Struktur | Monorepo, npm workspaces: `apps/api`, `apps/web`, ggf. `packages/shared-types` | Ein Build, eine Versionsnummer, gemeinsame TS-Typen zwischen API und Web ohne ein separat zu veröffentlichendes Paket |
+| Repo-Struktur | Monorepo, npm workspaces: `apps/api`, `apps/web`, `packages/shared` | Ein Build, eine Versionsnummer, gemeinsamer Code zwischen API und Web ohne ein separat zu veröffentlichendes Paket. Das Paket (bis Scheibe 5 der Review-Arbeit ein leerer Platzhalter namens `shared-types`, seitdem `@eunomia/shared`) enthält, **was beide Seiten gleich benennen oder gleich entscheiden**: die Status-Namen, die Fehlercodes, die Enum-Werte, die Settings-Schlüssel, die Fälligkeitsregel, die Vorschlagsregel für Kontoverbindungen und die deutschen Zahl-/Datumsformate. Nicht hinein gehört, was eine Seite allein entscheidet (Anzeige, Datenbankzugriff). Es wird kompiliert und zuerst gebaut; die API importiert sein `dist` zur Laufzeit |
 | Backend-Sprache | TypeScript auf Node.js 24 (LTS) | Typsicherheit über die ganze API; Node 24 ist bereits lokal installiert und war schon im Vorgänger als Zielversion vorgesehen (siehe `future-dev-environment.md` §4.1) |
 | Backend-Framework | Express 5, wie im Vorgänger | Die dort entwickelten Konventionen (siehe `eunomia-description.md` §6) waren solide; kein Grund für einen Wechsel |
 | Frontend | Vue 3 (`<script setup>`) + TypeScript + Vite, `vue-router`, `pinia` | SPA mit Routing und State-Management, deutlich weniger Boilerplate als React für die formular-/dialoglastigen Screens dieser App |
@@ -276,7 +276,7 @@ Jeder Slice ist für sich lauffähig/überprüfbar (App startet, Tests laufen, s
 
 ## Slice 0 — Projekt-Grundgerüst
 **Ziel:** Monorepo steht, alle Werkzeuge sind lauffähig, noch ohne Fachlogik.
-- npm workspaces (`apps/api`, `apps/web`, `packages/shared-types`)
+- npm workspaces (`apps/api`, `apps/web`, `packages/shared` — damals `shared-types`)
 - TypeScript-Konfiguration (strict) für beide Apps, ESLint + Prettier
 - `docker-compose.yml` mit App-Container (Platzhalter) + MariaDB-Container, `.env.example`
 - GitHub Actions: Lint + Typecheck + Test-Platzhalter
@@ -821,7 +821,7 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 **Umgesetzt (2026-09-24).** Entscheidungen beim Bau:
 
 - **Das Fälligkeitsfenster (10 Tage) ist bewusst keine Einstellung.** Was „fällig" heißt, definiert die Ampel in der Rechnungsliste; eine zweite, editierbare Zahl könnte davon abweichen („die Ampel ist gelb, aber es kam keine Mail"), und die Einstellungsseite ist für Nutzer ohne `MANAGE_SETTINGS` nicht einmal lesbar. Konfigurierbar ist nur der Wiederholungsabstand.
-- **Die Regel steht serverseitig neu** (`reminders/payment.ts`) als bewusste Zweitschrift zu `apps/web/src/invoices/payment.ts`, mit gegenseitigem Kommentarverweis und derselben Schwelle in beiden Testdateien. Das einzige echte Zuhause wäre ein geteiltes Paket — `packages/shared-types` ist bis heute ein leerer Platzhalter, den keine App importiert, und der erste app-übergreifende Import samt Build-Reihenfolge, Vite-Alias und Dockerfile wäre ein Nebenbau. → Backlog.
+- **Die Regel steht serverseitig neu** (`reminders/payment.ts`) als bewusste Zweitschrift zu `apps/web/src/invoices/payment.ts`, mit gegenseitigem Kommentarverweis und derselben Schwelle in beiden Testdateien. Das einzige echte Zuhause wäre ein geteiltes Paket — `packages/shared-types` ist bis heute ein leerer Platzhalter, den keine App importiert, und der erste app-übergreifende Import samt Build-Reihenfolge, Vite-Alias und Dockerfile wäre ein Nebenbau. → Backlog. **Nachtrag:** mit Scheibe 5 der Review-Arbeit (v0.16.0-slice.6) in `@eunomia/shared` zusammengelegt — und die beiden Datumsrechnungen waren da schon auseinandergelaufen (CR-02).
 - **Alles ist Kalenderarithmetik, keine Zeitstempel.** `InvoiceReminders.sentOn` ist ein `DATE`, der „heutige Tag" eines Laufs ist das Datum in der eingestellten Zone, und `daysUntil` rechnet auf `YYYY-MM-DD`. Damit kann weder die Zone des Servers noch die Sommerzeit ein Zahlungsziel um einen Tag verschieben. Die Zonenrechnung selbst macht `Intl` (`reminders/schedule.ts`) — die Zonendatenbank liegt der Laufzeit bei, eine Bibliothek wäre dafür zu viel.
 - **`reminders.lastRunAt` ist Status *und* Wasserstandsmarke** des Timers, damit es nicht zwei Werte gibt, die sich widersprechen können. Der Tick (alle 5 min, `unref()`, jeder Durchlauf in `try/catch`) fragt nur: Ist die Stunde in der Zone erreicht und war der letzte Lauf an einem früheren Tag? Ein verpasstes Fenster (Rechner war um 7:00 aus) wird dadurch **nachgeholt** statt übersprungen.
 - **Gestempelt wird erst nach angenommener Mail.** Ein Fehlschlag hinterlässt keine Zeile, wird also beim nächsten Lauf erneut versucht; ein Fehler bei einem Empfänger bricht den Lauf nicht ab. Im laufenden System geprüft.
@@ -835,7 +835,7 @@ Löst 1.3.7, Modell siehe 2.3 "Datenmodell v3". Jeder Slice ist eine vollständi
 
 **Backlog aus dieser Scheibe:**
 
-- **Geteiltes Paket für die Fälligkeitsregel:** `calcPaymentState` und `DUE_SOON_DAYS` stehen in zwei Dateien. `packages/shared-types` (heute ein leerer Platzhalter) wäre das Zuhause — dafür braucht es Build-Reihenfolge, Vite-Alias und Dockerfile-Anpassung, also eine eigene Scheibe.
+- ~~**Geteiltes Paket für die Fälligkeitsregel:** `calcPaymentState` und `DUE_SOON_DAYS` stehen in zwei Dateien. `packages/shared-types` (heute ein leerer Platzhalter) wäre das Zuhause — dafür braucht es Build-Reihenfolge, Vite-Alias und Dockerfile-Anpassung, also eine eigene Scheibe.~~ — umgesetzt mit v0.16.0-slice.6 (Scheibe 5 der Review-Arbeit).
 - **Erinnerung an unbeantwortete Einreichungen** („seit über N Tagen eingereicht, keine Erstattung zugeordnet") — zweite Erinnerungsart mit eigener Schwelle und Kadenz.
 - **Abmeldelink je Nutzer:** Heute schaltet nur ein Admin die Erinnerungen ganz ab; ein einzelner Nutzer kann sich nicht abmelden.
 - **HTML-Teil der Mail** — heute reiner Text, was für eine Liste genügt, aber in manchen Clients spröde aussieht.

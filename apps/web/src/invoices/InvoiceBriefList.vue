@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { euro, germanDate } from '../lib/format';
+import { germanDate, germanMoney } from '../lib/format';
 import type { InvoiceDto } from './api';
 
 /**
@@ -29,7 +29,7 @@ defineProps<{
         <td class="eu-brief__number">{{ invoice.invoiceNumber }}</td>
         <td>{{ (invoice.facilityUID && facilityNames[invoice.facilityUID]) || '–' }}</td>
         <td>{{ germanDate(invoice.invoiceDate) }}</td>
-        <td class="eu-brief__num">{{ euro(invoice.invoiceAmount) }}</td>
+        <td class="eu-brief__num">{{ germanMoney(invoice.invoiceAmount) }}</td>
       </tr>
     </tbody>
   </table>

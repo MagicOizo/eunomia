@@ -1,5 +1,6 @@
+import { ERROR_CODES, SETTING_KEYS, type SettingKey } from '@eunomia/shared';
+
 import { badRequest } from '../lib/api-error.js';
-import { ERROR_CODES } from '../lib/error-codes.js';
 
 /**
  * The catalog of system settings (see Notes/eunomia-plan.md, 2.6): what exists,
@@ -98,8 +99,8 @@ export const SETTINGS = {
 
   /*
    * Payment reminders (Slice 31). What "due" means is NOT configurable here:
-   * the traffic light in the invoice list defines it (DUE_SOON_DAYS, see
-   * reminders/payment.ts), and a second, editable number could drift from it —
+   * the traffic light in the invoice list defines it (DUE_SOON_DAYS in
+   * @eunomia/shared), and a second, editable number could drift from it —
    * "the light is amber but no mail came". Only how often an overdue invoice
    * nags again is a matter of taste.
    */
@@ -151,11 +152,15 @@ export const SETTINGS = {
     max: 1_000_000,
     readonly: true,
   },
-} as const satisfies Record<string, SettingDefinition>;
+} as const satisfies Record<SettingKey, SettingDefinition>;
 
-export type SettingKey = keyof typeof SETTINGS;
-
-export const SETTING_KEYS = Object.keys(SETTINGS) as SettingKey[];
+/**
+ * The names are shared with the web, which asks for settings by key and labels
+ * them in German; what a setting *is* stays here. Checking the table against
+ * that list is what makes the two sides one contract: a key only this file knows
+ * does not compile, and neither does one only the package knows.
+ */
+export { SETTING_KEYS, type SettingKey };
 
 /** Narrowing helper: the definitions are `as const`, the checks need the wide type. */
 function definition(key: SettingKey): SettingDefinition {
