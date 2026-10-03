@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import type { TermsDto, TermsInput } from './api';
 
 /**
@@ -15,19 +16,18 @@ import type { TermsDto, TermsInput } from './api';
  * bound to the terms, so new bonus amounts mean a new entry; a new entry
  * starts as a copy of `template` ("vom Vorjahr übernehmen").
  */
-const props = defineProps<{
-  open: boolean;
-  /** The entry being edited, or null to record terms from a new year. */
-  entry: TermsDto | null;
-  /** Earliest allowed year (the contract's begin year); also the default for the first entry. */
-  minYear: number;
-  /** Suggested year for a new entry. */
-  suggestedYear: number;
-  /** Terms a new entry is prefilled from (usually the latest), or null. */
-  template: TermsDto | null;
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    /** The entry being edited, or null to record terms from a new year. */
+    entry: TermsDto | null;
+    /** Earliest allowed year (the contract's begin year); also the default for the first entry. */
+    minYear: number;
+    /** Suggested year for a new entry. */
+    suggestedYear: number;
+    /** Terms a new entry is prefilled from (usually the latest), or null. */
+    template: TermsDto | null;
+  }
+>();
 
 const emit = defineEmits<{ close: []; submit: [payload: TermsInput] }>();
 
@@ -38,13 +38,11 @@ const reimbursementRate = ref('');
 /** Scale rows as edited; `years` stays a string until submit, like the year field. */
 const tiers = ref<Array<{ years: string; amount: number | null }>>([]);
 const copiedFrom = ref<number | null>(null);
-const localError = ref<string | null>(null);
 
-watch(
-  () => [props.open, props.entry] as const,
-  ([open, entry]) => {
-    if (!open) return;
-    localError.value = null;
+const { shownError, fail, clear } = useFormDialog(
+  props,
+  () => {
+    const entry = props.entry;
     const source = entry ?? props.template;
     copiedFrom.value = entry === null && source !== null ? source.validFromYear : null;
     validFromYear.value = String(entry?.validFromYear ?? props.suggestedYear);
@@ -56,7 +54,7 @@ watch(
       amount: tier.bonusAmount,
     }));
   },
-  { immediate: true },
+  () => props.entry,
 );
 
 function addTier(): void {
@@ -65,16 +63,14 @@ function addTier(): void {
 }
 
 function submit(): void {
-  localError.value = null;
+  clear();
   const year = Number(validFromYear.value);
   const rate = Number(reimbursementRate.value.replace(',', '.'));
   if (!Number.isInteger(year) || year < props.minYear) {
-    localError.value = `Bitte ein Jahr ab ${props.minYear} (Vertragsbeginn) angeben.`;
-    return;
+    return fail(`Bitte ein Jahr ab ${props.minYear} (Vertragsbeginn) angeben.`);
   }
   if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
-    localError.value = 'Der Erstattungssatz muss zwischen 0 und 100 % liegen.';
-    return;
+    return fail('Der Erstattungssatz muss zwischen 0 und 100 % liegen.');
   }
   const bonusTiers = tiers.value.map((tier) => ({
     claimFreeYears: Number(tier.years),
@@ -89,12 +85,10 @@ function submit(): void {
         Number.isNaN(tier.bonusAmount),
     )
   ) {
-    localError.value = 'Jede Bonus-Stufe braucht leistungsfreie Jahre (1–99) und einen Betrag.';
-    return;
+    return fail('Jede Bonus-Stufe braucht leistungsfreie Jahre (1–99) und einen Betrag.');
   }
   if (new Set(bonusTiers.map((tier) => tier.claimFreeYears)).size !== bonusTiers.length) {
-    localError.value = 'Jede Anzahl leistungsfreier Jahre darf nur einmal vorkommen.';
-    return;
+    return fail('Jede Anzahl leistungsfreier Jahre darf nur einmal vorkommen.');
   }
   bonusTiers.sort((a, b) => a.claimFreeYears - b.claimFreeYears);
   emit('submit', {
@@ -145,9 +139,7 @@ function submit(): void {
           <EuButton variant="secondary" :icon="faPlus" @click="addTier">Stufe hinzufügen</EuButton>
         </div>
       </fieldset>
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">
-        {{ error ?? localError }}
-      </p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
@@ -159,16 +151,8 @@ function submit(): void {
 </template>
 
 <style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
+/* One size smaller than the shared note: this one carries a whole sentence. */
 .eu-form__note {
-  margin: 0;
-  color: var(--eu-color-text-muted);
-  font-family: var(--eu-font-data);
   font-size: 0.9rem;
 }
 
@@ -202,11 +186,5 @@ function submit(): void {
   .eu-tiers__row > :nth-child(2) {
     grid-column: 1;
   }
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
 }
 </style>

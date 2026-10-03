@@ -7,7 +7,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, type BonusForfeitRule, forfeitsByRule } from '../contracts/api';
 import { todayIso } from '../lib/date-input';
-import { describeError } from '../lib/errors';
+import { useDialogAction } from '../lib/dialog-action';
 import { type BillingDto, type BillingListDto, createBilling, updateBilling } from './api';
 import { usePresetToggle } from './forfeit-toggle';
 
@@ -33,8 +33,8 @@ const emit = defineEmits<{ close: []; saved: [billing: BillingDto] }>();
 const billingNumber = ref('');
 const billingDate = ref('');
 const documentLink = ref('');
-const busy = ref(false);
-const error = ref<string | null>(null);
+/** This dialog writes itself, so it holds the host's half as well as the form's. */
+const action = useDialogAction();
 
 /**
  * Preset of the toggle. A new billing has reimbursed nothing yet, so the rule
@@ -51,7 +51,7 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    error.value = null;
+    action.clear();
     const billing = props.billing;
     billingNumber.value = billing?.billingNumber ?? props.presetNumber ?? '';
     billingDate.value = billing?.billingDate ?? todayIso();
@@ -62,13 +62,13 @@ watch(
 );
 
 function save(): void {
-  error.value = null;
+  action.clear();
   if (!billingNumber.value.trim() || !billingDate.value) {
-    error.value = 'Bitte Abrechnungsnummer und -datum angeben.';
+    action.error = 'Bitte Abrechnungsnummer und -datum angeben.';
     return;
   }
   if (!props.billing && !props.contractUID) {
-    error.value = 'Zu dieser Leistungsabrechnung fehlt die Police.';
+    action.error = 'Zu dieser Leistungsabrechnung fehlt die Police.';
     return;
   }
   const fields = {
@@ -77,19 +77,12 @@ function save(): void {
     documentLink: documentLink.value.trim() ? documentLink.value.trim() : null,
     forfeitsBonus: forfeit.value.value,
   };
-  void (async () => {
-    busy.value = true;
-    try {
-      const billing = props.billing
-        ? await updateBilling(props.billing.billingUID, fields)
-        : await createBilling({ contractUID: props.contractUID as string, ...fields });
-      emit('saved', billing);
-    } catch (err) {
-      error.value = describeError(err);
-    } finally {
-      busy.value = false;
-    }
-  })();
+  void action.run(async () => {
+    const billing = props.billing
+      ? await updateBilling(props.billing.billingUID, fields)
+      : await createBilling({ contractUID: props.contractUID as string, ...fields });
+    emit('saved', billing);
+  });
 }
 </script>
 
@@ -113,35 +106,31 @@ function save(): void {
           Regel der Police: Bonus verfällt {{ BONUS_FORFEIT_RULE_LABEL[bonusForfeitRule] }}.
         </p>
       </div>
-      <p v-if="error" class="eu-form__error" role="alert">{{ error }}</p>
+      <p v-if="action.error" class="eu-form__error" role="alert">{{ action.error }}</p>
     </form>
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
-      <EuButton :disabled="busy" @click="save">
-        {{ billing ? (busy ? 'Speichern…' : 'Speichern') : busy ? 'Anlegen…' : 'Anlegen' }}
+      <EuButton :disabled="action.busy" @click="save">
+        {{
+          billing
+            ? action.busy
+              ? 'Speichern…'
+              : 'Speichern'
+            : action.busy
+              ? 'Anlegen…'
+              : 'Anlegen'
+        }}
       </EuButton>
     </template>
   </EuDialog>
 </template>
 
 <style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 .eu-form__hint {
   margin: 0.35rem 0 0;
   color: var(--eu-color-text-muted);
   font-family: var(--eu-font-data);
   font-size: 0.85rem;
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
 }
 </style>

@@ -12,6 +12,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { usePaymentDetailPicker } from './payment-detail-picker';
 import type { InvoiceDto } from './api';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
@@ -22,18 +23,17 @@ import {
   sameCalendarYear,
 } from './treatment-days';
 
-const props = defineProps<{
-  open: boolean;
-  /** The invoice being edited, or null when creating. */
-  editing: InvoiceDto | null;
-  accountUID: string;
-  facilities: SelectOption[];
-  agencies: SelectOption[];
-  /** agencyUID → its payment details, to pick the ones the invoice goes to. */
-  agencyPaymentDetails: Record<string, AgencyPaymentDetailDto[]>;
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    /** The invoice being edited, or null when creating. */
+    editing: InvoiceDto | null;
+    accountUID: string;
+    facilities: SelectOption[];
+    agencies: SelectOption[];
+    /** agencyUID → its payment details, to pick the ones the invoice goes to. */
+    agencyPaymentDetails: Record<string, AgencyPaymentDetailDto[]>;
+  }
+>();
 
 const emit = defineEmits<{
   close: [];
@@ -60,7 +60,6 @@ const extraDays = ref<string[]>([]);
 // directPayment = the bill was already paid directly, e.g. cash at a pharmacy —
 // so there is nothing left for the user to transfer.
 const directPayment = ref(false);
-const localError = ref<string | null>(null);
 
 // Local option copies so an ad-hoc-created entity can be appended and selected
 // immediately, without waiting for the parent to reload its lists.
@@ -121,11 +120,9 @@ async function onPaymentDetailCreate(
   if (uid !== null) form.value.agencyAccountUID = uid;
 }
 
-watch(
-  () => [props.open, props.editing] as const,
-  ([open]) => {
-    if (!open) return;
-    localError.value = null;
+const { shownError, fail, clear } = useFormDialog(
+  props,
+  () => {
     const e = props.editing;
     form.value = {
       invoiceNumber: e?.invoiceNumber ?? '',
@@ -142,7 +139,7 @@ watch(
     extraDays.value = e ? furtherDays(e) : [];
     directPayment.value = e ? e.directPayment : false;
   },
-  { immediate: true },
+  () => props.editing,
 );
 
 function addDay(): void {
@@ -154,20 +151,17 @@ function removeDay(index: number): void {
 }
 
 function submit(): void {
-  localError.value = null;
+  clear();
   const f = form.value;
   if (!f.invoiceNumber.trim() || !f.invoiceDate || !f.treatmentDate || f.invoiceAmount === null) {
-    localError.value =
-      'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
-    return;
+    return fail('Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.');
   }
   // The whole list, the leading day included — the API reads `treatmentDates`
   // as the complete set and takes its earliest entry as `treatmentDate`.
   const days = normalizeDays([f.treatmentDate, ...extraDays.value]);
   if (!sameCalendarYear(days)) {
     // The API's own sentence, so the dialog and the round trip say the same.
-    localError.value = differentYearsMessage();
-    return;
+    return fail(differentYearsMessage());
   }
 
   const dp = directPayment.value;
@@ -276,9 +270,7 @@ function submit(): void {
       </template>
 
       <EuTextField v-model="form.documentLink" label="Dokument-Link" />
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">
-        {{ error ?? localError }}
-      </p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
@@ -314,18 +306,6 @@ function submit(): void {
 </template>
 
 <style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
-}
-
 .eu-form__hint {
   margin: 0;
   color: var(--eu-color-text-muted);

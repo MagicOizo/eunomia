@@ -1,0 +1,115 @@
+/*
+ * The look of the settings page, shared by the page and its three sections
+ * (CR-30). Not scoped: the sections are separate components, and a scoped rule
+ * here would not reach them — the `eu-settings__` prefix keeps it to this page.
+ */
+.eu-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.eu-settings__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.eu-settings__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+  width: 100%;
+  max-width: 44rem;
+}
+
+.eu-settings__grid > * {
+  min-width: 0;
+}
+
+.eu-settings__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0 0 1rem;
+  font-family: var(--eu-font-data);
+}
+
+.eu-settings__facts dt {
+  color: var(--eu-color-text-muted);
+}
+
+.eu-settings__facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.eu-settings__sentence,
+.eu-settings__hint,
+.eu-settings__ok,
+.eu-settings__error {
+  margin: 0;
+  font-family: var(--eu-font-data);
+  max-width: 44rem;
+}
+
+.eu-settings__hint {
+  font-size: 0.875rem;
+  color: var(--eu-color-text-muted);
+}
+
+.eu-settings__ok {
+  color: var(--eu-color-status-done-fg);
+}
+
+/* The rendered mail, shown verbatim in a dry run. It wraps rather than scrolls
+   sideways: a preview that needs a horizontal scrollbar on a phone is no
+   preview. */
+.eu-settings__preview {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--eu-color-border);
+  border-radius: 0.5rem;
+  /* The informational pair from the status scale: an AA-checked foreground on
+     its own background in both themes (design-system/CONTRAST.md). */
+  background-color: var(--eu-color-status-billed-bg);
+  color: var(--eu-color-status-billed-fg);
+  font-family: var(--eu-font-data);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.eu-settings__error {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  padding: 0.6em 0.9em;
+  border-radius: 0.375em;
+  background-color: var(--eu-color-error-bg);
+  color: var(--eu-color-error-fg);
+}
+
+.eu-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.eu-settings__link {
+  color: var(--eu-color-accent-text);
+}
+
+/* The dialogs' rule (Slice 29): a value column of its own on the phone. */
+@media (max-width: 30rem) {
+  .eu-settings__facts {
+    grid-template-columns: 1fr;
+    gap: 0.1rem 0;
+  }
+
+  .eu-settings__facts dd {
+    margin-bottom: 0.5rem;
+  }
+}

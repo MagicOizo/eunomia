@@ -20,6 +20,7 @@ import EuDetailField from '../design-system/components/EuDetailField.vue';
 import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
+import { useDialogAction } from '../lib/dialog-action';
 import { describeError } from '../lib/errors';
 import { germanDate, germanMoney, plural } from '../lib/format';
 import {
@@ -64,8 +65,17 @@ const contract = ref<ContractDetailDto | null>(null);
 const loadError = ref<string | null>(null);
 const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
-const saving = ref(false);
-const saveError = ref<string | null>(null);
+/** The mask, the history entries, a contract year and the delete, each on its own. */
+const mask = useDialogAction(afterChange);
+const entry = useDialogAction(afterChange);
+const year = useDialogAction(afterChange);
+const removal = useDialogAction(afterChange);
+
+/** What every write here does once it went through: reread and tell the list. */
+async function afterChange(): Promise<void> {
+  await load();
+  emit('changed');
+}
 /** Which history blocks show their older entries (see the history section). */
 const showOlder = reactive({ premiums: false, terms: false, years: false });
 
@@ -106,7 +116,7 @@ async function load(): Promise<void> {
 watch(
   () => [props.open, props.uid] as const,
   ([open]) => {
-    saveError.value = null;
+    mask.clear();
     showOlder.premiums = false;
     showOlder.terms = false;
     showOlder.years = false;
@@ -125,38 +135,32 @@ const title = computed(() =>
 const str = (value: DetailValue): string => (typeof value === 'string' ? value.trim() : '');
 
 async function saveMask(): Promise<void> {
-  if (!contract.value) return;
-  saveError.value = null;
-  const years = str(values.claimFreeYearsAtStart);
+  const current = contract.value;
+  if (!current) return;
+  mask.clear();
+  const claimFreeYears = str(values.claimFreeYearsAtStart);
   const fromYear = str(values.claimFreeCountingFromYear);
   if (!str(values.contractNumber) || !values.companyUID || !values.contractBegin) {
-    saveError.value = 'Bitte Vertragsnummer, Versicherung und Vertragsbeginn ausfüllen.';
+    mask.error = 'Bitte Vertragsnummer, Versicherung und Vertragsbeginn ausfüllen.';
     return;
   }
-  if (!/^\d{1,2}$/.test(years) || (fromYear !== '' && !/^\d{4}$/.test(fromYear))) {
-    saveError.value =
+  if (!/^\d{1,2}$/.test(claimFreeYears) || (fromYear !== '' && !/^\d{4}$/.test(fromYear))) {
+    mask.error =
       'Leistungsfreie Jahre als ganze Zahl, Zählbeginn als Jahreszahl (z. B. 2024) angeben.';
     return;
   }
-  saving.value = true;
-  try {
-    await updateContract(contract.value.contractUID, {
+  await mask.run(() =>
+    updateContract(current.contractUID, {
       contractNumber: str(values.contractNumber),
       companyUID: values.companyUID,
       contractKind: values.contractKind,
       contractBegin: values.contractBegin,
       contractEnd: values.contractEnd || null,
       bonusForfeitRule: values.bonusForfeitRule,
-      claimFreeYearsAtStart: Number(years),
+      claimFreeYearsAtStart: Number(claimFreeYears),
       claimFreeCountingFromYear: fromYear === '' ? null : Number(fromYear),
-    });
-    await load();
-    emit('changed');
-  } catch (error) {
-    saveError.value = describeError(error);
-  } finally {
-    saving.value = false;
-  }
+    }),
+  );
 }
 
 // --- History entries (premiums / terms) -------------------------------------
@@ -170,10 +174,7 @@ const termsDialog = reactive({
   /** Year a new entry should start in, when opened from the year history. */
   year: null as number | null,
 });
-const entrySaving = ref(false);
-const entryError = ref<string | null>(null);
 const pendingDelete = ref<{ segment: Segment; uid: string; label: string } | null>(null);
-const deleteError = ref<string | null>(null);
 
 const beginYear = computed(() =>
   Number(contract.value?.contractBegin.slice(0, 4) ?? new Date().getFullYear()),
@@ -183,16 +184,16 @@ const suggestedTermsYear = computed(() => {
   return last ? last.validFromYear + 1 : beginYear.value;
 });
 
-function openPremium(entry: PremiumDto | null): void {
-  entryError.value = null;
-  premiumDialog.entry = entry;
+function openPremium(forEntry: PremiumDto | null): void {
+  entry.clear();
+  premiumDialog.entry = forEntry;
   premiumDialog.open = true;
 }
 
-function openTerms(entry: TermsDto | null, year: number | null = null): void {
-  entryError.value = null;
-  termsDialog.entry = entry;
-  termsDialog.year = year;
+function openTerms(forEntry: TermsDto | null, forYear: number | null = null): void {
+  entry.clear();
+  termsDialog.entry = forEntry;
+  termsDialog.year = forYear;
   termsDialog.open = true;
 }
 
@@ -209,37 +210,25 @@ async function saveEntry(
   entryUID: string | null,
   payload: PremiumInput | TermsInput,
 ): Promise<void> {
-  if (!contract.value) return;
-  entrySaving.value = true;
-  entryError.value = null;
-  try {
-    await saveHistoryEntry(contract.value.contractUID, segment, entryUID, payload);
-    premiumDialog.open = false;
-    termsDialog.open = false;
-    await load();
-    emit('changed');
-  } catch (error) {
-    entryError.value = describeError(error);
-  } finally {
-    entrySaving.value = false;
-  }
+  const current = contract.value;
+  if (!current) return;
+  await entry.run(
+    () => saveHistoryEntry(current.contractUID, segment, entryUID, payload),
+    () => {
+      premiumDialog.open = false;
+      termsDialog.open = false;
+    },
+  );
 }
 
 async function confirmDelete(): Promise<void> {
-  if (!contract.value || !pendingDelete.value) return;
-  deleteError.value = null;
-  try {
-    await deleteHistoryEntry(
-      contract.value.contractUID,
-      pendingDelete.value.segment,
-      pendingDelete.value.uid,
-    );
-    pendingDelete.value = null;
-    await load();
-    emit('changed');
-  } catch (error) {
-    deleteError.value = describeError(error);
-  }
+  const current = contract.value;
+  const pending = pendingDelete.value;
+  if (!current || !pending) return;
+  await removal.run(
+    () => deleteHistoryEntry(current.contractUID, pending.segment, pending.uid),
+    () => (pendingDelete.value = null),
+  );
 }
 
 /**
@@ -310,29 +299,21 @@ function expectedLabel(y: BonusYearDto): string {
 }
 
 const yearDialog = reactive({ open: false, year: null as BonusYearDto | null });
-const yearSaving = ref(false);
-const yearError = ref<string | null>(null);
 
-function openYear(year: BonusYearDto): void {
-  yearError.value = null;
-  yearDialog.year = year;
+function openYear(forYear: BonusYearDto): void {
+  year.clear();
+  yearDialog.year = forYear;
   yearDialog.open = true;
 }
 
 async function saveYear(payload: ContractYearInput): Promise<void> {
-  if (!contract.value || !yearDialog.year) return;
-  yearSaving.value = true;
-  yearError.value = null;
-  try {
-    await saveContractYear(contract.value.contractUID, yearDialog.year.year, payload);
-    yearDialog.open = false;
-    await load();
-    emit('changed');
-  } catch (error) {
-    yearError.value = describeError(error);
-  } finally {
-    yearSaving.value = false;
-  }
+  const current = contract.value;
+  const open = yearDialog.year;
+  if (!current || !open) return;
+  await year.run(
+    () => saveContractYear(current.contractUID, open.year, payload),
+    () => (yearDialog.open = false),
+  );
 }
 </script>
 
@@ -400,7 +381,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
           type="text"
         />
       </EuDetailMask>
-      <p v-if="saveError" class="eu-contract__error" role="alert">{{ saveError }}</p>
+      <p v-if="mask.error" class="eu-contract__error" role="alert">{{ mask.error }}</p>
 
       <section class="eu-contract__block" aria-labelledby="eu-contract-premiums">
         <div class="eu-contract__block-head">
@@ -653,8 +634,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
-      <EuButton :disabled="saving || !contract" @click="saveMask">{{
-        saving ? 'Speichern…' : 'Speichern'
+      <EuButton :disabled="mask.busy || !contract" @click="saveMask">{{
+        mask.busy ? 'Speichern…' : 'Speichern'
       }}</EuButton>
     </template>
   </EuDialog>
@@ -663,8 +644,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
     :open="premiumDialog.open"
     :entry="premiumDialog.entry"
     :min-date="contract?.contractBegin ?? ''"
-    :submitting="entrySaving"
-    :error="entryError"
+    :submitting="entry.busy"
+    :error="entry.error"
     @close="premiumDialog.open = false"
     @submit="saveEntry('premiums', premiumDialog.entry?.premiumUID ?? null, $event)"
   />
@@ -674,25 +655,25 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
     :min-year="beginYear"
     :suggested-year="termsDialog.year ?? suggestedTermsYear"
     :template="termsTemplate"
-    :submitting="entrySaving"
-    :error="entryError"
+    :submitting="entry.busy"
+    :error="entry.error"
     @close="termsDialog.open = false"
     @submit="saveEntry('terms', termsDialog.entry?.termsUID ?? null, $event)"
   />
   <ContractYearDialog
     :open="yearDialog.open"
     :year="yearDialog.year"
-    :submitting="yearSaving"
-    :error="yearError"
+    :submitting="year.busy"
+    :error="year.error"
     @close="yearDialog.open = false"
     @submit="saveYear"
   />
   <EuDialog :open="pendingDelete !== null" title="Eintrag löschen" @close="pendingDelete = null">
     <p>Soll {{ pendingDelete?.label }} wirklich gelöscht werden?</p>
-    <p v-if="deleteError" class="eu-contract__error" role="alert">{{ deleteError }}</p>
+    <p v-if="removal.error" class="eu-contract__error" role="alert">{{ removal.error }}</p>
     <template #footer>
       <EuButton variant="secondary" @click="pendingDelete = null">Abbrechen</EuButton>
-      <EuButton @click="confirmDelete">Löschen</EuButton>
+      <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
     </template>
   </EuDialog>
 </template>

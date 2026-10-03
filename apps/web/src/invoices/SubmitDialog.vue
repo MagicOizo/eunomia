@@ -7,22 +7,22 @@ import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { todayIso } from '../lib/date-input';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { germanDate, plural } from '../lib/format';
 import type { InvoiceDto } from './api';
 import { type ContractOption, contractsCoveringPeriod, treatmentPeriod } from './eligibility';
 import InvoiceBriefList from './InvoiceBriefList.vue';
 
-const props = defineProps<{
-  open: boolean;
-  /** The invoices that will be submitted, listed so the selection is visible. */
-  invoices: InvoiceDto[];
-  /** facilityUID → name, for the list's provider column. */
-  facilityNames: Record<string, string>;
-  /** Only the policies every selected invoice can still go to (see eligibility.ts). */
-  contracts: ContractOption[];
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    /** The invoices that will be submitted, listed so the selection is visible. */
+    invoices: InvoiceDto[];
+    /** facilityUID → name, for the list's provider column. */
+    facilityNames: Record<string, string>;
+    /** Only the policies every selected invoice can still go to (see eligibility.ts). */
+    contracts: ContractOption[];
+  }
+>();
 
 const emit = defineEmits<{
   close: [];
@@ -31,7 +31,6 @@ const emit = defineEmits<{
 
 const contractUID = ref('');
 const submittedDate = ref('');
-const localError = ref<string | null>(null);
 /**
  * Shows the policies that did not run over the treatment period. Off by
  * default — the usual case is one policy and one obvious answer — but never
@@ -69,17 +68,11 @@ function contractTerm(contract: ContractOption): string {
     : `${germanDate(contract.contractBegin)} – ${germanDate(contract.contractEnd)}`;
 }
 
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) return;
-    localError.value = null;
-    showAll.value = false;
-    submittedDate.value = todayIso();
-    contractUID.value = offered.value.length === 1 ? offered.value[0].value : '';
-  },
-  { immediate: true },
-);
+const { shownError, fail, clear } = useFormDialog(props, () => {
+  showAll.value = false;
+  submittedDate.value = todayIso();
+  contractUID.value = offered.value.length === 1 ? offered.value[0].value : '';
+});
 
 // Keeps the choice and the list in step while the switch is thrown: one policy
 // left means it is the answer, and a policy the switch takes back out of the
@@ -90,10 +83,9 @@ watch(offered, (options) => {
 });
 
 function submit(): void {
-  localError.value = null;
+  clear();
   if (!contractUID.value || !submittedDate.value) {
-    localError.value = 'Bitte Police und Einreichungsdatum wählen.';
-    return;
+    return fail('Bitte Police und Einreichungsdatum wählen.');
   }
   emit('submit', {
     contractUID: contractUID.value,
@@ -137,9 +129,7 @@ function submit(): void {
         />
         <EuTextField v-model="submittedDate" label="Einreichungsdatum" type="date" />
       </template>
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">
-        {{ error ?? localError }}
-      </p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
@@ -150,23 +140,3 @@ function submit(): void {
     </template>
   </EuDialog>
 </template>
-
-<style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__note {
-  margin: 0;
-  color: var(--eu-color-text-muted);
-  font-family: var(--eu-font-data);
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
-}
-</style>

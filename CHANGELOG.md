@@ -7,6 +7,34 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.18.0-slice.3 — 2026-10-03
+
+Nothing in the app looks different after this release. It takes the shape that every dialog of the
+project had written out for itself and gives it one place to live — which is what the next slice
+needs, where the interface learns the permission model and every dialog has to ask about it.
+
+- **One form for every dialog.** Fourteen dialogs declared the same three props, thirteen kept their
+  own error beside the one their host passed down, and nine wrote their own "start over when it
+  opens" watcher. They now share `useFormDialog()` and one prop type; the same three CSS rules,
+  written out character for character in fifteen files, moved to the stylesheet the whole app reads.
+- **One write for every host.** The counterpart: busy, error, close the dialog, reload the list — a
+  page wrote that out once per action, fifteen times in all. `useDialogAction()` holds it, one group
+  per set of actions, so the form, the delete confirmation and each history block keep their own
+  state instead of sharing one and having to say which was meant. Left as they are: the loaders, the
+  objection dialog (which counts busy per row) and the invoice mask's blocks (which report into one
+  of several places without closing anything).
+- **The settings page is three pages.** Version, mail and reminders are now three components with a
+  page above them that does nothing but load the snapshot and hand it down. Each writes its own keys
+  and hands back what the API answered with, so the section below always sees what the one above
+  just saved.
+- **The invoice workspace keeps the work, not the table.** The table moved into a component of its
+  own that is handed finished rows, and the eight dialog states moved into `useInvoiceDialogs()`.
+  The largest file of the web app went from 1034 lines to 644, and its behaviour is held down by the
+  tests that were already there.
+- **One sentence changed.** A failure that is not an answer from the server — the network is gone
+  mid-request — was reported in the service-billing list as "Aktion fehlgeschlagen."; it now says
+  "Unerwarteter Fehler.", like everywhere else.
+
 ## 0.18.0-slice.2 — 2026-10-03
 
 Three findings that all sit in the same place: where a value or a list from a request enters the

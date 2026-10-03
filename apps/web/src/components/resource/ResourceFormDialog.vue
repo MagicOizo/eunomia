@@ -6,6 +6,7 @@ import EuCurrencyField from '../../design-system/components/EuCurrencyField.vue'
 import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
+import { useFormDialog, type FormDialogProps } from '../../lib/form-dialog';
 import type { FieldConfig } from '../../resources/config';
 import { type SelectOption } from './EuSelectField.vue';
 
@@ -14,27 +15,27 @@ import { type SelectOption } from './EuSelectField.vue';
  * editing an existing row is the display mask instead (ResourceDetailDialog),
  * the separation dialog-design.md asks for.
  */
-const props = defineProps<{
-  open: boolean;
-  title: string;
-  fields: FieldConfig[];
-  /** Select options keyed by lookup name (see ResourceConfig.lookups). */
-  options: Record<string, SelectOption[]>;
-  /** Seeds field values (e.g. an ad-hoc name typed elsewhere). */
-  prefill?: Record<string, string>;
-  submitting: boolean;
-  /** Server-side error message to show above the buttons. */
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    title: string;
+    fields: FieldConfig[];
+    /** Select options keyed by lookup name (see ResourceConfig.lookups). */
+    options: Record<string, SelectOption[]>;
+    /** Seeds field values (e.g. an ad-hoc name typed elsewhere). */
+    prefill?: Record<string, string>;
+  }
+>();
 
 const emit = defineEmits<{ close: []; submit: [payload: Record<string, unknown>] }>();
 
 const values = ref<Record<string, string>>({});
-const localError = ref<string | null>(null);
+
+const { shownError, fail, clear } = useFormDialog(props);
 
 /**
  * Keeps `values` in sync with the fields (prefill, then the field's default).
- * Runs even while closed so every field always has a string value (never
+ * The one seeding of the project that does not go through useFormDialog: it
+ * runs even while closed, so every field always has a string value (never
  * undefined) — the dialog body is rendered even when hidden, so an undefined
  * bound to a field component would warn. Depends on `fields` too, so switching
  * resources (the view is reused) rebuilds for the new keys.
@@ -42,7 +43,7 @@ const localError = ref<string | null>(null);
 watch(
   () => [props.open, props.fields, props.prefill] as const,
   () => {
-    localError.value = null;
+    clear();
     const next: Record<string, string> = {};
     for (const field of props.fields) {
       next[field.key] = props.prefill?.[field.key] ?? field.defaultValue ?? '';
@@ -53,16 +54,13 @@ watch(
 );
 
 function submit(): void {
-  localError.value = null;
+  clear();
   const payload: Record<string, unknown> = {};
 
   for (const field of props.fields) {
     const value = (values.value[field.key] ?? '').trim();
     if (value === '') {
-      if (field.required) {
-        localError.value = `Bitte „${field.label}“ ausfüllen.`;
-        return;
-      }
+      if (field.required) return fail(`Bitte „${field.label}“ ausfüllen.`);
       continue; // omit empty optionals so the server keeps its default / null
     }
     const numeric = field.type === 'number' || field.type === 'currency';
@@ -93,9 +91,7 @@ function submit(): void {
         />
         <EuTextField v-else v-model="values[field.key]" :label="field.label" :type="field.type" />
       </template>
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">
-        {{ error ?? localError }}
-      </p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
@@ -106,17 +102,3 @@ function submit(): void {
     </template>
   </EuDialog>
 </template>
-
-<style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
-}
-</style>

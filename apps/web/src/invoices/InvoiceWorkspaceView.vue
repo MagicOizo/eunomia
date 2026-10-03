@@ -1,31 +1,24 @@
 <script setup lang="ts">
-import { isHttpUrl, WORKFLOW_STATUSES } from '@eunomia/shared';
+import { isHttpUrl } from '@eunomia/shared';
 import {
-  faBan,
   faChevronLeft,
-  faCircleCheck,
   faFileInvoiceDollar,
   faPaperPlane,
-  faPen,
   faPlus,
   faTrash,
-  faTriangleExclamation,
-  faUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { computed, nextTick, ref, watch, watchEffect } from 'vue';
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 
 import type { AgencyPaymentDetailDto } from '../agencies/api';
-import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
-import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { apiData } from '../lib/api';
-import { germanDate, germanMoney, plural } from '../lib/format';
+import { useDialogAction } from '../lib/dialog-action';
+import { germanDate, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
-import { useTableSort } from '../lib/table-sort';
 import {
   type InvoiceDto,
   type ReimbursementPlanDto,
@@ -47,19 +40,18 @@ import {
   submittableContracts,
 } from './eligibility';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
+import { useInvoiceDialogs } from './invoice-dialogs';
 import { notCoveredTitle } from './not-covered';
 import InvoiceBriefList from './InvoiceBriefList.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceSummary from './InvoiceSummary.vue';
-import PaymentInfoPopover from './PaymentInfoPopover.vue';
-import RecommendationBadge from './RecommendationBadge.vue';
+import InvoiceTable, { type InvoiceRowView } from './InvoiceTable.vue';
 import { type InvoiceBadgeView, invoiceBadge } from './recommendation';
 import { reimbursementGap } from './reimbursement-gap';
 import SettleDialog from './SettleDialog.vue';
 import SubmitDialog from './SubmitDialog.vue';
 import { treatmentDaysLabel } from './treatment-days';
 import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, paymentState } from './payment';
-import { STATUS_DISPLAY } from './status';
 
 const props = withDefaults(
   defineProps<{
@@ -139,23 +131,14 @@ const selected = ref<Set<string>>(new Set());
  * the list drop it again.
  */
 const foundUID = ref<string | null>(null);
-const foundRow = ref<HTMLTableRowElement | null>(null);
+const table = useTemplateRef<InstanceType<typeof InvoiceTable>>('table');
 
 const loading = ref(false);
 const loadError = ref<string | null>(null);
 
-const formOpen = ref(false);
-const detailOpen = ref(false);
-const editing = ref<InvoiceDto | null>(null);
-const submitOpen = ref(false);
-const submitTargets = ref<InvoiceDto[]>([]);
-const billingOpen = ref(false);
-const billingTargets = ref<InvoiceDto[]>([]);
-const settleOpen = ref(false);
-const dialogInvoice = ref<InvoiceDto | null>(null);
-const dialogBusy = ref(false);
-const dialogError = ref<string | null>(null);
-const deleteTargets = ref<string[]>([]);
+/** Every write of this page: busy, error, and the reload that follows it. */
+const action = useDialogAction(afterMutation);
+const dialogs = useInvoiceDialogs(action);
 
 // The policy's term travels with the option: the submit dialog offers the
 // policies that ran over the treatment period first (see eligibility.ts).
@@ -169,7 +152,7 @@ const contractOptions = computed<ContractOption[]>(() =>
 );
 /** Policies all invoices of the submit dialog can still go to. */
 const submitContractOptions = computed(() =>
-  commonSubmittableContracts(submitTargets.value, contractOptions.value),
+  commonSubmittableContracts(dialogs.submitTargets, contractOptions.value),
 );
 const canSubmit = (invoice: InvoiceDto): boolean =>
   submittableContracts(invoice, contractOptions.value).length > 0;
@@ -191,37 +174,29 @@ const selectedInvoices = computed(() =>
 const selectedBookable = computed(() =>
   commonPolicies(selectedInvoices.value).length > 0 ? selectedInvoices.value : [],
 );
-const allSelected = computed(
-  () => invoices.value.length > 0 && selected.value.size === invoices.value.length,
+/**
+ * The rows as the table shows them: everything looked up here, where the
+ * facilities, the agencies and the optimizer's plan are (see InvoiceTable).
+ */
+const rows = computed<InvoiceRowView[]>(() =>
+  invoices.value.map((invoice) => {
+    const agency = agencyOf(invoice);
+    return {
+      invoice,
+      facilityName: facilityName(invoice),
+      agencyName: agency.name,
+      paymentDetails: agency.accounts,
+      badge: recommendationBadges.value.get(invoice.invoiceUID) ?? null,
+      payment: paymentView(invoice),
+      gap: reimbursementGap(invoice),
+      treatmentTitle: treatmentTitle(invoice),
+      treatmentLabel: treatmentDaysLabel(invoice.treatmentDates),
+      notCoveredTitle: notCoveredTitle(invoice),
+      canSubmit: canSubmit(invoice),
+      hasDocument: isHttpUrl(invoice.documentLink),
+    };
+  }),
 );
-const someSelected = computed(() => selected.value.size > 0 && !allSelected.value);
-
-const selectAllEl = ref<HTMLInputElement | null>(null);
-watchEffect(() => {
-  if (selectAllEl.value) selectAllEl.value.indeterminate = someSelected.value;
-});
-
-function invoiceSortValue(inv: InvoiceDto, key: string): string | number {
-  switch (key) {
-    case 'status':
-      return WORKFLOW_STATUSES.indexOf(inv.workflowStatus); // sort by workflow order, not label
-    case 'invoiceDate':
-      return inv.invoiceDate;
-    case 'treatmentDate':
-      return inv.treatmentDate;
-    case 'number':
-      return inv.invoiceNumber;
-    case 'facility':
-      return facilityName(inv) ?? '';
-    case 'amount':
-      return inv.invoiceAmount;
-    case 'reimbursed':
-      return inv.reimbursedTotal;
-    default:
-      return '';
-  }
-}
-const sort = useTableSort(invoices, invoiceSortValue);
 
 /** Loads the account-level data that does not depend on the selected year. */
 async function loadStatic(): Promise<void> {
@@ -293,14 +268,9 @@ async function refreshYears(): Promise<void> {
 }
 
 /**
- * Brings the invoice a search found into view and onto the keyboard: the row
- * carries aria-current, so a screen reader names it as the one meant here.
+ * Marks the invoice a search led here and asks the table to bring it into view
+ * — which it knows how to do, down to its own scroll container.
  */
-/** Holds on to the DOM row of the found invoice, so markFound() can reach it. */
-function keepFoundRow(uid: string, el: unknown): void {
-  if (uid === foundUID.value) foundRow.value = (el as HTMLTableRowElement | null) ?? null;
-}
-
 async function markFound(): Promise<void> {
   const wanted = props.focusInvoiceUID;
   if (wanted === undefined || !invoices.value.some((i) => i.invoiceUID === wanted)) {
@@ -309,17 +279,7 @@ async function markFound(): Promise<void> {
   }
   foundUID.value = wanted;
   await nextTick();
-  const row = foundRow.value;
-  if (row === null) return;
-  // Only the vertical move is wanted: a row wider than the table's scroll
-  // container makes both focus() and scrollIntoView() scroll sideways too, and
-  // the row then sits flush against the container's edge — exactly where its
-  // focus ring gets clipped (the space .eu-scroll-focus-safe reserves).
-  const wrap = row.closest('.eu-ws__table-wrap');
-  const keepLeft = wrap?.scrollLeft ?? 0;
-  row.focus({ preventScroll: true });
-  row.scrollIntoView({ block: 'center' });
-  if (wrap) wrap.scrollLeft = keepLeft;
+  await table.value?.revealFound();
 }
 
 async function init(): Promise<void> {
@@ -372,123 +332,70 @@ function toggleSelect(invoice: InvoiceDto): void {
 }
 
 function toggleSelectAll(): void {
-  selected.value = allSelected.value ? new Set() : new Set(invoices.value.map((i) => i.invoiceUID));
+  const all = invoices.value.length > 0 && selected.value.size === invoices.value.length;
+  selected.value = all ? new Set() : new Set(invoices.value.map((i) => i.invoiceUID));
 }
 
-// --- dialog openers ---
-function openCreate(): void {
-  editing.value = null;
-  dialogError.value = null;
-  formOpen.value = true;
-}
-// Editing opens the display-mask detail dialog; creating keeps the classic form.
-function openEdit(invoice: InvoiceDto): void {
-  dialogInvoice.value = invoice;
-  dialogError.value = null;
-  detailOpen.value = true;
-}
 function submitDetail(payload: Record<string, unknown>): void {
-  const invoice = dialogInvoice.value;
+  const invoice = dialogs.invoice;
   if (!invoice) return;
   // No blanket conflict sentence here: the invoice PATCH answers 409 with
   // several codes — the amount below what was reimbursed, "only a submitted
   // invoice can be marked as billed", and since Slice 42 "an invoice already
   // submitted cannot be marked as not covered". Each of them is translated by
   // its code in lib/error-messages.ts, and a hint would shadow all but one.
-  void runDialog(
-    () => updateInvoice(invoice.invoiceUID, payload).then(() => undefined),
-    () => (detailOpen.value = false),
+  void action.run(
+    () => updateInvoice(invoice.invoiceUID, payload),
+    () => (dialogs.detailOpen = false),
   );
 }
-function openSubmit(targets: InvoiceDto[]): void {
-  submitTargets.value = targets;
-  dialogError.value = null;
-  submitOpen.value = true;
-}
-function openBilling(targets: InvoiceDto[]): void {
-  billingTargets.value = targets;
-  dialogError.value = null;
-  billingOpen.value = true;
-}
-function openSettle(invoice: InvoiceDto): void {
-  dialogInvoice.value = invoice;
-  dialogError.value = null;
-  settleOpen.value = true;
-}
+
 /** The optimizer's advice for the invoice the detail dialog shows. */
 const detailPlan = computed(
-  () => plan.value?.invoices.find((i) => i.invoiceUID === dialogInvoice.value?.invoiceUID) ?? null,
+  () => plan.value?.invoices.find((i) => i.invoiceUID === dialogs.invoice?.invoiceUID) ?? null,
 );
 
 /** Detail dialog blocks changed something: reload and hand it the fresh invoice. */
 async function detailChanged(): Promise<void> {
-  const uid = dialogInvoice.value?.invoiceUID;
+  const uid = dialogs.invoice?.invoiceUID;
   await afterMutation();
-  dialogInvoice.value = invoices.value.find((i) => i.invoiceUID === uid) ?? dialogInvoice.value;
+  dialogs.invoice = invoices.value.find((i) => i.invoiceUID === uid) ?? dialogs.invoice;
 }
+
 /** The invoices behind the pending delete, for the confirmation's list. */
 const deleteInvoices = computed(() =>
-  invoices.value.filter((i) => deleteTargets.value.includes(i.invoiceUID)),
+  invoices.value.filter((i) => dialogs.deleteTargets.includes(i.invoiceUID)),
 );
 
-function openDelete(uids: string[]): void {
-  deleteTargets.value = uids;
-  dialogError.value = null;
-}
-
-/**
- * Wraps a dialog action with busy/error handling and a reload on success.
- * `conflictMessage` explains a 409 in the dialog's own terms.
- */
-async function runDialog(
-  action: () => Promise<void>,
-  close: () => void,
-  conflictMessage?: string,
-): Promise<void> {
-  dialogBusy.value = true;
-  dialogError.value = null;
-  try {
-    await action();
-    close();
-    await afterMutation();
-  } catch (error) {
-    dialogError.value = describeError(error, conflictMessage);
-  } finally {
-    dialogBusy.value = false;
-  }
-}
-
 function submitInvoiceForm(payload: Record<string, unknown>): void {
-  void runDialog(
-    async () => {
-      if (editing.value) await updateInvoice(editing.value.invoiceUID, payload);
-      else await createInvoice(payload);
-    },
-    () => (formOpen.value = false),
+  const edited = dialogs.editing;
+  void action.run(
+    () => (edited ? updateInvoice(edited.invoiceUID, payload) : createInvoice(payload)),
+    () => (dialogs.formOpen = false),
   );
 }
 
 function submitSubmission(payload: { contractUID: string; submittedDate: string }): void {
-  const invoiceUIDs = submitTargets.value.map((i) => i.invoiceUID);
-  void runDialog(
-    () => createSubmission({ ...payload, invoiceUIDs }).then(() => undefined),
-    () => (submitOpen.value = false),
+  const invoiceUIDs = dialogs.submitTargets.map((i) => i.invoiceUID);
+  void action.run(
+    () => createSubmission({ ...payload, invoiceUIDs }),
+    () => (dialogs.submitOpen = false),
   );
 }
 
 function submitBilling(payload: BillingAllocationPayload): void {
-  void runDialog(
+  void action.run(
     () => saveBillingAllocations(payload),
-    () => (billingOpen.value = false),
+    () => (dialogs.billingOpen = false),
   );
 }
 
 function submitSettle(transferDate: string): void {
-  const invoice = dialogInvoice.value;
+  const invoice = dialogs.invoice;
   if (!invoice) return;
-  void runDialog(
-    () => updateInvoice(invoice.invoiceUID, { transferDate }).then(() => undefined),
-    () => (settleOpen.value = false),
+  void action.run(
+    () => updateInvoice(invoice.invoiceUID, { transferDate }),
+    () => (dialogs.settleOpen = false),
   );
 }
 
@@ -503,11 +410,11 @@ function openDocument(invoice: InvoiceDto): void {
 }
 
 function confirmDelete(): void {
-  const uids = deleteTargets.value;
+  const uids = dialogs.deleteTargets;
   if (uids.length === 0) return;
-  void runDialog(
-    () => Promise.all(uids.map((uid) => deleteInvoice(uid))).then(() => undefined),
-    () => (deleteTargets.value = []),
+  void action.run(
+    () => Promise.all(uids.map((uid) => deleteInvoice(uid))),
+    () => (dialogs.deleteTargets = []),
   );
 }
 </script>
@@ -527,12 +434,12 @@ function confirmDelete(): void {
     </div>
 
     <div class="eu-ws__toolbar">
-      <EuButton :icon="faPlus" @click="openCreate">Neue Rechnung</EuButton>
+      <EuButton :icon="faPlus" @click="dialogs.openCreate">Neue Rechnung</EuButton>
       <EuButton
         :icon="faPaperPlane"
         variant="secondary"
         :disabled="selectedSubmittable.length === 0"
-        @click="openSubmit(selectedSubmittable)"
+        @click="dialogs.openSubmit(selectedSubmittable)"
       >
         Einreichen ({{ selectedSubmittable.length }})
       </EuButton>
@@ -540,7 +447,7 @@ function confirmDelete(): void {
         :icon="faFileInvoiceDollar"
         variant="secondary"
         :disabled="selectedBookable.length === 0"
-        @click="openBilling(selectedBookable)"
+        @click="dialogs.openBilling(selectedBookable)"
       >
         Abrechnung zuordnen ({{ selectedBookable.length }})
       </EuButton>
@@ -548,7 +455,7 @@ function confirmDelete(): void {
         :icon="faTrash"
         variant="secondary"
         :disabled="selected.size === 0"
-        @click="openDelete(Array.from(selected))"
+        @click="dialogs.openDelete(Array.from(selected))"
       >
         Löschen ({{ selected.size }})
       </EuButton>
@@ -575,203 +482,20 @@ function confirmDelete(): void {
       Keine Rechnungen für {{ activeYear }}.
     </p>
 
-    <div v-else class="eu-ws__table-wrap eu-scroll-focus-safe">
-      <table class="eu-ws__table">
-        <thead>
-          <tr>
-            <th>
-              <input
-                ref="selectAllEl"
-                type="checkbox"
-                aria-label="Alle auswählen"
-                :checked="allSelected"
-                @change="toggleSelectAll"
-              />
-            </th>
-            <EuSortableTh
-              label="Status"
-              :state="sort.stateOf('status')"
-              @sort="sort.toggle('status')"
-            />
-            <EuSortableTh
-              label="Rechnungsdatum"
-              :state="sort.stateOf('invoiceDate')"
-              @sort="sort.toggle('invoiceDate')"
-            />
-            <EuSortableTh
-              label="Behandlung"
-              :state="sort.stateOf('treatmentDate')"
-              @sort="sort.toggle('treatmentDate')"
-            />
-            <EuSortableTh
-              label="Nummer"
-              :state="sort.stateOf('number')"
-              @sort="sort.toggle('number')"
-            />
-            <EuSortableTh
-              label="Leistungserbringer"
-              :state="sort.stateOf('facility')"
-              @sort="sort.toggle('facility')"
-            />
-            <EuSortableTh
-              label="Betrag"
-              align="center"
-              :state="sort.stateOf('amount')"
-              @sort="sort.toggle('amount')"
-            />
-            <EuSortableTh
-              label="Erstattung"
-              align="center"
-              :state="sort.stateOf('reimbursed')"
-              @sort="sort.toggle('reimbursed')"
-            />
-            <th class="eu-ws__actions-head">Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="invoice in sort.sorted"
-            :key="invoice.invoiceUID"
-            :ref="(el) => keepFoundRow(invoice.invoiceUID, el)"
-            :class="{ 'is-found': invoice.invoiceUID === foundUID }"
-            :aria-current="invoice.invoiceUID === foundUID ? 'true' : undefined"
-            :tabindex="invoice.invoiceUID === foundUID ? -1 : undefined"
-          >
-            <td>
-              <input
-                type="checkbox"
-                :aria-label="`Rechnung ${invoice.invoiceNumber} auswählen`"
-                :checked="selected.has(invoice.invoiceUID)"
-                @change="toggleSelect(invoice)"
-              />
-            </td>
-            <td>
-              <div class="eu-ws__badges">
-                <EuBadge
-                  :tone="STATUS_DISPLAY[invoice.workflowStatus].tone"
-                  :icon="STATUS_DISPLAY[invoice.workflowStatus].icon"
-                >
-                  {{ STATUS_DISPLAY[invoice.workflowStatus].label }}
-                </EuBadge>
-                <span
-                  v-if="invoice.hasOpenObjection"
-                  class="eu-ws__objection"
-                  role="img"
-                  aria-label="Im Widerspruch"
-                  title="Im Widerspruch"
-                >
-                  <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
-                </span>
-                <EuBadge
-                  v-if="invoice.notCovered"
-                  tone="neutral"
-                  :icon="faBan"
-                  :title="notCoveredTitle(invoice)"
-                >
-                  Nicht gedeckt
-                </EuBadge>
-                <RecommendationBadge
-                  v-if="recommendationBadges.has(invoice.invoiceUID)"
-                  :badge="recommendationBadges.get(invoice.invoiceUID)!"
-                />
-              </div>
-            </td>
-            <td>{{ germanDate(invoice.invoiceDate) }}</td>
-            <td :title="treatmentTitle(invoice)">
-              {{ treatmentDaysLabel(invoice.treatmentDates) }}
-            </td>
-            <td>{{ invoice.invoiceNumber }}</td>
-            <td class="eu-ws__facility" :title="facilityName(invoice) ?? undefined">
-              {{ facilityName(invoice) ?? '–' }}
-            </td>
-            <td>
-              <div class="eu-ws__amount">
-                <span>{{ germanMoney(invoice.invoiceAmount) }}</span>
-                <PaymentInfoPopover
-                  :invoice="invoice"
-                  :facility-name="facilityName(invoice)"
-                  :agency-name="agencyOf(invoice).name"
-                  :payment-details="agencyOf(invoice).accounts"
-                >
-                  <template #trigger="{ expanded, panelId }">
-                    <button
-                      type="button"
-                      class="eu-ws__ampel"
-                      :style="{ color: paymentView(invoice).color }"
-                      :aria-label="`${paymentView(invoice).label} – Zahlungsinformationen anzeigen`"
-                      :title="`${paymentView(invoice).label} – Zahlungsinformationen anzeigen`"
-                      :aria-expanded="expanded"
-                      :aria-controls="panelId"
-                    >
-                      <FontAwesomeIcon :icon="paymentView(invoice).icon" aria-hidden="true" />
-                    </button>
-                  </template>
-                </PaymentInfoPopover>
-              </div>
-            </td>
-            <!-- A tariff excess or a deductible that ate into the reimbursement
-                 should catch the eye (issues.md 0.12.0-6). The colour never
-                 says it alone: the same sentence is the cell's tooltip and is
-                 read out before the figure. -->
-            <td
-              class="eu-ws__num"
-              :class="`is-${reimbursementGap(invoice)?.tone ?? 'covered'}`"
-              :title="reimbursementGap(invoice)?.label"
-            >
-              <span v-if="reimbursementGap(invoice)" class="eu-visually-hidden">
-                {{ reimbursementGap(invoice)?.label }}:
-              </span>
-              {{ germanMoney(invoice.reimbursedTotal) }}
-            </td>
-            <td class="eu-ws__actions">
-              <EuButton
-                v-if="isHttpUrl(invoice.documentLink)"
-                variant="secondary"
-                icon-only
-                :icon="faUpRightFromSquare"
-                aria-label="Dokument öffnen"
-                title="Hinterlegtes Dokument öffnen"
-                @click="openDocument(invoice)"
-              />
-              <EuButton
-                v-if="canSubmit(invoice) && invoice.workflowStatus === 'offen'"
-                variant="secondary"
-                icon-only
-                :icon="faPaperPlane"
-                aria-label="Einreichen"
-                title="Rechnung bei der Versicherung einreichen"
-                @click="openSubmit([invoice])"
-              />
-              <EuButton
-                v-if="invoice.workflowStatus !== 'offen' && invoice.transferDate === null"
-                variant="secondary"
-                icon-only
-                :icon="faCircleCheck"
-                aria-label="Als bezahlt markieren"
-                title="Rechnung als bezahlt markieren"
-                @click="openSettle(invoice)"
-              />
-              <EuButton
-                variant="secondary"
-                icon-only
-                :icon="faPen"
-                aria-label="Details"
-                title="Rechnungsdetails öffnen – bearbeiten, einreichen, abrechnen"
-                @click="openEdit(invoice)"
-              />
-              <EuButton
-                variant="secondary"
-                icon-only
-                :icon="faTrash"
-                aria-label="Löschen"
-                title="Rechnung löschen"
-                @click="openDelete([invoice.invoiceUID])"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <InvoiceTable
+      v-else
+      ref="table"
+      :rows="rows"
+      :selected="selected"
+      :found-u-i-d="foundUID"
+      @toggle="toggleSelect"
+      @toggle-all="toggleSelectAll"
+      @detail="dialogs.openDetail"
+      @submit="dialogs.openSubmit"
+      @settle="dialogs.openSettle"
+      @remove="dialogs.openDelete"
+      @document="openDocument"
+    />
 
     <InvoiceSummary
       v-if="!loading && !loadError && invoices.length > 0"
@@ -780,68 +504,72 @@ function confirmDelete(): void {
     />
 
     <InvoiceDetailDialog
-      :open="detailOpen"
-      :invoice="dialogInvoice"
+      :open="dialogs.detailOpen"
+      :invoice="dialogs.invoice"
       :account-name="accountName"
       :facilities="facilityOptions"
       :agencies="agencyOptions"
       :agency-payment-details="paymentDetailMap"
       :contracts="contractOptions"
       :plan-invoice="detailPlan"
-      :submitting="dialogBusy"
-      :error="dialogError"
-      @close="detailOpen = false"
+      :submitting="action.busy"
+      :error="action.error"
+      @close="dialogs.detailOpen = false"
       @submit="submitDetail"
       @changed="detailChanged"
       @entity-created="loadLookups"
     />
     <InvoiceFormDialog
-      :open="formOpen"
-      :editing="editing"
+      :open="dialogs.formOpen"
+      :editing="dialogs.editing"
       :account-u-i-d="accountUID"
       :facilities="facilityOptions"
       :agencies="agencyOptions"
       :agency-payment-details="paymentDetailMap"
-      :submitting="dialogBusy"
-      :error="dialogError"
-      @close="formOpen = false"
+      :submitting="action.busy"
+      :error="action.error"
+      @close="dialogs.formOpen = false"
       @submit="submitInvoiceForm"
       @entity-created="loadLookups"
     />
     <SubmitDialog
-      :open="submitOpen"
-      :invoices="submitTargets"
+      :open="dialogs.submitOpen"
+      :invoices="dialogs.submitTargets"
       :facility-names="facilityNameMap"
       :contracts="submitContractOptions"
-      :submitting="dialogBusy"
-      :error="dialogError"
-      @close="submitOpen = false"
+      :submitting="action.busy"
+      :error="action.error"
+      @close="dialogs.submitOpen = false"
       @submit="submitSubmission"
     />
     <BillingDialog
-      :open="billingOpen"
-      :invoices="billingTargets"
+      :open="dialogs.billingOpen"
+      :invoices="dialogs.billingTargets"
       :facility-names="facilityNameMap"
-      :submitting="dialogBusy"
-      :error="dialogError"
-      @close="billingOpen = false"
+      :submitting="action.busy"
+      :error="action.error"
+      @close="dialogs.billingOpen = false"
       @submit="submitBilling"
     />
     <SettleDialog
-      :open="settleOpen"
-      :invoice="dialogInvoice"
-      :submitting="dialogBusy"
-      :error="dialogError"
-      @close="settleOpen = false"
+      :open="dialogs.settleOpen"
+      :invoice="dialogs.invoice"
+      :submitting="action.busy"
+      :error="action.error"
+      @close="dialogs.settleOpen = false"
       @submit="submitSettle"
     />
-    <EuDialog :open="deleteTargets.length > 0" title="Rechnung löschen" @close="deleteTargets = []">
-      <p>{{ plural(deleteTargets.length, 'Rechnung', 'Rechnungen') }} wirklich löschen?</p>
+    <EuDialog
+      :open="dialogs.deleteTargets.length > 0"
+      title="Rechnung löschen"
+      @close="dialogs.deleteTargets = []"
+    >
+      <p>{{ plural(dialogs.deleteTargets.length, 'Rechnung', 'Rechnungen') }} wirklich löschen?</p>
       <InvoiceBriefList :invoices="deleteInvoices" :facility-names="facilityNameMap" />
-      <p v-if="dialogError" class="eu-ws__error" role="alert">{{ dialogError }}</p>
+      <p v-if="action.error" class="eu-ws__error" role="alert">{{ action.error }}</p>
       <template #footer>
-        <EuButton variant="secondary" @click="deleteTargets = []">Abbrechen</EuButton>
-        <EuButton :disabled="dialogBusy" @click="confirmDelete">Löschen</EuButton>
+        <EuButton variant="secondary" @click="dialogs.deleteTargets = []">Abbrechen</EuButton>
+        <EuButton :disabled="action.busy" @click="confirmDelete">Löschen</EuButton>
       </template>
     </EuDialog>
   </section>
@@ -912,123 +640,5 @@ function confirmDelete(): void {
 .eu-ws__error {
   color: var(--eu-color-error-fg);
   font-family: var(--eu-font-data);
-}
-
-.eu-ws__table-wrap {
-  overflow-x: auto;
-}
-
-.eu-ws__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--eu-font-data);
-}
-
-.eu-ws__table th,
-.eu-ws__table td {
-  padding: 0.55rem;
-  text-align: left;
-  border-bottom: 1px solid var(--eu-color-border);
-  white-space: nowrap;
-}
-
-/* Nine columns of nowrap data did not fit the card at 1440px and pushed the
-   actions header out of sight. The headers are the widest part of three of
-   those columns, so they — and only they — may break. */
-.eu-ws__table th {
-  font-family: var(--eu-font-heading);
-  color: var(--eu-color-text-muted);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  white-space: normal;
-  hyphens: auto;
-}
-
-.eu-ws__table .eu-ws__facility {
-  max-width: 13rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Shrink the actions column to its content so the data columns get the rest.
-   Prefixed with the table class to outweigh the base `.eu-ws__table td` rule. */
-.eu-ws__table .eu-ws__actions-head,
-.eu-ws__table .eu-ws__actions {
-  width: 1%;
-  white-space: nowrap;
-  text-align: right;
-}
-
-.eu-ws__actions button + button {
-  margin-left: 0.35rem;
-}
-
-.eu-ws__amount {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  font-variant-numeric: tabular-nums;
-}
-
-/* The row an invoice-number search led to: a tinted row with an accent bar,
-   both from the accent token, so light and dark need no separate rule. */
-.eu-ws__table tbody tr.is-found > td {
-  background-color: color-mix(in srgb, var(--eu-color-accent) 12%, transparent);
-}
-
-.eu-ws__table tbody tr.is-found > td:first-child {
-  box-shadow: inset 3px 0 0 0 var(--eu-color-accent);
-}
-
-.eu-ws__table .eu-ws__num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Closed and still short: what is left is the insured person's own share. */
-.eu-ws__table .eu-ws__num.is-short {
-  color: var(--eu-color-error-fg);
-}
-
-/* Short, but a further policy can still answer. */
-.eu-ws__table .eu-ws__num.is-pending {
-  color: var(--eu-color-warning-fg);
-}
-
-.eu-ws__badges {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-/* Objection marker: amber warning symbol; the label lives in its title
-   tooltip (and accessible name), so it stays compact next to the status. */
-.eu-ws__objection {
-  color: var(--eu-color-status-submitted-fg);
-  font-size: 1rem;
-  cursor: help;
-}
-
-/* Combined payment-status light + info trigger. Colour is bound inline from the
-   payment state; shape (the icon) and the title carry the state without relying
-   on colour alone (WCAG 1.4.1). */
-.eu-ws__ampel {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  border-radius: 0.25rem;
-}
-
-.eu-ws__ampel:focus-visible {
-  outline: 2px solid var(--eu-color-focus-ring);
-  outline-offset: 1px;
 }
 </style>

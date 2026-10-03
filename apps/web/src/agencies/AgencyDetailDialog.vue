@@ -8,6 +8,7 @@ import EuDetailField from '../design-system/components/EuDetailField.vue';
 import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
+import { useDialogAction } from '../lib/dialog-action';
 import { describeError } from '../lib/errors';
 import { paymentDetailLabel } from './payment-details';
 import {
@@ -45,8 +46,16 @@ const agency = ref<AgencyDto | null>(null);
 const loadError = ref<string | null>(null);
 const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
-const saving = ref(false);
-const saveError = ref<string | null>(null);
+/** The mask's own Save, the payment details and their delete, each on its own. */
+const mask = useDialogAction(afterChange);
+const entry = useDialogAction(afterChange);
+const removal = useDialogAction(afterChange);
+
+/** What every write here does once it went through: reread and tell the list. */
+async function afterChange(): Promise<void> {
+  await load();
+  emit('changed');
+}
 
 async function load(): Promise<void> {
   if (!props.uid) return;
@@ -64,7 +73,7 @@ async function load(): Promise<void> {
 watch(
   () => [props.open, props.uid] as const,
   ([open]) => {
-    saveError.value = null;
+    mask.clear();
     if (open) void load();
     else agency.value = null;
   },
@@ -79,69 +88,49 @@ const title = computed(() =>
 const str = (value: DetailValue): string => (typeof value === 'string' ? value.trim() : '');
 
 async function saveMask(): Promise<void> {
-  if (!agency.value) return;
-  saveError.value = null;
+  const current = agency.value;
+  if (!current) return;
+  mask.clear();
   if (!str(values.agencyName)) {
-    saveError.value = 'Bitte einen Namen angeben.';
+    mask.error = 'Bitte einen Namen angeben.';
     return;
   }
-  saving.value = true;
-  try {
-    await updateAgency(agency.value.agencyUID, str(values.agencyName));
-    await load();
-    emit('changed');
-  } catch (error) {
-    saveError.value = describeError(error);
-  } finally {
-    saving.value = false;
-  }
+  await mask.run(() => updateAgency(current.agencyUID, str(values.agencyName)));
 }
 
 // --- Payment details --------------------------------------------------------
 
 const detailDialog = reactive({ open: false, entry: null as AgencyPaymentDetailDto | null });
-const entrySaving = ref(false);
-const entryError = ref<string | null>(null);
 const pendingDelete = ref<{ uid: string; label: string } | null>(null);
-const deleteError = ref<string | null>(null);
 
-function openPaymentDetail(entry: AgencyPaymentDetailDto | null): void {
-  entryError.value = null;
-  detailDialog.entry = entry;
+function openPaymentDetail(forEntry: AgencyPaymentDetailDto | null): void {
+  entry.clear();
+  detailDialog.entry = forEntry;
   detailDialog.open = true;
 }
 
 async function saveEntry(payload: AgencyPaymentDetailInput): Promise<void> {
-  if (!agency.value) return;
-  entrySaving.value = true;
-  entryError.value = null;
-  try {
-    await saveAgencyPaymentDetail(
-      agency.value.agencyUID,
-      detailDialog.entry?.agencyAccountUID ?? null,
-      payload,
-    );
-    detailDialog.open = false;
-    await load();
-    emit('changed');
-  } catch (error) {
-    entryError.value = describeError(error);
-  } finally {
-    entrySaving.value = false;
-  }
+  const current = agency.value;
+  if (!current) return;
+  await entry.run(
+    () =>
+      saveAgencyPaymentDetail(
+        current.agencyUID,
+        detailDialog.entry?.agencyAccountUID ?? null,
+        payload,
+      ),
+    () => (detailDialog.open = false),
+  );
 }
 
 async function confirmDelete(): Promise<void> {
-  if (!agency.value || !pendingDelete.value) return;
-  deleteError.value = null;
-  try {
-    await deleteAgencyPaymentDetail(agency.value.agencyUID, pendingDelete.value.uid);
-    pendingDelete.value = null;
-    await load();
-    emit('changed');
-  } catch (error) {
-    deleteError.value = describeError(error);
-  }
+  const current = agency.value;
+  const pending = pendingDelete.value;
+  if (!current || !pending) return;
+  await removal.run(
+    () => deleteAgencyPaymentDetail(current.agencyUID, pending.uid),
+    () => (pendingDelete.value = null),
+  );
 }
 
 /** All of them, in the order the API hands them out: as they were recorded. */
@@ -161,7 +150,7 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
           required
         />
       </EuDetailMask>
-      <p v-if="saveError" class="eu-agency__error" role="alert">{{ saveError }}</p>
+      <p v-if="mask.error" class="eu-agency__error" role="alert">{{ mask.error }}</p>
 
       <section class="eu-agency__block" aria-labelledby="eu-agency-payment-details">
         <div class="eu-agency__block-head">
@@ -227,8 +216,8 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
-      <EuButton :disabled="saving || !agency" @click="saveMask">{{
-        saving ? 'Speichern…' : 'Speichern'
+      <EuButton :disabled="mask.busy || !agency" @click="saveMask">{{
+        mask.busy ? 'Speichern…' : 'Speichern'
       }}</EuButton>
     </template>
   </EuDialog>
@@ -236,8 +225,8 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
   <PaymentDetailFormDialog
     :open="detailDialog.open"
     :entry="detailDialog.entry"
-    :submitting="entrySaving"
-    :error="entryError"
+    :submitting="entry.busy"
+    :error="entry.error"
     @close="detailDialog.open = false"
     @submit="saveEntry"
   />
@@ -247,10 +236,10 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
     @close="pendingDelete = null"
   >
     <p>Soll {{ pendingDelete?.label }} wirklich gelöscht werden?</p>
-    <p v-if="deleteError" class="eu-agency__error" role="alert">{{ deleteError }}</p>
+    <p v-if="removal.error" class="eu-agency__error" role="alert">{{ removal.error }}</p>
     <template #footer>
       <EuButton variant="secondary" @click="pendingDelete = null">Abbrechen</EuButton>
-      <EuButton @click="confirmDelete">Löschen</EuButton>
+      <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
     </template>
   </EuDialog>
 </template>

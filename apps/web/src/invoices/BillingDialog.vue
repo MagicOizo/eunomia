@@ -9,6 +9,7 @@ import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, forfeitsByRule } from '../contracts/api';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { germanDate, germanMoney, plural } from '../lib/format';
 import {
   type BillingDto,
@@ -32,25 +33,24 @@ import { usePresetToggle } from './forfeit-toggle';
  * so a booking may mix submissions (Slice 37). Each card therefore names the day
  * its invoice was handed in.
  */
-const props = defineProps<{
-  open: boolean;
-  /** The invoices to book; they must share a policy (see eligibility.ts). */
-  invoices: InvoiceDto[];
-  /**
-   * The policy when it does not follow from the invoices — opened from the
-   * Leistungsabrechnungen page, the dialog starts with no card at all and the
-   * invoices are picked here. Fixes the policy, so the picker offers no other.
-   */
-  policy?: (CommonPolicy & { accountUID: string }) | null;
-  /** facilityUID → name, for the provider on each invoice card. */
-  facilityNames: Record<string, string>;
-  /** Preselected policy when opened from one card or from a billing. */
-  presetContract?: string | null;
-  /** Billing to preselect — the one just created from the contract side. */
-  presetBilling?: string | null;
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    /** The invoices to book; they must share a policy (see eligibility.ts). */
+    invoices: InvoiceDto[];
+    /**
+     * The policy when it does not follow from the invoices — opened from the
+     * Leistungsabrechnungen page, the dialog starts with no card at all and the
+     * invoices are picked here. Fixes the policy, so the picker offers no other.
+     */
+    policy?: (CommonPolicy & { accountUID: string }) | null;
+    /** facilityUID → name, for the provider on each invoice card. */
+    facilityNames: Record<string, string>;
+    /** Preselected policy when opened from one card or from a billing. */
+    presetContract?: string | null;
+    /** Billing to preselect — the one just created from the contract side. */
+    presetBilling?: string | null;
+  }
+>();
 
 const emit = defineEmits<{
   close: [];
@@ -75,7 +75,6 @@ const contractUID = ref('');
 const billings = ref<BillingListDto[]>([]);
 const selectedBilling = ref('');
 const accountInvoices = ref<InvoiceDto[]>([]);
-const localError = ref<string | null>(null);
 
 /**
  * The invoice number in a card's header names that card's two fields (see the
@@ -224,39 +223,33 @@ async function loadBillings(): Promise<void> {
   selectedBilling.value = billings.value.length === 1 ? billings.value[0].billingUID : '';
 }
 
-watch(
-  () => props.open,
-  async (open) => {
-    if (!open) return;
-    localError.value = null;
-    rows.value = [...props.invoices];
-    resetEntries();
-    const shared = availablePolicies.value;
-    // The card the dialog was opened from wins; otherwise default to the policy
-    // still waiting for an answer for one of these invoices.
-    contractUID.value =
-      shared.find((policy) => policy.contractUID === props.presetContract)?.contractUID ??
-      shared.find((policy) =>
-        rows.value.some((invoice) =>
-          invoice.submissions.some(
-            (s) => s.contractUID === policy.contractUID && s.status === 'eingereicht',
-          ),
+const { shownError, fail, clear } = useFormDialog(props, async () => {
+  rows.value = [...props.invoices];
+  resetEntries();
+  const shared = availablePolicies.value;
+  // The card the dialog was opened from wins; otherwise default to the policy
+  // still waiting for an answer for one of these invoices.
+  contractUID.value =
+    shared.find((policy) => policy.contractUID === props.presetContract)?.contractUID ??
+    shared.find((policy) =>
+      rows.value.some((invoice) =>
+        invoice.submissions.some(
+          (s) => s.contractUID === policy.contractUID && s.status === 'eingereicht',
         ),
-      )?.contractUID ??
-      shared[0]?.contractUID ??
-      '';
-    await loadBillings();
-    // Only here, not in loadBillings(): switching the policy afterwards must
-    // not bring the preselection back.
-    if (props.presetBilling) selectedBilling.value = props.presetBilling;
-    forfeit.reset();
-    // Without a card the account comes from the policy the dialog was opened
-    // for — that is where the invoices to pick from live.
-    const accountUID = rows.value[0]?.accountUID ?? props.policy?.accountUID;
-    accountInvoices.value = accountUID ? await listAccountInvoices(accountUID) : [];
-  },
-  { immediate: true },
-);
+      ),
+    )?.contractUID ??
+    shared[0]?.contractUID ??
+    '';
+  await loadBillings();
+  // Only here, not in loadBillings(): switching the policy afterwards must
+  // not bring the preselection back.
+  if (props.presetBilling) selectedBilling.value = props.presetBilling;
+  forfeit.reset();
+  // Without a card the account comes from the policy the dialog was opened
+  // for — that is where the invoices to pick from live.
+  const accountUID = rows.value[0]?.accountUID ?? props.policy?.accountUID;
+  accountInvoices.value = accountUID ? await listAccountInvoices(accountUID) : [];
+});
 
 function selectPolicy(uid: string | null): void {
   contractUID.value = uid ?? '';
@@ -268,7 +261,7 @@ function addInvoice(uid: string | null): void {
   if (!invoice) return;
   // Every complaint so far named the cards, so changing them clears it instead
   // of leaving "please pick an invoice" standing over the invoice just picked.
-  localError.value = null;
+  clear();
   rows.value = [...rows.value, invoice];
   entries[invoice.invoiceUID] = { reimbursement: null, receiptNumber: '' };
 }
@@ -277,7 +270,7 @@ function removeInvoice(uid: string): void {
   // The last card may only go when the caller named the policy: otherwise the
   // dialog would lose the policy it draws its candidates from, with no way back.
   if (rows.value.length <= 1 && !props.policy) return;
-  localError.value = null;
+  clear();
   rows.value = rows.value.filter((i) => i.invoiceUID !== uid);
   delete entries[uid];
 }
@@ -300,25 +293,17 @@ function onBillingFound(billing: BillingListDto): void {
 }
 
 function submit(): void {
-  localError.value = null;
-  if (!contractUID.value) {
-    localError.value = 'Bitte die Police wählen.';
-    return;
-  }
+  clear();
+  if (!contractUID.value) return fail('Bitte die Police wählen.');
   if (!selectedBilling.value) {
-    localError.value = 'Bitte eine Leistungsabrechnung wählen, suchen oder anlegen.';
-    return;
+    return fail('Bitte eine Leistungsabrechnung wählen, suchen oder anlegen.');
   }
-  if (rows.value.length === 0) {
-    localError.value = 'Bitte mindestens eine Rechnung wählen.';
-    return;
-  }
+  if (rows.value.length === 0) return fail('Bitte mindestens eine Rechnung wählen.');
   const missing = rows.value.filter((i) => entries[i.invoiceUID]?.reimbursement === null);
   if (missing.length > 0) {
-    localError.value = `Bitte den Erstattungsbetrag angeben für: ${missing
-      .map((i) => i.invoiceNumber)
-      .join(', ')}.`;
-    return;
+    return fail(
+      `Bitte den Erstattungsbetrag angeben für: ${missing.map((i) => i.invoiceNumber).join(', ')}.`,
+    );
   }
   // Checked here as well as on the server, so a booking is not attempted only
   // to be rejected as a whole for one amount.
@@ -328,10 +313,11 @@ function submit(): void {
       Math.round(invoice.remainingAmount * 100),
   );
   if (exceeding.length > 0) {
-    localError.value = `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — zu viel bei: ${exceeding
-      .map((i) => `${i.invoiceNumber} (noch offen: ${germanMoney(i.remainingAmount)})`)
-      .join(', ')}.`;
-    return;
+    return fail(
+      `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — zu viel bei: ${exceeding
+        .map((i) => `${i.invoiceNumber} (noch offen: ${germanMoney(i.remainingAmount)})`)
+        .join(', ')}.`,
+    );
   }
 
   const changed = forfeit.value.value !== storedForfeit.value;
@@ -475,9 +461,7 @@ function submit(): void {
           {{ BONUS_FORFEIT_RULE_LABEL[selectedPolicy.bonusForfeitRule] }}.
         </p>
       </div>
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">
-        {{ error ?? localError }}
-      </p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
@@ -510,18 +494,6 @@ function submit(): void {
 </template>
 
 <style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__note {
-  margin: 0;
-  color: var(--eu-color-text-muted);
-  font-family: var(--eu-font-data);
-}
-
 .eu-form__readonly {
   margin: -0.5rem 0 0;
   font-family: var(--eu-font-data);
@@ -533,12 +505,6 @@ function submit(): void {
   color: var(--eu-color-text-muted);
   font-family: var(--eu-font-data);
   font-size: 0.85rem;
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
 }
 
 .eu-bill__cards {

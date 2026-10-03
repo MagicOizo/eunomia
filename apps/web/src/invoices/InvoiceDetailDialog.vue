@@ -16,6 +16,7 @@ import type { PickerOption } from '../design-system/components/EuEntityPicker.vu
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { describeError } from '../lib/errors';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { germanMoney } from '../lib/format';
 import {
   type InvoiceAllocationDto,
@@ -64,21 +65,20 @@ import { STATUS_DISPLAY } from './status';
  * remove — act immediately through their own API calls and report back with
  * `changed`, independent of the mask's Save.
  */
-const props = defineProps<{
-  open: boolean;
-  invoice: InvoiceDto | null;
-  accountName: string;
-  facilities: SelectOption[];
-  agencies: SelectOption[];
-  /** agencyUID → its payment details, to pick the ones the invoice goes to. */
-  agencyPaymentDetails: Record<string, AgencyPaymentDetailDto[]>;
-  /** All policies of the insured person, for the submit and exclusion pickers. */
-  contracts: ContractOption[];
-  /** The optimizer's advice for this invoice, shown per policy card. */
-  planInvoice: PlanInvoiceDto | null;
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    invoice: InvoiceDto | null;
+    accountName: string;
+    facilities: SelectOption[];
+    agencies: SelectOption[];
+    /** agencyUID → its payment details, to pick the ones the invoice goes to. */
+    agencyPaymentDetails: Record<string, AgencyPaymentDetailDto[]>;
+    /** All policies of the insured person, for the submit and exclusion pickers. */
+    contracts: ContractOption[];
+    /** The optimizer's advice for this invoice, shown per policy card. */
+    planInvoice: PlanInvoiceDto | null;
+  }
+>();
 
 const emit = defineEmits<{
   close: [];
@@ -96,7 +96,6 @@ const saved = reactive<Record<string, DetailValue>>({});
 // that type would reach into the policy and agency masks as well.
 const extraDays = ref<string[]>([]);
 const savedExtraDays = ref<string[]>([]);
-const localError = ref<string | null>(null);
 
 // Local option copies so an ad-hoc-created entity can be appended and selected
 // immediately, without waiting for the parent to reload its lists.
@@ -162,13 +161,13 @@ async function onPaymentDetailCreate(
 const seeding = ref(false);
 
 // Seeded per opened invoice only: a reload after a block action passes a
-// fresh invoice object and must not discard unsaved edits in the mask.
-watch(
-  () => [props.open, props.invoice?.invoiceUID] as const,
-  ([open]) => {
+// fresh invoice object and must not discard unsaved edits in the mask — hence
+// the invoice's UID as the second trigger, not the invoice itself.
+const { shownError, fail, clear } = useFormDialog(
+  props,
+  () => {
     const inv = props.invoice;
-    if (!open || !inv) return;
-    localError.value = null;
+    if (!inv) return;
     const seed: Record<string, DetailValue> = {
       invoiceNumber: inv.invoiceNumber,
       invoiceDate: inv.invoiceDate,
@@ -194,7 +193,7 @@ watch(
     extraDays.value = furtherDays(inv);
     savedExtraDays.value = [...extraDays.value];
   },
-  { immediate: true },
+  () => props.invoice?.invoiceUID,
 );
 
 /**
@@ -480,7 +479,7 @@ async function confirmRemove(): Promise<void> {
 }
 
 function submit(): void {
-  localError.value = null;
+  clear();
   if (!props.invoice) return;
   if (
     !str(values.invoiceNumber) ||
@@ -488,22 +487,14 @@ function submit(): void {
     !values.treatmentDate ||
     values.invoiceAmount === null
   ) {
-    localError.value =
-      'Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.';
-    return;
+    return fail('Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.');
   }
   // The complete list, leading day included: the API takes its earliest entry
   // as `treatmentDate` (Slice 41).
   const days = normalizeDays([String(values.treatmentDate), ...extraDays.value]);
-  if (!sameCalendarYear(days)) {
-    localError.value = differentYearsMessage();
-    return;
-  }
+  if (!sameCalendarYear(days)) return fail(differentYearsMessage());
   const reason = str(values.notCoveredReason);
-  if (notCovered.value && reason === '') {
-    localError.value = reasonRequiredMessage();
-    return;
-  }
+  if (notCovered.value && reason === '') return fail(reasonRequiredMessage());
   const dp = directPayment.value;
   emit('submit', {
     invoiceNumber: str(values.invoiceNumber),
@@ -703,9 +694,7 @@ function submit(): void {
       </template>
     </EuDetailMask>
 
-    <p v-if="error ?? localError" class="eu-detail__error" role="alert">
-      {{ error ?? localError }}
-    </p>
+    <p v-if="shownError" class="eu-detail__error" role="alert">{{ shownError }}</p>
 
     <template v-if="invoice">
       <section class="eu-detail-block" aria-labelledby="eu-invoice-assignment">

@@ -23,6 +23,7 @@ import { apiData } from '../lib/api';
 import { useDebouncedCallback } from '../lib/debounce';
 import { germanDate, germanMoney, plural } from '../lib/format';
 import { todayIso } from '../lib/date-input';
+import { useDialogAction } from '../lib/dialog-action';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { listResource } from '../lib/resource';
@@ -93,8 +94,8 @@ const objectionOpen = ref(false);
 const editOpen = ref(false);
 const deleteOpen = ref(false);
 const selected = ref<BillingListDto | null>(null);
-const busy = ref(false);
-const dialogError = ref<string | null>(null);
+/** One group for all of this page's dialogs: only ever one of them is open. */
+const action = useDialogAction(load);
 const formDate = ref('');
 const formNote = ref('');
 const bookOpen = ref(false);
@@ -170,7 +171,7 @@ function openDocument(b: BillingListDto): void {
 
 function openObjection(b: BillingListDto): void {
   selected.value = b;
-  dialogError.value = null;
+  action.clear();
   formDate.value = todayIso();
   formNote.value = '';
   objectionOpen.value = true;
@@ -178,29 +179,14 @@ function openObjection(b: BillingListDto): void {
 
 const selectedOpen = computed(() => (selected.value ? isOpenObjection(selected.value) : false));
 
-/** Runs a mutating action, closing its dialog and reloading the list on success. */
-async function run(action: () => Promise<unknown>, close: () => void): Promise<void> {
-  busy.value = true;
-  dialogError.value = null;
-  try {
-    await action();
-    close();
-    await load();
-  } catch (err) {
-    dialogError.value = err instanceof HttpError ? describeError(err) : 'Aktion fehlgeschlagen.';
-  } finally {
-    busy.value = false;
-  }
-}
-
 function fileObjection(): void {
   const billing = selected.value;
   if (!billing) return;
   if (!formDate.value) {
-    dialogError.value = 'Bitte ein Datum für den Widerspruch angeben.';
+    action.error = 'Bitte ein Datum für den Widerspruch angeben.';
     return;
   }
-  void run(
+  void action.run(
     () =>
       updateBilling(billing.billingUID, {
         objectionDate: formDate.value,
@@ -214,7 +200,7 @@ function fileObjection(): void {
 function resolveObjection(): void {
   const billing = selected.value;
   if (!billing) return;
-  void run(
+  void action.run(
     () => updateBilling(billing.billingUID, { objectionResolvedDate: todayIso() }),
     () => (objectionOpen.value = false),
   );
@@ -222,7 +208,7 @@ function resolveObjection(): void {
 
 function openEdit(b: BillingListDto): void {
   selected.value = b;
-  dialogError.value = null;
+  action.clear();
   editOpen.value = true;
 }
 
@@ -236,7 +222,7 @@ async function onCreated(billing: BillingDto): Promise<void> {
   newOpen.value = false;
   await load();
   if (loadError.value) return;
-  dialogError.value = null;
+  action.clear();
   bookBilling.value = billing;
   bookOpen.value = true;
 }
@@ -247,7 +233,7 @@ function onEdited(): void {
 }
 
 function bookAllocations(payload: BillingAllocationPayload): void {
-  void run(
+  void action.run(
     () => saveBillingAllocations(payload),
     () => (bookOpen.value = false),
   );
@@ -255,14 +241,14 @@ function bookAllocations(payload: BillingAllocationPayload): void {
 
 function openDelete(b: BillingListDto): void {
   selected.value = b;
-  dialogError.value = null;
+  action.clear();
   deleteOpen.value = true;
 }
 
 function confirmDelete(): void {
   const billing = selected.value;
   if (!billing) return;
-  void run(
+  void action.run(
     () => deleteBilling(billing.billingUID),
     () => (deleteOpen.value = false),
   );
@@ -431,17 +417,17 @@ function confirmDelete(): void {
           <EuTextField v-model="formNote" label="Notiz (optional)" />
         </template>
 
-        <p v-if="dialogError" class="eu-billings__error" role="alert">{{ dialogError }}</p>
+        <p v-if="action.error" class="eu-billings__error" role="alert">{{ action.error }}</p>
       </div>
 
       <template #footer>
         <EuButton variant="secondary" @click="objectionOpen = false">Schließen</EuButton>
-        <EuButton v-if="selectedOpen" :disabled="busy" @click="resolveObjection">
+        <EuButton v-if="selectedOpen" :disabled="action.busy" @click="resolveObjection">
           Als aufgelöst markieren
         </EuButton>
         <EuButton
           v-else-if="selected && !selected.objectionDate"
-          :disabled="busy"
+          :disabled="action.busy"
           @click="fileObjection"
         >
           Widerspruch einlegen
@@ -472,8 +458,8 @@ function confirmDelete(): void {
       :policy="policy"
       :facility-names="facilityNames"
       :preset-billing="bookBilling?.billingUID ?? null"
-      :submitting="busy"
-      :error="dialogError"
+      :submitting="action.busy"
+      :error="action.error"
       @close="bookOpen = false"
       @submit="bookAllocations"
     />
@@ -493,12 +479,12 @@ function confirmDelete(): void {
           }}
           dadurch ihre Erstattung und gehen zurück auf „eingereicht".
         </p>
-        <p v-if="dialogError" class="eu-billings__error" role="alert">{{ dialogError }}</p>
+        <p v-if="action.error" class="eu-billings__error" role="alert">{{ action.error }}</p>
       </div>
       <template #footer>
         <EuButton variant="secondary" @click="deleteOpen = false">Abbrechen</EuButton>
-        <EuButton :disabled="busy" @click="confirmDelete">{{
-          busy ? 'Löschen…' : 'Löschen'
+        <EuButton :disabled="action.busy" @click="confirmDelete">{{
+          action.busy ? 'Löschen…' : 'Löschen'
         }}</EuButton>
       </template>
     </EuDialog>
@@ -641,17 +627,5 @@ function confirmDelete(): void {
   margin: 0;
   font-weight: 600;
   color: var(--eu-color-status-submitted-fg);
-}
-
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__note {
-  margin: 0;
-  color: var(--eu-color-text-muted);
-  font-family: var(--eu-font-data);
 }
 </style>

@@ -150,29 +150,11 @@ function confirm(): void {
 </template>
 
 <style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__note {
-  margin: 0;
-  color: var(--eu-color-text-muted);
-  font-family: var(--eu-font-data);
-}
-
 .eu-form__hint {
   margin: 0;
   color: var(--eu-color-text-muted);
   font-family: var(--eu-font-data);
   font-size: 0.85rem;
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
 }
 
 .eu-bsearch__row {

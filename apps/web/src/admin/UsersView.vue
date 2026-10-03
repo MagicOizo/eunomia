@@ -7,6 +7,7 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
+import { useDialogAction } from '../lib/dialog-action';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/table-sort';
@@ -32,10 +33,12 @@ const loadError = ref<string | null>(null);
 
 const dialogOpen = ref(false);
 const editing = ref<AdminUserDto | null>(null);
-const busy = ref(false);
-const formError = ref<string | null>(null);
 const deleteTarget = ref<AdminUserDto | null>(null);
-const deleteError = ref<string | null>(null);
+
+/** The same sentence for both: the e-mail address is what can collide. */
+const DUPLICATE_EMAIL = 'Diese E-Mail-Adresse wird bereits verwendet.';
+const form = useDialogAction(reload);
+const removal = useDialogAction(reload);
 
 function userSortValue(u: AdminUserDto, key: string): string | number {
   switch (key) {
@@ -71,7 +74,7 @@ async function reload(): Promise<void> {
       label: [a.firstname, a.surname].filter(Boolean).join(' '),
     }));
   } catch (error) {
-    loadError.value = describeError(error, 'Diese E-Mail-Adresse wird bereits verwendet.');
+    loadError.value = describeError(error, DUPLICATE_EMAIL);
   } finally {
     loading.value = false;
   }
@@ -81,53 +84,47 @@ onMounted(reload);
 
 function openCreate(): void {
   editing.value = null;
-  formError.value = null;
+  form.clear();
   dialogOpen.value = true;
 }
 function openEdit(user: AdminUserDto): void {
   editing.value = user;
-  formError.value = null;
+  form.clear();
   dialogOpen.value = true;
 }
 
 async function onSubmit(payload: UserFormPayload): Promise<void> {
-  busy.value = true;
-  formError.value = null;
-  try {
-    let uuid = editing.value?.uuid;
-    if (editing.value) {
-      await updateUser(editing.value.uuid, payload.user);
-    } else {
-      uuid = (
-        await createUser({
-          email: payload.user.email,
-          firstname: payload.user.firstname,
-          surname: payload.user.surname,
-          password: payload.user.password ?? '',
-        })
-      ).uuid;
-    }
-    await setGlobalRoles(uuid!, payload.globalRoleUIDs);
-    await setAccountRoles(uuid!, payload.grants);
-    dialogOpen.value = false;
-    await reload();
-  } catch (error) {
-    formError.value = describeError(error, 'Diese E-Mail-Adresse wird bereits verwendet.');
-  } finally {
-    busy.value = false;
-  }
+  await form.run(
+    async () => {
+      let uuid = editing.value?.uuid;
+      if (editing.value) {
+        await updateUser(editing.value.uuid, payload.user);
+      } else {
+        uuid = (
+          await createUser({
+            email: payload.user.email,
+            firstname: payload.user.firstname,
+            surname: payload.user.surname,
+            password: payload.user.password ?? '',
+          })
+        ).uuid;
+      }
+      await setGlobalRoles(uuid!, payload.globalRoleUIDs);
+      await setAccountRoles(uuid!, payload.grants);
+    },
+    () => (dialogOpen.value = false),
+    DUPLICATE_EMAIL,
+  );
 }
 
 async function confirmDelete(): Promise<void> {
-  if (!deleteTarget.value) return;
-  deleteError.value = null;
-  try {
-    await deleteUser(deleteTarget.value.uuid);
-    deleteTarget.value = null;
-    await reload();
-  } catch (error) {
-    deleteError.value = describeError(error, 'Diese E-Mail-Adresse wird bereits verwendet.');
-  }
+  const target = deleteTarget.value;
+  if (!target) return;
+  await removal.run(
+    () => deleteUser(target.uuid),
+    () => (deleteTarget.value = null),
+    DUPLICATE_EMAIL,
+  );
 }
 </script>
 
@@ -209,18 +206,18 @@ async function confirmDelete(): Promise<void> {
       :editing="editing"
       :roles="roles"
       :accounts="accountOptions"
-      :submitting="busy"
-      :error="formError"
+      :submitting="form.busy"
+      :error="form.error"
       @close="dialogOpen = false"
       @submit="onSubmit"
     />
 
     <EuDialog :open="deleteTarget !== null" title="Nutzer löschen" @close="deleteTarget = null">
       <p>Nutzer „{{ deleteTarget?.email }}" wirklich löschen?</p>
-      <p v-if="deleteError" class="eu-users__error" role="alert">{{ deleteError }}</p>
+      <p v-if="removal.error" class="eu-users__error" role="alert">{{ removal.error }}</p>
       <template #footer>
         <EuButton variant="secondary" @click="deleteTarget = null">Abbrechen</EuButton>
-        <EuButton @click="confirmDelete">Löschen</EuButton>
+        <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
       </template>
     </EuDialog>
   </section>

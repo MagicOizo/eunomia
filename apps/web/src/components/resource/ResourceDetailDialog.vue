@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 
 import EuButton from '../../design-system/components/EuButton.vue';
 import type { DetailType, DetailValue } from '../../design-system/components/EuDetailField.vue';
 import EuDetailField from '../../design-system/components/EuDetailField.vue';
 import EuDetailMask from '../../design-system/components/EuDetailMask.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
+import { useFormDialog, type FormDialogProps } from '../../lib/form-dialog';
 import type { ResourceRow } from '../../lib/resource';
 import type { FieldConfig } from '../../resources/config';
 import { type SelectOption } from './EuSelectField.vue';
@@ -18,24 +19,21 @@ import { type SelectOption } from './EuSelectField.vue';
  * (invoice, policy) brings its own dialog. Like the form, this dialog only
  * collects values; ResourceView owns the request.
  */
-const props = defineProps<{
-  open: boolean;
-  title: string;
-  fields: FieldConfig[];
-  /** Select options keyed by lookup name (see ResourceConfig.lookups). */
-  options: Record<string, SelectOption[]>;
-  /** The row being edited. */
-  editing: ResourceRow | null;
-  submitting: boolean;
-  /** Server-side error message to show below the mask. */
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    title: string;
+    fields: FieldConfig[];
+    /** Select options keyed by lookup name (see ResourceConfig.lookups). */
+    options: Record<string, SelectOption[]>;
+    /** The row being edited. */
+    editing: ResourceRow | null;
+  }
+>();
 
 const emit = defineEmits<{ close: []; submit: [payload: Record<string, unknown>] }>();
 
 const values = ref<Record<string, DetailValue>>({});
 const saved = ref<Record<string, DetailValue>>({});
-const localError = ref<string | null>(null);
 
 /** Empty means `null` for pickers and numbers, an empty string for text inputs. */
 const holdsNull = (field: FieldConfig): boolean =>
@@ -69,21 +67,21 @@ function displayValue(field: FieldConfig): DetailValue {
 
 // Seeded per opened row, so Reset always goes back to what the server holds.
 // Rebuilt from `fields` too: ResourceView is reused across resources.
-watch(
-  () => [props.open, props.editing, props.fields] as const,
-  ([open, row]) => {
-    if (!open || !row) return;
-    localError.value = null;
+const { shownError, fail, clear } = useFormDialog(
+  props,
+  () => {
+    const row = props.editing;
+    if (!row) return;
     const seed: Record<string, DetailValue> = {};
     for (const field of props.fields) seed[field.key] = seedValue(field, row[field.key]);
     values.value = seed;
     saved.value = { ...seed };
   },
-  { immediate: true },
+  () => [props.editing, props.fields],
 );
 
 function submit(): void {
-  localError.value = null;
+  clear();
   const payload: Record<string, unknown> = {};
 
   for (const field of props.fields) {
@@ -92,10 +90,7 @@ function submit(): void {
     const value = values.value[field.key] ?? null;
     const text = typeof value === 'string' ? value.trim() : '';
     if (value === null || (typeof value === 'string' && text === '')) {
-      if (field.required) {
-        localError.value = `Bitte „${field.label}“ ausfüllen.`;
-        return;
-      }
+      if (field.required) return fail(`Bitte „${field.label}“ ausfüllen.`);
       // Sent explicitly: clearing a field has to reach the server, unlike in
       // the create form where an empty optional is simply left out.
       payload[field.key] = null;
@@ -125,9 +120,7 @@ function submit(): void {
       />
     </EuDetailMask>
 
-    <p v-if="error ?? localError" class="eu-detail__error" role="alert">
-      {{ error ?? localError }}
-    </p>
+    <p v-if="shownError" class="eu-detail__error" role="alert">{{ shownError }}</p>
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>

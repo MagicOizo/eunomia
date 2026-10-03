@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -8,6 +8,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { useAuthStore } from '../stores/auth';
 import type { AdminUserDto, RoleDto } from './api';
 
@@ -23,14 +24,13 @@ export interface UserFormPayload {
   grants: Array<{ accountUID: string; roleUID: string }>;
 }
 
-const props = defineProps<{
-  open: boolean;
-  editing: AdminUserDto | null;
-  roles: RoleDto[];
-  accounts: SelectOption[];
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    editing: AdminUserDto | null;
+    roles: RoleDto[];
+    accounts: SelectOption[];
+  }
+>();
 
 const emit = defineEmits<{ close: []; submit: [payload: UserFormPayload] }>();
 
@@ -41,7 +41,6 @@ const password = ref('');
 const active = ref(true);
 const globalRoleUIDs = ref<Set<string>>(new Set());
 const grants = ref<Array<{ accountUID: string; roleUID: string }>>([]);
-const localError = ref<string | null>(null);
 
 /**
  * One's own password is not set here. The API refuses it (auth/admin-routes.ts)
@@ -61,11 +60,9 @@ const defaultRoleUID = computed(
   () => roleUidByName.value.get('Nutzer') ?? props.roles[0]?.roleUID ?? '',
 );
 
-watch(
-  () => [props.open, props.editing] as const,
-  ([open]) => {
-    if (!open) return;
-    localError.value = null;
+const { shownError, fail, clear } = useFormDialog(
+  props,
+  () => {
     const e = props.editing;
     email.value = e?.email ?? '';
     firstname.value = e?.firstname ?? '';
@@ -82,7 +79,7 @@ watch(
       roleUID: roleUidByName.value.get(g.roleName) ?? defaultRoleUID.value,
     }));
   },
-  { immediate: true },
+  () => props.editing,
 );
 
 function toggleRole(roleUID: string, on: boolean): void {
@@ -100,14 +97,12 @@ function removeGrant(index: number): void {
 }
 
 function submit(): void {
-  localError.value = null;
+  clear();
   if (!email.value.trim() || !firstname.value.trim()) {
-    localError.value = 'Bitte E-Mail und Vorname ausfüllen.';
-    return;
+    return fail('Bitte E-Mail und Vorname ausfüllen.');
   }
   if (!props.editing && password.value.length < 8) {
-    localError.value = 'Bitte ein Passwort mit mindestens 8 Zeichen vergeben.';
-    return;
+    return fail('Bitte ein Passwort mit mindestens 8 Zeichen vergeben.');
   }
   const validGrants = grants.value.filter((g) => g.accountUID && g.roleUID);
 
@@ -188,9 +183,7 @@ function submit(): void {
         >
       </fieldset>
 
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">
-        {{ error ?? localError }}
-      </p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
@@ -203,12 +196,6 @@ function submit(): void {
 </template>
 
 <style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 .eu-form__group {
   border: 1px solid var(--eu-color-border);
   border-radius: 0.5rem;
@@ -241,12 +228,6 @@ function submit(): void {
   margin: 0;
   color: var(--eu-color-text-muted);
   font-family: var(--eu-font-data);
-  font-size: 0.9rem;
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
   font-size: 0.9rem;
 }
 </style>

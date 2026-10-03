@@ -132,7 +132,20 @@ ausdrücklich vor einer anderen steht.
       trägt, lautlos weg (als Test festgehalten). Offen geblieben ist die dritte Schreibweise aus
       CR-18 in `reminders/store.ts`: dort ist die eingefügte Zeile nicht der Rückgabewert, der
       Umbau wäre ein anderer Schnitt.
-- [ ] **11 — Dialoge und große Ansichten.** CR-29 (★), CR-30 (★). Bereitet Scheibe 12 vor.
+- [x] **11 — Dialoge und große Ansichten.** CR-29 (★), CR-30 (★). Bereitet Scheibe 12 vor.
+      Umgesetzt mit v0.18.0-slice.3 (Slice 61). Alle 14 Dialoge auf einmal statt schrittweise, auf
+      Entscheidung des Autors: eine zweite Form im Bestand hätte Scheibe 12 doppelte Arbeit gemacht.
+      Drei Dinge gingen über den Review hinaus: (1) die Wirt-Seite bekam das Gegenstück
+      (`useDialogAction()` — busy, Fehler, Schließen, Nachladen standen fünfzehnmal in acht Dateien
+      von Hand); (2) `.eu-form`, `.eu-form__error` und `.eu-form__note` standen zeichengleich in 15
+      Dateien und stehen jetzt in `global.css`; (3) `BillingFormDialog` schreibt selbst und hat
+      beide Hälften bekommen. Ausdrücklich nicht umgestellt — je mit einem Satz im Code: die Lader,
+      `ObjectionDialog` (busy je Zeile), `InvoiceDetailDialog.runBlock` (mehrere Fehlerkanäle, kein
+      Schließen), `ProfileView` (kein Schließen, kein Nachladen) und das Füllen in
+      `ResourceFormDialog`, das absichtlich auch bei geschlossenem Dialog läuft. Eine einzige
+      Verhaltensänderung: ein Nicht-HTTP-Fehler heißt in `BillingsView` jetzt „Unerwarteter Fehler."
+      statt „Aktion fehlgeschlagen.". `InvoiceDetailDialog` und `ContractDetailDialog` bleiben
+      ungeteilt, wie der Review empfiehlt.
 - [ ] **12 — Die Oberfläche lernt das Rechtemodell.** CR-26.
 - [ ] **13 — Weniger Fragen an die Datenbank.** CR-16, CR-17, CR-27.
 - [ ] **14 — Typen statt Zusicherungen.** CR-19.

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { germanDate, germanMoney } from '../lib/format';
 import type { InvoiceAllocationDto, InvoiceDto } from './api';
 
@@ -14,15 +15,14 @@ import type { InvoiceAllocationDto, InvoiceDto } from './api';
  * and which Leistungsabrechnung it came from is what the booking *is*; moving
  * it elsewhere remains removing it and booking it anew.
  */
-const props = defineProps<{
-  open: boolean;
-  /** The booked reimbursement to correct. */
-  allocation: InvoiceAllocationDto | null;
-  /** The invoice it is booked on — for its number and what is still open on it. */
-  invoice: InvoiceDto | null;
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<
+  FormDialogProps & {
+    /** The booked reimbursement to correct. */
+    allocation: InvoiceAllocationDto | null;
+    /** The invoice it is booked on — for its number and what is still open on it. */
+    invoice: InvoiceDto | null;
+  }
+>();
 
 const emit = defineEmits<{
   close: [];
@@ -31,7 +31,6 @@ const emit = defineEmits<{
 
 const reimbursement = ref<number | null>(null);
 const receiptNumber = ref('');
-const localError = ref<string | null>(null);
 
 /**
  * The most this one booking may carry: what is still open on the invoice plus
@@ -41,16 +40,12 @@ const localError = ref<string | null>(null);
 const maxReimbursement = (): number =>
   (props.invoice?.remainingAmount ?? 0) + (props.allocation?.reimbursement ?? 0);
 
-watch(
-  () => props.open,
-  (open) => {
-    if (!open || !props.allocation) return;
-    localError.value = null;
-    reimbursement.value = props.allocation.reimbursement;
-    receiptNumber.value = props.allocation.receiptNumber ?? '';
-  },
-  { immediate: true },
-);
+const { shownError, fail, clear } = useFormDialog(props, () => {
+  const allocation = props.allocation;
+  if (!allocation) return;
+  reimbursement.value = allocation.reimbursement;
+  receiptNumber.value = allocation.receiptNumber ?? '';
+});
 
 /**
  * The invoice amount named in the note goes into the field below it (issues.md
@@ -64,18 +59,16 @@ function takeInvoiceAmount(): void {
 function submit(): void {
   const allocation = props.allocation;
   if (!allocation) return;
-  localError.value = null;
-  if (reimbursement.value === null) {
-    localError.value = 'Bitte den Erstattungsbetrag angeben.';
-    return;
-  }
+  clear();
+  if (reimbursement.value === null) return fail('Bitte den Erstattungsbetrag angeben.');
   // Checked here as well as on the server, so a correction is not sent only to
   // come back rejected.
   if (Math.round(reimbursement.value * 100) > Math.round(maxReimbursement() * 100)) {
-    localError.value = `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — hier sind höchstens ${germanMoney(
-      maxReimbursement(),
-    )} möglich.`;
-    return;
+    return fail(
+      `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — hier sind höchstens ${germanMoney(
+        maxReimbursement(),
+      )} möglich.`,
+    );
   }
   emit('submit', {
     allocationUID: allocation.allocationUID,
@@ -105,9 +98,7 @@ function submit(): void {
         <EuCurrencyField v-model="reimbursement" label="Erstattung" />
         <EuTextField v-model="receiptNumber" label="Belegnummer" />
       </div>
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">
-        {{ error ?? localError }}
-      </p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
@@ -119,24 +110,6 @@ function submit(): void {
 </template>
 
 <style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__note {
-  margin: 0;
-  color: var(--eu-color-text-muted);
-  font-family: var(--eu-font-data);
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
-}
-
 /* The amount in the note is also the way into the field under it (issues.md
    0.13.0-4): text at rest, clickable on hover and focus — the same shortcut as in
    the Zuordnen dialog. */

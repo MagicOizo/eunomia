@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { germanMoney, plural } from '../lib/format';
 import type { BonusYearDto, ContractYearInput } from './api';
 
@@ -15,12 +16,7 @@ import type { BonusYearDto, ContractYearInput } from './api';
  * where the counted result is wrong, a manual "bonus forfeited" override.
  * Emptying every field hands the year back to the calculation.
  */
-const props = defineProps<{
-  open: boolean;
-  year: BonusYearDto | null;
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<FormDialogProps & { year: BonusYearDto | null }>();
 
 const emit = defineEmits<{ close: []; submit: [payload: ContractYearInput] }>();
 
@@ -34,16 +30,17 @@ const forfeitOptions = [
   { value: 'no', label: 'Nein, Jahr ist leistungsfrei' },
 ];
 
-watch(
-  () => [props.open, props.year] as const,
-  ([open, year]) => {
-    if (!open || !year) return;
+const { shownError } = useFormDialog(
+  props,
+  () => {
+    const year = props.year;
+    if (!year) return;
     actualBonus.value = year.actualBonus;
     forfeitChoice.value =
       year.bonusForfeitedOverride === null ? 'auto' : year.bonusForfeitedOverride ? 'yes' : 'no';
     note.value = year.note ?? '';
   },
-  { immediate: true },
+  () => props.year,
 );
 
 function submit(): void {
@@ -80,7 +77,7 @@ function submit(): void {
         @update:model-value="forfeitChoice = ($event as 'auto' | 'yes' | 'no' | null) ?? 'auto'"
       />
       <EuTextField v-model="note" label="Notiz (optional)" />
-      <p v-if="error" class="eu-form__error" role="alert">{{ error }}</p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
@@ -90,23 +87,3 @@ function submit(): void {
     </template>
   </EuDialog>
 </template>
-
-<style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__note {
-  margin: 0;
-  color: var(--eu-color-text-muted);
-  font-family: var(--eu-font-data);
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
-}
-</style>

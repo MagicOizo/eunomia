@@ -209,10 +209,12 @@ Code-Reviews.
 	Der Rechnungs-Arbeitsbereich holt `/contracts` ohne Filter und wirft anschließend alles weg, was nicht zum angezeigten Versicherten gehört — während Rechnungen und Abrechnungen einen `accountUID`-Filter haben. `?accountUID=` an `GET /contracts` ergänzen (mit dem Helfer aus CR-07 wenige Zeilen).
 28.	`design-system/index.ts` ist tot (CR-28) — Umgesetzt mit v0.16.0-slice.2
 	Die Sammeldatei exportiert fünf der fünfzehn Komponenten und wird nirgends importiert: null Treffer, dagegen 141 direkte Importe aus `design-system/components/…`. Sie sieht aus wie die öffentliche Oberfläche des Design-Systems und ist keine. Löschen.
-29.	17 Dialoge wiederholen denselben Vertrag von Hand (CR-29)
+29.	17 Dialoge wiederholen denselben Vertrag von Hand (CR-29) — Umgesetzt mit v0.18.0-slice.3
 	Die Dialoge folgen alle derselben Form, schreiben sie aber jeder für sich: 14 deklarieren das Paar `submitting`/`error` als Props, 13 halten ein eigenes `localError`, 9 bauen einen eigenen `watch(() => props.open, …)` zum Zurücksetzen. Tut nicht weh, bis sich die Form ändert — etwa wenn die Rechteprüfung aus CR-26 in jeden Dialog muss; dann sind es 17 Änderungen statt einer. Ein `useFormDialog()` und ein gemeinsamer Prop-Typ, schrittweise eingeführt.
-30.	Vier Ansichten über 750 Zeilen (CR-30)
+	Umgesetzt wurden alle 14 Dialoge auf einmal statt schrittweise, auf Entscheidung des Autors: eine zweite Form im Bestand hätte Scheibe 12 doppelte Arbeit gemacht. Dazu kam die Wirt-Seite (`useDialogAction()`, 15 handgeschriebene `try/catch/finally` in acht Dateien) und die dreifache Stilregel `.eu-form`, die zeichengleich in 15 Dateien stand und jetzt in `global.css` steht.
+30.	Vier Ansichten über 750 Zeilen (CR-30) — Umgesetzt mit v0.18.0-slice.3
 	`InvoiceWorkspaceView.vue` (1025), `InvoiceDetailDialog.vue` (983), `ContractDetailDialog.vue` (830) und `SettingsView.vue` (766). Weniger schlimm, als die Zahlen klingen — die Fachlogik ist bereits in kleine, getestete Module ausgelagert, der Rest ist überwiegend Vorlage. Keine Generalüberholung, sondern zwei Schnitte: die acht Dialog-Zustände des Arbeitsbereichs in ein `useInvoiceDialogs()`, die Tabelle als eigene Komponente; `SettingsView` entlang seiner drei Abschnitte teilen.
+	Genau so umgesetzt: `InvoiceWorkspaceView` 1034 → 644 Zeilen (`InvoiceTable.vue` bekommt fertige Zeilen statt fünfzehn Nachschlagefunktionen), `SettingsView` 785 → 59 Zeilen über `UpdateSection`, `MailSection`, `ReminderSection` und ein geteiltes `settings.css`. `InvoiceDetailDialog` (974) und `ContractDetailDialog` (813) bleiben ungeteilt, wie der Review es empfiehlt — ihre Masse ist Vorlage, ihre Block-Mechanik ein eigener Schnitt.
 31.	Composable-Dateinamen uneinheitlich (CR-31) — Umgesetzt mit v0.16.0-slice.2
 	Fünf Dateien exportieren ein `use…`: `lib/useTableSort.ts` in camelCase, die übrigen vier in kebab-case wie der Rest des Projekts. Umbenennen, fünf Importe.
 32.	Keine Abdeckungsmessung, nirgends (CR-32)

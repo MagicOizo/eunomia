@@ -1,39 +1,25 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { todayIso } from '../lib/date-input';
+import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import type { InvoiceDto } from './api';
 
-const props = defineProps<{
-  open: boolean;
-  invoice: InvoiceDto | null;
-  submitting: boolean;
-  error: string | null;
-}>();
+const props = defineProps<FormDialogProps & { invoice: InvoiceDto | null }>();
 
 const emit = defineEmits<{ close: []; submit: [transferDate: string] }>();
 
 const transferDate = ref('');
-const localError = ref<string | null>(null);
 
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) return;
-    localError.value = null;
-    transferDate.value = props.invoice?.transferDate ?? todayIso();
-  },
-  { immediate: true },
-);
+const { shownError, fail } = useFormDialog(props, () => {
+  transferDate.value = props.invoice?.transferDate ?? todayIso();
+});
 
 function submit(): void {
-  if (!transferDate.value) {
-    localError.value = 'Bitte ein Zahlungsdatum wählen.';
-    return;
-  }
+  if (!transferDate.value) return fail('Bitte ein Zahlungsdatum wählen.');
   emit('submit', transferDate.value);
 }
 </script>
@@ -45,9 +31,7 @@ function submit(): void {
         Rechnung {{ invoice.invoiceNumber }} als erstattet/bezahlt markieren.
       </p>
       <EuTextField v-model="transferDate" label="Zahlungsdatum" type="date" />
-      <p v-if="error ?? localError" class="eu-form__error" role="alert">
-        {{ error ?? localError }}
-      </p>
+      <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
@@ -58,23 +42,3 @@ function submit(): void {
     </template>
   </EuDialog>
 </template>
-
-<style scoped>
-.eu-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.eu-form__note {
-  margin: 0;
-  color: var(--eu-color-text-muted);
-  font-family: var(--eu-font-data);
-}
-
-.eu-form__error {
-  margin: 0;
-  color: var(--eu-color-error-fg);
-  font-size: 0.9rem;
-}
-</style>

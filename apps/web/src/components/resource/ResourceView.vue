@@ -6,6 +6,7 @@ import EuButton from '../../design-system/components/EuButton.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuSortableTh from '../../design-system/components/EuSortableTh.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
+import { useDialogAction } from '../../lib/dialog-action';
 import { describeError } from '../../lib/errors';
 import { useTableSort } from '../../lib/table-sort';
 import {
@@ -39,14 +40,13 @@ const loadError = ref<string | null>(null);
 const createOpen = ref(false);
 const maskOpen = ref(false);
 const editing = ref<ResourceRow | null>(null);
-const submitting = ref(false);
-const formError = ref<string | null>(null);
+const form = useDialogAction(reload);
 
 /** UID of the row open in the resource's own detail dialog (see ResourceConfig.detailDialog). */
 const detailUid = ref<string | null>(null);
 
 const confirmTarget = ref<ResourceRow | null>(null);
-const deleteError = ref<string | null>(null);
+const removal = useDialogAction(reload);
 
 // Article-neutral so it reads correctly for every gender ("Police anlegen")
 // instead of a wrong "Neue Police".
@@ -140,7 +140,7 @@ const sort = useTableSort(visibleRows, sortValue);
 
 function openCreate(): void {
   editing.value = null;
-  formError.value = null;
+  form.clear();
   createOpen.value = true;
 }
 
@@ -150,39 +150,33 @@ function openEdit(row: ResourceRow): void {
     return;
   }
   editing.value = row;
-  formError.value = null;
+  form.clear();
   maskOpen.value = true;
 }
 
 async function onSubmit(payload: Record<string, unknown>): Promise<void> {
-  submitting.value = true;
-  formError.value = null;
-  try {
-    if (editing.value) {
-      await updateResource(props.config.path, String(editing.value[props.config.idKey]), payload);
-    } else {
-      await createResource(props.config.path, payload);
-    }
-    createOpen.value = false;
-    maskOpen.value = false;
-    await reload();
-  } catch (error) {
-    formError.value = describeError(error);
-  } finally {
-    submitting.value = false;
-  }
+  await form.run(
+    async () => {
+      if (editing.value) {
+        await updateResource(props.config.path, String(editing.value[props.config.idKey]), payload);
+      } else {
+        await createResource(props.config.path, payload);
+      }
+    },
+    () => {
+      createOpen.value = false;
+      maskOpen.value = false;
+    },
+  );
 }
 
 async function confirmDelete(): Promise<void> {
-  if (!confirmTarget.value) return;
-  deleteError.value = null;
-  try {
-    await deleteResource(props.config.path, String(confirmTarget.value[props.config.idKey]));
-    confirmTarget.value = null;
-    await reload();
-  } catch (error) {
-    deleteError.value = describeError(error);
-  }
+  const target = confirmTarget.value;
+  if (!target) return;
+  await removal.run(
+    () => deleteResource(props.config.path, String(target[props.config.idKey])),
+    () => (confirmTarget.value = null),
+  );
 }
 </script>
 
@@ -269,8 +263,8 @@ async function confirmDelete(): Promise<void> {
       :title="createTitle"
       :fields="config.fields"
       :options="optionsForForm"
-      :submitting="submitting"
-      :error="formError"
+      :submitting="form.busy"
+      :error="form.error"
       @close="createOpen = false"
       @submit="onSubmit"
     />
@@ -281,8 +275,8 @@ async function confirmDelete(): Promise<void> {
       :fields="config.fields"
       :options="optionsForForm"
       :editing="editing"
-      :submitting="submitting"
-      :error="formError"
+      :submitting="form.busy"
+      :error="form.error"
       @close="maskOpen = false"
       @submit="onSubmit"
     />
@@ -303,10 +297,10 @@ async function confirmDelete(): Promise<void> {
       @close="confirmTarget = null"
     >
       <p>Diesen Eintrag wirklich löschen?</p>
-      <p v-if="deleteError" class="eu-resource__error" role="alert">{{ deleteError }}</p>
+      <p v-if="removal.error" class="eu-resource__error" role="alert">{{ removal.error }}</p>
       <template #footer>
         <EuButton variant="secondary" @click="confirmTarget = null">Abbrechen</EuButton>
-        <EuButton @click="confirmDelete">Löschen</EuButton>
+        <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
       </template>
     </EuDialog>
   </section>
