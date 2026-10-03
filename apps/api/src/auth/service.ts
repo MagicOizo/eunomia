@@ -3,9 +3,11 @@ import { timingSafeEqual } from 'node:crypto';
 import type { Pool } from 'mariadb';
 
 import type { AuthConfig } from '../config/env.js';
+import { logEvent } from '../lib/log.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import {
   invalidCredentials,
+  invalidCurrentPassword,
   invalidRefreshToken,
   invalidSetupToken,
   setupAlreadyDone,
@@ -16,12 +18,16 @@ import {
   assignGlobalRole,
   countUsers,
   createUser,
+  findPasswordHashByUserId,
+  findRefreshTokenOwner,
   findUserByEmailWithHash,
   findUserByValidRefreshToken,
   insertRefreshToken,
+  deleteActiveRefreshTokens,
   revokeRefreshToken,
+  updatePasswordHash,
 } from './repository.js';
-import type { LoginInput, SetupInput } from './schemas.js';
+import type { ChangePasswordInput, LoginInput, SetupInput } from './schemas.js';
 import { generateRefreshToken, hashRefreshToken, signAccessToken } from './tokens.js';
 
 const ADMIN_ROLE_NAME = 'Admin';
@@ -108,9 +114,32 @@ export async function login(
 }
 
 /**
+ * A refresh token presented a second time is the one reliable sign of a stolen
+ * one: the legitimate client never shows a rotated token again (the browser
+ * shares one rotation between all waiting requests, see apps/web/src/lib/api.ts).
+ * So the whole token chain of that user falls, not just this request, and the
+ * event is written where an operator can grep for it.
+ *
+ * The price, accepted knowingly: if the answer to a successful rotation is lost
+ * on the way back, the client still holds the old token, shows it again, and is
+ * read as a theft — the user has to log in once more. That is the known cost of
+ * reuse detection, and the alternative is not detecting theft at all.
+ *
+ * The caller hears the same invalidRefreshToken() either way: an attacker must
+ * not learn from the answer whether he tripped the alarm.
+ */
+async function noteRefreshReuse(pool: Pool, tokenHash: string): Promise<void> {
+  const owner = await findRefreshTokenOwner(pool, tokenHash);
+  if (owner === null || owner.revokedAt === null) return;
+
+  const ended = await deleteActiveRefreshTokens(pool, owner.userId);
+  logEvent('warn', 'AUTH_REFRESH_REUSE', { user: owner.uuidText, sessionsEnded: ended });
+}
+
+/**
  * Rotates a refresh token: the presented token is revoked and a brand-new
- * session is issued. A missing/expired/revoked token throws, and reusing an
- * already-rotated token fails because it was revoked on first use.
+ * session is issued. A missing/expired/revoked token throws — and a revoked one
+ * additionally costs the user every other session (see noteRefreshReuse).
  */
 export async function refresh(
   pool: Pool,
@@ -120,10 +149,38 @@ export async function refresh(
   if (!presentedToken) throw invalidRefreshToken();
   const tokenHash = hashRefreshToken(presentedToken);
   const user = await findUserByValidRefreshToken(pool, tokenHash);
-  if (!user || user.userStatus !== 1) throw invalidRefreshToken();
+  if (!user || user.userStatus !== 1) {
+    if (user === null) await noteRefreshReuse(pool, tokenHash);
+    throw invalidRefreshToken();
+  }
 
   await revokeRefreshToken(pool, tokenHash);
   return issueSession(pool, config, user);
+}
+
+/**
+ * Changes the caller's own password against the old one, then ends every other
+ * session of theirs — which is the whole point of changing it (SEC-05). The
+ * session that asked keeps its refresh token: being logged out of the browser
+ * one just typed the old password into would be a punishment for doing the
+ * right thing.
+ */
+export async function changeOwnPassword(
+  pool: Pool,
+  user: AuthUser,
+  input: ChangePasswordInput,
+  currentRefreshToken: string | undefined,
+): Promise<void> {
+  const passwordHash = await findPasswordHashByUserId(pool, user.userId);
+  if (passwordHash === null) throw invalidCurrentPassword();
+  if (!(await verifyPassword(input.currentPassword, passwordHash))) throw invalidCurrentPassword();
+
+  await updatePasswordHash(pool, user.userId, await hashPassword(input.newPassword));
+  await deleteActiveRefreshTokens(
+    pool,
+    user.userId,
+    currentRefreshToken === undefined ? undefined : hashRefreshToken(currentRefreshToken),
+  );
 }
 
 /** Revokes the presented refresh token. Idempotent — an unknown token is a no-op. */

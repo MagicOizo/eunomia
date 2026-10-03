@@ -74,7 +74,13 @@ export function createApp(deps?: AppDependencies): Express {
     // Generous baseline for the whole API, strict on the auth endpoints.
     app.use('/api', limiter(config.rateLimit.globalWindowMs, config.rateLimit.globalMax));
     app.use(
-      ['/api/v1/auth/login', '/api/v1/auth/refresh', '/api/v1/setup'],
+      [
+        '/api/v1/auth/login',
+        '/api/v1/auth/refresh',
+        // The "current password" field is a guessing target like any other.
+        '/api/v1/auth/password',
+        '/api/v1/setup',
+      ],
       limiter(config.rateLimit.authWindowMs, config.rateLimit.authMax),
     );
   }

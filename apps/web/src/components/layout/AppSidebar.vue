@@ -58,10 +58,10 @@ async function logout(): Promise<void> {
 
     <div class="eu-sidebar__footer">
       <hr />
-      <p v-if="auth.user" class="eu-sidebar__user">
+      <RouterLink v-if="auth.user" class="eu-sidebar__user" to="/profile" @click="emit('navigate')">
         <FontAwesomeIcon :icon="faUser" aria-hidden="true" />
         <span>{{ auth.user.firstname }}</span>
-      </p>
+      </RouterLink>
       <button type="button" class="eu-sidebar__logout" @click="logout">
         <FontAwesomeIcon :icon="faArrowRightFromBracket" aria-hidden="true" />
         <span>Abmelden</span>
@@ -159,9 +159,23 @@ async function logout(): Promise<void> {
   margin: 1rem 0.25rem;
 }
 
+/* The name is the way to one's own account (Slice 7 of the review slices), so
+   it answers like the nav links above it — muted until pointed at, and full
+   contrast while it is the open page. */
 .eu-sidebar__user {
   color: var(--eu-color-text-inverse-muted);
   margin: 0;
+}
+
+.eu-sidebar__user:hover {
+  background-color: rgb(255 255 255 / 12%);
+  color: var(--eu-color-text-inverse);
+}
+
+.eu-sidebar__user.router-link-active {
+  background-color: rgb(255 255 255 / 18%);
+  color: var(--eu-color-text-inverse);
+  font-family: var(--eu-font-heading);
 }
 
 .eu-sidebar__logout {

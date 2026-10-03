@@ -74,7 +74,17 @@ ausdrücklich vor einer anderen steht.
       baut auf das Zählen der Rotationen einen Alarm. `lib/api.ts` und `stores/auth.ts` hatten
       keinen Test; beide haben jetzt einen, und der Fehler aus CR-24 ist als Regressionstest
       festgehalten (gegen den alten Stand rot geprüft).
-- [ ] **7 — Anmeldung und Sitzungen.** SEC-05, SEC-06, SEC-07, SEC-08.
+- [x] **7 — Anmeldung und Sitzungen.** SEC-05, SEC-06, SEC-07, SEC-08.
+      Umgesetzt mit v0.17.0-slice.2 (Slice 57). Der eigene Passwortwechsel bekam auf Wunsch des
+      Autors eine eigene Seite (`/profile`, „Mein Konto") statt eines Dialogs, und das eigene
+      Passwort lässt sich in der Nutzerverwaltung nicht mehr setzen — es wird immer mit dem alten
+      bestätigt. Drei Dinge gingen über den Review hinaus: (1) SEC-05/06 und SEC-07 stießen
+      zusammen — eine absichtlich beendete Sitzung darf nicht widerrufen, sondern muss gelöscht
+      werden, sonst liest die Reuse-Erkennung die Rückkehr des anderen Browsers als Diebstahl und
+      beendet genau die Sitzung, die der Wechsel verschonen sollte (rot geprüft). (2) Das Aufräumen
+      hängt nicht am Erinnerungs-Tick, der bei abgeschalteten Erinnerungen sofort aussteigt,
+      sondern an einem eigenen Timer. (3) Ein neuer Fehlercode `INVALID_CURRENT_PASSWORD` antwortet
+      403 statt 401, damit `apiFetch` nicht eine sinnlose Rotation darauf verwendet.
 - [ ] **8 — Kontotrennung an einem Ort.** CR-07, SEC-03, SEC-04.
 
 ### Block III — Struktur (Release 0.18.0)

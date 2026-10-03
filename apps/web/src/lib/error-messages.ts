@@ -170,6 +170,7 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
 
   // Anmeldung und Ersteinrichtung
   INVALID_CREDENTIALS: () => 'E-Mail oder Passwort ist falsch.',
+  INVALID_CURRENT_PASSWORD: () => 'Das aktuelle Passwort ist falsch.',
   INVALID_REFRESH_TOKEN: () => 'Die Sitzung ist abgelaufen. Bitte melde dich erneut an.',
   UNAUTHENTICATED: () => 'Bitte melde dich erneut an.',
   FORBIDDEN: () => 'Dazu fehlt dir die Berechtigung.',

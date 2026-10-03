@@ -7,6 +7,7 @@ import BillingPickerView from '../invoices/BillingPickerView.vue';
 import BillingsView from '../invoices/BillingsView.vue';
 import InvoicePickerView from '../invoices/InvoicePickerView.vue';
 import InvoiceWorkspaceView from '../invoices/InvoiceWorkspaceView.vue';
+import ProfileView from '../profile/ProfileView.vue';
 import { resourceConfigs } from '../resources/definitions';
 import TrashView from '../trash/TrashView.vue';
 import { useAuthStore } from '../stores/auth';
@@ -121,6 +122,16 @@ export const router = createRouter({
       name: '/system/settings',
       component: SettingsView,
       meta: { title: 'Einstellungen', requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      // The user's own account (Slice 7 of the review slices). Deliberately not
+      // in router/nav.ts: mainNav/systemNav are the fixed navigation of plan
+      // §2.7, and one's own account is not an area within it — the name in the
+      // sidebar footer leads here.
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView,
+      meta: { title: 'Mein Konto', requiresAuth: true },
     },
     {
       path: '/billings',

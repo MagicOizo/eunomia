@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import { loadConfig } from './config/env.js';
 import { createApp } from './app.js';
+import { startRefreshTokenCleanup } from './auth/cleanup.js';
 import { runMigrations } from './db/migrate.js';
 import { createPool, waitForDatabase } from './db/pool.js';
 import { createMailer } from './mail/mailer.js';
@@ -53,9 +54,20 @@ const scheduler = startReminderScheduler({
   run: () => reminders.run(),
 });
 
+/*
+ * Expired and long-revoked refresh tokens are swept daily (SEC-08). Here for
+ * the same reason as the scheduler above: createApp() builds the app for
+ * supertest too, and a test suite must not start deleting rows in the
+ * background.
+ */
+const tokenCleanup = startRefreshTokenCleanup(pool, {
+  retentionMs: config.auth.refreshTokenTtlSeconds * 1000,
+});
+
 /** Closes the HTTP server and database pool on shutdown signals. */
 async function shutdown(): Promise<void> {
   scheduler.stop();
+  tokenCleanup.stop();
   server.close();
   await pool.end();
 }

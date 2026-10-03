@@ -24,7 +24,7 @@ import {
 } from './admin-repository.js';
 import { createRequireAuth, createRequirePermission, getAuthUser } from './middleware.js';
 import { PERMISSIONS } from './permissions.js';
-import { createUser } from './repository.js';
+import { createUser, deleteActiveRefreshTokens } from './repository.js';
 
 const roleRef = z.string().regex(entityIdPattern(ENTITY_PREFIX.role));
 const accountRef = z.string().regex(entityIdPattern(ENTITY_PREFIX.account));
@@ -122,12 +122,16 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
   router.patch('/users/:uuid', async (req, res) => {
     const uuid = userUuid(req);
     const input = updateUserSchema.parse(req.body);
-    await requireUserId(uuid);
+    const userId = await requireUserId(uuid);
 
     if (input.status === 0) {
       assertNotSelf(res, uuid);
       await assertKeepsAnAdmin(uuid, false);
     }
+    // One's own password goes through POST /auth/password, which asks for the
+    // old one. Allowing it here would leave a way to set it without knowing it
+    // — and the revocation below would end the caller's own session (SEC-05/06).
+    if (input.password !== undefined) assertNotSelf(res, uuid);
 
     await updateUser(pool, uuid, {
       email: input.email,
@@ -136,6 +140,9 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
       status: input.status,
       passwordHash: input.password ? await hashPassword(input.password) : undefined,
     });
+    // A new password is exactly the situation one changes a password for, so
+    // the sessions it was meant to lock out have to go with it (SEC-05).
+    if (input.password !== undefined) await deleteActiveRefreshTokens(pool, userId);
     sendData(res, await getUser(pool, uuid));
   });
 

@@ -11,6 +11,14 @@ export class AuthError extends ApiError {}
 export const invalidCredentials = (): AuthError =>
   new AuthError(401, ERROR_CODES.INVALID_CREDENTIALS, 'Invalid email or password');
 
+/**
+ * Deliberately 403, not 401: the caller IS authenticated, only the proof of the
+ * old password is wrong. A 401 would make apps/web's apiFetch spend a refresh
+ * and a retry on a request that cannot succeed either way.
+ */
+export const invalidCurrentPassword = (): AuthError =>
+  new AuthError(403, ERROR_CODES.INVALID_CURRENT_PASSWORD, 'Current password is incorrect');
+
 export const invalidRefreshToken = (): AuthError =>
   new AuthError(
     401,

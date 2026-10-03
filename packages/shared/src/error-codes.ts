@@ -26,6 +26,12 @@ export const ERROR_CODES = {
 
   // Authentication and setup (see auth/errors.ts)
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  /**
+   * The current password presented alongside a new one is wrong. Not
+   * INVALID_CREDENTIALS and not a 401: the caller is authenticated, and a 401
+   * would send the browser's client into a pointless token rotation and retry.
+   */
+  INVALID_CURRENT_PASSWORD: 'INVALID_CURRENT_PASSWORD',
   INVALID_REFRESH_TOKEN: 'INVALID_REFRESH_TOKEN',
   SETUP_DISABLED: 'SETUP_DISABLED',
   INVALID_SETUP_TOKEN: 'INVALID_SETUP_TOKEN',

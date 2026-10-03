@@ -244,21 +244,30 @@ test('auth flow: setup, login, protected access, scoping, refresh, logout', asyn
       assert.ok(rotated.body.accessToken);
 
       // Reusing the pre-rotation token must fail (it was revoked on first use).
+      // What that additionally costs the user is the subject of
+      // password.integration.test.ts — here only the refusal is asserted.
       const reused = await request(app)
         .post('/api/v1/auth/refresh')
         .set('Cookie', `refresh_token=${firstCookie}`);
       assert.equal(reused.status, 401);
+    });
 
-      // Logout revokes the current (rotated) token.
-      const newCookie = refreshCookieValue(rotated.headers['set-cookie']);
+    await t.test('logout revokes the presented token', async () => {
+      // A session of its own: the reuse above ended the chain it belonged to.
+      const login = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: adminCreds.email, password: adminCreds.password });
+      const cookie = refreshCookieValue(login.headers['set-cookie']);
+      assert.ok(cookie);
+
       const loggedOut = await request(app)
         .post('/api/v1/auth/logout')
-        .set('Cookie', `refresh_token=${newCookie}`);
+        .set('Cookie', `refresh_token=${cookie}`);
       assert.equal(loggedOut.status, 204);
 
       const afterLogout = await request(app)
         .post('/api/v1/auth/refresh')
-        .set('Cookie', `refresh_token=${newCookie}`);
+        .set('Cookie', `refresh_token=${cookie}`);
       assert.equal(afterLogout.status, 401);
     });
 

@@ -8,6 +8,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
+import { useAuthStore } from '../stores/auth';
 import type { AdminUserDto, RoleDto } from './api';
 
 export interface UserFormPayload {
@@ -41,6 +42,16 @@ const active = ref(true);
 const globalRoleUIDs = ref<Set<string>>(new Set());
 const grants = ref<Array<{ accountUID: string; roleUID: string }>>([]);
 const localError = ref<string | null>(null);
+
+/**
+ * One's own password is not set here. The API refuses it (auth/admin-routes.ts)
+ * so that a new password always costs the old one — and because setting it
+ * revokes the sessions of the account it belongs to, which would be this one.
+ */
+const auth = useAuthStore();
+const editingSelf = computed(
+  () => props.editing !== null && props.editing.uuid === auth.user?.uuid,
+);
 
 const roleUidByName = computed(() => new Map(props.roles.map((r) => [r.roleName, r.roleUID])));
 const roleOptions = computed<SelectOption[]>(() =>
@@ -123,10 +134,16 @@ function submit(): void {
       <EuTextField v-model="firstname" label="Vorname" />
       <EuTextField v-model="surname" label="Nachname" />
       <EuTextField
+        v-if="!editingSelf"
         v-model="password"
         :label="editing ? 'Neues Passwort (optional)' : 'Passwort'"
         type="password"
       />
+      <p v-else class="eu-form__hint">
+        Das eigene Passwort änderst du unter
+        <RouterLink to="/profile">Mein Konto</RouterLink> — dort wird das alte Passwort als
+        Bestätigung verlangt.
+      </p>
       <EuToggle v-if="editing" v-model="active" label="Aktiv" />
 
       <fieldset class="eu-form__group">

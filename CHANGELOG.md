@@ -7,6 +7,28 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.17.0-slice.2 — 2026-10-03
+
+Passwords and sessions. Until now a password could only be set by an administrator, who then knew
+it — and a new password left every session that was open before it running, for up to thirty days.
+That is the one case one changes a password for.
+
+- **Your own password, changed by you.** The sidebar's name leads to a new page, "Mein Konto". It
+  asks for the old password before it accepts a new one, so nobody but you ever knows it. For the
+  same reason, the user administration no longer offers a password field for your own account and
+  points here instead; it keeps offering one for everyone else.
+- **A new password ends the other sessions.** Every session of that account, on every other device
+  and in every other browser, is over the moment the password changes — whether you changed it
+  yourself or an administrator reset it. The browser you are changing it in stays signed in.
+- **A refresh token shown twice costs the whole chain.** The server already refused a token that
+  had been exchanged once; it now draws the conclusion. Showing one a second time is the reliable
+  sign of a stolen one, so every session of that account ends and the event is written to the log
+  as `AUTH_REFRESH_REUSE`. If that was your own browser after a lost connection, you sign in once
+  more — the price of noticing a theft at all.
+- **The session table stops growing.** Every sign-in and every renewal wrote a row and none was
+  ever removed. A daily sweep deletes what is expired or has been revoked longer than a refresh
+  token lives.
+
 ## 0.17.0-slice.1 — 2026-10-03
 
 The one finding of the code review that a user could actually run into. After a quarter of an hour's

@@ -6,8 +6,8 @@ import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './http.
 import { createRequireAuth, getAuthUser } from './middleware.js';
 import { PERMISSIONS, getEffectivePermissions } from './permissions.js';
 import type { AuthUser } from './repository.js';
-import { loginSchema, setupSchema } from './schemas.js';
-import { login, logout, refresh, setupFirstAdmin } from './service.js';
+import { changePasswordSchema, loginSchema, setupSchema } from './schemas.js';
+import { changeOwnPassword, login, logout, refresh, setupFirstAdmin } from './service.js';
 
 /** The public shape of a user — the enumerable numeric key never leaves here. */
 function publicUser(user: AuthUser): Record<string, unknown> {
@@ -48,6 +48,15 @@ export function createAuthRouter(pool: Pool, config: AppConfig): Router {
     const session = await refresh(pool, config.auth, presented);
     setRefreshCookie(res, session.refreshToken, session.refreshExpiresAt, config.isProduction);
     res.json({ accessToken: session.accessToken, user: publicUser(session.user) });
+  });
+
+  // Everyone changes their own password here, and only here — the admin API
+  // refuses it for one's own account (auth/admin-routes.ts), so a new password
+  // for oneself always costs the old one.
+  router.post('/auth/password', requireAuth, async (req, res) => {
+    const input = changePasswordSchema.parse(req.body);
+    await changeOwnPassword(pool, getAuthUser(res), input, readRefreshCookie(req.headers.cookie));
+    res.status(204).end();
   });
 
   router.post('/auth/logout', async (req, res) => {
