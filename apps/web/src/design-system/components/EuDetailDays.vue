@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { faArrowRotateLeft, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 
 import { pastedIsoDate } from '../../lib/date-input';
+import { germanDate } from '../../lib/format';
+import { detailMaskReadonly } from './detail-mask';
 
 /**
  * A display-mask row holding a *list* of dates — Label | the dates | actions,
@@ -35,6 +37,15 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>();
+
+/** Read-only throughout when the surrounding mask is (see detail-mask.ts). */
+const maskReadonly = inject(detailMaskReadonly, undefined);
+const readonly = computed(() => maskReadonly?.value ?? false);
+/** The dates as one line of text, for the read-only row. */
+const readonlyText = computed(() => {
+  const days = props.modelValue.filter(Boolean).map(germanDate);
+  return days.length === 0 ? '–' : days.join(', ');
+});
 
 const canReset = computed(
   () =>
@@ -87,8 +98,13 @@ function reset(): void {
     <span class="eu-detail-days__label">{{ label }}</span>
 
     <div class="eu-detail-days__value">
-      <p v-if="modelValue.length === 0" class="eu-detail-days__empty">–</p>
-      <div v-for="(day, index) in modelValue" :key="index" class="eu-detail-days__row">
+      <p v-if="readonly" class="eu-detail-days__empty">{{ readonlyText }}</p>
+      <p v-else-if="modelValue.length === 0" class="eu-detail-days__empty">–</p>
+      <div
+        v-for="(day, index) in readonly ? [] : modelValue"
+        :key="index"
+        class="eu-detail-days__row"
+      >
         <input
           class="eu-detail-days__input"
           type="date"
@@ -114,35 +130,37 @@ function reset(): void {
 
     <div class="eu-detail-days__actions">
       <!-- Add, clear, reset — the icon order dialog-design.md fixes. -->
-      <button
-        type="button"
-        class="eu-detail-days__action"
-        :aria-label="addLabel"
-        :title="addLabel"
-        @click="add"
-      >
-        <FontAwesomeIcon :icon="faPlus" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        class="eu-detail-days__action"
-        :disabled="modelValue.length === 0"
-        aria-label="Alle Werte löschen"
-        title="Alle Werte löschen"
-        @click="clear"
-      >
-        <FontAwesomeIcon :icon="faXmark" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        class="eu-detail-days__action"
-        :disabled="!canReset"
-        aria-label="Zurücksetzen"
-        title="Auf gespeicherten Wert zurücksetzen"
-        @click="reset"
-      >
-        <FontAwesomeIcon :icon="faArrowRotateLeft" aria-hidden="true" />
-      </button>
+      <template v-if="!readonly">
+        <button
+          type="button"
+          class="eu-detail-days__action"
+          :aria-label="addLabel"
+          :title="addLabel"
+          @click="add"
+        >
+          <FontAwesomeIcon :icon="faPlus" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="eu-detail-days__action"
+          :disabled="modelValue.length === 0"
+          aria-label="Alle Werte löschen"
+          title="Alle Werte löschen"
+          @click="clear"
+        >
+          <FontAwesomeIcon :icon="faXmark" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="eu-detail-days__action"
+          :disabled="!canReset"
+          aria-label="Zurücksetzen"
+          title="Auf gespeicherten Wert zurücksetzen"
+          @click="reset"
+        >
+          <FontAwesomeIcon :icon="faArrowRotateLeft" aria-hidden="true" />
+        </button>
+      </template>
     </div>
   </div>
 </template>

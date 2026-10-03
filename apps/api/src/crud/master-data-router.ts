@@ -1,9 +1,9 @@
+import type { PermissionKey } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import type { z } from 'zod';
 
 import { createRequireAuth, createRequirePermission } from '../auth/middleware.js';
-import type { PermissionKey } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { notFound } from '../lib/api-error.js';
 import { sendData } from './envelope.js';

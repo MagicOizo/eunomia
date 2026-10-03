@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import type { PermissionKey } from '@eunomia/shared';
+import { faEye, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, ref, watch } from 'vue';
 
 import EuButton from '../../design-system/components/EuButton.vue';
@@ -7,6 +8,7 @@ import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuSortableTh from '../../design-system/components/EuSortableTh.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
 import { useDialogAction } from '../../lib/dialog-action';
+import { NO_PERMISSION } from '../../lib/error-messages';
 import { describeError } from '../../lib/errors';
 import { useTableSort } from '../../lib/table-sort';
 import {
@@ -17,11 +19,14 @@ import {
   updateResource,
 } from '../../lib/resource';
 import type { ColumnConfig, ResourceConfig } from '../../resources/config';
+import { useAuthStore } from '../../stores/auth';
 import type { SelectOption } from './EuSelectField.vue';
 import ResourceDetailDialog from './ResourceDetailDialog.vue';
 import ResourceFormDialog from './ResourceFormDialog.vue';
 
 const props = defineProps<{ config: ResourceConfig }>();
+
+const auth = useAuthStore();
 
 interface LookupData {
   options: SelectOption[];
@@ -60,6 +65,56 @@ const maskTitle = computed(() =>
 const optionsForForm = computed<Record<string, SelectOption[]>>(() =>
   Object.fromEntries(Object.entries(lookups.value).map(([name, data]) => [name, data.options])),
 );
+
+/**
+ * May this user write this row? The grant is asked for the row's account
+ * (`accountKey`) — or globally, where the resource has no account at all
+ * (companies, facilities, agencies).
+ */
+function mayManage(row: ResourceRow): boolean {
+  const account = props.config.accountKey ? String(row[props.config.accountKey]) : undefined;
+  return auth.can(props.config.managePermission, account);
+}
+
+/**
+ * Creating needs the permission for some account — or globally, where a new
+ * record has no account to scope it to (a new insured person; see the API's
+ * POST /accounts).
+ */
+const mayCreate = computed(() =>
+  props.config.createNeedsGlobal
+    ? auth.can(props.config.managePermission)
+    : auth.canAny(props.config.managePermission),
+);
+
+/**
+ * The create form's select options. An account picker declared with `scopedBy`
+ * offers only the accounts this user may write, so the form cannot be filled
+ * for a person the API would then refuse (CR-26). The display mask keeps the
+ * full map: there the account is a readonly row, and it has to be able to name
+ * the person it shows.
+ */
+const optionsForCreate = computed<Record<string, SelectOption[]>>(() => {
+  const scoped = new Map<string, PermissionKey>();
+  for (const field of props.config.fields) {
+    if (field.scopedBy && field.optionsFrom) scoped.set(field.optionsFrom, field.scopedBy);
+  }
+  if (scoped.size === 0) return optionsForForm.value;
+  return Object.fromEntries(
+    Object.entries(optionsForForm.value).map(([name, options]) => {
+      const permission = scoped.get(name);
+      return [
+        name,
+        permission === undefined
+          ? options
+          : options.filter((option) => auth.can(permission, option.value)),
+      ];
+    }),
+  );
+});
+
+/** The open mask is read-only unless the row may be written (the author's decision, CR-26). */
+const maskReadonly = computed(() => editing.value !== null && !mayManage(editing.value));
 
 async function loadLookups(): Promise<void> {
   const entries = Object.entries(props.config.lookups ?? {});
@@ -189,7 +244,13 @@ async function confirmDelete(): Promise<void> {
         class="eu-resource__search"
         label="Suchen"
       />
-      <EuButton :icon="faPlus" @click="openCreate">Neu</EuButton>
+      <EuButton
+        :icon="faPlus"
+        :disabled="!mayCreate"
+        :title="mayCreate ? undefined : NO_PERMISSION"
+        @click="openCreate"
+        >Neu</EuButton
+      >
     </div>
 
     <p v-if="loading" class="eu-resource__hint">Wird geladen…</p>
@@ -241,8 +302,8 @@ async function confirmDelete(): Promise<void> {
               <EuButton
                 variant="secondary"
                 icon-only
-                :icon="faPen"
-                :aria-label="`${config.singular} bearbeiten`"
+                :icon="mayManage(row) ? faPen : faEye"
+                :aria-label="`${config.singular} ${mayManage(row) ? 'bearbeiten' : 'ansehen'}`"
                 @click="openEdit(row)"
               />
               <EuButton
@@ -250,6 +311,8 @@ async function confirmDelete(): Promise<void> {
                 icon-only
                 :icon="faTrash"
                 :aria-label="`${config.singular} löschen`"
+                :disabled="!mayManage(row)"
+                :title="mayManage(row) ? undefined : NO_PERMISSION"
                 @click="confirmTarget = row"
               />
             </td>
@@ -262,7 +325,7 @@ async function confirmDelete(): Promise<void> {
       :open="createOpen"
       :title="createTitle"
       :fields="config.fields"
-      :options="optionsForForm"
+      :options="optionsForCreate"
       :submitting="form.busy"
       :error="form.error"
       @close="createOpen = false"
@@ -275,6 +338,7 @@ async function confirmDelete(): Promise<void> {
       :fields="config.fields"
       :options="optionsForForm"
       :editing="editing"
+      :readonly="maskReadonly"
       :submitting="form.busy"
       :error="form.error"
       @close="maskOpen = false"

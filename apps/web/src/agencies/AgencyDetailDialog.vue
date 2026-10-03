@@ -9,6 +9,7 @@ import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { useDialogAction } from '../lib/dialog-action';
+import { NO_PERMISSION } from '../lib/error-messages';
 import { describeError } from '../lib/errors';
 import { paymentDetailLabel } from './payment-details';
 import {
@@ -20,6 +21,7 @@ import {
   saveAgencyPaymentDetail,
   updateAgency,
 } from './api';
+import { useAuthStore } from '../stores/auth';
 import PaymentDetailFormDialog from './PaymentDetailFormDialog.vue';
 
 /**
@@ -41,6 +43,15 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ close: []; changed: [] }>();
+
+const auth = useAuthStore();
+/**
+ * Whether agencies may be written. Instance-wide: an agency belongs to no
+ * insured person, so the grant has to be global (Notes/eunomia-plan.md, 2.4).
+ */
+const mayManage = computed(() => auth.can('MANAGE_AGENCIES'));
+/** Why the actions are disabled, or nothing when they are not. */
+const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
 
 const agency = ref<AgencyDto | null>(null);
 const loadError = ref<string | null>(null);
@@ -141,7 +152,7 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
   <EuDialog :open="open" :title="title" wide @close="emit('close')">
     <p v-if="loadError" class="eu-agency__error" role="alert">{{ loadError }}</p>
     <template v-if="agency">
-      <EuDetailMask>
+      <EuDetailMask :readonly="!mayManage">
         <EuDetailField
           v-model="values.agencyName"
           :saved-value="saved.agencyName"
@@ -155,7 +166,12 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
       <section class="eu-agency__block" aria-labelledby="eu-agency-payment-details">
         <div class="eu-agency__block-head">
           <h3 id="eu-agency-payment-details">Kontoverbindungen</h3>
-          <EuButton variant="secondary" :icon="faPlus" @click="openPaymentDetail(null)"
+          <EuButton
+            variant="secondary"
+            :icon="faPlus"
+            :disabled="!mayManage"
+            :title="noPermission"
+            @click="openPaymentDetail(null)"
             >Kontoverbindung hinzufügen</EuButton
           >
         </div>
@@ -192,6 +208,8 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
                     icon-only
                     :icon="faPen"
                     :aria-label="`Kontoverbindung ${paymentDetailLabel(detail)} bearbeiten`"
+                    :disabled="!mayManage"
+                    :title="noPermission"
                     @click="openPaymentDetail(detail)"
                   />
                   <EuButton
@@ -199,6 +217,8 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
                     icon-only
                     :icon="faTrash"
                     :aria-label="`Kontoverbindung ${paymentDetailLabel(detail)} löschen`"
+                    :disabled="!mayManage"
+                    :title="noPermission"
                     @click="
                       pendingDelete = {
                         uid: detail.agencyAccountUID,
@@ -216,7 +236,7 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
-      <EuButton :disabled="mask.busy || !agency" @click="saveMask">{{
+      <EuButton v-if="mayManage" :disabled="mask.busy || !agency" @click="saveMask">{{
         mask.busy ? 'Speichern…' : 'Speichern'
       }}</EuButton>
     </template>

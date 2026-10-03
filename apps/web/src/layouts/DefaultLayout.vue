@@ -31,7 +31,7 @@ watch(
         <main class="eu-main">
           <AppHeader :title="title" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
           <div class="eu-main__content eu-scroll-focus-safe">
-            <SetupTokenBanner v-if="auth.isAdmin && auth.setupTokenActive" />
+            <SetupTokenBanner v-if="auth.can('MANAGE_USERS') && auth.setupTokenActive" />
             <slot />
           </div>
         </main>

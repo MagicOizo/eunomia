@@ -29,6 +29,13 @@ type Details = Record<string, unknown>;
 
 const quoted = (label: string): string => `„${label}“`;
 
+/**
+ * Why a button is disabled — the same sentence the API answers a `FORBIDDEN`
+ * with, said before the click instead of after it (CR-26). It stands here so
+ * the two never drift apart.
+ */
+export const NO_PERMISSION = 'Dazu fehlt dir die Berechtigung.';
+
 /** The field a zod issue belongs to: the last named segment of its path. */
 function keyOf(issue: ZodIssueLike): string {
   const named = (issue.path ?? []).filter((part): part is string => typeof part === 'string');
@@ -184,7 +191,7 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
   INVALID_CURRENT_PASSWORD: () => 'Das aktuelle Passwort ist falsch.',
   INVALID_REFRESH_TOKEN: () => 'Die Sitzung ist abgelaufen. Bitte melde dich erneut an.',
   UNAUTHENTICATED: () => 'Bitte melde dich erneut an.',
-  FORBIDDEN: () => 'Dazu fehlt dir die Berechtigung.',
+  FORBIDDEN: () => NO_PERMISSION,
   SETUP_DISABLED: () => 'Die Ersteinrichtung ist deaktiviert.',
   INVALID_SETUP_TOKEN: () => 'Das Setup-Token ist ungültig.',
   SETUP_ALREADY_DONE: () => 'Die Ersteinrichtung ist bereits abgeschlossen.',

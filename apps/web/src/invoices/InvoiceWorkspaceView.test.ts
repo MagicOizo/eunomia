@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { grant } from '../test/permissions';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceWorkspaceView from './InvoiceWorkspaceView.vue';
@@ -348,6 +349,82 @@ describe('InvoiceWorkspaceView document button', () => {
 
     expect(documentButton(wrapper)).toBeUndefined();
     expect(open).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+});
+
+/**
+ * What the workspace offers a user who may read this person's invoices but not
+ * write them (CR-26). Every test starts as a global admin (src/test/setup.ts),
+ * so the restricted case says here what the user holds.
+ */
+describe('InvoiceWorkspaceView permissions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiData.mockResolvedValue({ firstname: 'John', surname: 'Doe' });
+    listResource.mockResolvedValue([]);
+    listInvoiceYears.mockResolvedValue([2026]);
+    listInvoices.mockResolvedValue([invoice('i-1', 'R-1', '2026-03-01')]);
+    reimbursementPlan.mockResolvedValue(null);
+  });
+
+  const openWorkspace = async () => {
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  /** The four buttons of the toolbar, by the text they carry. */
+  const toolbarButton = (wrapper: ReturnType<typeof mount>, label: string) =>
+    wrapper.findAll('.eu-ws__toolbar button').find((button) => button.text().startsWith(label));
+
+  it('disables every write of the page, and says why', async () => {
+    grant({ perAccount: [{ accountUID: 'a-1', permissionKey: 'VIEW_INVOICES' }] });
+    const wrapper = await openWorkspace();
+
+    for (const label of ['Neue Rechnung', 'Einreichen', 'Abrechnung zuordnen', 'Löschen']) {
+      const button = toolbarButton(wrapper, label);
+      expect(button?.attributes('disabled'), label).toBeDefined();
+      expect(button?.attributes('title'), label).toBe('Dazu fehlt dir die Berechtigung.');
+    }
+    // The row keeps what reading allows and loses the rest.
+    const rowLabels = wrapper
+      .findAll('tbody button')
+      .filter((button) => button.attributes('disabled') !== undefined)
+      .map((button) => button.attributes('aria-label'));
+    expect(rowLabels).toContain('Löschen');
+    wrapper.unmount();
+  });
+
+  it('offers the writes again with the permission for this account', async () => {
+    grant({
+      perAccount: [
+        { accountUID: 'a-1', permissionKey: 'VIEW_INVOICES' },
+        { accountUID: 'a-1', permissionKey: 'MANAGE_INVOICES' },
+      ],
+    });
+    const wrapper = await openWorkspace();
+
+    expect(toolbarButton(wrapper, 'Neue Rechnung')?.attributes('disabled')).toBeUndefined();
+    // The selection buttons stay disabled until something is selected — that is
+    // their own rule, and it must not be mistaken for a missing permission.
+    expect(toolbarButton(wrapper, 'Einreichen')?.attributes('title')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('withholds the writes for a grant on another account', async () => {
+    grant({
+      perAccount: [
+        { accountUID: 'a-1', permissionKey: 'VIEW_INVOICES' },
+        { accountUID: 'a-2', permissionKey: 'MANAGE_INVOICES' },
+      ],
+    });
+    const wrapper = await openWorkspace();
+
+    expect(toolbarButton(wrapper, 'Neue Rechnung')?.attributes('disabled')).toBeDefined();
     wrapper.unmount();
   });
 });

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { faArrowRightFromBracket, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
 import eunomiaLogo from '../../assets/logo/eunomia-white.svg';
-import { mainNav, systemNav } from '../../router/nav';
+import { mainNav, systemNav, visibleNav } from '../../router/nav';
 import { useAuthStore } from '../../stores/auth';
 
 defineProps<{ open: boolean }>();
@@ -12,6 +13,11 @@ const emit = defineEmits<{ navigate: [] }>();
 
 const auth = useAuthStore();
 const router = useRouter();
+
+// Only the areas this user may enter (CR-26) — the route guard would turn the
+// others away, and an entry that leads nowhere is worse than no entry.
+const mainItems = computed(() => visibleNav(mainNav, auth.canAny));
+const systemItems = computed(() => visibleNav(systemNav, auth.canAny));
 
 async function logout(): Promise<void> {
   await auth.logout();
@@ -34,7 +40,7 @@ async function logout(): Promise<void> {
 
     <nav class="eu-sidebar__nav" aria-label="Hauptnavigation">
       <ul>
-        <li v-for="item in mainNav" :key="item.to">
+        <li v-for="item in mainItems" :key="item.to">
           <RouterLink :to="item.to" @click="emit('navigate')">
             <FontAwesomeIcon :icon="item.icon" class="eu-sidebar__icon" aria-hidden="true" />
             <span>{{ item.title }}</span>
@@ -42,11 +48,11 @@ async function logout(): Promise<void> {
         </li>
       </ul>
 
-      <template v-if="auth.isAdmin">
+      <template v-if="systemItems.length > 0">
         <hr />
         <p class="eu-sidebar__section">System</p>
         <ul>
-          <li v-for="item in systemNav" :key="item.to">
+          <li v-for="item in systemItems" :key="item.to">
             <RouterLink :to="item.to" @click="emit('navigate')">
               <FontAwesomeIcon :icon="item.icon" class="eu-sidebar__icon" aria-hidden="true" />
               <span>{{ item.title }}</span>

@@ -28,9 +28,9 @@ function updateResponse(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Grants the permission the admin-only nav (and this footer) checks for. */
+/** Grants the permission the update check (and so this footer) asks for. */
 function signInAsAdmin(): void {
-  useAuthStore().permissions = { global: ['MANAGE_USERS'], perAccount: [] };
+  useAuthStore().permissions = { global: ['MANAGE_SETTINGS'], perAccount: [] };
 }
 
 describe('AppFooter', () => {

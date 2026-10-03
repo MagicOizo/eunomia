@@ -1,3 +1,4 @@
+import { PERMISSIONS } from '@eunomia/shared';
 import { faFilter } from '@fortawesome/free-solid-svg-icons';
 
 import AgencyDetailDialog from '../agencies/AgencyDetailDialog.vue';
@@ -27,6 +28,10 @@ const accounts: ResourceConfig = {
   singular: 'Versicherter',
   plural: 'Versicherte',
   idKey: 'accountUID',
+  managePermission: PERMISSIONS.MANAGE_ACCOUNTS,
+  // The row *is* the account, so the grant is checked against its own UID.
+  accountKey: 'accountUID',
+  createNeedsGlobal: true,
   columns: [
     { key: 'firstname', label: 'Vorname' },
     { key: 'surname', label: 'Nachname' },
@@ -50,6 +55,7 @@ const companies: ResourceConfig = {
   singular: 'Versicherung',
   plural: 'Versicherungen',
   idKey: 'companyUID',
+  managePermission: PERMISSIONS.MANAGE_COMPANIES,
   columns: [
     { key: 'companyName', label: 'Name' },
     { key: 'addressCity', label: 'Ort' },
@@ -71,6 +77,8 @@ const contracts: ResourceConfig = {
   singular: 'Police',
   plural: 'Policen',
   idKey: 'contractUID',
+  managePermission: PERMISSIONS.MANAGE_CONTRACTS,
+  accountKey: 'accountUID',
   // One row per policy; premiums and yearly terms live in the detail dialog.
   columns: [
     { key: 'contractNumber', label: 'Vertragsnummer' },
@@ -103,6 +111,7 @@ const contracts: ResourceConfig = {
       required: true,
       immutable: true,
       optionsFrom: 'accounts',
+      scopedBy: PERMISSIONS.MANAGE_CONTRACTS,
     },
     {
       key: 'companyUID',
@@ -149,6 +158,7 @@ const facilities: ResourceConfig = {
   singular: 'Leistungserbringer',
   plural: 'Leistungserbringer',
   idKey: 'facilityUID',
+  managePermission: PERMISSIONS.MANAGE_FACILITIES,
   columns: [
     { key: 'facilityName', label: 'Name' },
     {
@@ -187,6 +197,7 @@ const agencies: ResourceConfig = {
   singular: 'Abrechnungsdienstleister',
   plural: 'Abrechnungsdienstleister',
   idKey: 'agencyUID',
+  managePermission: PERMISSIONS.MANAGE_AGENCIES,
   columns: [
     { key: 'agencyName', label: 'Name' },
     { key: 'bankAccount', label: 'IBAN', format: paymentDetailCell },

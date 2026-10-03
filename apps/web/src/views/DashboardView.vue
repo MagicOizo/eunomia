@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { computed } from 'vue';
 
-import { mainNav } from '../router/nav';
+import { mainNav, visibleNav } from '../router/nav';
 import { useAuthStore } from '../stores/auth';
 
 const auth = useAuthStore();
-// The nav entries other than the dashboard itself, shown as quick-access cards.
-const cards = mainNav.filter((item) => item.to !== '/');
+// The nav entries other than the dashboard itself, shown as quick-access cards
+// — through the same filter as the sidebar, so both offer the same areas.
+const cards = computed(() => visibleNav(mainNav, auth.canAny).filter((item) => item.to !== '/'));
 </script>
 
 <template>

@@ -7,6 +7,34 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.18.0-slice.4 — 2026-10-03
+
+The interface learns the permission model. The API has twelve permissions, granted globally or per
+insured person; until now the web app read exactly one of them and called it "admin or not". Nothing
+changes for an administrator, who holds everything — this is for the first user who does not.
+
+- **Areas appear with the permission their page needs.** The trash asks for `MANAGE_TRASH` and the
+  settings for `MANAGE_SETTINGS`, but both were shown — and their routes opened — for
+  `MANAGE_USERS` alone. A role carrying the trash now finds it, and finds nothing else. The master
+  data stays visible for everyone signed in, because the API gives those lists to everyone.
+- **Actions say when they are not yours.** Every button that writes — new invoice, submit, settle,
+  delete, the policy's premium and terms histories, an agency's payment details — is now disabled
+  unless the permission covers the record it is about, and carries the reason the API would have
+  answered with: "Dazu fehlt dir die Berechtigung." Shown instead of hidden: a missing permission
+  is something to see, not something to hide.
+- **A record you may read opens read-only.** The display mask shows every row as text and offers no
+  save, instead of refusing to open. The rows learned to say a date, an amount, a switch and a
+  relation without their editors, in German rather than as stored.
+- **A new policy is only offered for the people you may write.** The insured-person picker of the
+  create form is filtered by the permission, so a form cannot be filled in for a record the API
+  would then refuse.
+- **One list of permission names.** The twelve keys and the rule that six of them are instance-wide
+  now live in `@eunomia/shared`; both apps read them from there, and a typo in a permission check
+  stops the build.
+- **One fix on the way.** The footer polled the update status for `MANAGE_USERS`, while its endpoint
+  requires `MANAGE_SETTINGS` — so one role asked in vain and another never asked. It now follows the
+  permission its endpoint names.
+
 ## 0.18.0-slice.3 — 2026-10-03
 
 Nothing in the app looks different after this release. It takes the shape that every dialog of the

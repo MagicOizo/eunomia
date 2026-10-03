@@ -19,7 +19,9 @@ onMounted(async () => {
 });
 
 /*
- * The update check is admin-only and authenticated, so it waits for /me to
+ * The update check needs MANAGE_SETTINGS — the permission its endpoint requires
+ * (routes/update-check.ts); until CR-26 this asked for MANAGE_USERS, so the
+ * right role either polled in vain or never polled at all. It waits for /me to
  * report the permissions — watching instead of onMounted, because this footer
  * is already mounted while that request is still in flight. Any failure (no
  * permission, no network, GitHub unreachable) leaves the notice off: knowing
@@ -30,11 +32,11 @@ onMounted(async () => {
  * instead of leaving it on the state of this page load (issues.md 0.13.0-6).
  */
 watch(
-  () => auth.isAdmin,
-  async (isAdmin, wasAdmin) => {
-    if (!isAdmin) {
+  () => auth.can('MANAGE_SETTINGS'),
+  async (mayCheck, couldCheck) => {
+    if (!mayCheck) {
       // Signed out: what that session learned must not outlive it in this tab.
-      if (wasAdmin) clearUpdateStatus();
+      if (couldCheck) clearUpdateStatus();
       return;
     }
     try {

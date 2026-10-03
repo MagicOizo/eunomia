@@ -1,10 +1,27 @@
 <script setup lang="ts">
+import { computed, provide } from 'vue';
+
+import { detailMaskReadonly } from './detail-mask';
+
 /**
  * The three-column display mask of dialog-design.md: Label | value | actions.
  * Holds the grid that `EuDetailField` rows dissolve into (they use
  * `display: contents`), so every mask — invoice, policy, master data — lines up
  * the same way. Rows go in the default slot.
  */
+const props = defineProps<{
+  /**
+   * Shows the record without offering to change it: every row inside renders
+   * as text and keeps no actions (see detail-mask.ts). For a user who may read
+   * this record but not write it (CR-26).
+   */
+  readonly?: boolean;
+}>();
+
+provide(
+  detailMaskReadonly,
+  computed(() => props.readonly ?? false),
+);
 </script>
 
 <template>

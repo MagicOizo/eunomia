@@ -1,3 +1,4 @@
+import { PERMISSIONS, type PermissionKey } from '@eunomia/shared';
 import { type LocationQueryValue, createRouter, createWebHistory } from 'vue-router';
 
 import SettingsView from '../admin/SettingsView.vue';
@@ -14,6 +15,7 @@ import { useAuthStore } from '../stores/auth';
 import DashboardView from '../views/DashboardView.vue';
 import LoginView from '../views/LoginView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
+import { routeRejection } from './guard';
 import { mainNav, systemNav } from './nav';
 
 /** One query value as a plain string; a repeated parameter yields an array. */
@@ -26,7 +28,10 @@ declare module 'vue-router' {
   interface RouteMeta {
     title?: string;
     requiresAuth?: boolean;
-    requiresAdmin?: boolean;
+    /** The permission the page needs — the same one its endpoints require (CR-26). */
+    permission?: PermissionKey;
+    /** The route parameter naming the account that permission is about (see guard.ts). */
+    accountParam?: string;
     layout?: 'blank';
   }
 }
@@ -56,7 +61,7 @@ const navRoutes = [
     meta: {
       title: item.title,
       requiresAuth: true,
-      requiresAdmin: item.to.startsWith('/system'),
+      permission: item.permission,
     },
   };
 });
@@ -89,7 +94,7 @@ export const router = createRouter({
         facility: queryString(route.query.facility),
         status: queryString(route.query.status),
       }),
-      meta: { title: 'Rechnungen', requiresAuth: true },
+      meta: { title: 'Rechnungen', requiresAuth: true, permission: PERMISSIONS.VIEW_INVOICES },
     },
     {
       // `year` and `invoice` come from the invoice-number search on /invoices:
@@ -103,25 +108,30 @@ export const router = createRouter({
         focusYear: queryString(route.query.year),
         focusInvoiceUID: queryString(route.query.invoice),
       }),
-      meta: { title: 'Rechnungen', requiresAuth: true },
+      meta: {
+        title: 'Rechnungen',
+        requiresAuth: true,
+        permission: PERMISSIONS.VIEW_INVOICES,
+        accountParam: 'accountUID',
+      },
     },
     {
       path: '/system/users',
       name: '/system/users',
       component: UsersView,
-      meta: { title: 'Nutzer & Rechte', requiresAuth: true, requiresAdmin: true },
+      meta: { title: 'Nutzer & Rechte', requiresAuth: true, permission: PERMISSIONS.MANAGE_USERS },
     },
     {
       path: '/system/trash',
       name: '/system/trash',
       component: TrashView,
-      meta: { title: 'Papierkorb', requiresAuth: true, requiresAdmin: true },
+      meta: { title: 'Papierkorb', requiresAuth: true, permission: PERMISSIONS.MANAGE_TRASH },
     },
     {
       path: '/system/settings',
       name: '/system/settings',
       component: SettingsView,
-      meta: { title: 'Einstellungen', requiresAuth: true, requiresAdmin: true },
+      meta: { title: 'Einstellungen', requiresAuth: true, permission: PERMISSIONS.MANAGE_SETTINGS },
     },
     {
       // The user's own account (Slice 7 of the review slices). Deliberately not
@@ -137,13 +147,20 @@ export const router = createRouter({
       path: '/billings',
       name: '/billings',
       component: BillingPickerView,
-      meta: { title: 'Leistungsabrechnungen', requiresAuth: true },
+      meta: {
+        title: 'Leistungsabrechnungen',
+        requiresAuth: true,
+        permission: PERMISSIONS.VIEW_INVOICES,
+      },
     },
     {
       path: '/billings/:contractUID',
       name: 'billings-contract',
       component: BillingsView,
       props: true,
+      // No permission in the meta: the account hangs on the policy, not on the
+      // path, so there is nothing here to check it against. Without the right
+      // the API answers 403 and the page shows that sentence.
       meta: { title: 'Leistungsabrechnungen', requiresAuth: true },
     },
     ...navRoutes,
@@ -160,12 +177,9 @@ export const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore();
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } };
-  }
-  if (to.meta.requiresAdmin && !auth.isAdmin) {
-    return { name: 'home' };
-  }
+  const rejection = routeRejection(to.meta, to.params, auth);
+  if (rejection === 'login') return { name: 'login', query: { redirect: to.fullPath } };
+  if (rejection === 'home') return { name: 'home' };
   if (to.name === 'login' && auth.isAuthenticated) {
     return { name: 'home' };
   }

@@ -27,6 +27,14 @@ const props = defineProps<
     options: Record<string, SelectOption[]>;
     /** The row being edited. */
     editing: ResourceRow | null;
+    /**
+     * Shows the record without offering to change it — for a user who may read
+     * this row but not write it (CR-26). The mask passes it on to its rows (see
+     * detail-mask.ts) and the footer holds nothing but "Schließen": the mask
+     * stays the way to read the details, it just stops promising a save that
+     * the API would refuse.
+     */
+    readonly?: boolean;
   }
 >();
 
@@ -105,7 +113,7 @@ function submit(): void {
 
 <template>
   <EuDialog :open="open" :title="title" wide @close="emit('close')">
-    <EuDetailMask v-if="editing">
+    <EuDetailMask v-if="editing" :readonly="readonly">
       <EuDetailField
         v-for="field in fields"
         :key="field.key"
@@ -124,7 +132,7 @@ function submit(): void {
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
-      <EuButton :disabled="submitting" @click="submit">
+      <EuButton v-if="!readonly" :disabled="submitting" @click="submit">
         {{ submitting ? 'Speichern…' : 'Speichern' }}
       </EuButton>
     </template>

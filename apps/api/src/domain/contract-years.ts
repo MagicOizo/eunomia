@@ -1,10 +1,9 @@
-import { type BonusForfeitRule, ERROR_CODES } from '@eunomia/shared';
+import { type BonusForfeitRule, ERROR_CODES, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';

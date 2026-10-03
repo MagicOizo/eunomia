@@ -1,4 +1,4 @@
-import { ERROR_CODES } from '@eunomia/shared';
+import { ERROR_CODES, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { Pool } from 'mariadb';
@@ -23,7 +23,6 @@ import {
   userIdByUuid,
 } from './admin-repository.js';
 import { createRequireAuth, createRequirePermission, getAuthUser } from './middleware.js';
-import { PERMISSIONS } from './permissions.js';
 import { createUser, deleteActiveRefreshTokens } from './repository.js';
 
 const roleRef = z.string().regex(entityIdPattern(ENTITY_PREFIX.role));

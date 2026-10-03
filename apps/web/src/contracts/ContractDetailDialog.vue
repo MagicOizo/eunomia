@@ -21,6 +21,7 @@ import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { useDialogAction } from '../lib/dialog-action';
+import { NO_PERMISSION } from '../lib/error-messages';
 import { describeError } from '../lib/errors';
 import { germanDate, germanMoney, plural } from '../lib/format';
 import {
@@ -40,6 +41,7 @@ import {
   saveHistoryEntry,
   updateContract,
 } from './api';
+import { useAuthStore } from '../stores/auth';
 import ContractYearDialog from './ContractYearDialog.vue';
 import PremiumFormDialog from './PremiumFormDialog.vue';
 import TermsFormDialog from './TermsFormDialog.vue';
@@ -62,6 +64,16 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; changed: [] }>();
 
 const contract = ref<ContractDetailDto | null>(null);
+
+const auth = useAuthStore();
+/**
+ * Whether this policy may be written — MANAGE_CONTRACTS for its insured person
+ * (CR-26). Reading is enough to open the dialog: the mask and the three
+ * histories then show the policy without offering to change it.
+ */
+const mayManage = computed(() => auth.can('MANAGE_CONTRACTS', contract.value?.accountUID));
+/** Why the actions are disabled, or nothing when they are not. */
+const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
 const loadError = ref<string | null>(null);
 const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
@@ -321,7 +333,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
   <EuDialog :open="open" :title="title" wide @close="emit('close')">
     <p v-if="loadError" class="eu-contract__error" role="alert">{{ loadError }}</p>
     <template v-if="contract">
-      <EuDetailMask>
+      <EuDetailMask :readonly="!mayManage">
         <EuDetailField
           v-model="values.contractNumber"
           :saved-value="saved.contractNumber"
@@ -386,7 +398,12 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
       <section class="eu-contract__block" aria-labelledby="eu-contract-premiums">
         <div class="eu-contract__block-head">
           <h3 id="eu-contract-premiums">Beitragsverlauf</h3>
-          <EuButton variant="secondary" :icon="faPlus" @click="openPremium(null)"
+          <EuButton
+            variant="secondary"
+            :icon="faPlus"
+            :disabled="!mayManage"
+            :title="noPermission"
+            @click="openPremium(null)"
             >Beitragsanpassung erfassen</EuButton
           >
         </div>
@@ -420,6 +437,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     icon-only
                     :icon="faPen"
                     :aria-label="`Beitragsstand ab ${germanDate(premium.validFrom)} bearbeiten`"
+                    :disabled="!mayManage"
+                    :title="noPermission"
                     @click="openPremium(premium)"
                   />
                   <EuButton
@@ -427,6 +446,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     icon-only
                     :icon="faTrash"
                     :aria-label="`Beitragsstand ab ${germanDate(premium.validFrom)} löschen`"
+                    :disabled="!mayManage"
+                    :title="noPermission"
                     @click="
                       pendingDelete = {
                         segment: 'premiums',
@@ -460,7 +481,12 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
       <section class="eu-contract__block" aria-labelledby="eu-contract-terms">
         <div class="eu-contract__block-head">
           <h3 id="eu-contract-terms">Konditionen je Jahr</h3>
-          <EuButton variant="secondary" :icon="faPlus" @click="openTerms(null)"
+          <EuButton
+            variant="secondary"
+            :icon="faPlus"
+            :disabled="!mayManage"
+            :title="noPermission"
+            @click="openTerms(null)"
             >Konditionen ab Jahr erfassen</EuButton
           >
         </div>
@@ -508,6 +534,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     icon-only
                     :icon="faPen"
                     :aria-label="`Konditionen ab ${terms.validFromYear} bearbeiten`"
+                    :disabled="!mayManage"
+                    :title="noPermission"
                     @click="openTerms(terms)"
                   />
                   <EuButton
@@ -515,6 +543,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     icon-only
                     :icon="faTrash"
                     :aria-label="`Konditionen ab ${terms.validFromYear} löschen`"
+                    :disabled="!mayManage"
+                    :title="noPermission"
                     @click="
                       pendingDelete = {
                         segment: 'terms',
@@ -600,6 +630,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     icon-only
                     :icon="faPlus"
                     :aria-label="`Konditionen und Staffel für ${y.year} erfassen`"
+                    :disabled="!mayManage"
+                    :title="noPermission"
                     @click="openTerms(null, y.year)"
                   />
                   <EuButton
@@ -607,6 +639,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     icon-only
                     :icon="faPen"
                     :aria-label="`Jahr ${y.year} erfassen (Rückerstattung, Verwirkung)`"
+                    :disabled="!mayManage"
+                    :title="noPermission"
                     @click="openYear(y)"
                   />
                 </td>
@@ -634,7 +668,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
-      <EuButton :disabled="mask.busy || !contract" @click="saveMask">{{
+      <EuButton v-if="mayManage" :disabled="mask.busy || !contract" @click="saveMask">{{
         mask.busy ? 'Speichern…' : 'Speichern'
       }}</EuButton>
     </template>

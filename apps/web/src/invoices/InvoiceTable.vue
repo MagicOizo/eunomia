@@ -3,6 +3,7 @@ import { WORKFLOW_STATUSES } from '@eunomia/shared';
 import {
   faBan,
   faCircleCheck,
+  faEye,
   faPaperPlane,
   faPen,
   faTrash,
@@ -18,6 +19,7 @@ import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
+import { NO_PERMISSION } from '../lib/error-messages';
 import { germanDate, germanMoney } from '../lib/format';
 import { useTableSort } from '../lib/table-sort';
 import type { InvoiceDto } from './api';
@@ -60,6 +62,12 @@ const props = defineProps<{
   selected: Set<string>;
   /** The invoice an invoice-number search led here, or null. */
   foundUID: string | null;
+  /**
+   * Whether this person's invoices may be written (MANAGE_INVOICES for their
+   * account, CR-26). Handed down like the rows themselves: the whole table
+   * belongs to one insured person, so one answer covers every row.
+   */
+  canManage: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -296,7 +304,8 @@ defineExpose({ revealFound });
               icon-only
               :icon="faPaperPlane"
               aria-label="Einreichen"
-              title="Rechnung bei der Versicherung einreichen"
+              :disabled="!canManage"
+              :title="canManage ? 'Rechnung bei der Versicherung einreichen' : NO_PERMISSION"
               @click="emit('submit', [row.invoice])"
             />
             <EuButton
@@ -305,15 +314,20 @@ defineExpose({ revealFound });
               icon-only
               :icon="faCircleCheck"
               aria-label="Als bezahlt markieren"
-              title="Rechnung als bezahlt markieren"
+              :disabled="!canManage"
+              :title="canManage ? 'Rechnung als bezahlt markieren' : NO_PERMISSION"
               @click="emit('settle', row.invoice)"
             />
             <EuButton
               variant="secondary"
               icon-only
-              :icon="faPen"
+              :icon="canManage ? faPen : faEye"
               aria-label="Details"
-              title="Rechnungsdetails öffnen – bearbeiten, einreichen, abrechnen"
+              :title="
+                canManage
+                  ? 'Rechnungsdetails öffnen – bearbeiten, einreichen, abrechnen'
+                  : 'Rechnungsdetails ansehen'
+              "
               @click="emit('detail', row.invoice)"
             />
             <EuButton
@@ -321,7 +335,8 @@ defineExpose({ revealFound });
               icon-only
               :icon="faTrash"
               aria-label="Löschen"
-              title="Rechnung löschen"
+              :disabled="!canManage"
+              :title="canManage ? 'Rechnung löschen' : NO_PERMISSION"
               @click="emit('remove', [row.invoice.invoiceUID])"
             />
           </td>

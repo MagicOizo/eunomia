@@ -16,9 +16,11 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { apiData } from '../lib/api';
 import { useDialogAction } from '../lib/dialog-action';
+import { NO_PERMISSION } from '../lib/error-messages';
 import { germanDate, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
+import { useAuthStore } from '../stores/auth';
 import {
   type InvoiceDto,
   type ReimbursementPlanDto,
@@ -72,6 +74,17 @@ interface ContractRef extends ContractPeriod {
 
 /** "Nummer · Versicherung" — tells a person's full and supplementary policy apart. */
 const contractLabel = (c: ContractRef): string => `${c.contractNumber} · ${c.companyName}`;
+
+const auth = useAuthStore();
+
+/**
+ * Whether this person's invoices may be written — every action of this page
+ * needs MANAGE_INVOICES for exactly this account (CR-26). Viewing got the user
+ * here: the route lets them in on VIEW_INVOICES alone.
+ */
+const mayManage = computed(() => auth.can('MANAGE_INVOICES', props.accountUID));
+/** Why the actions are disabled, or nothing when they are not. */
+const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
 
 const accountName = ref('');
 const years = ref<number[]>([]);
@@ -434,11 +447,18 @@ function confirmDelete(): void {
     </div>
 
     <div class="eu-ws__toolbar">
-      <EuButton :icon="faPlus" @click="dialogs.openCreate">Neue Rechnung</EuButton>
+      <EuButton
+        :icon="faPlus"
+        :disabled="!mayManage"
+        :title="noPermission"
+        @click="dialogs.openCreate"
+        >Neue Rechnung</EuButton
+      >
       <EuButton
         :icon="faPaperPlane"
         variant="secondary"
-        :disabled="selectedSubmittable.length === 0"
+        :disabled="!mayManage || selectedSubmittable.length === 0"
+        :title="noPermission"
         @click="dialogs.openSubmit(selectedSubmittable)"
       >
         Einreichen ({{ selectedSubmittable.length }})
@@ -446,7 +466,8 @@ function confirmDelete(): void {
       <EuButton
         :icon="faFileInvoiceDollar"
         variant="secondary"
-        :disabled="selectedBookable.length === 0"
+        :disabled="!mayManage || selectedBookable.length === 0"
+        :title="noPermission"
         @click="dialogs.openBilling(selectedBookable)"
       >
         Abrechnung zuordnen ({{ selectedBookable.length }})
@@ -454,7 +475,8 @@ function confirmDelete(): void {
       <EuButton
         :icon="faTrash"
         variant="secondary"
-        :disabled="selected.size === 0"
+        :disabled="!mayManage || selected.size === 0"
+        :title="noPermission"
         @click="dialogs.openDelete(Array.from(selected))"
       >
         Löschen ({{ selected.size }})
@@ -488,6 +510,7 @@ function confirmDelete(): void {
       :rows="rows"
       :selected="selected"
       :found-u-i-d="foundUID"
+      :can-manage="mayManage"
       @toggle="toggleSelect"
       @toggle-all="toggleSelectAll"
       @detail="dialogs.openDetail"

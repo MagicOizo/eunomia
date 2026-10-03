@@ -3,6 +3,10 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ResourceConfig } from '../../resources/config';
+import { grant } from '../../test/permissions';
+import type { SelectOption } from './EuSelectField.vue';
+import ResourceDetailDialog from './ResourceDetailDialog.vue';
+import ResourceFormDialog from './ResourceFormDialog.vue';
 import ResourceView from './ResourceView.vue';
 
 const { listResource } = vi.hoisted(() => ({ listResource: vi.fn() }));
@@ -25,6 +29,7 @@ const config: ResourceConfig = {
   singular: 'Leistungserbringer',
   plural: 'Leistungserbringer',
   idKey: 'facilityUID',
+  managePermission: 'MANAGE_FACILITIES',
   columns: [
     { key: 'facilityName', label: 'Name' },
     { key: 'accountUID', label: 'Versicherter', lookup: 'accounts' },
@@ -113,5 +118,122 @@ describe('ResourceView search', () => {
     const link = wrapper.find('tbody tr a');
     expect(link.attributes('href')).toBe('/invoices?facility=f-1');
     expect(link.attributes('aria-label')).toBe('Rechnungen von Praxis Nord anzeigen');
+  });
+});
+
+/**
+ * What the list offers a user who may not write it (CR-26). The permissions
+ * come from the auth store, which every test starts with full (see
+ * src/test/setup.ts), so each case here says what the user actually holds.
+ */
+describe('ResourceView permissions', () => {
+  /** A policy-like list: account-scoped rows and an account picker in the form. */
+  const scopedConfig: ResourceConfig = {
+    path: '/contracts',
+    singular: 'Police',
+    plural: 'Policen',
+    idKey: 'contractUID',
+    managePermission: 'MANAGE_CONTRACTS',
+    accountKey: 'accountUID',
+    columns: [{ key: 'contractNumber', label: 'Vertragsnummer' }],
+    fields: [
+      { key: 'contractNumber', label: 'Vertragsnummer', type: 'text', required: true },
+      {
+        key: 'accountUID',
+        label: 'Versicherter',
+        type: 'select',
+        optionsFrom: 'accounts',
+        scopedBy: 'MANAGE_CONTRACTS',
+      },
+    ],
+    lookups: {
+      accounts: {
+        path: '/accounts',
+        idKey: 'accountUID',
+        label: (row) => String(row.firstname),
+      },
+    },
+  };
+
+  const contracts = [
+    { contractUID: 'c-1', contractNumber: 'V-1', accountUID: 'a-1' },
+    { contractUID: 'c-2', contractNumber: 'V-2', accountUID: 'a-2' },
+  ];
+  const twoAccounts = [
+    { accountUID: 'a-1', firstname: 'Anna', surname: 'Muster' },
+    { accountUID: 'a-2', firstname: 'Bodo', surname: 'Muster' },
+  ];
+
+  /** The row's action buttons, in template order: edit, delete. */
+  const actionsOf = (wrapper: Awaited<ReturnType<typeof mountView>>, index: number) =>
+    wrapper.findAll('tbody tr')[index].findAll('.eu-resource__actions button');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listResource.mockImplementation((path: string) =>
+      Promise.resolve(path === '/accounts' ? twoAccounts : contracts),
+    );
+  });
+
+  it('disables creating without the permission, and says why', async () => {
+    grant({ global: [], perAccount: [] });
+    const wrapper = await mountView(scopedConfig);
+
+    const create = wrapper.findAll('button').find((b) => b.text() === 'Neu');
+    expect(create?.attributes('disabled')).toBeDefined();
+    expect(create?.attributes('title')).toBe('Dazu fehlt dir die Berechtigung.');
+  });
+
+  it('allows creating on an account-scoped grant alone', async () => {
+    grant({ perAccount: [{ accountUID: 'a-1', permissionKey: 'MANAGE_CONTRACTS' }] });
+    const wrapper = await mountView(scopedConfig);
+
+    const create = wrapper.findAll('button').find((b) => b.text() === 'Neu');
+    expect(create?.attributes('disabled')).toBeUndefined();
+  });
+
+  it('asks for a global grant where creating has no account to scope to', async () => {
+    // A new insured person is nobody's yet, so the API's POST /accounts wants
+    // the permission globally — a grant for one account does not cover it.
+    grant({ perAccount: [{ accountUID: 'a-1', permissionKey: 'MANAGE_CONTRACTS' }] });
+    const wrapper = await mountView({ ...scopedConfig, createNeedsGlobal: true });
+
+    const create = wrapper.findAll('button').find((b) => b.text() === 'Neu');
+    expect(create?.attributes('disabled')).toBeDefined();
+  });
+
+  it('binds each row to its own account', async () => {
+    grant({ perAccount: [{ accountUID: 'a-1', permissionKey: 'MANAGE_CONTRACTS' }] });
+    const wrapper = await mountView(scopedConfig);
+
+    const [, deleteOwn] = actionsOf(wrapper, 0);
+    const [, deleteOther] = actionsOf(wrapper, 1);
+    expect(deleteOwn.attributes('disabled')).toBeUndefined();
+    expect(deleteOther.attributes('disabled')).toBeDefined();
+    expect(deleteOther.attributes('title')).toBe('Dazu fehlt dir die Berechtigung.');
+  });
+
+  it('leads to the record even when it may only be read', async () => {
+    grant({ global: [], perAccount: [] });
+    const wrapper = await mountView(scopedConfig);
+
+    // The mask stays the way to read the details, so the first action is open
+    // and says so — "ansehen" instead of "bearbeiten".
+    const [open] = actionsOf(wrapper, 0);
+    expect(open.attributes('disabled')).toBeUndefined();
+    expect(open.attributes('aria-label')).toBe('Police ansehen');
+
+    await open.trigger('click');
+    const mask = wrapper.findComponent(ResourceDetailDialog);
+    expect(mask.props('readonly')).toBe(true);
+    expect(mask.text()).not.toContain('Speichern');
+  });
+
+  it('offers only the accounts the new record may be created for', async () => {
+    grant({ perAccount: [{ accountUID: 'a-1', permissionKey: 'MANAGE_CONTRACTS' }] });
+    const wrapper = await mountView(scopedConfig);
+
+    const offered = wrapper.findComponent(ResourceFormDialog).props('options').accounts;
+    expect(offered.map((option: SelectOption) => option.value)).toEqual(['a-1']);
   });
 });

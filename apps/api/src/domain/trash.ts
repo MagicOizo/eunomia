@@ -1,9 +1,8 @@
-import { ERROR_CODES } from '@eunomia/shared';
+import { ERROR_CODES, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 
 import { createRequireAuth, createRequirePermission } from '../auth/middleware.js';
-import { PERMISSIONS } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';

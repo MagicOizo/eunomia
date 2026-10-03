@@ -1,9 +1,9 @@
+import { PERMISSIONS } from '@eunomia/shared';
 import type { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import type { AppConfig } from '../config/env.js';
-import { PERMISSIONS } from '../auth/permissions.js';
 import { createMasterDataRouter } from '../crud/master-data-router.js';
 import type { CrudTable } from '../crud/repository.js';
 

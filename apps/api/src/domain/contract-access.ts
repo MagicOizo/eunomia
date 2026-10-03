@@ -1,7 +1,8 @@
+import type { PermissionKey } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
 import { forbidden } from '../auth/errors.js';
-import { type PermissionKey, hasPermission } from '../auth/permissions.js';
+import { hasPermission } from '../auth/permissions.js';
 import { type CrudTable, getRow } from '../crud/repository.js';
 import { notFound } from '../lib/api-error.js';
 

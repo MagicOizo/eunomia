@@ -1,7 +1,9 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
+import { h } from 'vue';
 
 import EuDetailField from './EuDetailField.vue';
+import EuDetailMask from './EuDetailMask.vue';
 
 /**
  * The add action of a display-mask row. Unlike the create form, the mask keeps
@@ -12,6 +14,9 @@ const addAction = (wrapper: ReturnType<typeof mountField>, noun: string) =>
   wrapper.findAll('button').find((b) => b.attributes('aria-label') === `${noun} hinzufügen`);
 
 const options = [{ value: 'f-1', label: 'Praxis Nord' }];
+
+/** What Intl puts between amount and currency sign (see @eunomia/shared). */
+const NBSP = '\u00a0';
 
 /** A paste as the browser sends it, so `defaultPrevented` can be read after. */
 function paste(el: Element, text: string): Event {
@@ -83,5 +88,49 @@ describe('EuDetailField toggle row', () => {
     expect(input.attributes('aria-label')).toBe('Direkt-/Barzahlung');
     // The visible label column already carries the text — twice would be noise.
     expect(wrapper.find('.eu-toggle__label').exists()).toBe(false);
+  });
+});
+
+/**
+ * A read-only mask (CR-26: a record its reader may not write) turns every row
+ * into text. The value then has to say for itself what its editor said for it.
+ */
+describe('EuDetailField in a read-only mask', () => {
+  /** One row of the given type, inside a mask that is read-only. */
+  function mountInReadonlyMask(props: Record<string, unknown>) {
+    return mount(EuDetailMask, {
+      props: { readonly: true },
+      slots: { default: h(EuDetailField, { label: 'Feld', options, ...props }) },
+    });
+  }
+
+  it('writes a date the way this country writes it', () => {
+    const wrapper = mountInReadonlyMask({ type: 'date', modelValue: '1985-04-12' });
+
+    expect(wrapper.find('.eu-detail__readonly').text()).toBe('12.04.1985');
+    expect(wrapper.find('input').exists()).toBe(false);
+  });
+
+  it('names the record a relation points at, not its UID', () => {
+    const wrapper = mountInReadonlyMask({ type: 'select', modelValue: 'f-1' });
+
+    expect(wrapper.find('.eu-detail__readonly').text()).toBe('Praxis Nord');
+  });
+
+  it('says an amount and a switch in words', () => {
+    expect(
+      mountInReadonlyMask({ type: 'currency', modelValue: 120 })
+        .find('.eu-detail__readonly')
+        .text(),
+    ).toBe(`120,00${NBSP}€`);
+    expect(
+      mountInReadonlyMask({ type: 'toggle', modelValue: true }).find('.eu-detail__readonly').text(),
+    ).toBe('Ja');
+  });
+
+  it('keeps no action in the row', () => {
+    const wrapper = mountInReadonlyMask({ type: 'text', modelValue: 'Praxis Nord' });
+
+    expect(wrapper.findAll('button')).toHaveLength(0);
   });
 });

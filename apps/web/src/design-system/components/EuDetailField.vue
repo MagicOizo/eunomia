@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { faArrowRotateLeft, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { computed, ref } from 'vue';
+import { computed, inject, ref } from 'vue';
 
 import { pastedIsoDate } from '../../lib/date-input';
+import { germanDate, germanMoney } from '../../lib/format';
+import { detailMaskReadonly } from './detail-mask';
 import EuCurrencyField from './EuCurrencyField.vue';
 import EuEntityPicker, { type PickerOption } from './EuEntityPicker.vue';
 import EuToggle from './EuToggle.vue';
@@ -55,6 +57,40 @@ const emit = defineEmits<{
   create: [query: string];
 }>();
 
+/**
+ * What the row actually renders: its own type, or `readonly` throughout when
+ * the surrounding mask is read-only (see detail-mask.ts). Everything below
+ * reads this instead of `props.type`, so a read-only mask has no editor and no
+ * action anywhere in it.
+ */
+const maskReadonly = inject(detailMaskReadonly, undefined);
+const shownType = computed<DetailType>(() =>
+  (maskReadonly?.value ?? false) ? 'readonly' : props.type,
+);
+
+/**
+ * The text a readonly row shows. Without its editor a value has to say itself
+ * what the editor said for it: a relation holds a UID, which means nothing to a
+ * reader, and a date or an amount is stored the way the API carries it, not the
+ * way this country writes it.
+ */
+const readonlyText = computed<string>(() => {
+  const value = props.modelValue;
+  if (value === null || value === undefined || value === '') return '–';
+  switch (props.type) {
+    case 'select':
+      return props.options.find((option) => option.value === value)?.label ?? String(value);
+    case 'toggle':
+      return value ? 'Ja' : 'Nein';
+    case 'date':
+      return germanDate(value);
+    case 'currency':
+      return germanMoney(value);
+    default:
+      return String(value);
+  }
+});
+
 // What the picker currently has typed in it: the add action sits outside the
 // field (the mask puts actions in their own column), so it needs to be told.
 const query = ref('');
@@ -62,10 +98,10 @@ const query = ref('');
 const isEmpty = computed(
   () => props.modelValue === null || props.modelValue === undefined || props.modelValue === '',
 );
-const clearable = computed(() => props.type !== 'toggle' && props.type !== 'readonly');
+const clearable = computed(() => shownType.value !== 'toggle' && shownType.value !== 'readonly');
 const canReset = computed(
   () =>
-    props.type !== 'readonly' &&
+    shownType.value !== 'readonly' &&
     props.savedValue !== undefined &&
     props.modelValue !== props.savedValue,
 );
@@ -115,13 +151,13 @@ function reset(): void {
       <!-- `after` puts something beside the field itself (the GiroCode next to
            the chosen bank account), without replacing it the way `value` does. -->
       <slot name="value">
-        <span v-if="type === 'readonly'" class="eu-detail__readonly">
-          {{ modelValue === null || modelValue === '' ? '–' : modelValue }}
+        <span v-if="shownType === 'readonly'" class="eu-detail__readonly">
+          {{ readonlyText }}
         </span>
         <input
-          v-else-if="type === 'text' || type === 'email' || type === 'date'"
+          v-else-if="shownType === 'text' || shownType === 'email' || shownType === 'date'"
           class="eu-detail__input"
-          :type="type === 'text' ? 'text' : type"
+          :type="shownType === 'text' ? 'text' : shownType"
           autocomplete="off"
           :value="modelValue ?? ''"
           :aria-label="label"
@@ -131,7 +167,7 @@ function reset(): void {
           @paste="onPaste"
         />
         <input
-          v-else-if="type === 'number'"
+          v-else-if="shownType === 'number'"
           class="eu-detail__input"
           type="number"
           inputmode="numeric"
@@ -144,14 +180,14 @@ function reset(): void {
           @input="onNumber"
         />
         <EuCurrencyField
-          v-else-if="type === 'currency'"
+          v-else-if="shownType === 'currency'"
           bare
           :label="label"
           :model-value="numberValue"
           @update:model-value="emit('update:modelValue', $event)"
         />
         <EuEntityPicker
-          v-else-if="type === 'select'"
+          v-else-if="shownType === 'select'"
           bare
           :label="label"
           :required="required"
@@ -165,7 +201,7 @@ function reset(): void {
           @create="emit('create', $event)"
         />
         <EuToggle
-          v-else-if="type === 'toggle'"
+          v-else-if="shownType === 'toggle'"
           bare
           :label="label"
           :model-value="booleanValue"
@@ -176,11 +212,11 @@ function reset(): void {
     </div>
 
     <div class="eu-detail__actions">
-      <template v-if="type !== 'readonly'">
+      <template v-if="shownType !== 'readonly'">
         <!-- Add, clear, reset — the icon order dialog-design.md fixes. In the
              mask the actions live in this column, not inside the field. -->
         <button
-          v-if="type === 'select' && allowCreate"
+          v-if="shownType === 'select' && allowCreate"
           type="button"
           class="eu-detail__action"
           :disabled="disabled"

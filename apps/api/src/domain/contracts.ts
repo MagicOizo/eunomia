@@ -1,11 +1,11 @@
-import { BONUS_FORFEIT_RULES, CONTRACT_KINDS } from '@eunomia/shared';
+import { BONUS_FORFEIT_RULES, CONTRACT_KINDS, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { forbidden } from '../auth/errors.js';
 import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS, accountFilter, hasPermission } from '../auth/permissions.js';
+import { accountFilter, hasPermission } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';

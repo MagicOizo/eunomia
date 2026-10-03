@@ -1,10 +1,9 @@
-import { defaultPaymentDetail } from '@eunomia/shared';
+import { defaultPaymentDetail, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { createRequireAuth, createRequirePermission } from '../auth/middleware.js';
-import { PERMISSIONS } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';

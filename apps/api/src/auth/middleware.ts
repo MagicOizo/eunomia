@@ -1,9 +1,10 @@
+import type { PermissionKey } from '@eunomia/shared';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { Pool } from 'mariadb';
 
 import type { AppConfig } from '../config/env.js';
 import { forbidden, unauthenticated } from './errors.js';
-import { type PermissionKey, hasPermission } from './permissions.js';
+import { hasPermission } from './permissions.js';
 import { type AuthUser, findUserByUuid } from './repository.js';
 import { verifyAccessToken } from './tokens.js';
 

@@ -24,10 +24,12 @@ import { useDebouncedCallback } from '../lib/debounce';
 import { germanDate, germanMoney, plural } from '../lib/format';
 import { todayIso } from '../lib/date-input';
 import { useDialogAction } from '../lib/dialog-action';
+import { NO_PERMISSION } from '../lib/error-messages';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/table-sort';
+import { useAuthStore } from '../stores/auth';
 import {
   type BillingDto,
   type BillingListDto,
@@ -42,11 +44,22 @@ import BillingFormDialog from './BillingFormDialog.vue';
 
 const props = defineProps<{ contractUID: string }>();
 
+const auth = useAuthStore();
+
 const billings = ref<BillingListDto[]>([]);
 const heading = ref('');
 const forfeitRule = ref<BonusForfeitRule>('ON_REIMBURSEMENT');
 /** This page's policy, as the booking dialog needs it (it has no invoices to derive it from). */
 const policy = ref<(CommonPolicy & { accountUID: string }) | null>(null);
+/**
+ * Whether these billings may be written — MANAGE_INVOICES for the insured
+ * person behind the policy (CR-26). It is known only once the policy is
+ * loaded, which is also when the actions appear; until then nothing is offered.
+ */
+const mayManage = computed(() => auth.can('MANAGE_INVOICES', policy.value?.accountUID));
+/** Why the actions are disabled, or nothing when they are not. */
+const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
+
 const facilityNames = ref<Record<string, string>>({});
 const newOpen = ref(false);
 const loading = ref(true);
@@ -269,7 +282,14 @@ function confirmDelete(): void {
         </RouterLink>
         <h2 class="eu-billings__title">{{ heading }}</h2>
       </div>
-      <EuButton v-if="!loading && !loadError" :icon="faPlus" @click="newOpen = true">Neu</EuButton>
+      <EuButton
+        v-if="!loading && !loadError"
+        :icon="faPlus"
+        :disabled="!mayManage"
+        :title="noPermission"
+        @click="newOpen = true"
+        >Neu</EuButton
+      >
     </div>
 
     <p v-if="loading" class="eu-billings__hint">Wird geladen…</p>
@@ -366,7 +386,8 @@ function confirmDelete(): void {
                   icon-only
                   :icon="faGavel"
                   aria-label="Widerspruch"
-                  title="Widerspruch einlegen oder auflösen"
+                  :disabled="!mayManage"
+                  :title="mayManage ? 'Widerspruch einlegen oder auflösen' : NO_PERMISSION"
                   @click="openObjection(b)"
                 />
                 <EuButton
@@ -374,7 +395,8 @@ function confirmDelete(): void {
                   icon-only
                   :icon="faPen"
                   aria-label="Bearbeiten"
-                  title="Abrechnung bearbeiten"
+                  :disabled="!mayManage"
+                  :title="mayManage ? 'Abrechnung bearbeiten' : NO_PERMISSION"
                   @click="openEdit(b)"
                 />
                 <EuButton
@@ -382,7 +404,8 @@ function confirmDelete(): void {
                   icon-only
                   :icon="faTrash"
                   aria-label="Löschen"
-                  title="Abrechnung löschen"
+                  :disabled="!mayManage"
+                  :title="mayManage ? 'Abrechnung löschen' : NO_PERMISSION"
                   @click="openDelete(b)"
                 />
               </td>

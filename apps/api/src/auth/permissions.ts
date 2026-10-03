@@ -1,30 +1,15 @@
+/**
+ * How a permission is resolved against the database — the queries behind the
+ * rights model (Notes/eunomia-plan.md, 2.4). The permission NAMES live in
+ * `@eunomia/shared`, because the web asks the same questions to decide what to
+ * offer (CR-26); what a grant means is answered here, on the side that has the
+ * tables.
+ */
+
+import type { PermissionKey } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
 import type { Filter } from '../crud/repository.js';
-
-/**
- * Permission keys the application code checks against. They mirror rows in the
- * `Permissions` catalog table, which is seeded by migrations — the migration
- * is the immutable source of truth for what exists in a given schema version;
- * this object is the compile-time-checked set the code refers to. Adding a
- * permission means both a new migration row and a new entry here.
- */
-export const PERMISSIONS = {
-  VIEW_INVOICES: 'VIEW_INVOICES',
-  MANAGE_INVOICES: 'MANAGE_INVOICES',
-  VIEW_ACCOUNTS: 'VIEW_ACCOUNTS',
-  MANAGE_ACCOUNTS: 'MANAGE_ACCOUNTS',
-  VIEW_CONTRACTS: 'VIEW_CONTRACTS',
-  MANAGE_CONTRACTS: 'MANAGE_CONTRACTS',
-  MANAGE_FACILITIES: 'MANAGE_FACILITIES',
-  MANAGE_COMPANIES: 'MANAGE_COMPANIES',
-  MANAGE_AGENCIES: 'MANAGE_AGENCIES',
-  MANAGE_USERS: 'MANAGE_USERS',
-  MANAGE_SETTINGS: 'MANAGE_SETTINGS',
-  MANAGE_TRASH: 'MANAGE_TRASH',
-} as const;
-
-export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 /**
  * Resolves whether a user holds a permission — the core of the rights model

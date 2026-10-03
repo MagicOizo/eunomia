@@ -1,10 +1,11 @@
+import { PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 
 import type { AppConfig } from '../config/env.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './http.js';
 import { createRequireAuth, getAuthUser } from './middleware.js';
-import { PERMISSIONS, getEffectivePermissions } from './permissions.js';
+import { getEffectivePermissions } from './permissions.js';
 import type { AuthUser } from './repository.js';
 import { changePasswordSchema, loginSchema, setupSchema } from './schemas.js';
 import { changeOwnPassword, login, logout, refresh, setupFirstAdmin } from './service.js';

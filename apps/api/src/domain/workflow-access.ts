@@ -1,7 +1,8 @@
+import type { PermissionKey } from '@eunomia/shared';
 import type { Pool, PoolConnection } from 'mariadb';
 
 import { forbidden } from '../auth/errors.js';
-import { type PermissionKey, hasPermission } from '../auth/permissions.js';
+import { hasPermission } from '../auth/permissions.js';
 import { notFound } from '../lib/api-error.js';
 
 type Queryable = Pool | PoolConnection;

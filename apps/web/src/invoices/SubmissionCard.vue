@@ -12,6 +12,7 @@ import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
+import { NO_PERMISSION } from '../lib/error-messages';
 import { germanDate, germanMoney } from '../lib/format';
 import type { InvoiceAllocationDto, InvoiceSubmissionDto, PlanInvoicePolicyAction } from './api';
 import { policyActionBadge } from './recommendation';
@@ -29,6 +30,8 @@ const props = defineProps<{
   /** No further reimbursement is expected: the invoice is marked as billed. */
   closed: boolean;
   busy: boolean;
+  /** Whether this person's invoices may be written (MANAGE_INVOICES, CR-26). */
+  canManage: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -92,8 +95,12 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           icon-only
           :icon="faPen"
           :aria-label="`Erstattung aus Abrechnung ${allocation.billingNumber} ändern`"
-          :title="`Erstattungsbetrag und Belegnummer ändern (${allocation.billingNumber})`"
-          :disabled="busy"
+          :title="
+            canManage
+              ? `Erstattungsbetrag und Belegnummer ändern (${allocation.billingNumber})`
+              : NO_PERMISSION
+          "
+          :disabled="busy || !canManage"
           @click="emit('editAllocation', allocation)"
         />
         <EuButton
@@ -101,8 +108,12 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           icon-only
           :icon="faTrash"
           :aria-label="`Erstattung aus Abrechnung ${allocation.billingNumber} entfernen`"
-          :title="`Erstattung aus Abrechnung ${allocation.billingNumber} entfernen`"
-          :disabled="busy"
+          :title="
+            canManage
+              ? `Erstattung aus Abrechnung ${allocation.billingNumber} entfernen`
+              : NO_PERMISSION
+          "
+          :disabled="busy || !canManage"
           @click="emit('removeAllocation', allocation)"
         />
       </li>
@@ -120,8 +131,12 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           icon-only
           :icon="faPlus"
           :aria-label="`Abrechnung für ${submission.contractNumber} erfassen`"
-          :title="`Leistungsabrechnung erfassen und Erstattung zuordnen (${submission.contractNumber})`"
-          :disabled="busy"
+          :title="
+            canManage
+              ? `Leistungsabrechnung erfassen und Erstattung zuordnen (${submission.contractNumber})`
+              : NO_PERMISSION
+          "
+          :disabled="busy || !canManage"
           @click="emit('bill', submission)"
         />
         <EuButton
@@ -130,8 +145,12 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           icon-only
           :icon="faGavel"
           :aria-label="`Widerspruch bei ${submission.contractNumber}`"
-          :title="`Fehlerhafte Leistungsabrechnung als Widerspruch markieren (${submission.contractNumber})`"
-          :disabled="busy"
+          :title="
+            canManage
+              ? `Fehlerhafte Leistungsabrechnung als Widerspruch markieren (${submission.contractNumber})`
+              : NO_PERMISSION
+          "
+          :disabled="busy || !canManage"
           @click="emit('objection', submission)"
         />
         <EuButton
@@ -140,8 +159,10 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           icon-only
           :icon="faArrowRotateLeft"
           :aria-label="`Einreichung bei ${submission.contractNumber} zurückziehen`"
-          :title="`Einreichung bei ${submission.contractNumber} zurückziehen`"
-          :disabled="busy"
+          :title="
+            canManage ? `Einreichung bei ${submission.contractNumber} zurückziehen` : NO_PERMISSION
+          "
+          :disabled="busy || !canManage"
           @click="emit('withdraw', submission)"
         />
       </div>

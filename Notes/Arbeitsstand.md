@@ -146,7 +146,22 @@ ausdrücklich vor einer anderen steht.
       Verhaltensänderung: ein Nicht-HTTP-Fehler heißt in `BillingsView` jetzt „Unerwarteter Fehler."
       statt „Aktion fehlgeschlagen.". `InvoiceDetailDialog` und `ContractDetailDialog` bleiben
       ungeteilt, wie der Review empfiehlt.
-- [ ] **12 — Die Oberfläche lernt das Rechtemodell.** CR-26.
+- [x] **12 — Die Oberfläche lernt das Rechtemodell.** CR-26.
+      Umgesetzt mit v0.18.0-slice.4 (Slice 62). Vier Festlegungen des Autors prägen das Ergebnis:
+      Aktionen ohne Recht bleiben sichtbar und deaktiviert, mit „Dazu fehlt dir die Berechtigung."
+      als Hinweis; Anzeigemasken öffnen nur-lesend statt gar nicht; Konto-Auswahlen beim Anlegen
+      zeigen nur verwaltbare Konten; und die zwölf Rechtenamen stehen samt der Einteilung
+      instanzweit/kontobezogen in `@eunomia/shared`, die API liest sie von dort (25 Dateien). Die
+      Regeln stehen jetzt in §2.4 des Plans. Drei Dinge gingen über den Review hinaus: (1) der
+      Update-Status in der Fußzeile hing an `MANAGE_USERS`, sein Endpunkt verlangt aber
+      `MANAGE_SETTINGS` — zwei Rollen, die ihn nie oder vergeblich abgefragt hätten; (2) der
+      Nur-Lesen-Modus sitzt in `EuDetailMask` und wird an die Zeilen durchgereicht, die dabei
+      gelernt haben, Datum, Betrag, Schalter und Relation ohne ihren Editor deutsch zu schreiben;
+      (3) der Testlauf hat seither eine Festlegung — jeder Test ist ein globaler Administrator,
+      solange er nichts anderes sagt. Von Hand geprüft: ein Nutzer mit der Rolle „Nutzer" an genau
+      einem Konto sieht keinen System-Bereich, nur seinen Versicherten, kann dessen Rechnungen
+      schreiben und dessen Stammdaten nur lesen; `/system/trash` und das Konto eines anderen führen
+      auf die Startseite.
 - [ ] **13 — Weniger Fragen an die Datenbank.** CR-16, CR-17, CR-27.
 - [ ] **14 — Typen statt Zusicherungen.** CR-19.
 

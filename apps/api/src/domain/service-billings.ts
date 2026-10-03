@@ -1,10 +1,10 @@
-import { ERROR_CODES, isHttpUrl } from '@eunomia/shared';
+import { ERROR_CODES, isHttpUrl, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
-import { PERMISSIONS, accountFilter } from '../auth/permissions.js';
+import { accountFilter } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { parseQuery, pathParam } from '../crud/params.js';

@@ -1,3 +1,4 @@
+import type { PermissionKey } from '@eunomia/shared';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import type { Component } from 'vue';
 
@@ -20,6 +21,13 @@ export interface FieldConfig {
   options?: SelectOption[];
   /** Initial value in create mode. */
   defaultValue?: string;
+  /**
+   * For a `select` over accounts: offer only the accounts the user may
+   * exercise this permission on. The policy form asks it, so a new policy
+   * cannot be started for an insured person whose record the user may read but
+   * not write — the 403 would come only after filling the form (CR-26).
+   */
+  scopedBy?: PermissionKey;
 }
 
 /** One column in a resource list. */
@@ -63,6 +71,21 @@ export interface ResourceConfig {
   plural: string;
   /** The row's public id field, used for edit/delete and as the row key. */
   idKey: string;
+  /** The permission creating, editing and deleting a row requires (CR-26). */
+  managePermission: PermissionKey;
+  /**
+   * The row field holding the account the permission is about — `accountUID`
+   * for policies, the `idKey` itself for the insured persons. Absent for the
+   * instance-wide master data (companies, facilities, agencies), which have no
+   * account at all (see Notes/eunomia-plan.md, 2.4).
+   */
+  accountKey?: string;
+  /**
+   * Creating needs the permission GLOBALLY, not merely for some account. True
+   * for the insured persons: a new one has no account to scope the check to, so
+   * the API's POST /accounts asks for the global grant.
+   */
+  createNeedsGlobal?: boolean;
   columns: ColumnConfig[];
   fields: FieldConfig[];
   /** Shown in the actions cell, before editing and deleting. */

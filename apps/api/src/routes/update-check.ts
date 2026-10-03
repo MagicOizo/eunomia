@@ -1,8 +1,8 @@
+import { PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 
 import { createRequireAuth, createRequirePermission } from '../auth/middleware.js';
-import { PERMISSIONS } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { readAppVersion } from '../lib/app-version.js';

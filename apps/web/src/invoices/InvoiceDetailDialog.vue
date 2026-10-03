@@ -16,7 +16,9 @@ import type { PickerOption } from '../design-system/components/EuEntityPicker.vu
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { describeError } from '../lib/errors';
+import { NO_PERMISSION } from '../lib/error-messages';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
+import { useAuthStore } from '../stores/auth';
 import { germanMoney } from '../lib/format';
 import {
   type InvoiceAllocationDto,
@@ -88,6 +90,17 @@ const emit = defineEmits<{
   /** An entity was created on the side: the parent's lookup lists are stale. */
   entityCreated: [];
 }>();
+
+const auth = useAuthStore();
+
+/**
+ * Whether this invoice may be written — MANAGE_INVOICES for the insured person
+ * it belongs to (CR-26). Reading it is enough to open this dialog: the mask
+ * then shows the invoice as text and the assignment block offers nothing.
+ */
+const mayManage = computed(() => auth.can('MANAGE_INVOICES', props.invoice?.accountUID));
+/** Why the actions are disabled, or nothing when they are not. */
+const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
 
 const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
@@ -521,7 +534,7 @@ function submit(): void {
 
 <template>
   <EuDialog :open="open" title="Rechnungsdetails" wide @close="emit('close')">
-    <EuDetailMask v-if="invoice">
+    <EuDetailMask v-if="invoice" :readonly="!mayManage">
       <EuDetailField
         v-model="values.invoiceNumber"
         :saved-value="saved.invoiceNumber"
@@ -704,7 +717,8 @@ function submit(): void {
             <EuButton
               variant="secondary"
               :icon="faPaperPlane"
-              :disabled="openContracts.length === 0 || blockBusy"
+              :disabled="!mayManage || openContracts.length === 0 || blockBusy"
+              :title="noPermission"
               @click="
                 submitError = null;
                 submitOpen = true;
@@ -714,7 +728,8 @@ function submit(): void {
             <EuButton
               variant="secondary"
               :icon="faBan"
-              :disabled="markableContracts.length === 0 || blockBusy"
+              :disabled="!mayManage || markableContracts.length === 0 || blockBusy"
+              :title="noPermission"
               @click="
                 exclusionError = null;
                 exclusionOpen = true;
@@ -738,6 +753,7 @@ function submit(): void {
             :plan-action="planActions.get(submission.contractUID) ?? null"
             :closed="invoice.reimbursementClosed"
             :busy="blockBusy"
+            :can-manage="mayManage"
             @bill="openBilling"
             @objection="objectionOpen = true"
             @withdraw="pendingWithdraw = $event"
@@ -759,8 +775,10 @@ function submit(): void {
               icon-only
               :icon="faTrash"
               :aria-label="`Markierung für ${exclusion.contractNumber} entfernen`"
-              :title="`Markierung für ${exclusion.contractNumber} entfernen`"
-              :disabled="blockBusy"
+              :title="
+                mayManage ? `Markierung für ${exclusion.contractNumber} entfernen` : NO_PERMISSION
+              "
+              :disabled="!mayManage || blockBusy"
               @click="pendingRemove = exclusion"
             />
           </article>
@@ -771,7 +789,7 @@ function submit(): void {
 
     <template #footer>
       <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
-      <EuButton :disabled="submitting" @click="submit">
+      <EuButton v-if="mayManage" :disabled="submitting" @click="submit">
         {{ submitting ? 'Speichern…' : 'Speichern' }}
       </EuButton>
     </template>

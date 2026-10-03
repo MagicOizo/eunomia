@@ -13,6 +13,13 @@ const props = withDefaults(
     /** Required when iconOnly is true — otherwise screen reader users get an unlabeled button. */
     ariaLabel?: string;
     /**
+     * The native tooltip, used to say why a button is disabled (CR-26: "Dazu
+     * fehlt dir die Berechtigung."). Not EuTooltip: that one wraps a focusable
+     * span, and a disabled button takes no focus — `title` is what a browser
+     * still shows on a control that cannot be pressed.
+     */
+    title?: string;
+    /**
      * Makes the button a link to that route instead of a button. For an action
      * that leads somewhere (Slice 45: "show the invoices of this agency") — a
      * real link opens in a new tab and answers a middle click, which a button
@@ -27,6 +34,7 @@ const props = withDefaults(
     disabled: false,
     type: 'button',
     ariaLabel: undefined,
+    title: undefined,
     to: undefined,
   },
 );
@@ -43,7 +51,13 @@ const classes = computed(() => [
 </script>
 
 <template>
-  <RouterLink v-if="to" :to="to" :class="classes" :aria-label="iconOnly ? ariaLabel : undefined">
+  <RouterLink
+    v-if="to"
+    :to="to"
+    :class="classes"
+    :title="title"
+    :aria-label="iconOnly ? ariaLabel : undefined"
+  >
     <FontAwesomeIcon v-if="icon" :icon="icon" aria-hidden="true" />
     <span v-if="!iconOnly"><slot /></span>
   </RouterLink>
@@ -51,6 +65,7 @@ const classes = computed(() => [
     v-else
     :type="type"
     :class="classes"
+    :title="title"
     :disabled="disabled"
     :aria-label="iconOnly ? ariaLabel : undefined"
   >

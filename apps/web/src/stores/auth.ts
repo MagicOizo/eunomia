@@ -1,3 +1,4 @@
+import { type PermissionKey, isInstancePermission } from '@eunomia/shared';
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 
@@ -30,8 +31,9 @@ interface MeResponse {
 /**
  * Auth store. The access token is held ONLY in memory (never localStorage) to
  * avoid XSS persistence (see Notes/eunomia-plan.md, 1.3.5); it is restored
- * after a reload via the httpOnly refresh cookie in `initialize()`. Permissions
- * are loaded from /me and drive nav visibility.
+ * after a reload via the httpOnly refresh cookie in `initialize()`. The
+ * permissions come from /me and answer every "may I?" the interface asks — the
+ * areas it shows and the actions it offers (CR-26).
  */
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null);
@@ -41,11 +43,42 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => accessToken.value !== null);
 
-  /** True when the user holds the permission globally (account-scoped grants ignored here). */
-  function hasGlobalPermission(key: string): boolean {
-    return permissions.value?.global.includes(key) ?? false;
+  /**
+   * Whether the user may exercise a permission — the same rule the API applies
+   * in `hasPermission()` (apps/api/src/auth/permissions.ts), so the interface
+   * offers exactly what the server would allow:
+   *
+   *  - a GLOBAL grant counts for every account;
+   *  - an ACCOUNT-SCOPED grant counts only for the account named here;
+   *  - an instance-wide permission (Notes/eunomia-plan.md, 2.4) is answered
+   *    from the global grants alone — bound to a single account it carries no
+   *    effect, so neither does it here.
+   *
+   * Without an `accountUID` the question is "globally?", which is what an
+   * action on something that has no insured person needs.
+   */
+  function can(permission: PermissionKey, accountUID?: string): boolean {
+    const held = permissions.value;
+    if (!held) return false;
+    if (held.global.includes(permission)) return true;
+    if (accountUID === undefined || isInstancePermission(permission)) return false;
+    return held.perAccount.some(
+      (grant) => grant.accountUID === accountUID && grant.permissionKey === permission,
+    );
   }
-  const isAdmin = computed(() => hasGlobalPermission('MANAGE_USERS'));
+
+  /**
+   * Whether the permission is held at all — globally or for any one account.
+   * What an area or a list asks before it has an account in view: is there
+   * anything here for this user, and does the entry belong in the navigation.
+   */
+  function canAny(permission: PermissionKey): boolean {
+    const held = permissions.value;
+    if (!held) return false;
+    if (held.global.includes(permission)) return true;
+    if (isInstancePermission(permission)) return false;
+    return held.perAccount.some((grant) => grant.permissionKey === permission);
+  }
 
   function clear(): void {
     accessToken.value = null;
@@ -122,8 +155,8 @@ export const useAuthStore = defineStore('auth', () => {
     permissions,
     setupTokenActive,
     isAuthenticated,
-    isAdmin,
-    hasGlobalPermission,
+    can,
+    canAny,
     login,
     tryRefresh,
     initialize,

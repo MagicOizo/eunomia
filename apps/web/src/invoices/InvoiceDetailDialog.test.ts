@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { nextTick } from 'vue';
 
 import EuDetailField from '../design-system/components/EuDetailField.vue';
+import EuDetailMask from '../design-system/components/EuDetailMask.vue';
+import { grant } from '../test/permissions';
 import type { InvoiceDto } from './api';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 
@@ -272,6 +274,40 @@ describe('InvoiceDetailDialog bank account', () => {
     await setDirectPayment(wrapper, true);
 
     expect(row(wrapper, 'Kontoverbindung')?.props('modelValue')).toBeNull();
+    wrapper.unmount();
+  });
+});
+
+/**
+ * The dialog opens for anyone who may read the invoice; writing it needs
+ * MANAGE_INVOICES for its insured person (CR-26). Every test starts as a global
+ * admin (src/test/setup.ts), so the read-only case says what the user holds.
+ */
+describe('InvoiceDetailDialog without the write permission', () => {
+  it('shows the invoice as text and offers no save', () => {
+    grant({ perAccount: [{ accountUID: 'a-1', permissionKey: 'VIEW_INVOICES' }] });
+    const wrapper = open(invoice());
+
+    expect(wrapper.findComponent(EuDetailMask).props('readonly')).toBe(true);
+    // The mask's own rows render as text, so none of them takes an input.
+    expect(wrapper.find('.eu-detail__input').exists()).toBe(false);
+    const footer = wrapper.find('.eu-dialog__footer');
+    expect(footer.text()).toContain('Schließen');
+    expect(footer.text()).not.toContain('Speichern');
+    wrapper.unmount();
+  });
+
+  it('keeps the mask editable with the permission', () => {
+    grant({
+      perAccount: [
+        { accountUID: 'a-1', permissionKey: 'VIEW_INVOICES' },
+        { accountUID: 'a-1', permissionKey: 'MANAGE_INVOICES' },
+      ],
+    });
+    const wrapper = open(invoice());
+
+    expect(wrapper.findComponent(EuDetailMask).props('readonly')).toBe(false);
+    expect(wrapper.find('.eu-dialog__footer').text()).toContain('Speichern');
     wrapper.unmount();
   });
 });
