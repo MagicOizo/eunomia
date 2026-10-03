@@ -7,6 +7,51 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.18.0 — 2026-10-03
+
+Everything from the six previews below, as one release: the third of four blocks working off the
+security and code reviews on the way to 1.0.0. It closes eleven more of the 54 findings; eleven are
+left, and they are the last block.
+
+This is the first of these blocks with something to see. An account that is not an administrator
+now meets an interface that knows what it may offer, instead of one that assumed everything and let
+the server say no. Everything else is structure and speed: the pages that were slow because they
+asked the database a question per record ask a fixed number now, and the three largest source files
+of the project have been taken apart.
+
+- **The interface knows your permissions.** The API has had twelve permissions, granted globally or
+  per insured person, since the beginning; the web app read exactly one of them and called it
+  "admin or not". Now every area appears with the permission its page actually needs, every button
+  that writes is disabled with the reason where the permission is missing — shown, not hidden — and
+  a record you may read but not change opens as a display mask rather than refusing to open. For an
+  administrator, who holds everything, nothing changes.
+- **A document link can no longer be a piece of code.** The link to a scanned invoice or billing was
+  checked for being an address but not for what kind, so `javascript:` and `data:` passed and became
+  something clickable in the payment information. Only `http://` and `https://` are accepted now,
+  asked in one place that the API, the database migration and the three spots in the interface that
+  open a document all read from. **This release migrates data:** a stored link a browser must not
+  follow is cleared, and the migration names the records it cleared.
+- **Every list from a request has an upper bound, and is written in one go.** The reimbursements of
+  a service billing, the invoices of a submission and a user's roles were limited by nothing but the
+  size of the request — and were inserted row by row, two round trips each, while every invoice
+  involved was locked.
+- **Pages ask a fixed number of questions.** Opening the invoice workspace cost five questions per
+  policy and every change of year cost them again; listing the trash walked the records below every
+  single entry, around ten questions each, so fifty entries meant several hundred round trips for
+  one page. Both now ask per kind rather than per record — eleven questions instead of twenty-two
+  for the reimbursement plan of the development data, and a further policy or trash entry costs
+  none at all. Two tests count the questions so they cannot start growing again. The invoice
+  workspace also stopped fetching every insured person's policies to drop most of them on arrival.
+- **Three files that had grown past reading.** The invoice endpoints, the invoice workspace and the
+  dialogs: 944, 1034 and fourteen-times-the-same-twenty-lines. The rules an invoice obeys now live
+  in a file of their own with 33 tests that need no database — the first tests in the project to
+  address them directly — and every dialog shares one form contract instead of writing it out again.
+- **The compiler checks what the database hands over.** The driver answers untyped rows, and in 45
+  places the code took the type back with an assertion, which is a promise nobody checks. A table
+  now carries the shape of its rows, the column list is checked against it, and where the database
+  itself guarantees nothing — a policy's kind is stored as plain text — the value is checked when it
+  is read instead of assumed. Eleven assertions are left, each at a boundary to a foreign library.
+
 ## 0.18.0-slice.6 — 2026-10-03
 
 Nothing in the app looks different after this release, and the eleven endpoints that were measured
