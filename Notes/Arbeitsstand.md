@@ -66,7 +66,14 @@ ausdrücklich vor einer anderen steht.
 
 ### Block II — Sitzung und Sichtbarkeit (Release 0.17.0)
 
-- [ ] **6 — Der Client hält die Sitzung.** CR-24, CR-25. **Vor Scheibe 7.**
+- [x] **6 — Der Client hält die Sitzung.** CR-24, CR-25. **Vor Scheibe 7.**
+      Umgesetzt mit v0.17.0-slice.1 (Slice 56). Der Single-Flight allein deckt nur die gleichzeitige
+      401 ab; eine 401, die eintrifft, nachdem ein Geschwister den Token schon erneuert hat, hätte
+      weiter eine zweite Rotation gestartet. `apiFetch` merkt sich darum den Token, mit dem es
+      losgelaufen ist, und wiederholt bei geändertem Token direkt — heute unsichtbar, aber Scheibe 7
+      baut auf das Zählen der Rotationen einen Alarm. `lib/api.ts` und `stores/auth.ts` hatten
+      keinen Test; beide haben jetzt einen, und der Fehler aus CR-24 ist als Regressionstest
+      festgehalten (gegen den alten Stand rot geprüft).
 - [ ] **7 — Anmeldung und Sitzungen.** SEC-05, SEC-06, SEC-07, SEC-08.
 - [ ] **8 — Kontotrennung an einem Ort.** CR-07, SEC-03, SEC-04.
 

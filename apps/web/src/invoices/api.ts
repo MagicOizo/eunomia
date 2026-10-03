@@ -1,5 +1,5 @@
 import type { BonusForfeitRule } from '../contracts/api';
-import { apiFetch } from '../lib/api';
+import { apiData, apiFetch } from '../lib/api';
 import { type InvoiceFilter, apiQueryFromFilter } from './invoice-search';
 import type { SubmissionStatus, WorkflowStatus } from './status';
 
@@ -179,12 +179,8 @@ export interface ReimbursementPlanDto {
   invoices: PlanInvoiceDto[];
 }
 
-const unwrap = <T>(res: { data: T }): T => res.data;
-
 export async function listInvoices(accountUID: string, year: number): Promise<InvoiceDto[]> {
-  return unwrap(
-    await apiFetch<{ data: InvoiceDto[] }>(`/invoices?accountUID=${accountUID}&year=${year}`),
-  );
+  return apiData<InvoiceDto[]>(`/invoices?accountUID=${accountUID}&year=${year}`);
 }
 
 /**
@@ -195,12 +191,12 @@ export async function listInvoices(accountUID: string, year: number): Promise<In
  */
 export async function searchInvoices(filter: InvoiceFilter, limit = 50): Promise<InvoiceDto[]> {
   const query = new URLSearchParams({ ...apiQueryFromFilter(filter), limit: String(limit) });
-  return unwrap(await apiFetch<{ data: InvoiceDto[] }>(`/invoices?${query.toString()}`));
+  return apiData<InvoiceDto[]>(`/invoices?${query.toString()}`);
 }
 
 /** All invoices of an account (every year) — used to pick allocation targets. */
 export async function listAccountInvoices(accountUID: string): Promise<InvoiceDto[]> {
-  return unwrap(await apiFetch<{ data: InvoiceDto[] }>(`/invoices?accountUID=${accountUID}`));
+  return apiData<InvoiceDto[]>(`/invoices?accountUID=${accountUID}`);
 }
 
 export interface SubmissionDto {
@@ -213,24 +209,22 @@ export interface SubmissionDto {
 
 /** All submissions the user may view (filter by contract client-side). */
 export async function listSubmissions(): Promise<SubmissionDto[]> {
-  return unwrap(await apiFetch<{ data: SubmissionDto[] }>('/submissions'));
+  return apiData<SubmissionDto[]>('/submissions');
 }
 
 export async function listInvoiceYears(accountUID: string): Promise<number[]> {
-  return unwrap(await apiFetch<{ data: number[] }>(`/invoices/years?accountUID=${accountUID}`));
+  return apiData<number[]>(`/invoices/years?accountUID=${accountUID}`);
 }
 
 export async function createInvoice(body: Record<string, unknown>): Promise<InvoiceDto> {
-  return unwrap(await apiFetch<{ data: InvoiceDto }>('/invoices', { method: 'POST', body }));
+  return apiData<InvoiceDto>('/invoices', { method: 'POST', body });
 }
 
 export async function updateInvoice(
   uid: string,
   body: Record<string, unknown>,
 ): Promise<InvoiceDto> {
-  return unwrap(
-    await apiFetch<{ data: InvoiceDto }>(`/invoices/${uid}`, { method: 'PATCH', body }),
-  );
+  return apiData<InvoiceDto>(`/invoices/${uid}`, { method: 'PATCH', body });
 }
 
 export async function deleteInvoice(uid: string): Promise<void> {
@@ -242,9 +236,7 @@ export async function createSubmission(body: {
   submittedDate: string;
   invoiceUIDs: string[];
 }): Promise<{ submissionUID: string }> {
-  return unwrap(
-    await apiFetch<{ data: { submissionUID: string } }>('/submissions', { method: 'POST', body }),
-  );
+  return apiData<{ submissionUID: string }>('/submissions', { method: 'POST', body });
 }
 
 /** Withdraws an invoice from a submission that has no service billing yet. */
@@ -257,12 +249,10 @@ export async function addExclusion(
   invoiceUID: string,
   body: { contractUID: string; note?: string | null },
 ): Promise<InvoiceDto> {
-  return unwrap(
-    await apiFetch<{ data: InvoiceDto }>(`/invoices/${invoiceUID}/exclusions`, {
-      method: 'POST',
-      body,
-    }),
-  );
+  return apiData<InvoiceDto>(`/invoices/${invoiceUID}/exclusions`, {
+    method: 'POST',
+    body,
+  });
 }
 
 export async function removeExclusion(invoiceUID: string, contractUID: string): Promise<void> {
@@ -290,7 +280,7 @@ export async function searchBillings(params: BillingSearchParams): Promise<Billi
     if (value === undefined || value === '' || value === false) continue;
     query.set(key, String(value));
   }
-  return unwrap(await apiFetch<{ data: BillingListDto[] }>(`/billings?${query.toString()}`));
+  return apiData<BillingListDto[]>(`/billings?${query.toString()}`);
 }
 
 export async function createBilling(body: {
@@ -300,7 +290,7 @@ export async function createBilling(body: {
   documentLink?: string | null;
   forfeitsBonus?: boolean;
 }): Promise<BillingDto> {
-  return unwrap(await apiFetch<{ data: BillingDto }>('/billings', { method: 'POST', body }));
+  return apiData<BillingDto>('/billings', { method: 'POST', body });
 }
 
 /** Edits a billing's metadata and/or its objection ("Widerspruch") state. */
@@ -316,9 +306,7 @@ export async function updateBilling(
     objectionNote?: string | null;
   },
 ): Promise<BillingDto> {
-  return unwrap(
-    await apiFetch<{ data: BillingDto }>(`/billings/${uid}`, { method: 'PATCH', body }),
-  );
+  return apiData<BillingDto>(`/billings/${uid}`, { method: 'PATCH', body });
 }
 
 /** Deletes a billing, cascading to its allocations (affected invoices revert). */
@@ -366,9 +354,5 @@ export async function reimbursementPlan(
   accountUID: string,
   year: number,
 ): Promise<ReimbursementPlanDto> {
-  return unwrap(
-    await apiFetch<{ data: ReimbursementPlanDto }>(
-      `/accounts/${accountUID}/reimbursement-plan?year=${year}`,
-    ),
-  );
+  return apiData<ReimbursementPlanDto>(`/accounts/${accountUID}/reimbursement-plan?year=${year}`);
 }

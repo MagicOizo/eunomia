@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 
-import { apiFetch } from './api';
+import { apiData } from './api';
 
 /**
  * Whether a newer release is published — one answer for the whole app.
@@ -57,8 +57,8 @@ function store(result: UpdateStatus, askedAt: number): UpdateStatus {
  */
 export function loadUpdateStatus(): Promise<UpdateStatus> {
   const askedAt = epoch;
-  pending ??= apiFetch<{ data: UpdateStatus }>('/update-check')
-    .then((res) => store(res.data, askedAt))
+  pending ??= apiData<UpdateStatus>('/update-check')
+    .then((result) => store(result, askedAt))
     .finally(() => {
       pending = null;
     });
@@ -72,8 +72,8 @@ export function loadUpdateStatus(): Promise<UpdateStatus> {
  */
 export async function refreshUpdateStatus(): Promise<UpdateStatus> {
   const askedAt = epoch;
-  const res = await apiFetch<{ data: UpdateStatus }>('/update-check/refresh', { method: 'POST' });
-  return store(res.data, askedAt);
+  const result = await apiData<UpdateStatus>('/update-check/refresh', { method: 'POST' });
+  return store(result, askedAt);
 }
 
 /**

@@ -3,7 +3,7 @@ import axe from 'axe-core';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiFetch } from '../../lib/api';
+import { apiData } from '../../lib/api';
 import { resetAppInfo } from '../../lib/app-info';
 import { request } from '../../lib/http';
 import { clearUpdateStatus, refreshUpdateStatus } from '../../lib/update-status';
@@ -11,22 +11,20 @@ import { useAuthStore } from '../../stores/auth';
 import AppFooter from './AppFooter.vue';
 
 vi.mock('../../lib/http', () => ({ request: vi.fn() }));
-vi.mock('../../lib/api', () => ({ apiFetch: vi.fn() }));
+vi.mock('../../lib/api', () => ({ apiData: vi.fn() }));
 
 const requestMock = vi.mocked(request);
-const apiFetchMock = vi.mocked(apiFetch);
+const apiDataMock = vi.mocked(apiData);
 
-/** The API's update-check envelope, defaulting to "a newer release exists". */
+/** The API's update status, defaulting to "a newer release exists". */
 function updateResponse(overrides: Record<string, unknown> = {}) {
   return {
-    data: {
-      current: '0.9.0',
-      latest: '1.0.0',
-      updateAvailable: true,
-      releaseUrl: 'https://github.com/MagicOizo/eunomia/releases/tag/v1.0.0',
-      status: 'ok',
-      ...overrides,
-    },
+    current: '0.9.0',
+    latest: '1.0.0',
+    updateAvailable: true,
+    releaseUrl: 'https://github.com/MagicOizo/eunomia/releases/tag/v1.0.0',
+    status: 'ok',
+    ...overrides,
   };
 }
 
@@ -57,7 +55,7 @@ describe('AppFooter', () => {
   });
 
   it('links to the release notes when a newer version exists', async () => {
-    apiFetchMock.mockResolvedValue(updateResponse());
+    apiDataMock.mockResolvedValue(updateResponse());
     signInAsAdmin();
 
     const wrapper = mount(AppFooter);
@@ -76,7 +74,7 @@ describe('AppFooter', () => {
   });
 
   it('stays quiet when the instance is up to date', async () => {
-    apiFetchMock.mockResolvedValue(updateResponse({ latest: '0.9.0', updateAvailable: false }));
+    apiDataMock.mockResolvedValue(updateResponse({ latest: '0.9.0', updateAvailable: false }));
     signInAsAdmin();
 
     const wrapper = mount(AppFooter);
@@ -87,7 +85,7 @@ describe('AppFooter', () => {
   });
 
   it('stays quiet when the check could not reach GitHub', async () => {
-    apiFetchMock.mockResolvedValue(
+    apiDataMock.mockResolvedValue(
       updateResponse({
         latest: null,
         updateAvailable: false,
@@ -108,13 +106,13 @@ describe('AppFooter', () => {
     const wrapper = mount(AppFooter);
     await flushPromises();
 
-    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(apiDataMock).not.toHaveBeenCalled();
     expect(wrapper.find('a').exists()).toBe(false);
     wrapper.unmount();
   });
 
   it('swallows a failing update check', async () => {
-    apiFetchMock.mockRejectedValue(new Error('403'));
+    apiDataMock.mockRejectedValue(new Error('403'));
     signInAsAdmin();
 
     const wrapper = mount(AppFooter);
@@ -131,7 +129,7 @@ describe('AppFooter', () => {
    * check of the very same thing — left it as it was until the page reloaded.
    */
   it('takes over what a check made elsewhere found', async () => {
-    apiFetchMock.mockResolvedValue(updateResponse({ latest: '0.9.0', updateAvailable: false }));
+    apiDataMock.mockResolvedValue(updateResponse({ latest: '0.9.0', updateAvailable: false }));
     signInAsAdmin();
 
     const wrapper = mount(AppFooter);
@@ -140,7 +138,7 @@ describe('AppFooter', () => {
 
     // What pressing "Jetzt prüfen" on the settings page does, without this
     // component being remounted or even knowing about it.
-    apiFetchMock.mockResolvedValue(updateResponse());
+    apiDataMock.mockResolvedValue(updateResponse());
     await refreshUpdateStatus();
     await flushPromises();
 
@@ -149,7 +147,7 @@ describe('AppFooter', () => {
   });
 
   it('drops the notice when a later check finds nothing new', async () => {
-    apiFetchMock.mockResolvedValue(updateResponse());
+    apiDataMock.mockResolvedValue(updateResponse());
     signInAsAdmin();
 
     const wrapper = mount(AppFooter);
@@ -157,7 +155,7 @@ describe('AppFooter', () => {
     expect(wrapper.find('a').exists()).toBe(true);
 
     // The same way round: after the update the instance is the latest itself.
-    apiFetchMock.mockResolvedValue(updateResponse({ latest: '1.0.0', updateAvailable: false }));
+    apiDataMock.mockResolvedValue(updateResponse({ latest: '1.0.0', updateAvailable: false }));
     await refreshUpdateStatus();
     await flushPromises();
 
@@ -166,7 +164,7 @@ describe('AppFooter', () => {
   });
 
   it('forgets what it knew when the admin session ends', async () => {
-    apiFetchMock.mockResolvedValue(updateResponse());
+    apiDataMock.mockResolvedValue(updateResponse());
     signInAsAdmin();
 
     const wrapper = mount(AppFooter);
@@ -182,7 +180,7 @@ describe('AppFooter', () => {
   });
 
   it('has no automatically detectable accessibility violations', async () => {
-    apiFetchMock.mockResolvedValue(updateResponse());
+    apiDataMock.mockResolvedValue(updateResponse());
     signInAsAdmin();
 
     const wrapper = mount(AppFooter, { attachTo: document.body });

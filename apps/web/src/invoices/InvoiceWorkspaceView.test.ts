@@ -6,9 +6,9 @@ import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import InvoiceWorkspaceView from './InvoiceWorkspaceView.vue';
 import PaymentInfoPopover from './PaymentInfoPopover.vue';
 
-const { apiFetch, listResource, listInvoices, listInvoiceYears, reimbursementPlan } = vi.hoisted(
+const { apiData, listResource, listInvoices, listInvoiceYears, reimbursementPlan } = vi.hoisted(
   () => ({
-    apiFetch: vi.fn(),
+    apiData: vi.fn(),
     listResource: vi.fn(),
     listInvoices: vi.fn(),
     listInvoiceYears: vi.fn(),
@@ -16,7 +16,7 @@ const { apiFetch, listResource, listInvoices, listInvoiceYears, reimbursementPla
   }),
 );
 
-vi.mock('../lib/api', () => ({ apiFetch }));
+vi.mock('../lib/api', () => ({ apiData }));
 vi.mock('../lib/resource', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/resource')>()),
   listResource,
@@ -35,7 +35,7 @@ describe('InvoiceWorkspaceView lookup lists', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     facilities.length = 1;
-    apiFetch.mockResolvedValue({ data: { firstname: 'John', surname: 'Doe' } });
+    apiData.mockResolvedValue({ firstname: 'John', surname: 'Doe' });
     listResource.mockImplementation((path: string) => {
       if (path === '/facilities') return Promise.resolve([...facilities]);
       if (path === '/agencies') return Promise.resolve([]);
@@ -107,7 +107,7 @@ function invoice(uid: string, number: string, treatmentDate: string) {
 describe('InvoiceWorkspaceView arriving from the invoice-number search', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    apiFetch.mockResolvedValue({ data: { firstname: 'Anna', surname: 'Muster' } });
+    apiData.mockResolvedValue({ firstname: 'Anna', surname: 'Muster' });
     listResource.mockResolvedValue([]);
     listInvoiceYears.mockResolvedValue([2026, 2024]);
     listInvoices.mockImplementation((_account: string, year: number) =>
@@ -186,7 +186,7 @@ describe('InvoiceWorkspaceView hands the payment details down', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    apiFetch.mockResolvedValue({ data: { firstname: 'Anna', surname: 'Muster' } });
+    apiData.mockResolvedValue({ firstname: 'Anna', surname: 'Muster' });
     listResource.mockImplementation((path: string) =>
       Promise.resolve(
         path === '/agencies'
@@ -235,7 +235,7 @@ describe('InvoiceWorkspaceView hands the payment details down', () => {
 describe('InvoiceWorkspaceView reimbursement column', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    apiFetch.mockResolvedValue({ data: { firstname: 'Anna', surname: 'Muster' } });
+    apiData.mockResolvedValue({ firstname: 'Anna', surname: 'Muster' });
     listResource.mockResolvedValue([]);
     listInvoiceYears.mockResolvedValue([2026]);
     reimbursementPlan.mockResolvedValue(null);

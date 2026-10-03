@@ -70,8 +70,7 @@ export const useAuthStore = defineStore('auth', () => {
     await loadMe();
   }
 
-  /** Exchanges the refresh cookie for a fresh access token. Returns success. */
-  async function tryRefresh(): Promise<boolean> {
+  async function runRefresh(): Promise<boolean> {
     try {
       const session = await request<SessionResponse>('/auth/refresh', { method: 'POST' });
       accessToken.value = session.accessToken;
@@ -80,6 +79,27 @@ export const useAuthStore = defineStore('auth', () => {
       clear();
       return false;
     }
+  }
+
+  /**
+   * The refresh in flight, shared by every caller that finds the token expired.
+   * Same shape as `pending` in lib/update-status.ts, but here it prevents a bug
+   * rather than a second request: the server rotates the refresh token and
+   * revokes the one presented, so a second concurrent refresh would present an
+   * already revoked token, fail, and `clear()` the session that the first one
+   * had just renewed (issues.md 0.16.0-slice.2 24).
+   */
+  let refreshing: Promise<boolean> | null = null;
+
+  /**
+   * Exchanges the refresh cookie for a fresh access token. Returns success.
+   * Concurrent callers wait on the same exchange instead of starting their own.
+   */
+  function tryRefresh(): Promise<boolean> {
+    refreshing ??= runRefresh().finally(() => {
+      refreshing = null;
+    });
+    return refreshing;
   }
 
   /** On app start, silently restore a session from the refresh cookie if present. */

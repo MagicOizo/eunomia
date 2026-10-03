@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiFetch } from '../lib/api';
+import { apiData } from '../lib/api';
 import { type UpdateStatus, clearUpdateStatus } from '../lib/update-status';
 import type { ReminderRunResult, SettingWrite, SettingsSnapshot } from './settings-api';
 
@@ -21,9 +21,9 @@ vi.mock('./settings-api', () => ({
 // The update check is not mocked away: its state is shared with the footer
 // (lib/update-status.ts), and this card has to render from that shared state.
 // Only the HTTP call below it is replaced.
-vi.mock('../lib/api', () => ({ apiFetch: vi.fn() }));
+vi.mock('../lib/api', () => ({ apiData: vi.fn() }));
 
-const apiFetchMock = vi.mocked(apiFetch);
+const apiDataMock = vi.mocked(apiData);
 
 const { default: SettingsView } = await import('./SettingsView.vue');
 
@@ -181,7 +181,7 @@ describe('SettingsView', () => {
     saveSettings.mockImplementation(async () => snapshot());
     // The shared update state outlives a single case, so each one starts unasked.
     clearUpdateStatus();
-    apiFetchMock.mockResolvedValue({ data: privateRepo });
+    apiDataMock.mockResolvedValue(privateRepo);
     runReminders.mockResolvedValue(dryRunResult());
   });
 

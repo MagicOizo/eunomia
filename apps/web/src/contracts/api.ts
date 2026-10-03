@@ -1,6 +1,6 @@
 import type { BonusForfeitRule, ContractKind } from '@eunomia/shared';
 
-import { apiFetch } from '../lib/api';
+import { apiData, apiFetch } from '../lib/api';
 
 /** The two enums are the API's, labelled here (see @eunomia/shared). */
 export type { BonusForfeitRule, ContractKind };
@@ -96,10 +96,8 @@ export type TermsInput = Pick<
   'validFromYear' | 'deductible' | 'reimbursementCap' | 'reimbursementRate' | 'bonusTiers'
 >;
 
-const unwrap = <T>(res: { data: T }): T => res.data;
-
 export async function getContract(uid: string): Promise<ContractDetailDto> {
-  return unwrap(await apiFetch<{ data: ContractDetailDto }>(`/contracts/${uid}`));
+  return apiData<ContractDetailDto>(`/contracts/${uid}`);
 }
 
 export async function updateContract(uid: string, body: Record<string, unknown>): Promise<void> {

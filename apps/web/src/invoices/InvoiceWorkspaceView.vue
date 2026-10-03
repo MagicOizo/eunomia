@@ -21,7 +21,7 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
-import { apiFetch } from '../lib/api';
+import { apiData } from '../lib/api';
 import { germanDate, germanMoney, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
@@ -225,10 +225,10 @@ const sort = useTableSort(invoices, invoiceSortValue);
 
 /** Loads the account-level data that does not depend on the selected year. */
 async function loadStatic(): Promise<void> {
-  const account = await apiFetch<{ data: { firstname: string; surname: string | null } }>(
+  const account = await apiData<{ firstname: string; surname: string | null }>(
     `/accounts/${props.accountUID}`,
   );
-  accountName.value = [account.data.firstname, account.data.surname].filter(Boolean).join(' ');
+  accountName.value = [account.firstname, account.surname].filter(Boolean).join(' ');
 
   const allContracts = await listResource<ContractRef & { accountUID: string }>('/contracts');
   contracts.value = allContracts

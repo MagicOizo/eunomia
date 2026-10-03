@@ -18,7 +18,7 @@ import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { type BonusForfeitRule } from '../contracts/api';
-import { apiFetch } from '../lib/api';
+import { apiData } from '../lib/api';
 import { useDebouncedCallback } from '../lib/debounce';
 import { germanDate, germanMoney, plural } from '../lib/format';
 import { todayIso } from '../lib/date-input';
@@ -123,26 +123,24 @@ async function load(): Promise<void> {
   loading.value = true;
   loadError.value = null;
   try {
-    const contract = await apiFetch<{
-      data: {
-        contractNumber: string;
-        companyName: string;
-        accountUID: string;
-        bonusForfeitRule: BonusForfeitRule;
-      };
+    const contract = await apiData<{
+      contractNumber: string;
+      companyName: string;
+      accountUID: string;
+      bonusForfeitRule: BonusForfeitRule;
     }>(`/contracts/${props.contractUID}`);
-    const account = await apiFetch<{ data: { firstname: string; surname: string | null } }>(
-      `/accounts/${contract.data.accountUID}`,
+    const account = await apiData<{ firstname: string; surname: string | null }>(
+      `/accounts/${contract.accountUID}`,
     );
-    const person = [account.data.firstname, account.data.surname].filter(Boolean).join(' ');
-    heading.value = `${contract.data.contractNumber} · ${person}`;
-    forfeitRule.value = contract.data.bonusForfeitRule;
+    const person = [account.firstname, account.surname].filter(Boolean).join(' ');
+    heading.value = `${contract.contractNumber} · ${person}`;
+    forfeitRule.value = contract.bonusForfeitRule;
     policy.value = {
       contractUID: props.contractUID,
-      contractNumber: contract.data.contractNumber,
-      companyName: contract.data.companyName,
-      bonusForfeitRule: contract.data.bonusForfeitRule,
-      accountUID: contract.data.accountUID,
+      contractNumber: contract.contractNumber,
+      companyName: contract.companyName,
+      bonusForfeitRule: contract.bonusForfeitRule,
+      accountUID: contract.accountUID,
     };
     // The provider names are what the booking dialog needs for its cards; the
     // invoices it looks up itself, so their open amounts are never stale.

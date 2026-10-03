@@ -7,6 +7,27 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.17.0-slice.1 — 2026-10-03
+
+The one finding of the code review that a user could actually run into. After a quarter of an hour's
+pause, the first page that loaded two lists at once could put you back on the login screen, with the
+state of the page gone and nothing to explain it.
+
+- **One renewal, however many requests are waiting for it.** An access token lives fifteen minutes;
+  when it has expired, the request that notices renews it and repeats itself. A page that loads two
+  lists sends two requests, so both ran into the expired token and both asked for a renewal — and
+  because the server rotates the refresh token and revokes the one it was shown, the second ask
+  presented a token that had just been revoked, was refused, and ended the session the first ask had
+  just renewed. Every request waiting on a renewal now shares the one that is already running, and a
+  request whose refusal arrives after a sibling has renewed the token repeats itself with that token
+  instead of asking for another one. When it works, there is nothing to see: the page loads and the
+  session holds.
+- **The browser stops writing the envelope out by hand.** Every list and record answer carries its
+  payload under `data`, which 35 call sites spelled out in their own types, and five modules
+  unpacked with their own copy of the same one-line helper. One `apiData()` next to `apiFetch()`
+  does it for all of them; `apiFetch` keeps the three routes that answer without an envelope and the
+  ones that answer nothing at all. No answer on the wire changes.
+
 ## 0.16.0-slice.6 — 2026-10-03
 
 The package both apps were supposed to share has been empty since the first slice, so every contract

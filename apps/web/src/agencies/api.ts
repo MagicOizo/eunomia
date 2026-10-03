@@ -1,4 +1,4 @@
-import { apiFetch } from '../lib/api';
+import { apiData, apiFetch } from '../lib/api';
 
 /**
  * A collection agency and its payment details. Since Slice 44 it holds several
@@ -35,10 +35,8 @@ export type AgencyPaymentDetailInput = Pick<
   'bankAccount' | 'bic' | 'recipientName' | 'note'
 >;
 
-const unwrap = <T>(res: { data: T }): T => res.data;
-
 export async function getAgency(uid: string): Promise<AgencyDto> {
-  return unwrap(await apiFetch<{ data: AgencyDto }>(`/agencies/${uid}`));
+  return apiData<AgencyDto>(`/agencies/${uid}`);
 }
 
 export async function updateAgency(uid: string, agencyName: string): Promise<void> {
@@ -52,12 +50,10 @@ export async function saveAgencyPaymentDetail(
   body: AgencyPaymentDetailInput,
 ): Promise<AgencyPaymentDetailDto> {
   const base = `/agencies/${agencyUID}/accounts`;
-  return unwrap(
-    await apiFetch<{ data: AgencyPaymentDetailDto }>(entryUID ? `${base}/${entryUID}` : base, {
-      method: entryUID ? 'PATCH' : 'POST',
-      body,
-    }),
-  );
+  return apiData<AgencyPaymentDetailDto>(entryUID ? `${base}/${entryUID}` : base, {
+    method: entryUID ? 'PATCH' : 'POST',
+    body,
+  });
 }
 
 export async function deleteAgencyPaymentDetail(

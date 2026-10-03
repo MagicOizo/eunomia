@@ -1,4 +1,4 @@
-import { apiFetch } from '../lib/api';
+import { apiData, apiFetch } from '../lib/api';
 
 export interface AdminUserDto {
   uuid: string;
@@ -18,10 +18,8 @@ export interface RoleDto {
   permissions: string[];
 }
 
-const unwrap = <T>(res: { data: T }): T => res.data;
-
 export async function listUsers(): Promise<AdminUserDto[]> {
-  return unwrap(await apiFetch<{ data: AdminUserDto[] }>('/users'));
+  return apiData<AdminUserDto[]>('/users');
 }
 
 export async function createUser(body: {
@@ -30,16 +28,14 @@ export async function createUser(body: {
   surname?: string | null;
   password: string;
 }): Promise<AdminUserDto> {
-  return unwrap(await apiFetch<{ data: AdminUserDto }>('/users', { method: 'POST', body }));
+  return apiData<AdminUserDto>('/users', { method: 'POST', body });
 }
 
 export async function updateUser(
   uuid: string,
   body: Record<string, unknown>,
 ): Promise<AdminUserDto> {
-  return unwrap(
-    await apiFetch<{ data: AdminUserDto }>(`/users/${uuid}`, { method: 'PATCH', body }),
-  );
+  return apiData<AdminUserDto>(`/users/${uuid}`, { method: 'PATCH', body });
 }
 
 export async function deleteUser(uuid: string): Promise<void> {
@@ -47,26 +43,22 @@ export async function deleteUser(uuid: string): Promise<void> {
 }
 
 export async function setGlobalRoles(uuid: string, roleUIDs: string[]): Promise<AdminUserDto> {
-  return unwrap(
-    await apiFetch<{ data: AdminUserDto }>(`/users/${uuid}/global-roles`, {
-      method: 'PUT',
-      body: { roleUIDs },
-    }),
-  );
+  return apiData<AdminUserDto>(`/users/${uuid}/global-roles`, {
+    method: 'PUT',
+    body: { roleUIDs },
+  });
 }
 
 export async function setAccountRoles(
   uuid: string,
   grants: Array<{ accountUID: string; roleUID: string }>,
 ): Promise<AdminUserDto> {
-  return unwrap(
-    await apiFetch<{ data: AdminUserDto }>(`/users/${uuid}/account-roles`, {
-      method: 'PUT',
-      body: { grants },
-    }),
-  );
+  return apiData<AdminUserDto>(`/users/${uuid}/account-roles`, {
+    method: 'PUT',
+    body: { grants },
+  });
 }
 
 export async function listRoles(): Promise<RoleDto[]> {
-  return unwrap(await apiFetch<{ data: RoleDto[] }>('/roles'));
+  return apiData<RoleDto[]>('/roles');
 }

@@ -1,4 +1,4 @@
-import { apiFetch } from '../lib/api';
+import { apiData, apiFetch } from '../lib/api';
 
 /**
  * The trash API (Slice 39). One read for the whole page and two writes, both
@@ -39,16 +39,16 @@ export interface TrashGroupDto {
 }
 
 export async function loadTrash(): Promise<TrashGroupDto[]> {
-  const res = await apiFetch<{ data: { groups: TrashGroupDto[] } }>('/trash');
-  return res.data.groups;
+  const { groups } = await apiData<{ groups: TrashGroupDto[] }>('/trash');
+  return groups;
 }
 
 /** Brings the record — and what was deleted together with it — back. */
 export async function restoreEntry(uid: string): Promise<number> {
-  const res = await apiFetch<{ data: { restored: number } }>(`/trash/${uid}/restore`, {
+  const { restored } = await apiData<{ restored: number }>(`/trash/${uid}/restore`, {
     method: 'POST',
   });
-  return res.data.restored;
+  return restored;
 }
 
 /** Removes the record for good, with everything that hangs on it. */

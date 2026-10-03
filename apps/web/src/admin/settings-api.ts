@@ -1,4 +1,4 @@
-import { apiFetch } from '../lib/api';
+import { apiData } from '../lib/api';
 
 /**
  * The system settings endpoints (Slice 30). Mirrors the API's shapes; the
@@ -46,10 +46,8 @@ export interface ReminderRunResult {
 
 export type SettingWrite = Record<string, string | number | boolean | null>;
 
-const unwrap = <T>(res: { data: T }): T => res.data;
-
 export async function loadSettings(): Promise<SettingsSnapshot> {
-  return unwrap(await apiFetch<{ data: SettingsSnapshot }>('/settings'));
+  return apiData<SettingsSnapshot>('/settings');
 }
 
 /**
@@ -57,17 +55,13 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
  * secret keeps its stored value while the form shows only a placeholder.
  */
 export async function saveSettings(values: SettingWrite): Promise<SettingsSnapshot> {
-  return unwrap(
-    await apiFetch<{ data: SettingsSnapshot }>('/settings', { method: 'PUT', body: { values } }),
-  );
+  return apiData<SettingsSnapshot>('/settings', { method: 'PUT', body: { values } });
 }
 
 export async function sendTestMail(): Promise<{ recipient: string; status: MailStatus }> {
-  return unwrap(
-    await apiFetch<{ data: { recipient: string; status: MailStatus } }>('/settings/mail/test', {
-      method: 'POST',
-    }),
-  );
+  return apiData<{ recipient: string; status: MailStatus }>('/settings/mail/test', {
+    method: 'POST',
+  });
 }
 
 /**
@@ -75,12 +69,10 @@ export async function sendTestMail(): Promise<{ recipient: string; status: MailS
  * sending anything or remembering that it did.
  */
 export async function runReminders(dryRun: boolean): Promise<ReminderRunResult> {
-  return unwrap(
-    await apiFetch<{ data: ReminderRunResult }>('/settings/reminders/run', {
-      method: 'POST',
-      body: { dryRun },
-    }),
-  );
+  return apiData<ReminderRunResult>('/settings/reminders/run', {
+    method: 'POST',
+    body: { dryRun },
+  });
 }
 
 // The update check has no function here: its answer is shared with the footer,
