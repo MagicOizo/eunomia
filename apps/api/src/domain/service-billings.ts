@@ -1,4 +1,4 @@
-import { ERROR_CODES } from '@eunomia/shared';
+import { ERROR_CODES, isHttpUrl } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -45,7 +45,9 @@ const base = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
   billingDate: z.string().date(),
   billingNumber: z.string().trim().min(1).max(50),
-  documentLink: z.string().trim().url().max(255).nullish(),
+  // `.url()` asks whether this is an address, `isHttpUrl` whether a browser may
+  // follow it: zod's URL check takes `javascript:` and `data:` too (SEC-01).
+  documentLink: z.string().trim().url().max(255).refine(isHttpUrl).nullish(),
   // Whether this billing forfeits the policy's bonus for the treatment year
   // (see bonus-timeline.ts); null follows the policy's bonusForfeitRule.
   forfeitsBonus: z

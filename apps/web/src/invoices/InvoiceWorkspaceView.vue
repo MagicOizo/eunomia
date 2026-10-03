@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { WORKFLOW_STATUSES } from '@eunomia/shared';
+import { isHttpUrl, WORKFLOW_STATUSES } from '@eunomia/shared';
 import {
   faBan,
   faChevronLeft,
@@ -492,8 +492,14 @@ function submitSettle(transferDate: string): void {
   );
 }
 
+/**
+ * The schemas refuse anything but http(s) and migration 017 cleared what was
+ * stored before that, so this is the second line, not the first: the sink does
+ * not take the row's word for it (SEC-01).
+ */
 function openDocument(invoice: InvoiceDto): void {
-  if (invoice.documentLink) window.open(invoice.documentLink, '_blank', 'noopener');
+  const link = invoice.documentLink;
+  if (isHttpUrl(link)) window.open(link, '_blank', 'noopener');
 }
 
 function confirmDelete(): void {
@@ -719,7 +725,7 @@ function confirmDelete(): void {
             </td>
             <td class="eu-ws__actions">
               <EuButton
-                v-if="invoice.documentLink"
+                v-if="isHttpUrl(invoice.documentLink)"
                 variant="secondary"
                 icon-only
                 :icon="faUpRightFromSquare"

@@ -31,10 +31,14 @@ export const submissionsTable: CrudTable = {
 const createSchema = z.object({
   contractUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.contract)),
   submittedDate: z.string().date(),
-  // The invoices bundled into this submission — at least one, no duplicates.
+  // The invoices bundled into this submission — at least one, no duplicates,
+  // and an upper bound for the same reason as the bookings (SEC-11): the rows
+  // are written in one transaction. 200 is far above the business case; CR-13
+  // did its arithmetic for a submission of some 78 invoices.
   invoiceUIDs: z
     .array(z.string().regex(entityIdPattern(ENTITY_PREFIX.invoice)))
     .min(1)
+    .max(200)
     .refine((uids) => new Set(uids).size === uids.length, 'invoiceUIDs must be unique'),
 });
 

@@ -13,7 +13,7 @@ import {
   type Queryable,
   type Row,
   getRow,
-  insertRow,
+  insertManyRows,
   softDeleteRow,
   updateRow,
 } from '../crud/repository.js';
@@ -45,6 +45,10 @@ export const allocationEntriesSchema = z.object({
       }),
     )
     .min(1)
+    // One letter of the insurer answers a handful of invoices, not a thousand.
+    // The bound matters because every entry is its own INSERT in ONE
+    // transaction, with every invoice it touches locked FOR UPDATE (SEC-11).
+    .max(200)
     .refine(
       (entries) => new Set(entries.map((e) => e.invoiceUID)).size === entries.length,
       'entries must not repeat an invoice',
@@ -187,11 +191,11 @@ export async function createAllocationsForBilling(
     const candidates = await loadCandidates(conn, billing.contractUID, invoiceUIDs);
     assertEntriesBookable(candidates, entries);
 
-    const created: Row[] = [];
-    for (const entry of entries) {
-      created.push(await insertRow(conn, allocationsTable, { ...entry, billingUID }));
-    }
-    return created;
+    return insertManyRows(
+      conn,
+      allocationsTable,
+      entries.map((entry) => ({ ...entry, billingUID })),
+    );
   });
 }
 

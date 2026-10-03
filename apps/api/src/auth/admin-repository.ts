@@ -1,5 +1,6 @@
 import type { Pool } from 'mariadb';
 
+import type { Queryable } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 
 /**
@@ -123,6 +124,25 @@ export async function softDeleteUser(pool: Pool, uuid: string): Promise<number> 
   return result.affectedRows;
 }
 
+/**
+ * The numeric keys the join tables hold, for the role UIDs the admin UI sends.
+ * A UID that matches no role is simply absent from the map, and the caller
+ * leaves it out — which is what the `INSERT … SELECT … WHERE roleUID = ?` this
+ * replaces did, silently and one statement at a time.
+ *
+ * It has to be a separate lookup: `conn.batch` speaks MariaDB's bulk protocol,
+ * and that protocol does not carry `INSERT … SELECT` (error 1295,
+ * ER_UNSUPPORTED_PS). So the UIDs are resolved once, up front, instead of once
+ * per row.
+ */
+async function roleIdsByUid(conn: Queryable, roleUIDs: string[]): Promise<Map<string, number>> {
+  const rows = await conn.query<Array<{ roleUID: string; roleID: number }>>(
+    `SELECT roleUID, roleID FROM Roles WHERE roleUID IN (${roleUIDs.map(() => '?').join(', ')})`,
+    roleUIDs,
+  );
+  return new Map(rows.map((row) => [row.roleUID, Number(row.roleID)]));
+}
+
 /** Replaces a user's global roles (UserRoles) with the given role UIDs. */
 export async function setGlobalRoles(
   pool: Pool,
@@ -131,12 +151,15 @@ export async function setGlobalRoles(
 ): Promise<void> {
   await withTransaction(pool, async (conn) => {
     await conn.query('DELETE FROM UserRoles WHERE userID = ?', [userId]);
-    for (const roleUID of roleUIDs) {
-      await conn.query(
-        `INSERT INTO UserRoles (userID, roleID) SELECT ?, roleID FROM Roles WHERE roleUID = ?`,
-        [userId, roleUID],
-      );
-    }
+    // The empty list is how every role is taken away; then the delete is all.
+    if (roleUIDs.length === 0) return;
+    const roleIds = await roleIdsByUid(conn, roleUIDs);
+    const rows = roleUIDs.flatMap((roleUID) => {
+      const roleID = roleIds.get(roleUID);
+      return roleID === undefined ? [] : [[userId, roleID]];
+    });
+    if (rows.length === 0) return;
+    await conn.batch('INSERT INTO UserRoles (userID, roleID) VALUES (?, ?)', rows);
   });
 }
 
@@ -148,13 +171,20 @@ export async function setAccountRoles(
 ): Promise<void> {
   await withTransaction(pool, async (conn) => {
     await conn.query('DELETE FROM UserAccountRoles WHERE userID = ?', [userId]);
-    for (const grant of grants) {
-      await conn.query(
-        `INSERT INTO UserAccountRoles (userID, roleID, accountUID)
-         SELECT ?, roleID, ? FROM Roles WHERE roleUID = ?`,
-        [userId, grant.accountUID, grant.roleUID],
-      );
-    }
+    if (grants.length === 0) return;
+    const roleIds = await roleIdsByUid(
+      conn,
+      grants.map((grant) => grant.roleUID),
+    );
+    const rows = grants.flatMap((grant) => {
+      const roleID = roleIds.get(grant.roleUID);
+      return roleID === undefined ? [] : [[userId, roleID, grant.accountUID]];
+    });
+    if (rows.length === 0) return;
+    await conn.batch(
+      'INSERT INTO UserAccountRoles (userID, roleID, accountUID) VALUES (?, ?, ?)',
+      rows,
+    );
   });
 }
 

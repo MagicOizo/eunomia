@@ -5,7 +5,7 @@
  * `invoice-queries.ts`.
  */
 
-import { ERROR_CODES, STATUS_FILTERS, type WorkflowStatus } from '@eunomia/shared';
+import { ERROR_CODES, isHttpUrl, STATUS_FILTERS, type WorkflowStatus } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 import { z } from 'zod';
@@ -66,7 +66,9 @@ const base = z.object({
   transferUntilDate: z.string().date().nullish(),
   transferDate: z.string().date().nullish(),
   transferSubject: z.string().trim().min(1).max(100).nullish(),
-  documentLink: z.string().trim().url().max(255).nullish(),
+  // `.url()` asks whether this is an address, `isHttpUrl` whether a browser may
+  // follow it: zod's URL check takes `javascript:` and `data:` too (SEC-01).
+  documentLink: z.string().trim().url().max(255).refine(isHttpUrl).nullish(),
   agencyUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.agency)).nullish(),
   /**
    * Which payment details of that agency the invoice goes to (Slice 44). An

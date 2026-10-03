@@ -301,3 +301,53 @@ describe('InvoiceWorkspaceView reimbursement column', () => {
     wrapper.unmount();
   });
 });
+
+/**
+ * The row's document button is the other sink for a stored link: it opens one
+ * in a new window. The schemas refuse anything but http(s) and migration 017
+ * cleared the stock — this is the second line (SEC-01).
+ */
+describe('InvoiceWorkspaceView document button', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiData.mockResolvedValue({ firstname: 'Anna', surname: 'Muster' });
+    listResource.mockResolvedValue([]);
+    listInvoiceYears.mockResolvedValue([2026]);
+    reimbursementPlan.mockResolvedValue(null);
+  });
+
+  const openWorkspace = async (documentLink: string) => {
+    listInvoices.mockResolvedValue([
+      { ...invoice('inv-1', 'R-2026-1', '2026-01-01'), documentLink },
+    ]);
+    const wrapper = mount(InvoiceWorkspaceView, {
+      props: { accountUID: 'a-1' },
+      global: { stubs: { RouterLink: true } },
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  const documentButton = (wrapper: ReturnType<typeof mount>) =>
+    wrapper
+      .findAll('button')
+      .find((button) => button.attributes('aria-label') === 'Dokument öffnen');
+
+  it('opens an http(s) document', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const wrapper = await openWorkspace('https://docs.example/r-1.pdf');
+
+    await documentButton(wrapper)?.trigger('click');
+    expect(open).toHaveBeenCalledWith('https://docs.example/r-1.pdf', '_blank', 'noopener');
+    wrapper.unmount();
+  });
+
+  it('offers no button for a link a browser would execute, and opens nothing', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const wrapper = await openWorkspace('javascript:alert(document.domain)');
+
+    expect(documentButton(wrapper)).toBeUndefined();
+    expect(open).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+});

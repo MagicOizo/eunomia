@@ -108,6 +108,7 @@ export const FIELD_FORMATS: Record<string, string> = {
   addressPostalCode: 'fünfstellig, z. B. 12345',
   bankAccount: 'nur Großbuchstaben und Ziffern, z. B. DE02120300000000202051',
   bic: '8 oder 11 Zeichen in Großbuchstaben, z. B. COBADEFFXXX',
+  documentLink: 'vollständige Internetadresse mit http:// oder https://',
 };
 
 /** The German label of a payload key, or the key itself if it has none yet. */

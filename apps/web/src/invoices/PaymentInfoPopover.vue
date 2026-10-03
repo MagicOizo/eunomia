@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isHttpUrl } from '@eunomia/shared';
 import {
   faCalendarCheck,
   faCalendarDay,
@@ -84,7 +85,7 @@ const showQr = computed(
       <dt><EuIconLabel :icon="faEuroSign" label="Rechnungssumme" /></dt>
       <dd>{{ germanMoney(invoice.invoiceAmount) }}</dd>
 
-      <template v-if="invoice.documentLink">
+      <template v-if="isHttpUrl(invoice.documentLink)">
         <dt><EuIconLabel :icon="faReceipt" label="Dokument" /></dt>
         <dd><a :href="invoice.documentLink" target="_blank" rel="noopener">Dokument öffnen</a></dd>
       </template>

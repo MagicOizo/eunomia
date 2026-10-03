@@ -142,19 +142,22 @@ export const termsSpec: HistorySpec = {
   },
 };
 
-/** Replaces the bonus scale of a terms entry with the given tiers. */
+/**
+ * Replaces the bonus scale of a terms entry with the given tiers. The empty
+ * scale is a legitimate answer — it means the terms carry no bonus — and then
+ * the delete is the whole job (CR-18).
+ */
 async function replaceBonusTiers(
   db: Queryable,
   termsUID: string,
   tiers: BonusTierInput[],
 ): Promise<void> {
   await db.query('DELETE FROM ContractBonusTiers WHERE termsUID = ?', [termsUID]);
-  for (const tier of tiers) {
-    await db.query(
-      'INSERT INTO ContractBonusTiers (termsUID, claimFreeYears, bonusAmount) VALUES (?, ?, ?)',
-      [termsUID, tier.claimFreeYears, tier.bonusAmount],
-    );
-  }
+  if (tiers.length === 0) return;
+  await db.batch(
+    'INSERT INTO ContractBonusTiers (termsUID, claimFreeYears, bonusAmount) VALUES (?, ?, ?)',
+    tiers.map((tier) => [termsUID, tier.claimFreeYears, tier.bonusAmount]),
+  );
 }
 
 /**

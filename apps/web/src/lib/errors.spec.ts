@@ -70,6 +70,36 @@ describe('describeError — validation issues', () => {
     ).toBe('Bitte „PLZ“ im richtigen Format angeben (fünfstellig, z. B. 12345).');
   });
 
+  it('explains a refused document link by the format the field expects', () => {
+    // The scheme check is a `.refine`, which zod reports as `custom` without a
+    // `validation` — the sentence then comes from the field's own format
+    // (SEC-01). Without this the user read "nicht zulässig" and nothing more.
+    expect(
+      describeError(
+        validation({
+          code: 'custom',
+          path: ['documentLink'],
+          message: 'Invalid input',
+        }),
+      ),
+    ).toBe(
+      'Bitte „Dokument-Link“ im richtigen Format angeben ' +
+        '(vollständige Internetadresse mit http:// oder https://).',
+    );
+  });
+
+  it('keeps the general sentence for a refinement on a field without a format', () => {
+    expect(
+      describeError(
+        validation({
+          code: 'custom',
+          path: ['entries'],
+          message: 'entries must not repeat an invoice',
+        }),
+      ),
+    ).toBe('Die Angabe bei „Erstattungen“ ist nicht zulässig.');
+  });
+
   it('resolves a nested path to its field, and repeats a sentence only once', () => {
     const issue = {
       code: 'too_big',

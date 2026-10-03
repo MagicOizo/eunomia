@@ -102,6 +102,40 @@ describe('PaymentInfoPopover labels', () => {
 });
 
 /**
+ * The document link is the one value of an invoice that becomes an `href`, and
+ * Vue does not clean one. The schemas refuse anything but http(s) and migration
+ * 017 cleared what was stored before they did — this is the second line, for a
+ * row that reaches the browser anyway (SEC-01).
+ */
+describe('PaymentInfoPopover document link', () => {
+  it('links a document with an http(s) address', async () => {
+    const wrapper = await openPopover({
+      invoice: { ...invoice, documentLink: 'https://docs.example/r-1.pdf' },
+    });
+
+    const link = wrapper.find('a[href="https://docs.example/r-1.pdf"]');
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toBe('Dokument öffnen');
+    wrapper.unmount();
+  });
+
+  it('puts a link a browser would execute into no href at all', async () => {
+    for (const documentLink of [
+      'javascript:alert(document.domain)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+      'file:///etc/passwd',
+    ]) {
+      const wrapper = await openPopover({ invoice: { ...invoice, documentLink } });
+
+      expect(wrapper.findAll('dt').map((dt) => dt.text())).not.toContain('Dokument');
+      expect(wrapper.html()).not.toContain(documentLink);
+      wrapper.unmount();
+    }
+  });
+});
+
+/**
  * Which payment details apply is what the invoice names, not a rule about dates
  * (see agencies/payment-details.ts).
  */

@@ -12,6 +12,7 @@
 export * from './contract-enums.js';
 export * from './error-codes.js';
 export * from './german.js';
+export * from './http-url.js';
 export * from './invoice-status.js';
 export * from './payment-details.js';
 export * from './payment-state.js';

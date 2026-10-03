@@ -176,6 +176,43 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
       assert.equal((await request(app).get('/api/v1/users').set(clerk)).status, 403);
     });
 
+    // SEC-11: both lists replace what the user holds, and each entry is its own
+    // row in one transaction. The empty list has to keep working — it is the way
+    // to take everything away (CR-18 made both a single statement).
+    await t.test('the role lists are bounded, and the empty list still clears', async () => {
+      const tooMany = await request(app)
+        .put(`/api/v1/users/${clerkUuid}/global-roles`)
+        .set(admin)
+        .send({ roleUIDs: Array.from({ length: 101 }, () => nutzerRole.roleUID) });
+      assert.equal(tooMany.status, 400);
+      assert.equal(tooMany.body.error.code, 'VALIDATION_ERROR');
+
+      const tooManyGrants = await request(app)
+        .put(`/api/v1/users/${clerkUuid}/account-roles`)
+        .set(admin)
+        .send({
+          grants: Array.from({ length: 101 }, () => ({
+            accountUID: accountA,
+            roleUID: nutzerRole.roleUID,
+          })),
+        });
+      assert.equal(tooManyGrants.status, 400);
+
+      const cleared = await request(app)
+        .put(`/api/v1/users/${clerkUuid}/account-roles`)
+        .set(admin)
+        .send({ grants: [] });
+      assert.equal(cleared.status, 200);
+      assert.deepEqual(cleared.body.data.accountGrants, []);
+
+      // Put the one grant back: the suites after this one read it.
+      const regranted = await request(app)
+        .put(`/api/v1/users/${clerkUuid}/account-roles`)
+        .set(admin)
+        .send({ grants: [{ accountUID: accountA, roleUID: nutzerRole.roleUID }] });
+      assert.equal(regranted.status, 200);
+    });
+
     // CR-11: a path segment that is not a UUID is a malformed call, so it is
     // answered as one instead of being looked up and reported as missing.
     await t.test('a user id that is not a UUID is a 400', async () => {

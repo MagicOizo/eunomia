@@ -44,9 +44,15 @@ const updateUserSchema = z.object({
   password: z.string().min(8).optional(),
 });
 
-const globalRolesSchema = z.object({ roleUIDs: z.array(roleRef) });
+/**
+ * Both lists replace what a user holds, so the empty list is the way to take
+ * everything away and has to stay allowed. The upper bound is there because
+ * each entry is its own INSERT in one transaction (SEC-11); 100 roles or 100
+ * account grants on one user is already far past anything real.
+ */
+const globalRolesSchema = z.object({ roleUIDs: z.array(roleRef).max(100) });
 const accountRolesSchema = z.object({
-  grants: z.array(z.object({ accountUID: accountRef, roleUID: roleRef })),
+  grants: z.array(z.object({ accountUID: accountRef, roleUID: roleRef })).max(100),
 });
 
 /**

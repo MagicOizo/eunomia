@@ -114,7 +114,24 @@ ausdrücklich vor einer anderen steht.
       `invoice-rules.ts` sonst nicht mehr frei von der Datenbankschicht wäre. Der Ertrag ist
       `invoice-rules.test.ts`: 33 Fälle ohne Datenbank, die ersten Tests im Projekt für diese fünf
       Regeln. Kein Integrationstest musste angefasst werden.
-- [ ] **10 — Grenzen an den Eingängen.** SEC-01, SEC-11, CR-18.
+- [x] **10 — Grenzen an den Eingängen.** SEC-01, SEC-11, CR-18.
+      Umgesetzt mit v0.18.0-slice.2 (Slice 60). Die Bestandsdaten gehen auf Entscheidung des
+      Autors nicht in die Oberfläche, sondern weg: Migration 017 setzt jeden Dokument-Link, dem ein
+      Browser nicht folgen darf, auf NULL und nennt dabei die betroffenen Datensätze — ein
+      ungültiger Link hat in der Produktion nichts verloren. Der Prüfer `isHttpUrl` steht in
+      `@eunomia/shared` und wird von den beiden Schemata, der Migration und den drei Senken im Web
+      gelesen. Vier Dinge gingen über den Review hinaus: (1) `submissions.invoiceUIDs` hat der
+      Review nicht gezählt, ist aber dieselbe Form und bekam dieselbe Grenze; (2) `setGlobalRoles`
+      und `setAccountRoles` rollten die Schleife aus CR-18 ebenfalls — sie gingen mit, brauchten
+      dafür aber eine eigene Auflösung von Rollen-UID zu Rollen-ID, weil das Bulk-Protokoll von
+      `conn.batch` kein `INSERT … SELECT` trägt (Fehler 1295, rot gesehen); (3) ein `.refine()`
+      meldet zod als `custom`, was im Web „Die Angabe … ist nicht zulässig“ ergab — ein
+      `custom`-Befund liest jetzt das Format des Feldes, wo eines hinterlegt ist, und sonst weiter
+      den allgemeinen Satz; (4) `insertManyRows` nimmt die Spalten als Vereinigung über alle
+      Zeilen, nicht aus der ersten — sonst fiele eine Belegnummer, die nur der zweite Eintrag
+      trägt, lautlos weg (als Test festgehalten). Offen geblieben ist die dritte Schreibweise aus
+      CR-18 in `reminders/store.ts`: dort ist die eingefügte Zeile nicht der Rückgabewert, der
+      Umbau wäre ein anderer Schnitt.
 - [ ] **11 — Dialoge und große Ansichten.** CR-29 (★), CR-30 (★). Bereitet Scheibe 12 vor.
 - [ ] **12 — Die Oberfläche lernt das Rechtemodell.** CR-26.
 - [ ] **13 — Weniger Fragen an die Datenbank.** CR-16, CR-17, CR-27.

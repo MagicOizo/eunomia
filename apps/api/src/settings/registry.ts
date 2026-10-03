@@ -1,4 +1,4 @@
-import { ERROR_CODES, SETTING_KEYS, type SettingKey } from '@eunomia/shared';
+import { ERROR_CODES, isHttpUrl, SETTING_KEYS, type SettingKey } from '@eunomia/shared';
 
 import { badRequest } from '../lib/api-error.js';
 
@@ -52,16 +52,6 @@ function isTimeZone(value: string): boolean {
   try {
     new Intl.DateTimeFormat('en', { timeZone: value });
     return true;
-  } catch {
-    return false;
-  }
-}
-
-/** An absolute http(s) URL — the base the reminder mails link back to. */
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
   }

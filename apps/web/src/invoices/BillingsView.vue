@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isHttpUrl } from '@eunomia/shared';
 import {
   faChevronLeft,
   faGavel,
@@ -161,8 +162,10 @@ async function load(): Promise<void> {
 
 onMounted(load);
 
+/** The second line against a link a browser must not follow — see SEC-01. */
 function openDocument(b: BillingListDto): void {
-  if (b.documentLink) window.open(b.documentLink, '_blank', 'noopener');
+  const link = b.documentLink;
+  if (isHttpUrl(link)) window.open(link, '_blank', 'noopener');
 }
 
 function openObjection(b: BillingListDto): void {
@@ -364,7 +367,7 @@ function confirmDelete(): void {
               </td>
               <td class="eu-billings__actions">
                 <EuButton
-                  v-if="b.documentLink"
+                  v-if="isHttpUrl(b.documentLink)"
                   variant="secondary"
                   icon-only
                   :icon="faUpRightFromSquare"

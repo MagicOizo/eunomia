@@ -53,6 +53,14 @@ function tooBig(issue: ZodIssueLike, label: string): string {
   return `${quoted(label)} darf höchstens ${max} sein.`;
 }
 
+/** The sentence that spells out a field's own format, where one is written down. */
+function formatSentence(key: string, label: string): string | null {
+  const format = FIELD_FORMATS[key];
+  return format === undefined
+    ? null
+    : `Bitte ${quoted(label)} im richtigen Format angeben (${format}).`;
+}
+
 function invalidString(issue: ZodIssueLike, key: string, label: string): string {
   switch (issue.validation) {
     case 'email':
@@ -62,12 +70,8 @@ function invalidString(issue: ZodIssueLike, key: string, label: string): string 
     case 'date':
     case 'datetime':
       return `${quoted(label)} ist kein gültiges Datum.`;
-    default: {
-      const format = FIELD_FORMATS[key];
-      return format
-        ? `Bitte ${quoted(label)} im richtigen Format angeben (${format}).`
-        : `${quoted(label)} hat nicht das erwartete Format.`;
-    }
+    default:
+      return formatSentence(key, label) ?? `${quoted(label)} hat nicht das erwartete Format.`;
   }
 }
 
@@ -89,6 +93,13 @@ export function describeIssue(issue: ZodIssueLike): string {
       return invalidString(issue, key, label);
     case 'invalid_date':
       return `${quoted(label)} ist kein gültiges Datum.`;
+    // A refinement (`.refine`) carries no `validation` to translate. Where the
+    // field writes down a format, that is the sentence — it is how the document
+    // link's refused scheme gets explained instead of being called merely
+    // inadmissible (SEC-01). A refinement that is not about a format at all
+    // (two entries for the same invoice) keeps the general sentence.
+    case 'custom':
+      return formatSentence(key, label) ?? `Die Angabe bei ${quoted(label)} ist nicht zulässig.`;
     default:
       return `Die Angabe bei ${quoted(label)} ist nicht zulässig.`;
   }

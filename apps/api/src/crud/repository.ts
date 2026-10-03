@@ -104,6 +104,55 @@ export async function insertRow(
 }
 
 /**
+ * Inserts several rows in ONE round trip, and returns them in the order they
+ * were given.
+ *
+ * Why it exists: inserting a list in a loop costs two round trips per entry,
+ * and for a service billing that answers thirty invoices those thirty pairs run
+ * while every invoice it touches is locked FOR UPDATE (CR-18, SEC-11). The same
+ * list is bounded in the schema; this is the other half of that.
+ *
+ * One statement means one column list for every row, so the columns are the
+ * union over all rows — a key missing from a row is written as NULL, not left
+ * to the column's default. A row from a request is a parsed schema, where an
+ * optional field is simply absent, and NULL is what it would have become
+ * anyway; a column whose default is something else has to be set explicitly.
+ *
+ * Atomicity is the caller's, exactly as with `insertRow`: pass the connection of
+ * an open transaction, not the pool, when all the rows have to land together.
+ */
+export async function insertManyRows(
+  pool: Queryable,
+  t: CrudTable,
+  rows: Array<Record<string, unknown>>,
+): Promise<Row[]> {
+  if (rows.length === 0) return [];
+
+  const columns = t.columns.filter((column) =>
+    rows.some((row) => Object.prototype.hasOwnProperty.call(row, column)),
+  );
+  const allColumns = [t.uidColumn, ...columns];
+  const placeholders = allColumns.map(() => '?').join(', ');
+  const uids = rows.map(() => generateEntityId(t.entity));
+  await pool.batch(
+    `INSERT INTO ${t.table} (${allColumns.join(', ')}) VALUES (${placeholders})`,
+    rows.map((row, index) => [uids[index], ...columns.map((column) => row[column] ?? null)]),
+  );
+
+  const created = await pool.query<Row[]>(
+    `SELECT ${outputColumns(t)} FROM ${t.table}
+      WHERE ${t.uidColumn} IN (${uids.map(() => '?').join(', ')})`,
+    uids,
+  );
+  const byUid = new Map(created.map((row) => [row[t.uidColumn], row]));
+  return uids.map((uid) => {
+    const row = byUid.get(uid);
+    if (!row) throw new Error(`Row ${uid} vanished immediately after insert into ${t.table}`);
+    return row;
+  });
+}
+
+/**
  * Updates the given columns of a non-deleted row. Returns the updated row, or
  * null if no such row exists (so the caller can answer 404).
  */

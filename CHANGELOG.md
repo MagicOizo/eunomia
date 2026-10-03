@@ -7,6 +7,29 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.18.0-slice.2 — 2026-10-03
+
+Three findings that all sit in the same place: where a value or a list from a request enters the
+database. One of them is the single exploitable path the security review found.
+
+- **A document link can no longer be a piece of code.** The link to a scanned invoice or billing
+  was checked for being an address, but not for what kind: `javascript:`, `data:`, `vbscript:` and
+  `file:` all passed, and in the payment information the value became a link you could click. A
+  user who may enter invoices for one insured person could put one there and wait for an
+  administrator to open it. Only `http://` and `https://` are accepted now — asked in one place
+  that the API, the stored rows and the three spots in the interface that open a document all read
+  from. A link already stored that a browser must not follow is removed when the database is
+  migrated, and the migration names the records it cleared.
+- **Every list from a request has an upper bound.** The reimbursements of one service billing, the
+  invoices of one submission, and a user's roles and account grants were limited by nothing but the
+  size of the request. Each entry is a row written inside one transaction, and for the
+  reimbursements every invoice involved is locked while it happens. The bounds are 200, 200, 100
+  and 100, all far above anything the subject matter produces.
+- **A list is written in one go.** The same lists were inserted row by row, two round trips each,
+  where a service billing answering thirty invoices paid for thirty of those pairs with every
+  invoice locked. They go in one statement now, which is also how the rest of the project already
+  did it.
+
 ## 0.18.0-slice.1 — 2026-10-03
 
 Nothing in the app changes with this release. It takes the largest source file in the project

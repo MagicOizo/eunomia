@@ -32,6 +32,25 @@ function databaseConfigFromEnv(): DatabaseConfig | null {
   };
 }
 
+/**
+ * Whether the reported validation issues include a length complaint about this
+ * field — the way an upper bound is pinned without depending on which other
+ * rule a deliberately oversized list also breaks (SEC-11).
+ */
+function tooBigOn(details: unknown, field: string): boolean {
+  return (
+    Array.isArray(details) &&
+    details.some(
+      (issue) =>
+        typeof issue === 'object' &&
+        issue !== null &&
+        (issue as { code?: unknown }).code === 'too_big' &&
+        Array.isArray((issue as { path?: unknown }).path) &&
+        (issue as { path: unknown[] }).path.includes(field),
+    )
+  );
+}
+
 const SETUP_TOKEN = 'workflow-setup-token';
 
 function testConfig(database: DatabaseConfig): AppConfig {
@@ -794,6 +813,12 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       });
       assert.equal(res.status, 201);
       assert.equal(res.body.data.length, 2);
+      // The rows come back in the order they were sent — the entries are
+      // written in one statement now (CR-18), and the answer is that list.
+      assert.deepEqual(
+        res.body.data.map((row: Row) => row.invoiceUID),
+        [invB1, invB2],
+      );
 
       const first = await request(app).get(`/api/v1/invoices/${invB1}`).set(admin);
       assert.equal(first.body.data.workflowStatus, 'teilabgerechnet');
@@ -801,6 +826,145 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       const second = await request(app).get(`/api/v1/invoices/${invB2}`).set(admin);
       assert.equal(second.body.data.workflowStatus, 'abgerechnet');
       assert.equal(Number(second.body.data.reimbursedTotal), 300);
+    });
+
+    await t.test('a receipt number on the second entry alone is kept', async () => {
+      // One statement means one column list for every row, so the columns are
+      // the union over all entries. Were they taken from the first entry, this
+      // receipt number would be dropped without a word (CR-18).
+      const invB3 = await makeInvoice(accountB, 50, 'R-B3');
+      const invB4 = await makeInvoice(accountB, 50, 'R-B4');
+      await post('/api/v1/submissions', {
+        contractUID: contractB,
+        submittedDate: '2024-06-01',
+        invoiceUIDs: [invB3, invB4],
+      });
+      const billing = (
+        await post('/api/v1/billings', {
+          contractUID: contractB,
+          billingDate: '2024-06-10',
+          billingNumber: 'LA-B-receipts',
+        })
+      ).body.data.billingUID as string;
+
+      const res = await post(`/api/v1/billings/${billing}/allocations`, {
+        entries: [
+          { invoiceUID: invB3, reimbursement: 10 },
+          { invoiceUID: invB4, reimbursement: 20, receiptNumber: 'BEL-B4' },
+        ],
+      });
+      assert.equal(res.status, 201);
+      assert.deepEqual(
+        res.body.data.map((row: Row) => row.receiptNumber),
+        [null, 'BEL-B4'],
+      );
+
+      // Taken back out again: the filters this policy's list is asserted with
+      // further down count what is in it, down to the single row.
+      assert.equal(
+        (await request(app).delete(`/api/v1/billings/${billing}`).set(admin)).status,
+        204,
+      );
+      for (const uid of [invB3, invB4]) {
+        assert.equal((await request(app).delete(`/api/v1/invoices/${uid}`).set(admin)).status, 204);
+      }
+    });
+
+    await t.test('more booked entries than a letter can carry are refused', async () => {
+      // The upper bound matters because every entry is its own row in ONE
+      // transaction, with every invoice locked FOR UPDATE (SEC-11). Asserted on
+      // the issue itself: such a list fails other rules too, and the point here
+      // is that the length is one of them.
+      const entries = Array.from({ length: 201 }, () => ({
+        invoiceUID: invB1,
+        reimbursement: 1,
+      }));
+      const res = await post(`/api/v1/billings/${billingB}/allocations`, { entries });
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+      assert.ok(tooBigOn(res.body.error.details, 'entries'));
+    });
+
+    await t.test('more invoices in one submission than the bound allows are refused', async () => {
+      const res = await post('/api/v1/submissions', {
+        contractUID: contractB,
+        submittedDate: '2024-09-01',
+        invoiceUIDs: Array.from({ length: 201 }, () => invB1),
+      });
+      assert.equal(res.status, 400);
+      assert.ok(tooBigOn(res.body.error.details, 'invoiceUIDs'));
+    });
+
+    await t.test('a document link a browser would execute is refused', async () => {
+      // zod's `.url()` takes these; only the scheme check turns them down
+      // (SEC-01). Both endpoints that carry a link are asked.
+      for (const documentLink of [
+        'javascript:alert(document.domain)',
+        'data:text/html,<script>alert(1)</script>',
+        'vbscript:msgbox(1)',
+        'file:///etc/passwd',
+      ]) {
+        const invoice = await post('/api/v1/invoices', {
+          invoiceNumber: `R-link-${documentLink.slice(0, 4)}`,
+          invoiceDate: '2024-05-01',
+          treatmentDate: '2024-05-01',
+          accountUID: accountB,
+          invoiceAmount: 10,
+          documentLink,
+        });
+        assert.equal(invoice.status, 400, documentLink);
+        assert.equal(invoice.body.error.code, 'VALIDATION_ERROR');
+
+        const billing = await post('/api/v1/billings', {
+          contractUID: contractB,
+          billingDate: '2024-08-10',
+          billingNumber: `LA-link-${documentLink.slice(0, 4)}`,
+          documentLink,
+        });
+        assert.equal(billing.status, 400, documentLink);
+      }
+    });
+
+    await t.test('an http(s) document link is stored on both', async () => {
+      const link = 'https://docs.example/invoice.pdf';
+      const invoice = await post('/api/v1/invoices', {
+        invoiceNumber: 'R-link-ok',
+        invoiceDate: '2024-05-01',
+        treatmentDate: '2024-05-01',
+        accountUID: accountB,
+        invoiceAmount: 10,
+        documentLink: link,
+      });
+      assert.equal(invoice.status, 201);
+      assert.equal(invoice.body.data.documentLink, link);
+
+      const billing = await post('/api/v1/billings', {
+        contractUID: contractB,
+        billingDate: '2024-08-10',
+        billingNumber: 'LA-link-ok',
+        documentLink: link,
+      });
+      assert.equal(billing.status, 201);
+      assert.equal(billing.body.data.documentLink, link);
+
+      // Both are taken back out: the suites after this one read the lists of
+      // this account and this policy, and count what is in them.
+      assert.equal(
+        (
+          await request(app)
+            .delete(`/api/v1/billings/${billing.body.data.billingUID as string}`)
+            .set(admin)
+        ).status,
+        204,
+      );
+      assert.equal(
+        (
+          await request(app)
+            .delete(`/api/v1/invoices/${invoice.body.data.invoiceUID as string}`)
+            .set(admin)
+        ).status,
+        204,
+      );
     });
 
     await t.test('the billing filters narrow the list', async () => {
