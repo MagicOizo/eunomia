@@ -55,6 +55,8 @@ describe('InvoiceWorkspaceView lookup lists', () => {
     await flushPromises();
 
     const listed = (path: string) => listResource.mock.calls.filter(([p]) => p === path).length;
+    // CR-27: the policies are asked for by insured person, not filtered here.
+    expect(listed('/contracts?accountUID=a-1')).toBe(1);
     expect(listed('/facilities')).toBe(1);
     expect(wrapper.findComponent(InvoiceDetailDialog).props('facilities')).toEqual([
       { value: 'f-1', label: 'Praxis Nord' },

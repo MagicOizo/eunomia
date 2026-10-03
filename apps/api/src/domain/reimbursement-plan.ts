@@ -10,8 +10,8 @@ import { parseQuery, pathParam } from '../crud/params.js';
 import { notFound } from '../lib/api-error.js';
 import type { BonusYear } from './bonus-timeline.js';
 import type { ContractRow } from './contract-access.js';
-import { termsForYear } from './contract-history.js';
-import { loadBonusTimeline } from './contract-years.js';
+import { termsInForce } from './bonus-timeline.js';
+import { bonusTimelineFrom, loadBonusRows } from './contract-years.js';
 import {
   type BonusMode,
   type InvoicePolicyState,
@@ -87,9 +87,15 @@ export function createReimbursementPlanRouter(pool: Pool, config: AppConfig): Ro
 
     const policies: OptimizerPolicy[] = [];
     const details = new Map<string, Record<string, unknown>>();
+    // Four queries for all policies together, not five per policy (CR-16): the
+    // terms in force are picked from the same rows the timeline is built from.
+    const bonusRows = await loadBonusRows(
+      pool,
+      contracts.map((contract) => contract.contractUID),
+    );
     for (const contract of contracts) {
-      const terms = await termsForYear(pool, contract.contractUID, year);
-      const timeline = await loadBonusTimeline(pool, contract, currentYear);
+      const terms = termsInForce(bonusRows.terms.get(contract.contractUID) ?? [], year);
+      const timeline = bonusTimelineFrom(contract, bonusRows, currentYear);
       const entry = timeline.find((y) => y.year === year);
       const bonus = bonusFor(entry);
       const policy: OptimizerPolicy = {

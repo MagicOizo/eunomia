@@ -103,9 +103,17 @@ function claimForfeits(rule: BonusForfeitRule, claim: BonusClaim): boolean | nul
   return Math.round(claim.reimbursement * 100) > 0;
 }
 
-/** The terms in force for a year: the latest entry that started at or before it. */
-function termsInForce(terms: BonusTerms[], year: number): BonusTerms | null {
-  let found: BonusTerms | null = null;
+/**
+ * The terms in force for a year: the latest entry that started at or before it.
+ * Generic over the row, because the reimbursement plan asks the same question
+ * of the whole terms row — deductible, cap and rate — that it used to ask the
+ * database once per policy (CR-16).
+ */
+export function termsInForce<T extends { validFromYear: number }>(
+  terms: readonly T[],
+  year: number,
+): T | null {
+  let found: T | null = null;
   for (const entry of terms) {
     if (
       entry.validFromYear <= year &&

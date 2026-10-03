@@ -165,7 +165,32 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     await resetData(pool);
 
     const config = testConfig(database);
-    const app = createApp({ pool, config });
+    /**
+     * The app on a counted pool. CR-16 was a query count that grew with the
+     * data, so the proof is a number rather than a promise: the same request
+     * over more policies has to cost the same. Nothing but a request runs
+     * against this pool — `createApp` starts no timers — so the count is the
+     * request's own.
+     */
+    let queries = 0;
+    const counting = new Proxy(pool, {
+      get(target, prop) {
+        if (prop === 'query') {
+          return (...args: Parameters<Pool['query']>) => {
+            queries += 1;
+            return target.query(...args);
+          };
+        }
+        const value = Reflect.get(target, prop) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const countQueries = async (run: () => Promise<unknown>): Promise<number> => {
+      queries = 0;
+      await run();
+      return queries;
+    };
+    const app = createApp({ pool: counting, config });
 
     await request(app)
       .post('/api/v1/setup')
@@ -1019,6 +1044,23 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(res.status, 403);
     });
 
+    /*
+     * CR-16: the plan used to ask five questions per policy — the terms, the
+     * claims, the year records, the terms again and their bonus tiers. They are
+     * four questions for all policies now, so account A with two policies has
+     * to cost exactly what account B with one costs.
+     */
+    await t.test('the reimbursement plan asks the same of one policy and of two', async () => {
+      const policiesOf = async (account: string): Promise<number> =>
+        (await plan(account)).body.data.policies.length;
+      assert.equal(await policiesOf(accountB), 1);
+      assert.equal(await policiesOf(accountA), 2);
+
+      const forOne = await countQueries(() => plan(accountB));
+      const forTwo = await countQueries(() => plan(accountA));
+      assert.equal(forTwo, forOne, 'the second policy costs no further query');
+    });
+
     await t.test('account scoping: a scoped user is confined to their account', async () => {
       const user = await scopedNutzer(pool, app, 'user@example.com', accountA);
 
@@ -1110,6 +1152,21 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
           `${path} hides B's rows from the scoped user`,
         );
       }
+
+      // CR-27: the policy list takes the insured person as a filter, like the
+      // invoice and billing searches — and refuses the account the user may not
+      // see instead of answering with an empty list.
+      const ownPolicies = await rowsFor(`/api/v1/contracts?accountUID=${accountA}`);
+      assert.ok(ownPolicies.length > 0);
+      assert.deepEqual([...new Set(ownPolicies.map((row) => row.accountUID))], [accountA]);
+      assert.equal(
+        (await request(app).get(`/api/v1/contracts?accountUID=${accountB}`).set(scoped)).status,
+        403,
+      );
+      assert.equal(
+        (await request(app).get('/api/v1/contracts?accountUID=not-a-uid').set(admin)).status,
+        400,
+      );
 
       // Allocations name no account of their own; B's booking is the proof.
       const allocations = await rowsFor('/api/v1/allocations');

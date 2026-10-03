@@ -13,6 +13,7 @@ import {
   type Row,
   getRow,
   insertRow,
+  placeholders,
   softDeleteRow,
   updateRow,
 } from '../crud/repository.js';
@@ -309,54 +310,77 @@ export async function listPremiumsWithValidity(
   });
 }
 
+/** A row of `ContractTerms` as the database holds it. */
+interface TermsRow {
+  contractUID: string;
+  termsUID: string;
+  validFromYear: number;
+  deductible: number;
+  reimbursementCap: number | null;
+  reimbursementRate: number;
+}
+
+/** Terms with their bonus scale (tiers ordered by claim-free years). */
+export interface TermsWithTiers extends Omit<TermsRow, 'contractUID'> {
+  bonusTiers: BonusTierInput[];
+}
+
 /**
- * Lists a contract's active terms, oldest first, each with a derived
- * `validToYear` and its bonus scale (tiers ordered by claim-free years).
+ * The active terms of any number of policies with their bonus scales, oldest
+ * first within each policy. Two queries for all of them rather than two per
+ * policy, so a whole household can be asked for at once (CR-16); the terms in
+ * force for one year are then picked in memory with `termsInForce`.
  */
-export async function listTermsWithValidity(db: Queryable, contract: ContractRow): Promise<Row[]> {
-  const rows = await db.query<Row[]>(
-    `SELECT termsUID, validFromYear, deductible, reimbursementCap, reimbursementRate FROM ContractTerms
-      WHERE contractUID = ? AND termsStatus <> -1 ORDER BY validFromYear`,
-    [contract.contractUID],
+export async function loadTermsWithTiers(
+  db: Queryable,
+  contractUIDs: readonly string[],
+): Promise<Map<string, TermsWithTiers[]>> {
+  const byContract = new Map<string, TermsWithTiers[]>();
+  if (contractUIDs.length === 0) return byContract;
+  const uids = [...contractUIDs];
+
+  const rows = await db.query<TermsRow[]>(
+    `SELECT contractUID, termsUID, validFromYear, deductible, reimbursementCap, reimbursementRate
+       FROM ContractTerms
+      WHERE contractUID IN (${placeholders(uids)}) AND termsStatus <> -1
+      ORDER BY contractUID, validFromYear`,
+    uids,
   );
   const tiers = await db.query<Array<BonusTierInput & { termsUID: string }>>(
     `SELECT b.termsUID, b.claimFreeYears, b.bonusAmount
        FROM ContractBonusTiers b
        JOIN ContractTerms t ON t.termsUID = b.termsUID
-      WHERE t.contractUID = ? AND t.termsStatus <> -1
+      WHERE t.contractUID IN (${placeholders(uids)}) AND t.termsStatus <> -1
       ORDER BY b.claimFreeYears`,
-    [contract.contractUID],
+    uids,
   );
-  const endYear = contract.contractEnd === null ? null : yearOf(contract.contractEnd);
-  return rows.map((row, index) => {
-    const next = rows[index + 1];
-    return {
+
+  for (const { contractUID, ...row } of rows) {
+    const list = byContract.get(contractUID) ?? [];
+    list.push({
       ...row,
-      validToYear: next ? Number(next.validFromYear) - 1 : endYear,
+      validFromYear: Number(row.validFromYear),
       bonusTiers: tiers
         .filter((tier) => tier.termsUID === row.termsUID)
         .map(({ claimFreeYears, bonusAmount }) => ({ claimFreeYears, bonusAmount })),
-    };
-  });
+    });
+    byContract.set(contractUID, list);
+  }
+  return byContract;
 }
 
-/** The terms in force for a contract in a calendar year, or null when none are recorded yet. */
-export async function termsForYear(
-  db: Queryable,
-  contractUID: string,
-  year: number,
-): Promise<{
-  deductible: number;
-  reimbursementCap: number | null;
-  reimbursementRate: number;
-} | null> {
-  const rows = await db.query<
-    Array<{ deductible: number; reimbursementCap: number | null; reimbursementRate: number }>
-  >(
-    `SELECT deductible, reimbursementCap, reimbursementRate FROM ContractTerms
-      WHERE contractUID = ? AND termsStatus <> -1 AND validFromYear <= ?
-      ORDER BY validFromYear DESC LIMIT 1`,
-    [contractUID, year],
-  );
-  return rows[0] ?? null;
+/**
+ * One policy's terms as its detail view shows them: each entry with a derived
+ * `validToYear` — the year before the next entry starts, or the contract's end
+ * year for the latest one (null while the contract is open-ended).
+ */
+export function withValidity(
+  contract: ContractRow,
+  terms: readonly TermsWithTiers[],
+): Array<TermsWithTiers & { validToYear: number | null }> {
+  const endYear = contract.contractEnd === null ? null : yearOf(contract.contractEnd);
+  return terms.map((row, index) => {
+    const next = terms[index + 1];
+    return { ...row, validToYear: next ? next.validFromYear - 1 : endYear };
+  });
 }

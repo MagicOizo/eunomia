@@ -71,8 +71,8 @@ const DELETED_AT = (alias: string): string =>
   `DATE_FORMAT(${alias}.deletedAt, '%Y-%m-%dT%H:%i:%s') AS deletedAt,
                      ${BATCH_OF(alias)} AS batch`;
 
-/** The batch expression on its own, for matching a child against its parent's. */
-export const BATCH_OF = (alias: string): string =>
+/** The batch expression on its own; a child is matched against its parent's in memory. */
+const BATCH_OF = (alias: string): string =>
   `DATE_FORMAT(${alias}.deletedAt, '%Y-%m-%d %H:%i:%s.%f')`;
 
 const text = (value: unknown): string =>

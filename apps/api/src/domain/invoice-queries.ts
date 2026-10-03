@@ -11,8 +11,9 @@
 
 import { ERROR_CODES } from '@eunomia/shared';
 
-import type { CrudTable, Queryable } from '../crud/repository.js';
+import { type CrudTable, type Queryable, placeholders } from '../crud/repository.js';
 import { conflict } from '../lib/api-error.js';
+import { groupBy } from '../lib/group.js';
 import {
   type NotCovered,
   type PaymentDetailChoice,
@@ -140,13 +141,7 @@ export async function queryInvoices(
 
 /** Groups rows by invoiceUID. */
 function byInvoice<T extends { invoiceUID: string }>(rows: T[]): Map<string, T[]> {
-  const map = new Map<string, T[]>();
-  for (const row of rows) {
-    const list = map.get(row.invoiceUID) ?? [];
-    list.push(row);
-    map.set(row.invoiceUID, list);
-  }
-  return map;
+  return groupBy(rows, (row) => row.invoiceUID);
 }
 
 /**
@@ -160,14 +155,7 @@ function byInvoice<T extends { invoiceUID: string }>(rows: T[]): Map<string, T[]
  * bucket.
  */
 function byInvoicePolicy(rows: InvoiceAllocationRow[]): Map<string, InvoiceAllocationRow[]> {
-  const map = new Map<string, InvoiceAllocationRow[]>();
-  for (const row of rows) {
-    const key = `${row.invoiceUID}\u0000${row.contractUID}`;
-    const list = map.get(key) ?? [];
-    list.push(row);
-    map.set(key, list);
-  }
-  return map;
+  return groupBy(rows, (row) => `${row.invoiceUID}\u0000${row.contractUID}`);
 }
 
 /**
@@ -181,7 +169,6 @@ export async function present(
 ): Promise<Record<string, unknown>[]> {
   if (rows.length === 0) return [];
   const uids = rows.map((row) => row.invoiceUID);
-  const placeholders = uids.map(() => '?').join(', ');
 
   const submissions = byInvoice(
     await db.query<InvoiceSubmissionRow[]>(
@@ -199,7 +186,7 @@ export async function present(
                       ON b.billingUID = a.billingUID AND b.billingStatus <> -1)
                 ON a.invoiceUID = si.invoiceUID AND a.allocationStatus <> -1
                AND b.contractUID = si.contractUID
-        WHERE si.invoiceUID IN (${placeholders})
+        WHERE si.invoiceUID IN (${placeholders(uids)})
         GROUP BY si.invoiceUID, s.submissionUID
         ORDER BY s.submittedDate, s.submissionUID`,
       uids,
@@ -215,7 +202,7 @@ export async function present(
                    THEN 1 ELSE 0 END AS objectionOpen
          FROM Allocations a
          JOIN ServiceBillings b ON b.billingUID = a.billingUID AND b.billingStatus <> -1
-        WHERE a.invoiceUID IN (${placeholders}) AND a.allocationStatus <> -1
+        WHERE a.invoiceUID IN (${placeholders(uids)}) AND a.allocationStatus <> -1
         ORDER BY b.billingDate, b.billingUID`,
       uids,
     ),
@@ -225,7 +212,7 @@ export async function present(
   const treatmentDays = byInvoice(
     await db.query<InvoiceTreatmentDayRow[]>(
       `SELECT invoiceUID, treatmentDate FROM InvoiceTreatmentDays
-        WHERE invoiceUID IN (${placeholders})
+        WHERE invoiceUID IN (${placeholders(uids)})
         ORDER BY treatmentDate`,
       uids,
     ),
@@ -236,7 +223,7 @@ export async function present(
          FROM InvoiceExclusions x
          JOIN Contracts c ON c.contractUID = x.contractUID
          JOIN InsuranceCompanies v ON v.companyUID = c.companyUID
-        WHERE x.invoiceUID IN (${placeholders})
+        WHERE x.invoiceUID IN (${placeholders(uids)})
         ORDER BY c.contractNumber`,
       uids,
     ),

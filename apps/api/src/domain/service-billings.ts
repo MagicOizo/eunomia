@@ -15,6 +15,7 @@ import {
   deletionTimestamp,
   getRow,
   insertRow,
+  placeholders,
   updateRow,
 } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
@@ -132,7 +133,7 @@ async function invoiceNumbersFor(pool: Pool, billingUIDs: string[]): Promise<Map
        FROM Allocations al
        JOIN Invoices inv ON inv.invoiceUID = al.invoiceUID AND inv.invoiceStatus <> -1
       WHERE al.allocationStatus <> -1
-        AND al.billingUID IN (${billingUIDs.map(() => '?').join(', ')})
+        AND al.billingUID IN (${placeholders(billingUIDs)})
       ORDER BY inv.invoiceNumber`,
     billingUIDs,
   );

@@ -1,6 +1,6 @@
 import type { Pool } from 'mariadb';
 
-import type { Queryable } from '../crud/repository.js';
+import { type Queryable, placeholders } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 
 /**
@@ -137,7 +137,7 @@ export async function softDeleteUser(pool: Pool, uuid: string): Promise<number> 
  */
 async function roleIdsByUid(conn: Queryable, roleUIDs: string[]): Promise<Map<string, number>> {
   const rows = await conn.query<Array<{ roleUID: string; roleID: number }>>(
-    `SELECT roleUID, roleID FROM Roles WHERE roleUID IN (${roleUIDs.map(() => '?').join(', ')})`,
+    `SELECT roleUID, roleID FROM Roles WHERE roleUID IN (${placeholders(roleUIDs)})`,
     roleUIDs,
   );
   return new Map(rows.map((row) => [row.roleUID, Number(row.roleID)]));

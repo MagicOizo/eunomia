@@ -9,7 +9,7 @@
 import type { PermissionKey } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
-import type { Filter } from '../crud/repository.js';
+import { type Filter, placeholders } from '../crud/repository.js';
 
 /**
  * Resolves whether a user holds a permission — the core of the rights model
@@ -115,7 +115,7 @@ export async function accountFilter(
   if (scope.all) return { clause: 'TRUE', params: [] };
   if (scope.accountUIDs.length === 0) return null;
   return {
-    clause: `${column} IN (${scope.accountUIDs.map(() => '?').join(', ')})`,
+    clause: `${column} IN (${placeholders(scope.accountUIDs)})`,
     params: scope.accountUIDs,
   };
 }

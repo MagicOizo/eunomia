@@ -14,6 +14,7 @@ import {
   type Row,
   getRow,
   insertManyRows,
+  placeholders,
   softDeleteRow,
   updateRow,
 } from '../crud/repository.js';
@@ -93,7 +94,6 @@ async function loadCandidates(
   invoiceUIDs: string[],
   ignoreAllocationUID?: string,
 ): Promise<CandidateInvoice[]> {
-  const placeholders = invoiceUIDs.map(() => '?').join(', ');
   const ignore = ignoreAllocationUID ? 'AND a.allocationUID <> ?' : '';
   return conn.query<CandidateInvoice[]>(
     `SELECT i.invoiceUID, i.invoiceNumber, i.invoiceAmount,
@@ -108,7 +108,7 @@ async function loadCandidates(
                WHERE a.invoiceUID = i.invoiceUID AND a.allocationStatus <> -1 ${ignore}
             ), 0) AS allocated
        FROM Invoices i
-      WHERE i.invoiceUID IN (${placeholders}) AND i.invoiceStatus <> -1`,
+      WHERE i.invoiceUID IN (${placeholders(invoiceUIDs)}) AND i.invoiceStatus <> -1`,
     [contractUID, ...(ignoreAllocationUID ? [ignoreAllocationUID] : []), ...invoiceUIDs],
   );
 }
@@ -183,9 +183,8 @@ export async function createAllocationsForBilling(
 
   return withTransaction(pool, async (conn) => {
     const invoiceUIDs = entries.map((e) => e.invoiceUID);
-    const placeholders = invoiceUIDs.map(() => '?').join(', ');
     await conn.query(
-      `SELECT invoiceUID FROM Invoices WHERE invoiceUID IN (${placeholders}) FOR UPDATE`,
+      `SELECT invoiceUID FROM Invoices WHERE invoiceUID IN (${placeholders(invoiceUIDs)}) FOR UPDATE`,
       invoiceUIDs,
     );
     const candidates = await loadCandidates(conn, billing.contractUID, invoiceUIDs);

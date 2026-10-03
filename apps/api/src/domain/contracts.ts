@@ -8,18 +8,14 @@ import { createRequireAuth, getAuthUser } from '../auth/middleware.js';
 import { accountFilter, hasPermission } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
-import { pathParam } from '../crud/params.js';
+import { parseQuery, pathParam } from '../crud/params.js';
 import { type Row, insertRow, softDeleteRow, updateRow } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { type ContractRow, contractsTable, loadAuthorizedContract } from './contract-access.js';
-import {
-  insertHistoryEntry,
-  listPremiumsWithValidity,
-  listTermsWithValidity,
-} from './contract-history.js';
-import { loadBonusTimeline } from './contract-years.js';
+import { insertHistoryEntry, listPremiumsWithValidity, withValidity } from './contract-history.js';
+import { bonusTimelineFrom, loadBonusRows } from './contract-years.js';
 
 const money = z.number().min(0).max(999999.99);
 
@@ -45,6 +41,15 @@ const createSchema = base.extend({
   initialDeductible: money.optional(),
   initialReimbursementCap: money.nullish(),
   initialReimbursementRate: z.number().min(0).max(100).optional(),
+});
+
+/**
+ * The list takes one filter, the insured person — like the invoice and billing
+ * searches, so a workspace does not have to fetch every policy and drop what it
+ * does not need (CR-27).
+ */
+const listQuery = z.object({
+  accountUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.account)).optional(),
 });
 
 // accountUID is immutable: a contract belongs to one insured person for life,
@@ -85,23 +90,40 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
   const router = Router();
   const requireAuth = createRequireAuth(pool, config);
 
-  router.get('/', requireAuth, async (_req, res) => {
+  router.get('/', requireAuth, async (req, res) => {
     const user = getAuthUser(res);
-    const accountScope = await accountFilter(
-      pool,
-      user.userId,
-      PERMISSIONS.VIEW_CONTRACTS,
-      'c.accountUID',
-    );
-    if (accountScope === null) {
-      sendData(res, []);
-      return;
+    const where: string[] = [];
+    const params: unknown[] = [];
+
+    const requestedAccount = parseQuery(req, listQuery).accountUID;
+    if (requestedAccount !== undefined) {
+      if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_CONTRACTS, requestedAccount))) {
+        throw forbidden();
+      }
+      where.push('c.accountUID = ?');
+      params.push(requestedAccount);
+    } else {
+      // Without an account the list runs over everything the user may see —
+      // the same two ends as the invoice and billing searches (invoices.ts).
+      const accountScope = await accountFilter(
+        pool,
+        user.userId,
+        PERMISSIONS.VIEW_CONTRACTS,
+        'c.accountUID',
+      );
+      if (accountScope === null) {
+        sendData(res, []);
+        return;
+      }
+      where.push(accountScope.clause);
+      params.push(...accountScope.params);
     }
+
     sendData(
       res,
       await pool.query<Row[]>(
-        `${LIST_SELECT} AND ${accountScope.clause} ORDER BY c.contractUID`,
-        accountScope.params,
+        `${LIST_SELECT} AND ${where.join(' AND ')} ORDER BY c.contractUID`,
+        params,
       ),
     );
   });
@@ -114,11 +136,14 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
       pathParam(req, 'uid'),
       PERMISSIONS.VIEW_CONTRACTS,
     );
+    // The terms travel twice through this answer — as the history and inside
+    // the bonus timeline — but they are read once (CR-16).
+    const bonusRows = await loadBonusRows(pool, [contract.contractUID]);
     sendData(res, {
       ...contract,
       premiums: await listPremiumsWithValidity(pool, contract),
-      terms: await listTermsWithValidity(pool, contract),
-      years: await loadBonusTimeline(pool, contract),
+      terms: withValidity(contract, bonusRows.terms.get(contract.contractUID) ?? []),
+      years: bonusTimelineFrom(contract, bonusRows),
     });
   });
 

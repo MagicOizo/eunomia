@@ -8,7 +8,7 @@ import { accountFilter } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
-import type { CrudTable } from '../crud/repository.js';
+import { type CrudTable, placeholders } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern, generateEntityId } from '../lib/ids.js';
@@ -143,9 +143,8 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
     );
 
     const submissionUID = await withTransaction(pool, async (conn) => {
-      const placeholders = input.invoiceUIDs.map(() => '?').join(', ');
       await conn.query(
-        `SELECT invoiceUID FROM Invoices WHERE invoiceUID IN (${placeholders}) FOR UPDATE`,
+        `SELECT invoiceUID FROM Invoices WHERE invoiceUID IN (${placeholders(input.invoiceUIDs)}) FOR UPDATE`,
         input.invoiceUIDs,
       );
       const candidates = await conn.query<CandidateInvoice[]>(
@@ -161,7 +160,7 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
                    WHERE x.invoiceUID = i.invoiceUID AND x.contractUID = ?
                 ) AS excluded
            FROM Invoices i
-          WHERE i.invoiceUID IN (${placeholders}) AND i.invoiceStatus <> -1`,
+          WHERE i.invoiceUID IN (${placeholders(input.invoiceUIDs)}) AND i.invoiceStatus <> -1`,
         [input.contractUID, input.contractUID, ...input.invoiceUIDs],
       );
       assertInvoicesSubmittable(candidates, input.invoiceUIDs, contractAccount);
@@ -226,7 +225,7 @@ export function createSubmissionsRouter(pool: Pool, config: AppConfig): Router {
       const links = await pool.query<Array<{ submissionUID: string; invoiceUID: string }>>(
         `SELECT submissionUID, invoiceUID
            FROM SubmissionInvoices
-          WHERE submissionUID IN (${uids.map(() => '?').join(', ')})
+          WHERE submissionUID IN (${placeholders(uids)})
           ORDER BY invoiceUID`,
         uids,
       );

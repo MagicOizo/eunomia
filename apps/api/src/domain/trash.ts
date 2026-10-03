@@ -6,24 +6,23 @@ import { createRequireAuth, createRequirePermission } from '../auth/middleware.j
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
-import {
-  type Queryable,
-  type Row,
-  hardDeleteRow,
-  restoreRow,
-  softDeleteRow,
-} from '../crud/repository.js';
+import { type Queryable, hardDeleteRow, restoreRow, softDeleteRow } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { ApiError, conflict, notFound } from '../lib/api-error.js';
 import { linksFrom, linksTo } from './trash-references.js';
+import { type TrashEntry, TRASH_ENTITIES, entityOfTable, entityOfUid } from './trash-registry.js';
 import {
-  BATCH_OF,
-  type TrashEntity,
-  type TrashEntry,
-  TRASH_ENTITIES,
-  entityOfTable,
-  entityOfUid,
-} from './trash-registry.js';
+  type Counted,
+  type Located,
+  attachedCounts,
+  batchOf,
+  blockers,
+  childEdges,
+  deletedDescendants,
+  descendantsOf,
+  loadAll,
+  loadOne,
+} from './trash-tree.js';
 
 /**
  * The Papierkorb (see Notes/eunomia-plan.md, Slice 39). Everything the app
@@ -51,30 +50,6 @@ import {
  * no account at all. The permission therefore belongs to administrators only.
  */
 
-/** Rows that are not records of their own but go with the record they belong to. */
-const ATTACHED_ROW_NAMES: Record<string, { one: string; many: string }> = {
-  SubmissionInvoices: { one: 'Rechnung in einer Einreichung', many: 'Rechnungen in Einreichungen' },
-  InvoiceExclusions: {
-    one: 'Markierung „nicht erstattungsfähig“',
-    many: 'Markierungen „nicht erstattungsfähig“',
-  },
-  ContractBonusTiers: { one: 'Stufe der Bonus-Staffel', many: 'Stufen der Bonus-Staffel' },
-  ContractYears: { one: 'Versicherungsjahr', many: 'Versicherungsjahre' },
-  UserAccountRoles: { one: 'Rechte-Zuweisung', many: 'Rechte-Zuweisungen' },
-  InvoiceReminders: { one: 'Zahlungserinnerung', many: 'Zahlungserinnerungen' },
-};
-
-/** A counted mention of something, in the right German number. */
-interface Counted {
-  label: string;
-  count: number;
-}
-
-const counted = (names: { one: string; many: string }, count: number): Counted => ({
-  label: count === 1 ? names.one : names.many,
-  count,
-});
-
 /** One deleted record, ready for the UI. */
 export interface TrashEntryDto extends TrashEntry {
   restorable: boolean;
@@ -94,160 +69,19 @@ export interface TrashGroupDto {
   entries: TrashEntryDto[];
 }
 
-/** A located row: which entity it belongs to, its UID and what it says. */
-interface Located {
-  entity: TrashEntity;
-  uid: string;
-  row: Row;
-  entry: TrashEntry;
-}
-
-const describe = (entity: TrashEntity, row: Row): TrashEntry => ({
-  uid: String(row.uid),
-  deletedAt: row.deletedAt === null || row.deletedAt === undefined ? null : String(row.deletedAt),
-  ...entity.describe(row),
-});
-
-/** The deletion batch a row belongs to, or null for a row deleted before Slice 39. */
-const batchOf = (located: Located): string | null =>
-  located.row.batch === null || located.row.batch === undefined ? null : String(located.row.batch);
-
-const locate = (entity: TrashEntity, row: Row): Located => ({
-  entity,
-  uid: String(row.uid),
-  row,
-  entry: describe(entity, row),
-});
-
-/** One deleted row of an entity, or null. */
-async function loadOne(db: Queryable, entity: TrashEntity, uid: string): Promise<Located | null> {
-  const rows = await db.query<Row[]>(
-    `${entity.listSql} AND ${entity.alias}.${entity.table.uidColumn} = ? LIMIT 1`,
-    [uid],
-  );
-  const row = rows[0];
-  return row === undefined ? null : locate(entity, row);
-}
-
-/** Every deleted row of an entity, newest deletion first (undated ones last). */
-async function loadAll(db: Queryable, entity: TrashEntity): Promise<Located[]> {
-  const rows = await db.query<Row[]>(
-    `${entity.listSql} ORDER BY ${entity.alias}.deletedAt DESC, uid`,
-  );
-  return rows.map((row) => locate(entity, row));
-}
-
-/**
- * The deleted records that hang directly on this one. With `batch` given, only
- * those deleted in the same moment — which is what a cascade leaves behind and
- * therefore exactly what a restore reverses.
- */
-async function deletedChildren(
-  db: Queryable,
-  parent: Located,
-  batch?: string | null,
-): Promise<Located[]> {
-  const links = await linksTo(db, parent.entity.table.table, parent.entity.table.uidColumn);
-  const children: Located[] = [];
-  for (const link of links) {
-    const entity = entityOfTable(link.table);
-    if (!entity) continue;
-    const sameBatch = batch === undefined ? '' : ` AND ${BATCH_OF(entity.alias)} = ?`;
-    const params = batch === undefined ? [parent.uid] : [parent.uid, batch];
-    const rows = await db.query<Row[]>(
-      `${entity.listSql} AND ${entity.alias}.${link.column} = ?${sameBatch}`,
-      params,
-    );
-    children.push(...rows.map((row) => locate(entity, row)));
-  }
-  return children;
-}
-
-/**
- * All deleted records below this one, children before parents. `batch` narrows
- * it to one deletion moment (see `deletedChildren`). The `seen` set keeps the
- * self-reference of `Accounts.leadAccountUID` from turning into a loop.
- */
-async function deletedDescendants(
-  db: Queryable,
-  parent: Located,
-  batch?: string | null,
-  seen = new Set<string>([`${parent.entity.table.table}:${parent.uid}`]),
-): Promise<Located[]> {
-  const found: Located[] = [];
-  for (const child of await deletedChildren(db, parent, batch)) {
-    const marker = `${child.entity.table.table}:${child.uid}`;
-    if (seen.has(marker)) continue;
-    seen.add(marker);
-    found.push(...(await deletedDescendants(db, child, batch, seen)), child);
-  }
-  return found;
-}
-
-/** Attached rows of link tables (no records of their own) hanging on a record. */
-async function attachedRows(db: Queryable, located: Located): Promise<Counted[]> {
-  const links = await linksTo(db, located.entity.table.table, located.entity.table.uidColumn);
-  const counts: Counted[] = [];
-  for (const link of links) {
-    if (entityOfTable(link.table)) continue;
-    const names = ATTACHED_ROW_NAMES[link.table];
-    if (!names) continue;
-    const rows = await db.query<Array<{ n: number }>>(
-      `SELECT COUNT(*) AS n FROM ${link.table} WHERE ${link.column} = ?`,
-      [located.uid],
-    );
-    const n = Number(rows[0]?.n ?? 0);
-    if (n > 0) counts.push(counted(names, n));
-  }
-  return counts;
-}
-
-/**
- * What still ACTIVELY points at this record (or at one of the deleted records
- * below it) and therefore stops it from being removed for good. Counted per
- * kind, so the sentence reads "2 Rechnungen, 1 Police".
- */
-async function blockers(db: Queryable, located: Located): Promise<Counted[]> {
-  const tally = new Map<string, { entity: TrashEntity; count: number }>();
-  const walk = async (current: Located, seen: Set<string>): Promise<void> => {
-    const links = await linksTo(db, current.entity.table.table, current.entity.table.uidColumn);
-    for (const link of links) {
-      const entity = entityOfTable(link.table);
-      if (!entity) continue;
-      const rows = await db.query<Array<{ n: number }>>(
-        `SELECT COUNT(*) AS n FROM ${link.table}
-          WHERE ${link.column} = ? AND ${entity.table.statusColumn} <> -1`,
-        [current.uid],
-      );
-      const n = Number(rows[0]?.n ?? 0);
-      if (n > 0) {
-        const seenBefore = tally.get(entity.key);
-        tally.set(entity.key, { entity, count: (seenBefore?.count ?? 0) + n });
-      }
-    }
-    for (const child of await deletedChildren(db, current)) {
-      const marker = `${child.entity.table.table}:${child.uid}`;
-      if (seen.has(marker)) continue;
-      seen.add(marker);
-      await walk(child, seen);
-    }
-  };
-  await walk(located, new Set([`${located.entity.table.table}:${located.uid}`]));
-  return [...tally.values()].map(({ entity, count }) =>
-    counted({ one: entity.singular, many: entity.plural }, count),
-  );
-}
-
 /** The whole trash, grouped by kind in the registry's order; empty groups fall away. */
 async function listTrash(db: Queryable): Promise<TrashGroupDto[]> {
   const groups: TrashGroupDto[] = [];
   for (const entity of TRASH_ENTITIES) {
     const located = await loadAll(db, entity);
     if (located.length === 0) continue;
+    // Asked once for the whole kind, then read per entry (CR-17).
+    const edges = await childEdges(db, located);
+    const counts = await attachedCounts(db, entity, located);
     const entries: TrashEntryDto[] = [];
     for (const one of located) {
-      const attached = await deletedDescendants(db, one);
-      const batch = await deletedDescendants(db, one, batchOf(one));
+      const attached = descendantsOf(one, edges);
+      const batch = descendantsOf(one, edges, batchOf(one));
       entries.push({
         ...one.entry,
         restorable: entity.restoreNote === undefined,
@@ -259,7 +93,7 @@ async function listTrash(db: Queryable): Promise<TrashGroupDto[]> {
           plural: child.entity.plural,
           label: child.entry.label,
         })),
-        attachedRows: await attachedRows(db, one),
+        attachedRows: counts.get(one.uid) ?? [],
         restoresWith: batch.length,
       });
     }

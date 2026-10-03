@@ -125,7 +125,32 @@ test('trash: list, restore and delete for good', async (t) => {
     await resetData(pool);
 
     const config = testConfig(database);
-    const app = createApp({ pool, config });
+    /**
+     * The app on a counted pool. CR-17 was a query count that grew with the
+     * number of entries, so the proof is a number rather than a promise: a
+     * longer trash has to cost the same page. Nothing but a request runs
+     * against this pool — `createApp` starts no timers — so the count is the
+     * request's own.
+     */
+    let queries = 0;
+    const counting = new Proxy(pool, {
+      get(target, prop) {
+        if (prop === 'query') {
+          return (...args: Parameters<Pool['query']>) => {
+            queries += 1;
+            return target.query(...args);
+          };
+        }
+        const value = Reflect.get(target, prop) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const countQueries = async (run: () => Promise<unknown>): Promise<number> => {
+      queries = 0;
+      await run();
+      return queries;
+    };
+    const app = createApp({ pool: counting, config });
 
     await request(app)
       .post('/api/v1/setup')
@@ -522,6 +547,39 @@ test('trash: list, restore and delete for good', async (t) => {
       assert.equal(purge.status, 404);
       const unknown = await del('/api/v1/trash/zzzzzzzzzzzz');
       assert.equal(unknown.status, 404);
+    });
+
+    /*
+     * CR-17: the page used to ask per entry — twice the recursive descent over
+     * the foreign keys and a count per link table, around ten questions for a
+     * single invoice. It asks per kind and per level now, so two more entries
+     * of the same kind have to cost nothing at all.
+     */
+    await t.test('the trash page asks the same of one entry and of three', async () => {
+      // Without a facility, so the only thing that changes between the two
+      // measurements is the number of entries in the invoice group.
+      const uids = [
+        await makeInvoice('R-COUNT-1', 10),
+        await makeInvoice('R-COUNT-2', 20),
+        await makeInvoice('R-COUNT-3', 30),
+      ];
+      const invoiceEntries = async (): Promise<number> =>
+        (await group('invoice'))?.entries.length ?? 0;
+      const before = await invoiceEntries();
+
+      await del(`/api/v1/invoices/${uids[0]}`);
+      assert.equal(await invoiceEntries(), before + 1);
+      const forOne = await countQueries(() => request(app).get('/api/v1/trash').set(admin));
+
+      for (const uid of uids.slice(1)) await del(`/api/v1/invoices/${uid}`);
+      assert.equal(await invoiceEntries(), before + 3);
+      const forThree = await countQueries(() => request(app).get('/api/v1/trash').set(admin));
+      assert.equal(forThree, forOne, 'two further entries cost no further query');
+
+      for (const uid of uids) {
+        assert.equal((await post(`/api/v1/trash/${uid}/restore`, {})).status, 200);
+      }
+      assert.equal(await invoiceEntries(), before, 'the counted entries are back out again');
     });
 
     await t.test('without MANAGE_TRASH the whole area is closed', async () => {

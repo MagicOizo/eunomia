@@ -1,5 +1,6 @@
 import type { Pool } from 'mariadb';
 
+import { placeholders } from '../crud/repository.js';
 import { ENTITY_PREFIX, ID_ALPHABET, type EntityName } from '../lib/ids.js';
 
 /**
@@ -42,9 +43,8 @@ export async function seedRow(
   if (firstColumn === undefined) {
     throw new Error(`seedRow called with no columns for table ${table}`);
   }
-  const placeholders = columns.map(() => '?').join(', ');
   await pool.query(
-    `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})
+    `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders(columns)})
      ON DUPLICATE KEY UPDATE ${firstColumn} = ${firstColumn}`,
     Object.values(row),
   );

@@ -45,6 +45,15 @@ function outputColumns(t: CrudTable): string {
   return [t.uidColumn, ...t.columns, t.statusColumn].join(', ');
 }
 
+/**
+ * `?, ?, ?` for a list of values — the bound form of an `IN (…)` list and of
+ * the column list of a `VALUES (…)`. Written out by hand in a dozen places
+ * before, which is a dozen chances to get the count wrong (CR-16/CR-17).
+ */
+export function placeholders(values: readonly unknown[]): string {
+  return values.map(() => '?').join(', ');
+}
+
 /** Keeps only entries whose key is a known writable column of the table. */
 function pickColumns(
   t: CrudTable,
@@ -93,11 +102,10 @@ export async function insertRow(
   const uid = generateEntityId(t.entity);
   const [columns, values] = pickColumns(t, data);
   const allColumns = [t.uidColumn, ...columns];
-  const placeholders = allColumns.map(() => '?').join(', ');
-  await pool.query(`INSERT INTO ${t.table} (${allColumns.join(', ')}) VALUES (${placeholders})`, [
-    uid,
-    ...values,
-  ]);
+  await pool.query(
+    `INSERT INTO ${t.table} (${allColumns.join(', ')}) VALUES (${placeholders(allColumns)})`,
+    [uid, ...values],
+  );
   const created = await getRow(pool, t, uid);
   if (!created) throw new Error(`Row ${uid} vanished immediately after insert into ${t.table}`);
   return created;
@@ -132,16 +140,15 @@ export async function insertManyRows(
     rows.some((row) => Object.prototype.hasOwnProperty.call(row, column)),
   );
   const allColumns = [t.uidColumn, ...columns];
-  const placeholders = allColumns.map(() => '?').join(', ');
   const uids = rows.map(() => generateEntityId(t.entity));
   await pool.batch(
-    `INSERT INTO ${t.table} (${allColumns.join(', ')}) VALUES (${placeholders})`,
+    `INSERT INTO ${t.table} (${allColumns.join(', ')}) VALUES (${placeholders(allColumns)})`,
     rows.map((row, index) => [uids[index], ...columns.map((column) => row[column] ?? null)]),
   );
 
   const created = await pool.query<Row[]>(
     `SELECT ${outputColumns(t)} FROM ${t.table}
-      WHERE ${t.uidColumn} IN (${uids.map(() => '?').join(', ')})`,
+      WHERE ${t.uidColumn} IN (${placeholders(uids)})`,
     uids,
   );
   const byUid = new Map(created.map((row) => [row[t.uidColumn], row]));

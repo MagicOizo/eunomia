@@ -7,6 +7,31 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.18.0-slice.5 — 2026-10-03
+
+Nothing in the app looks different after this release. Three places asked the database a number of
+questions that grew with the data instead of staying put; they now ask a fixed number, and two
+tests count the questions so they cannot start growing again.
+
+- **The reimbursement plan asks once for the whole household.** Opening the invoice workspace, and
+  every change of year in it, built the plan by asking five questions per policy — the terms, the
+  claims, the year records, the terms again and their bonus scale. It asks four for all policies
+  together now. With the three policies of the development data that is eleven questions for the
+  page instead of twenty-two, and a fourth policy would add none at all. The bonus calculation
+  itself is untouched.
+- **The trash asks per kind, not per entry.** Listing the trash walked the foreign keys below every
+  single entry twice over and counted its attached rows one table at a time — around ten questions
+  for one deleted invoice, so a trash of fifty entries cost several hundred round trips for one
+  page. The descent now reads a whole level at once and walks the result in memory. Two further
+  entries of a kind cost no further question, which is what the retention period planned for a
+  later release will rely on.
+- **Policies can be asked for by insured person.** `GET /contracts` takes `?accountUID=` like the
+  invoice and billing lists always have. The invoice workspace used to fetch every policy of every
+  insured person and drop what it did not need on arrival; it now receives only the ones it shows.
+- **One way to write a bound list.** The `?, ?, ?` of an `IN (…)` was written out by hand in
+  fourteen places, each one a chance to get the count wrong. There is one helper for it now, and
+  the grouping of rows that every batched query needs afterwards has one as well, with its own test.
+
 ## 0.18.0-slice.4 — 2026-10-03
 
 The interface learns the permission model. The API has twelve permissions, granted globally or per

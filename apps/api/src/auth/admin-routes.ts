@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
+import { placeholders } from '../crud/repository.js';
 import { badRequest, notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { hashPassword } from '../lib/password.js';
@@ -171,7 +172,7 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
       roleUIDs.length === 0
         ? []
         : await pool.query<Array<{ roleName: string }>>(
-            `SELECT roleName FROM Roles WHERE roleUID IN (${roleUIDs.map(() => '?').join(', ')})`,
+            `SELECT roleName FROM Roles WHERE roleUID IN (${placeholders(roleUIDs)})`,
             roleUIDs,
           );
     const willRemainAdmin = names.some((n) => n.roleName === 'Admin');

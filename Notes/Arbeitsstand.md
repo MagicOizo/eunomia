@@ -162,7 +162,30 @@ ausdrücklich vor einer anderen steht.
       einem Konto sieht keinen System-Bereich, nur seinen Versicherten, kann dessen Rechnungen
       schreiben und dessen Stammdaten nur lesen; `/system/trash` und das Konto eines anderen führen
       auf die Startseite.
-- [ ] **13 — Weniger Fragen an die Datenbank.** CR-16, CR-17, CR-27.
+- [x] **13 — Weniger Fragen an die Datenbank.** CR-16, CR-17, CR-27.
+      Umgesetzt mit v0.18.0-slice.5 (Slice 63). Zwei Festlegungen des Autors prägen das Ergebnis:
+      die lesende Hälfte des Papierkorbs bekam ein eigenes Geschwister (`trash-tree.ts`; `trash.ts`
+      schrumpft von 440 auf 274 Zeilen), und der Platzhalter-Helfer `placeholders()` wurde über
+      alle 14 Bestandsstellen durchgesetzt statt nur an den neuen. Der Ertrag ist in Zahlen
+      messbar: der Erstattungsplan kostet auf den Entwicklungsdaten 11 Abfragen statt 22, und zwei
+      Integrationstests zählen die Abfragen mit einem `Proxy` um den Pool — eine zweite Police und
+      zwei weitere Papierkorb-Einträge kosten keine einzige weitere. Vier Dinge gingen über den
+      Review hinaus: (1) `termsForYear` ist ersatzlos entfallen, weil `termsInForce` dieselbe Frage
+      schon als private Funktion in `bonus-timeline.ts` beantwortete — sie wurde nur exportiert und
+      über die Zeile generisch gemacht; (2) `listTermsWithValidity` ist in eine Abfrage
+      (`loadTermsWithTiers`) und eine reine Funktion (`withValidity`) zerfallen, womit die
+      Detailroute `GET /contracts/:uid` die Konditionen einmal statt zweimal liest und der doppelte
+      Cast aus CR-19 von selbst verschwindet (der Rest von CR-19 bleibt Scheibe 14); (3) `lib/group.ts`
+      (`addTo`, `groupBy`) samt Test, weil die Gruppierung im Speicher die andere Hälfte jeder
+      gebündelten Abfrage ist und viermal von Hand dastand; (4) `BATCH_OF` ist nicht mehr
+      exportiert, weil der Löschstapel jetzt im Speicher gefiltert wird — und genau dort liegt die
+      Falle, die festgehalten gehört: `DATE_FORMAT(…) = NULL` ist in SQL nie wahr, `null === null`
+      im Speicher aber schon, also darf eine Zeile ohne `deletedAt` keinen Stapel bekommen. Die
+      Zahl der Abfragen ist fest in der Zahl der Einträge, nicht in der Tiefe des Baums: eine
+      Ebene mehr kostet weiter ihre Abfragen. Von Hand geprüft: alle elf Antworten der angefassten
+      Endpunkte (Plan für drei Jahre, Policenliste, sechs Police-Details, die ganze
+      Papierkorb-Seite) sind gegen die Entwicklungsdatenbank vor und nach dem Umbau zeichengleich;
+      dazu Arbeitsbereich, Jahreswechsel, Erstattungsplan und Papierkorb im Browser.
 - [ ] **14 — Typen statt Zusicherungen.** CR-19.
 
 ### Block IV — Betrieb und Nachweis (Release 0.19.0)

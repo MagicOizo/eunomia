@@ -6,6 +6,7 @@ import {
   type BonusTimelineInput,
   type BonusYear,
   computeBonusTimeline,
+  termsInForce,
 } from './bonus-timeline.js';
 
 // Scale from the author's example (PKV x): 1 year → 300 €, 2 → 450 €, 4 → 600 €.
@@ -176,4 +177,27 @@ test('only the running year is in progress; claims outside the range are ignored
 
 test('a counting year after the last year yields no years', () => {
   assert.deepEqual(run({ countingFromYear: 2026 }), []);
+});
+
+/*
+ * `termsInForce` answers for the reimbursement plan too since CR-16, which took
+ * the question away from the database ("the latest entry at or before the
+ * year"), so it is worth its own cases rather than only the ones the timeline
+ * happens to walk through.
+ */
+test('the terms in force are the latest ones that had started', () => {
+  const terms = [
+    { validFromYear: 2021, deductible: 300 },
+    { validFromYear: 2024, deductible: 500 },
+    { validFromYear: 2023, deductible: 400 },
+  ];
+  assert.equal(termsInForce(terms, 2020), null, 'nothing was in force yet');
+  assert.equal(termsInForce(terms, 2021)?.deductible, 300);
+  assert.equal(termsInForce(terms, 2022)?.deductible, 300, 'the earlier terms carry on');
+  assert.equal(termsInForce(terms, 2023)?.deductible, 400, 'order of the rows does not matter');
+  assert.equal(termsInForce(terms, 2026)?.deductible, 500, 'the latest ones stay in force');
+});
+
+test('a policy without any terms has none in force', () => {
+  assert.equal(termsInForce([], 2025), null);
 });

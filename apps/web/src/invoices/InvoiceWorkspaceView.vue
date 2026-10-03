@@ -218,16 +218,18 @@ async function loadStatic(): Promise<void> {
   );
   accountName.value = [account.firstname, account.surname].filter(Boolean).join(' ');
 
-  const allContracts = await listResource<ContractRef & { accountUID: string }>('/contracts');
-  contracts.value = allContracts
-    .filter((c) => c.accountUID === props.accountUID)
-    .map((c) => ({
-      contractUID: c.contractUID,
-      contractNumber: c.contractNumber,
-      companyName: c.companyName,
-      contractBegin: c.contractBegin,
-      contractEnd: c.contractEnd,
-    }));
+  // The API filters by insured person, so nothing of the other households is
+  // transferred here at all (CR-27).
+  const accountContracts = await listResource<ContractRef>(
+    `/contracts?accountUID=${props.accountUID}`,
+  );
+  contracts.value = accountContracts.map((c) => ({
+    contractUID: c.contractUID,
+    contractNumber: c.contractNumber,
+    companyName: c.companyName,
+    contractBegin: c.contractBegin,
+    contractEnd: c.contractEnd,
+  }));
 
   await loadLookups();
 }

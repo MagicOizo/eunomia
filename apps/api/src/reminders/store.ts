@@ -3,6 +3,7 @@ import type { PayableInvoice, ReminderStage } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
 import { listUsersWithAccess } from '../auth/permissions.js';
+import { placeholders } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import type { SettingKey, SettingValue } from '../settings/registry.js';
 import { type EncryptionKey, getSettings, setApplicationValues } from '../settings/repository.js';
@@ -176,13 +177,12 @@ export function createReminderStore(pool: Pool, encryptionKey: EncryptionKey): R
 
     listReminders: async (invoiceUIDs: string[]): Promise<ReminderRecord[]> => {
       if (invoiceUIDs.length === 0) return [];
-      const placeholders = invoiceUIDs.map(() => '?').join(', ');
       const rows = await pool.query<
         Array<{ invoiceUID: string; userID: number; stage: ReminderStage; sentOn: string }>
       >(
         `SELECT invoiceUID, userID, stage, sentOn
            FROM InvoiceReminders
-          WHERE invoiceUID IN (${placeholders})`,
+          WHERE invoiceUID IN (${placeholders(invoiceUIDs)})`,
         invoiceUIDs,
       );
       return rows.map((row) => ({
