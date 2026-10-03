@@ -100,7 +100,20 @@ ausdrücklich vor einer anderen steht.
 
 ### Block III — Struktur (Release 0.18.0)
 
-- [ ] **9 — `invoices.ts` schneiden.** CR-15. **Vor Scheibe 10.**
+- [x] **9 — `invoices.ts` schneiden.** CR-15. **Vor Scheibe 10.**
+      Umgesetzt mit v0.18.0-slice.1 (Slice 59). Flach geschnitten statt ins Unterverzeichnis, auf
+      Entscheidung des Autors: `invoice-rules.ts` (177 Zeilen) und `invoice-queries.ts` (381) neben
+      `invoices.ts` (434, nur noch Schemata und Router) — ein Unterverzeichnis gäbe es in
+      `src/domain/` sonst nirgends, und `invoice-status.ts` ist bereits genau so ein
+      herausgelöstes Geschwister. Die Abhängigkeit läuft in eine Richtung:
+      Router → Queries → Regeln. Zwei Dinge gingen über den Review hinaus: `invoicesTable.columns`
+      und `INVOICE_COLUMNS` standen zweimal untereinander in derselben Datei und mussten von Hand
+      in Schritt gehalten werden — die zweite Liste leitet sich jetzt aus der ersten ab (der
+      erzeugte String wurde gegen den alten verglichen, zeichengleich); und `notCoveredOf` ist bei
+      den Queries gelandet statt bei den Regeln, weil es eine `InvoiceRow` liest und
+      `invoice-rules.ts` sonst nicht mehr frei von der Datenbankschicht wäre. Der Ertrag ist
+      `invoice-rules.test.ts`: 33 Fälle ohne Datenbank, die ersten Tests im Projekt für diese fünf
+      Regeln. Kein Integrationstest musste angefasst werden.
 - [ ] **10 — Grenzen an den Eingängen.** SEC-01, SEC-11, CR-18.
 - [ ] **11 — Dialoge und große Ansichten.** CR-29 (★), CR-30 (★). Bereitet Scheibe 12 vor.
 - [ ] **12 — Die Oberfläche lernt das Rechtemodell.** CR-26.

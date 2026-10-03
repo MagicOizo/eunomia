@@ -11,7 +11,7 @@ import { contractsTable } from './contract-access.js';
 import { assertValidityFree, premiumSpec, termsSpec } from './contract-history.js';
 import { facilitiesTable } from './facilities.js';
 import { companiesTable } from './insurance-companies.js';
-import { invoicesTable } from './invoices.js';
+import { invoicesTable } from './invoice-queries.js';
 import { assertBillingNumberFree, billingsTable } from './service-billings.js';
 import { submissionsTable } from './submissions.js';
 

@@ -7,6 +7,22 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.18.0-slice.1 — 2026-10-03
+
+Nothing in the app changes with this release. It takes the largest source file in the project
+apart, so that the rules an invoice obeys can be read — and tested — on their own.
+
+- **The invoice rules have a file, and a test.** Five rules decide what a write to an invoice
+  leaves behind: which days it is billed for, whether the "not covered" mark may be set, what the
+  two transfer dates become when a bill was paid on the spot, and which of a collection agency's
+  payment details it goes to. They were buried in the middle of a 944-line file that was also the
+  table description, the schemas, the database queries and seven endpoints, and the only way to
+  reach them was through a running server and a database. They now live in one file of their own,
+  with 33 tests that run in a quarter of a second — the first tests in the project to address
+  these rules directly. The rules themselves are unchanged, line for line.
+- **One list of columns instead of two.** The invoice's columns were written out twice, a few
+  lines apart, and had to be kept in step by hand. The second list is now derived from the first.
+
 ## 0.17.0 — 2026-10-03
 
 Everything from the nine previews below, as one release: the `0.16.0-slice.N` and
