@@ -8,12 +8,14 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker, { type PickerOption } from '../design-system/components/EuEntityPicker.vue';
+import EuSuggestedDateField from '../design-system/components/EuSuggestedDateField.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { usePaymentDetailPicker } from './payment-detail-picker';
+import { paymentTermSuggestions } from './payment-terms';
 import type { InvoiceDto } from './api';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import {
@@ -83,6 +85,14 @@ watch(
   (map) => paymentDetailPicker.refresh(map),
 );
 const paymentDetailOptions = computed(() => paymentDetailPicker.optionsOf(form.value.agencyUID));
+
+/**
+ * The payment terms a bill usually names, counted from the invoice date as it
+ * stands right now (issues.md 0.15.0-2). Only a suggestion: once one is picked
+ * the date is the value, and correcting the invoice date afterwards does not
+ * move it.
+ */
+const paymentTerms = computed(() => paymentTermSuggestions(form.value.invoiceDate));
 
 /** Picking an agency suggests its first details; clearing it takes both. */
 function pickAgency(uid: string | null): void {
@@ -243,7 +253,12 @@ function submit(): void {
       <EuToggle v-model="directPayment" label="Direkt-/Barzahlung" />
 
       <template v-if="!directPayment">
-        <EuTextField v-model="form.transferUntilDate" label="Zahlungsziel" type="date" />
+        <EuSuggestedDateField
+          v-model="form.transferUntilDate"
+          label="Zahlungsziel"
+          :suggestions="paymentTerms"
+          suggestions-label="Typische Zahlungsziele"
+        />
         <EuTextField v-model="form.transferSubject" label="Verwendungszweck" />
         <EuEntityPicker
           :model-value="form.agencyUID || null"

@@ -46,8 +46,20 @@ Bindestrich dreimal unbemerkt das Docker-`:latest` verschoben hat. 5a steht vor 
 - [x] **Release 0.19.0.** Eigener Commit, keine Slice-Nummer. Der Abschnitt im `CHANGELOG.md` zieht
       die Scheiben 1–6 zusammen; Tag und Push macht der Autor
       (`git tag -a v0.19.0 -m "v0.19.0"`).
-- [ ] **2 — Eingabe-Politur** (`0.20.0-slice.1`). IBAN mit Leerzeichen (0.15.0-1) und typische
-      Zahlungsziele (0.15.0-2).
+- [x] **2 — Eingabe-Politur** (`0.20.0-slice.1`). IBAN mit Leerzeichen (0.15.0-1) und typische
+      Zahlungsziele (0.15.0-2). Umgesetzt mit v0.20.0-slice.1 (Slice 71). Beide Punkte sind an einer
+      Stelle gelandet, an der sie weiterwirken: die IBAN-Schreibweise wird in der **Prüfung** abgeräumt
+      (`ibanField`/`bicField`), nicht im Dialog, und das Zahlungsziel bekommt mit `EuSuggestedDateField`
+      ein Datumsfeld mit Vorschlagsliste, das jedes andere Datum auch haben kann.
+      Zwei Dinge sind beim Nachfahren am laufenden Programm aufgefallen und stehen deshalb in
+      `issues.md`: ein `<input type="date">` verbraucht Tab zuerst für seine drei eigenen Felder, die
+      Liste ist also der vierte Tab-Druck (der erste außerhalb des Feldes) — die Entscheidung „Tab
+      statt Pfeiltasten" bleibt richtig, aber sie heißt nicht „ein Tastendruck". Und die IBAN-Spalte
+      der Liste war die letzte Stelle, die die Nummer roh druckte, während Maske und Picker sie
+      gruppieren; eine Zeile, aber genau die Inkonsequenz, von der der Punkt sprach.
+      Gewarnt sei vor `z.preprocess`: dass `bicField.nullish()` „kein BIC" nicht plötzlich als
+      Fehler liest, hängt daran, dass zod Nullable/Optional **vor** dem Effect auswertet. Das ist im
+      Unit-Test festgenagelt, damit es beim nächsten zod-Sprung nicht stillschweigend kippt.
 - [ ] **3 — Abgerechnet schon bei der Zuordnung** (`0.20.0-slice.2`). 0.15.0-4.
 - [ ] **4 — Leistungsabrechnungen finden** (`0.20.0-slice.3`). 0.15.0-5; reines Web, die API kann es
       schon.

@@ -11,7 +11,7 @@ import {
 import ContractDetailDialog from '../contracts/ContractDetailDialog.vue';
 import { apiData } from '../lib/api';
 import { downloadJson, isoToday } from '../lib/download';
-import { germanDate, germanMoney } from '../lib/format';
+import { bic, germanDate, germanMoney, iban } from '../lib/format';
 import type { ResourceRow } from '../lib/resource';
 import type { ResourceConfig } from './config';
 
@@ -212,11 +212,14 @@ const facilities: ResourceConfig = {
  * The IBAN column of an agency shows its first payment details — the ones a new
  * invoice is suggested — and says how many others stand beside them (Slice 44). Which
  * an invoice actually goes to is the invoice's own statement.
+ *
+ * Grouped in fours, like the detail dialog, the picker and now the input field:
+ * this column was the one place that printed the stored number raw.
  */
 function paymentDetailCell(value: unknown, row: ResourceRow): string {
-  const iban = value === null || value === undefined ? '–' : String(value);
+  const printed = value === null || value === undefined ? '–' : iban(String(value));
   const count = Array.isArray(row.accounts) ? row.accounts.length : 0;
-  return count > 1 ? `${iban} (+${count - 1} weitere)` : iban;
+  return count > 1 ? `${printed} (+${count - 1} weitere)` : printed;
 }
 
 const agencies: ResourceConfig = {
@@ -232,8 +235,10 @@ const agencies: ResourceConfig = {
   ],
   fields: [
     { key: 'agencyName', label: 'Name', type: 'text', required: true },
-    { key: 'bankAccount', label: 'IBAN', type: 'text', required: true },
-    { key: 'bic', label: 'BIC', type: 'text' },
+    // Both are read off a bill in their printed form — the IBAN in groups of
+    // four, neither of them necessarily in capitals (issues.md 0.15.0-1).
+    { key: 'bankAccount', label: 'IBAN', type: 'text', required: true, normalize: iban },
+    { key: 'bic', label: 'BIC', type: 'text', normalize: bic },
     { key: 'recipientName', label: 'Empfänger (nur wenn abweichend)', type: 'text' },
   ],
   // Which invoices go through this agency (issues.md 0.12.0-5) — the filtered

@@ -4,7 +4,7 @@ import { ref } from 'vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import { iban } from '../lib/format';
+import { bic as bicText, iban } from '../lib/format';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import type { AgencyPaymentDetailDto, AgencyPaymentDetailInput } from './api';
 
@@ -58,8 +58,8 @@ function submit(): void {
     <form class="eu-form" @submit.prevent="submit">
       <!-- The explanations sit in the labels, as in the other forms of this
            kind: EuTextField has no hint of its own. -->
-      <EuTextField v-model="bankAccount" label="IBAN" />
-      <EuTextField v-model="bic" label="BIC (optional)" />
+      <EuTextField v-model="bankAccount" label="IBAN" :normalize="iban" />
+      <EuTextField v-model="bic" label="BIC (optional)" :normalize="bicText" />
       <EuTextField v-model="recipientName" label="Empfänger (nur wenn abweichend)" />
       <EuTextField v-model="note" label="Notiz (z. B. wofür dieses Konto gilt)" />
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>

@@ -54,6 +54,23 @@ export function pastedIsoDate(event: ClipboardEvent): string | null {
 }
 
 /**
+ * `2026-09-24` plus `days` as `YYYY-MM-DD`, or `null` if the text is not a date
+ * this module would accept. Counted in UTC on purpose, like `todayIso` reads
+ * the local day on purpose: a calendar day plus fourteen calendar days has
+ * nothing to do with clocks, and a local `Date` read back as ISO text drags the
+ * zone into it — in Berlin, local midnight of `2026-10-25` is already
+ * `2026-10-24` in UTC, and adding the days as milliseconds then lands a day
+ * short because that night is 25 hours long.
+ */
+export function isoPlusDays(value: string, days: number): string | null {
+  const iso = isoFromGerman(value);
+  if (iso === null) return null;
+  const [year, month, day] = iso.split('-').map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return shifted.toISOString().slice(0, 10);
+}
+
+/**
  * Today as `YYYY-MM-DD` in the reader's own zone — the calendar day they would
  * write on a form. Not `toISOString().slice(0, 10)`, which is the UTC day: in
  * Berlin that is still yesterday until 2 a.m., and the app would prefill a date

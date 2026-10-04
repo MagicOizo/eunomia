@@ -48,17 +48,30 @@ export const paymentDetailsTable = crudTable({
   columns: ['agencyUID', 'bankAccount', 'bic', 'recipientName', 'note'],
 });
 
+/**
+ * The written form of an account number, reduced to the number itself: an IBAN
+ * is printed in groups of four and a BIC in capitals, but neither the grouping
+ * nor the case belongs to the value. Whoever copies an IBAN off a bill copies
+ * the spaces with it (issues.md 0.15.0-1), and being rejected for that while
+ * every list on screen shows the very same number *with* spaces is the
+ * contradiction this removes. Normalising here rather than in the dialogs makes
+ * it one rule for every door, and makes the stored value canonical — which the
+ * display formatter in the web already claimed it was.
+ */
+const compact = (value: unknown): unknown =>
+  typeof value === 'string' ? value.replace(/\s+/g, '').toUpperCase() : value;
+
 /** IBAN — a loose length/charset check, not a checksum validation (as before). */
-export const ibanField = z
-  .string()
-  .trim()
-  .regex(/^[A-Z0-9]{15,34}$/, 'Expected an IBAN-like account number');
+export const ibanField = z.preprocess(
+  compact,
+  z.string().regex(/^[A-Z0-9]{15,34}$/, 'Expected an IBAN-like account number'),
+);
 
 /** BIC — 8 or 11 characters, the shape the EPC scheme (and the GiroCode) wants. */
-export const bicField = z
-  .string()
-  .trim()
-  .regex(/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/, 'Expected a BIC of 8 or 11 characters');
+export const bicField = z.preprocess(
+  compact,
+  z.string().regex(/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/, 'Expected a BIC of 8 or 11 characters'),
+);
 
 /** Beneficiary name; 70 characters is the GiroCode's field length (AT-21). */
 export const recipientNameField = z.string().trim().min(1).max(70);

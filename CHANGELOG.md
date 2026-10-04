@@ -7,6 +7,25 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.20.0-slice.1 — 2026-10-04
+
+Two small things about typing, both reported from everyday use.
+
+- **An IBAN may be written the way it is printed.** Copied off a bill or out of a banking app, an
+  IBAN comes in groups of four and not always in capitals — and the form refused exactly that,
+  while every list in the app shows the same number in groups. The spaces and the case are now
+  understood as notation: they are taken off before the number is checked, wherever it arrives, and
+  what is stored is the number itself. The field writes it out in groups once it is left, so what
+  stands there is what the lists will show. The one place that still printed the stored number raw,
+  the IBAN column of the agency list, now groups it too.
+- **The usual payment terms are one click away.** Some bills name a due date, others only "within
+  14 days". Focusing the Zahlungsziel field in the create form now offers the four steps a bill
+  usually names — immediately, 14, 15 or 30 days — each with the date it works out to, counted from
+  the invoice date. Picking one fills the date field and that is the end of it: nothing is stored
+  about the step, and correcting the invoice date afterwards leaves a due date already written down
+  exactly where it is. The list is reachable with the keyboard and leaves the date field's own keys
+  alone.
+
 ## 0.19.0 — 2026-10-04
 
 Everything from the six previews below, as one release: the fourth and last of the blocks working

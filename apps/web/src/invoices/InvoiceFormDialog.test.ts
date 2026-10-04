@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import PaymentDetailFormDialog from '../agencies/PaymentDetailFormDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
+import EuSuggestedDateField from '../design-system/components/EuSuggestedDateField.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
 import { differentYearsMessage } from './treatment-days';
 
@@ -289,6 +290,83 @@ describe('InvoiceFormDialog bank account', () => {
 
     expect(submitted(wrapper)?.agencyUID).toBeNull();
     expect(submitted(wrapper)?.agencyAccountUID).toBeNull();
+
+    wrapper.unmount();
+  });
+});
+/**
+ * The payment terms a bill usually names, offered under the Zahlungsziel field
+ * (issues.md 0.15.0-2). A suggestion and nothing more: picked once, the date is
+ * the value and stays where it is.
+ */
+describe('InvoiceFormDialog payment terms', () => {
+  /** The Zahlungsziel field with its list open, and the suggestions standing in it. */
+  async function openTerms(wrapper: Form) {
+    const field = wrapper.findComponent(EuSuggestedDateField);
+    await field.find('input').trigger('focusin');
+    return field;
+  }
+
+  it('offers the four steps counted from the invoice date', async () => {
+    const wrapper = mountForm();
+    await fillRequired(wrapper, '2020-03-02');
+    const field = await openTerms(wrapper);
+
+    expect(field.findAll('.eu-date-suggest__label').map((o) => o.text())).toEqual([
+      'sofort',
+      '14 Tage',
+      '15 Tage',
+      '30 Tage',
+    ]);
+    // Counted from the invoice date (01.03.2020), not from the treatment day.
+    expect(field.findAll('.eu-date-suggest__hint').map((o) => o.text())).toEqual([
+      '01.03.2020',
+      '15.03.2020',
+      '16.03.2020',
+      '31.03.2020',
+    ]);
+
+    wrapper.unmount();
+  });
+
+  it('sends the date the picked step works out to', async () => {
+    const wrapper = mountForm();
+    await fillRequired(wrapper, '2020-03-02');
+    const field = await openTerms(wrapper);
+    await field.findAll('.eu-date-suggest__option')[1].trigger('click');
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(submitted(wrapper)?.transferUntilDate).toBe('2020-03-15');
+
+    wrapper.unmount();
+  });
+
+  it('leaves a picked date where it is when the invoice date is corrected', async () => {
+    const wrapper = mountForm();
+    await fillRequired(wrapper, '2020-03-02');
+    const field = await openTerms(wrapper);
+    await field.findAll('.eu-date-suggest__option')[1].trigger('click');
+
+    // The invoice turns out to be dated a month later. The suggestions move
+    // with it, the date already written down does not (the issue says so).
+    await wrapper.findAll('.eu-text-field__input')[1].setValue('2020-04-01');
+    await flushPromises();
+    expect(field.props('suggestions')[1].value).toBe('2020-04-15');
+
+    await wrapper.find('form').trigger('submit');
+
+    expect(submitted(wrapper)?.transferUntilDate).toBe('2020-03-15');
+
+    wrapper.unmount();
+  });
+
+  it('suggests nothing before an invoice date stands', async () => {
+    const wrapper = mountForm();
+    const field = await openTerms(wrapper);
+
+    expect(field.props('suggestions')).toEqual([]);
+    expect(field.find('[role="group"]').exists()).toBe(false);
 
     wrapper.unmount();
   });

@@ -106,8 +106,10 @@ export const FIELD_LABELS: Record<string, string> = {
  */
 export const FIELD_FORMATS: Record<string, string> = {
   addressPostalCode: 'fünfstellig, z. B. 12345',
-  bankAccount: 'nur Großbuchstaben und Ziffern, z. B. DE02120300000000202051',
-  bic: '8 oder 11 Zeichen in Großbuchstaben, z. B. COBADEFFXXX',
+  // Leerzeichen und Kleinbuchstaben nimmt das Feld seit 0.20.0 an und räumt sie
+  // selbst weg (issues.md 0.15.0-1); was bleibt, ist die Länge und das Alphabet.
+  bankAccount: '15 bis 34 Buchstaben und Ziffern, z. B. DE02 1203 0000 0000 2020 51',
+  bic: '8 oder 11 Buchstaben und Ziffern, z. B. COBADEFFXXX',
   documentLink: 'vollständige Internetadresse mit http:// oder https://',
 };
 

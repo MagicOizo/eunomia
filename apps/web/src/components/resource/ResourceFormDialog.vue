@@ -58,7 +58,10 @@ function submit(): void {
   const payload: Record<string, unknown> = {};
 
   for (const field of props.fields) {
-    const value = (values.value[field.key] ?? '').trim();
+    const typed = (values.value[field.key] ?? '').trim();
+    // On save as well as on blur: a field filled and submitted with Enter was
+    // never left, and would otherwise be the one that sends its raw text.
+    const value = field.normalize ? field.normalize(typed) : typed;
     if (value === '') {
       if (field.required) return fail(`Bitte „${field.label}“ ausfüllen.`);
       continue; // omit empty optionals so the server keeps its default / null
@@ -89,7 +92,13 @@ function submit(): void {
           :label="field.label"
           @update:model-value="values[field.key] = $event === null ? '' : String($event)"
         />
-        <EuTextField v-else v-model="values[field.key]" :label="field.label" :type="field.type" />
+        <EuTextField
+          v-else
+          v-model="values[field.key]"
+          :label="field.label"
+          :type="field.type"
+          :normalize="field.normalize"
+        />
       </template>
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>

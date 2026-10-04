@@ -46,3 +46,13 @@ export function iban(value: string): string {
   const compact = value.replace(/\s+/g, '').toUpperCase();
   return compact.match(/.{1,4}/g)?.join(' ') ?? '';
 }
+
+/**
+ * The printed form of a BIC: no spaces, capitals. Unlike an IBAN it is not
+ * grouped, so this is also exactly what is stored — it is here beside `iban`
+ * because the two are typed into neighbouring fields and read off the same
+ * line of the same bill.
+ */
+export function bic(value: string): string {
+  return value.replace(/\s+/g, '').toUpperCase();
+}

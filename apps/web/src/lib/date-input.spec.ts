@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isoFromGerman } from './date-input';
+import { isoFromGerman, isoPlusDays } from './date-input';
 
 describe('isoFromGerman', () => {
   it('reads the German notation a spreadsheet puts on the clipboard', () => {
@@ -33,5 +33,31 @@ describe('isoFromGerman', () => {
     for (const text of ['', '   ', 'morgen', '24/09/2026', '24.09.2026 08:15', '20260924']) {
       expect(isoFromGerman(text)).toBeNull();
     }
+  });
+});
+
+describe('isoPlusDays', () => {
+  it('counts calendar days on from a date', () => {
+    expect(isoPlusDays('2020-03-01', 14)).toBe('2020-03-15');
+    expect(isoPlusDays('2020-03-01', 0)).toBe('2020-03-01');
+  });
+
+  it('carries over the end of a month and of a year', () => {
+    expect(isoPlusDays('2026-09-24', 30)).toBe('2026-10-24');
+    expect(isoPlusDays('2026-12-20', 15)).toBe('2027-01-04');
+    expect(isoPlusDays('2024-02-20', 14)).toBe('2024-03-05'); // leap year
+    expect(isoPlusDays('2026-02-20', 14)).toBe('2026-03-06');
+  });
+
+  it('crosses the end of summer time without losing a day', () => {
+    // The night of 2026-10-25 is 25 hours long in Europe/Berlin: over a local
+    // Date plus 14 × 86_400_000 ms this comes out as 2026-11-07 (measured).
+    expect(isoPlusDays('2026-10-25', 14)).toBe('2026-11-08');
+  });
+
+  it('takes the German notation too, and refuses what is not a date', () => {
+    expect(isoPlusDays('24.09.2026', 14)).toBe('2026-10-08');
+    expect(isoPlusDays('', 14)).toBeNull();
+    expect(isoPlusDays('2026-02-31', 14)).toBeNull();
   });
 });

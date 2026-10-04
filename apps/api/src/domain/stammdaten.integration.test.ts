@@ -114,6 +114,37 @@ test('master-data CRUD and account scoping', async (t) => {
       assert.equal(badBic.body.error.code, 'VALIDATION_ERROR');
     });
 
+    await t.test('an IBAN arrives as it stands on the bill, stored as a number', async () => {
+      // The way it is read off paper and out of a banking app (issues.md
+      // 0.15.0-1): in groups of four, and nobody holds shift for the country
+      // code. Both doors take it, and both store the same canonical value the
+      // lists then print in groups again.
+      const created = await request(app).post('/api/v1/agencies').set(admin).send({
+        agencyName: 'Inkasso Abschrift',
+        bankAccount: 'de02 1203 0000 0000 2020 51',
+        bic: 'coba deff xxx',
+      });
+      assert.equal(created.status, 201);
+      assert.equal(created.body.data.bankAccount, 'DE02120300000000202051');
+      assert.equal(created.body.data.bic, 'COBADEFFXXX');
+
+      const uid = created.body.data.agencyUID as string;
+      const second = await request(app)
+        .post(`/api/v1/agencies/${uid}/accounts`)
+        .set(admin)
+        .send({ bankAccount: 'de89 3704 0044 0532 0130 00' });
+      assert.equal(second.status, 201);
+      assert.equal(second.body.data.bankAccount, 'DE89370400440532013000');
+
+      // The grouping was notation; a number that is too short stays too short.
+      const tooShort = await request(app)
+        .post(`/api/v1/agencies/${uid}/accounts`)
+        .set(admin)
+        .send({ bankAccount: 'DE02 1203 0000 00' });
+      assert.equal(tooShort.status, 400);
+      assert.equal(tooShort.body.error.code, 'VALIDATION_ERROR');
+    });
+
     await t.test('an agency holds several bank accounts side by side', async () => {
       const created = await request(app)
         .post('/api/v1/agencies')

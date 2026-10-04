@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { germanDateTime, iban, plural } from './format';
+import { bic, germanDateTime, iban, plural } from './format';
 
 describe('plural', () => {
   it('uses the singular for exactly one', () => {
@@ -36,6 +36,20 @@ describe('germanDateTime', () => {
     for (const value of ['', 'irgendwas', null, undefined, 42]) {
       expect(germanDateTime(value)).toBe('–');
     }
+  });
+});
+
+describe('bic', () => {
+  it('takes the spaces out and upper-cases — a BIC is not grouped', () => {
+    expect(bic('coba deff xxx')).toBe('COBADEFFXXX');
+  });
+
+  it('leaves one already written that way alone', () => {
+    expect(bic('COBADEFF')).toBe('COBADEFF');
+  });
+
+  it('leaves nothing standing for an empty value', () => {
+    expect(bic('')).toBe('');
   });
 });
 

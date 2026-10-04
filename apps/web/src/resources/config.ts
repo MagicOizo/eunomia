@@ -22,6 +22,13 @@ export interface FieldConfig {
   /** Initial value in create mode. */
   defaultValue?: string;
   /**
+   * The canonical written form of the value, for a field whose printed shape is
+   * not what is stored — the IBAN of an agency (issues.md 0.15.0-1). Applied
+   * when the field is left and again on save, so a field that was filled and
+   * never left is sent in the same form as one that was.
+   */
+  normalize?: (value: string) => string;
+  /**
    * For a `select` over accounts: offer only the accounts the user may
    * exercise this permission on. The policy form asks it, so a new policy
    * cannot be started for an insured person whose record the user may read but

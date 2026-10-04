@@ -16,8 +16,17 @@ const props = withDefaults(
      * password manager has to recognise the fields.
      */
     autocomplete?: string;
+    /**
+     * The canonical written form of this field's value, applied when the field
+     * is left — for a value that has one printed shape and is stored in
+     * another: an IBAN is typed in groups of four and stored as one number
+     * (issues.md 0.15.0-1). Never while typing: re-grouping under the caret
+     * would move it, and a field that fights the keyboard is worse than one
+     * that waits.
+     */
+    normalize?: (value: string) => string;
   }>(),
-  { error: undefined, type: 'text', autocomplete: 'off' },
+  { error: undefined, type: 'text', autocomplete: 'off', normalize: undefined },
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
@@ -28,6 +37,17 @@ const hasError = computed(() => Boolean(props.error));
 
 function onInput(event: Event): void {
   emit('update:modelValue', (event.target as HTMLInputElement).value);
+}
+
+/**
+ * Leaving the field writes the value in its canonical form — and only then: an
+ * unchanged text emits nothing, so a field without a `normalize`, or one
+ * already written correctly, stays as quiet as it was before.
+ */
+function onBlur(): void {
+  if (!props.normalize) return;
+  const normalized = props.normalize(props.modelValue);
+  if (normalized !== props.modelValue) emit('update:modelValue', normalized);
 }
 
 /** A German date pasted into a date field (see lib/date-input.ts). */
@@ -52,6 +72,7 @@ function onPaste(event: ClipboardEvent): void {
       :aria-invalid="hasError || undefined"
       :aria-describedby="hasError ? errorId : undefined"
       @input="onInput"
+      @blur="onBlur"
       @paste="onPaste"
     />
     <p v-if="hasError" :id="errorId" class="eu-text-field__error">{{ error }}</p>
