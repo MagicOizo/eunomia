@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+# Judges every version tag on its way out, before it reaches GitHub.
+#
+# Why here and not only in the Actions: `version:check --tag` does run there,
+# but in the job *after* the one that builds and pushes the image — and a tag
+# without a pre-release part moves the Docker `:latest` in that earlier job. A
+# tag that does not match its commit has therefore already done its damage by
+# the time anything complains, which happened three times (issues.md 0.18.0-1).
+#
+# git hands a pre-push hook one line per ref on stdin:
+#   <local ref> <local sha> <remote ref> <remote sha>
+# A deletion arrives with an all-zero local sha and has nothing to check.
+
+set -u
+
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/tags/v*) ;;
+    *) continue ;;
+  esac
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;;
+  esac
+
+  tag="${remote_ref#refs/tags/}"
+  echo "pre-push: checking $tag against the commit it names"
+  # `--at` is the point: the bump has to be in the tagged commit, not merely in
+  # the working tree the tag was created from.
+  if ! node scripts/version.ts check --tag "$tag" --at "$local_sha"; then
+    echo "pre-push: $tag does not match its commit — nothing was pushed." >&2
+    echo "pre-push: put the bump in the tagged commit, move the tag, push again." >&2
+    exit 1
+  fi
+done
+
+exit 0

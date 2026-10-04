@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { PERMISSIONS } from '@eunomia/shared';
 import request from 'supertest';
 
 import { createApp } from '../app.js';
 import { runMigrations } from '../db/migrate.js';
+import { generateEntityId } from '../lib/ids.js';
 import { bootstrapAdmin, openTestDatabase, resetData, testConfig } from '../test/harness.js';
 
 /**
@@ -327,6 +329,43 @@ test('account export: the inventory of what is stored about one person', async (
       assert.equal(mine.status, 200, 'the person they may read');
       const foreign = await request(app).get(`/api/v1/accounts/${accountUID}/export`).set(reader);
       assert.equal(foreign.status, 403, 'and no other');
+    });
+
+    await t.test('reading the record is not enough; the export wants all three', async () => {
+      // The decision on B-3 (2026-10-04): the document carries the invoices and
+      // the billings, and every other way to those asks for its own permission.
+      // No such role exists today — "Nutzer" carries all three and roles cannot
+      // be created over the API — so it is composed here, which is exactly the
+      // role the finding was about.
+      const roleUID = generateEntityId('role');
+      await pool.query('INSERT INTO Roles (roleUID, roleName, roleStatus) VALUES (?, ?, 1)', [
+        roleUID,
+        'Nur Stammdaten lesen',
+      ]);
+      await pool.query(
+        `INSERT INTO RolePermissions (roleID, permissionID)
+         SELECT (SELECT roleID FROM Roles WHERE roleUID = ?), permissionID
+           FROM Permissions WHERE permissionKey = ?`,
+        [roleUID, PERMISSIONS.VIEW_ACCOUNTS],
+      );
+
+      const created = await post('/api/v1/users', {
+        email: 'recordreader@example.com',
+        firstname: 'Rec',
+        password: 'recordpass1',
+      });
+      await put(`/api/v1/users/${created.body.data.uuid}/account-roles`, {
+        grants: [{ accountUID: other, roleUID }],
+      });
+      const login = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'recordreader@example.com', password: 'recordpass1' });
+      const reader = { Authorization: `Bearer ${login.body.accessToken}` };
+
+      const record = await request(app).get(`/api/v1/accounts/${other}`).set(reader);
+      assert.equal(record.status, 200, 'the record itself stays readable');
+      const exportRes = await request(app).get(`/api/v1/accounts/${other}/export`).set(reader);
+      assert.equal(exportRes.status, 403, 'the export is not');
     });
   } finally {
     await pool.end();

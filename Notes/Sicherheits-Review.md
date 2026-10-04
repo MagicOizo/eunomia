@@ -93,19 +93,19 @@ begründet ändern — sie sind nicht Beschreibung, sondern Vorgabe.
 Leistungsabrechnung oder Buchung liest oder schreibt, hält die Berechtigung **auf deren Konto** —
 über `authorizeAccount`/`loadAuthorizedContract` bei Einzelzugriff, über `accountFilter`
 (auf `getAccessibleAccounts`) als `WHERE`-Einschränkung bei Listen. Eine Liste ohne Kontofilter ist
-ein Fehler, kein Sonderfall. Die Ausnahmen sind abschließend benannt und begründet:
+ein Fehler, kein Sonderfall. Die Ausnahme ist abschließend benannt und begründet:
 
 1. der Papierkorb hinter dem instanzweiten `MANAGE_TRASH` (siehe SEC-04 und §2.4 des Plans) — ein
-   gelöschter Eintrag kann den Verweis auf seinen Versicherten selbst verloren haben;
-2. der Export einer Versicherten (`GET /accounts/:uid/export`, SEC-15): er trägt Rechnungen,
-   Einreichungen, Abrechnungen und Buchungen, verlangt aber nur `VIEW_ACCOUNTS` **auf genau diesem
-   Konto** — die Entscheidung von §2.11 des Plans, wer den Datensatz lesen darf, darf lesen, was zu
-   ihm gespeichert ist. Mit den beiden Systemrollen ist das heute ohne Wirkung (die Rolle „Nutzer"
-   trägt `VIEW_INVOICES` und `VIEW_CONTRACTS` mit), und Rollen lassen sich über die API nicht
-   anlegen. Gefunden bei der Nachprüfung (§8), offen als Punkt in `issues.md`.
+   gelöschter Eintrag kann den Verweis auf seinen Versicherten selbst verloren haben.
 
-**Die zweite Ausnahme ist eine Grenze, keine Erlaubnis:** jeder *weitere* Weg zu Falldaten braucht
-die Berechtigung seiner Art.
+Eine zweite Ausnahme hat die Nachprüfung aufgeschrieben und die Entscheidung des Autors wieder
+aufgehoben: der Export einer Versicherten (`GET /accounts/:uid/export`) verlangt seit dem
+04.10.2026 `VIEW_ACCOUNTS`, `VIEW_INVOICES` **und** `VIEW_CONTRACTS` auf diesem Konto und ist damit
+keine Ausnahme mehr (§8, B-3).
+
+**Die Ausnahme ist eine Grenze, keine Erlaubnis:** jeder *weitere* Weg zu Falldaten braucht die
+Berechtigung seiner Art — der Export ist der Fall, an dem diese Regel einmal nachgegeben hat und
+dann wiederhergestellt wurde.
 
 **I-3 `accountUID` ist unveränderlich.** Rechnung und Police lassen sich nicht zwischen Versicherten
 verschieben; die Update-Schemata nehmen das Feld ausdrücklich heraus. Ein Verschieben bräuchte eine
@@ -661,15 +661,19 @@ hätte nur den Anschein einer engeren Prüfung gehabt.
   einer anderen URL-Art gilt jetzt als `no_release`. Als Fall festgehalten und rot geprüft.
   I-9 ist dabei um fremde Antworten erweitert worden: dass die Regel nur von „Benutzereingabe"
   sprach, ist der Grund, warum diese Stelle durch zwei Reviews gekommen ist.
-- **B-3 (I-2, als Grenze benannt, Punkt offen).** `GET /accounts/:uid/export` liefert Rechnungen,
-  Einreichungen, Abrechnungen und Buchungen einer Versicherten, verlangt aber nur `VIEW_ACCOUNTS`
-  auf diesem Konto — das war die Entscheidung zu SEC-15 (§2.11 des Plans: wer den Datensatz lesen
-  darf, darf lesen, was zu ihm gespeichert ist). Mit den beiden Systemrollen hat das keine Wirkung,
-  weil „Nutzer" `VIEW_INVOICES` und `VIEW_CONTRACTS` mitträgt und Rollen über die API nicht
-  anlegbar sind; eine Rolle, die in der Datenbank anders zusammengesetzt wird, hätte sie. Nicht
-  eigenmächtig geändert, weil es eine Entscheidung des Autors ist: als zweite Ausnahme in I-2
-  geschrieben und als Punkt in `issues.md` offen, wo über zusätzliche Prüfungen auf
-  `VIEW_INVOICES`/`VIEW_CONTRACTS` entschieden wird.
+- **B-3 (I-2, behoben).** `GET /accounts/:uid/export` liefert Rechnungen, Einreichungen,
+  Abrechnungen und Buchungen einer Versicherten, verlangte aber nur `VIEW_ACCOUNTS` auf diesem
+  Konto — das war die Entscheidung zu SEC-15 (§2.11 des Plans: wer den Datensatz lesen darf, darf
+  lesen, was zu ihm gespeichert ist). Mit den beiden Systemrollen hatte das keine Wirkung, weil
+  „Nutzer" `VIEW_INVOICES` und `VIEW_CONTRACTS` mitträgt und Rollen über die API nicht anlegbar
+  sind; eine Rolle, die in der Datenbank anders zusammengesetzt wird, hätte sie. Nicht eigenmächtig
+  geändert, sondern vorgelegt — und **entschieden (Autor, 2026-10-04, Scheibe 1 der letzten
+  Befunde): der Export verlangt alle drei Leserechte.** „Den Datensatz lesen dürfen" heißt damit
+  nicht „alles über die Person lesen dürfen", I-2 hat seine zweite Ausnahme wieder verloren, und
+  §2.11 des Plans ist entsprechend geändert. Der Fall steht in
+  `domain/account-export.integration.test.ts` mit einer Rolle, die nur `VIEW_ACCOUNTS` trägt — die
+  Rolle, von der der Befund sprach. Die Oberfläche zeigt den Export-Knopf ohne die Rechte weiter an
+  und deaktiviert ihn, wie jede andere Aktion seit CR-26.
 
 ### Was jetzt geprüft statt zugesagt ist
 
@@ -705,6 +709,6 @@ Einsetzer fällt beim Lesen auf, weil er der einzige wäre.
 
 ### Stand
 
-I-1 bis I-13 gelten. Zwei Befunde behoben und durch Prüfungen festgehalten, einer als benannte
-Grenze in I-2 und als offener Punkt in `issues.md`. Damit ist die Nachprüfung erledigt, und 1.0.0
-hängt nur noch an der Entscheidung zu B-3.
+I-1 bis I-13 gelten. Alle drei Befunde sind behoben und durch Prüfungen festgehalten; B-3 wurde
+dem Autor vorgelegt und am 04.10.2026 zugunsten der strengeren Variante entschieden, womit I-2
+wieder genau eine Ausnahme hat (den Papierkorb). Damit ist die Nachprüfung erledigt.

@@ -371,9 +371,20 @@ Rollen, Konto-Zugriffe, Sitzungen und Erinnerungs-Vermerke kaskadieren,
 Konto absichtlich (Migrationen 002, 009, 010).
 
 **Die Auskunft.** `GET /accounts/:uid/export` gibt alles, was zu einem Versicherten gespeichert ist,
-als ein JSON-Dokument; in der Liste der Versicherten lädt ein Knopf die Datei herunter. Das Recht
-ist `VIEW_ACCOUNTS` auf genau dieses Konto — wer den Datensatz lesen darf, darf lesen, was zu ihm
-gespeichert ist. Drei Festlegungen:
+als ein JSON-Dokument; in der Liste der Versicherten lädt ein Knopf die Datei herunter.
+
+Die Rechte sind **`VIEW_ACCOUNTS`, `VIEW_INVOICES` und `VIEW_CONTRACTS`, alle drei auf genau dieses
+Konto** (korrigiert am 04.10.2026). Zunächst stand hier `VIEW_ACCOUNTS` allein, mit dem Satz „wer
+den Datensatz lesen darf, darf lesen, was zu ihm gespeichert ist". Die Nachprüfung der Invarianten
+hat das als Befund B-3 vorgelegt (§8 des Sicherheits-Reviews): das Dokument trägt Rechnungen,
+Einreichungen, Abrechnungen und Buchungen, und jeder andere Weg zu diesen verlangt sein eigenes
+Recht — ein Export mit nur einem wäre die einzige Tür mit dem schwächeren Schloss. Mit den beiden
+Systemrollen war der Unterschied ohne Wirkung; eine Rolle, die in der Datenbank anders
+zusammengesetzt wird, hätte ihn gehabt. „Den Datensatz lesen dürfen" heißt deshalb **nicht** „alles
+über die Person lesen dürfen", und I-2 führt den Export nicht mehr als Ausnahme. In der Oberfläche
+bleibt der Knopf ohne die Rechte sichtbar und deaktiviert, wie jede andere Aktion seit CR-26.
+
+Drei weitere Festlegungen:
 
 - **Gelöschte Zeilen sind dabei**, mit Status und Löschdatum. Eine Auskunft über gespeicherte Daten,
   die einen Teil des Gespeicherten verschweigt, wäre keine.

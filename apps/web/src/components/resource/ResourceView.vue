@@ -98,6 +98,17 @@ function mayManage(row: ResourceRow): boolean {
 }
 
 /**
+ * May this user run this row action? Its endpoint may ask for more than seeing
+ * the row does — the account export wants all three read permissions, not just
+ * `VIEW_ACCOUNTS` (B-3). An action that names none is open to anyone the list
+ * already let in.
+ */
+function mayRunAction(action: RowActionConfig, row: ResourceRow): boolean {
+  const account = props.config.accountKey ? String(row[props.config.accountKey]) : undefined;
+  return (action.permissions ?? []).every((permission) => auth.can(permission, account));
+}
+
+/**
  * Creating needs the permission for some account — or globally, where a new
  * record has no account to scope it to (a new insured person; see the API's
  * POST /accounts).
@@ -319,9 +330,9 @@ async function confirmDelete(): Promise<void> {
                 icon-only
                 :icon="action.icon"
                 :aria-label="action.label(row)"
-                :title="action.label(row)"
-                :to="action.to?.(row)"
-                :disabled="busyAction === action.label(row)"
+                :to="mayRunAction(action, row) ? action.to?.(row) : undefined"
+                :disabled="busyAction === action.label(row) || !mayRunAction(action, row)"
+                :title="mayRunAction(action, row) ? action.label(row) : NO_PERMISSION"
                 @click="action.run ? runRowAction(action, row) : undefined"
               />
               <EuButton

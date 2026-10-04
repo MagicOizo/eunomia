@@ -7,6 +7,40 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.19.0-slice.6 — 2026-10-04
+
+The last three items the two reviews before 1.0 left lying about. None of them is a feature; one
+closes a question the owner had to answer, one stops a mistake that has been made three times, and
+one makes two tests tell the truth.
+
+- **A mistyped version tag is stopped before it leaves the machine.** Three times a tag was pushed
+  that did not match the version in the commit it named, and three times nobody noticed, because
+  the only check ran in a job _after_ the one that builds and publishes the image — and that job
+  moves the `latest` image tag. Once it did so for a preview, which is what every production host
+  pulls by default. There are now two bolts. A `pre-push` hook checks every version tag on its way
+  out, reading the version from **the commit the tag names** rather than from the working directory,
+  which is precisely the distinction that was missed each time. And the workflow checks the version
+  in its own step first, with the image build waiting on it, so the published `latest` can no longer
+  move ahead of the check.
+- **The export of one person's data now asks for all three read permissions.** It used to ask only
+  for permission to see the person's record, on the reasoning that whoever may read a record may
+  read what is stored about it — but the document it hands over holds that person's invoices,
+  submissions, billings and reimbursements, and every other way to those asks for its own
+  permission. It was the one door with a weaker lock. With the two roles the instance ships this
+  changed nothing; a role put together differently would have found the gap. The button stays where
+  it is for someone without the permissions, disabled and saying so, as every other action does.
+- **Two tests that went red about once in a hundred runs now hold.** Both were racing the same
+  thing: a dialog moves the cursor into its first field a moment after it opens, and a test that
+  had meanwhile opened a dropdown lost it again. The tests now wait for the dialog to have finished
+  rather than for a fixed number of turns, and a helper that used to shrug when it could not find
+  the button it was asked to click now says so — which is why the real cause took two reviews to
+  surface. Checked over three hundred runs.
+- **The scripts in `scripts/` can be tested at all.** They were covered by no test pattern, so the
+  one that guards every release had never run outside a release. There is now `npm run test:scripts`,
+  wired into the normal test command, and the version check has eight cases of its own — including
+  one against a repository built by the test, with a tag on an older commit, which is the only way
+  to show that it really reads the commit and not the files on disk.
+
 ## 0.19.0-slice.5 — 2026-10-04
 
 The two reviews before 1.0 set thirteen security invariants and asked for one more pass over them

@@ -51,14 +51,20 @@ const accounts: ResourceConfig = {
   },
   /**
    * Everything the instance has stored about this person, as a file (SEC-15,
-   * Art. 15/20 DSGVO). No permission of its own: the list already shows only
-   * the insured persons this user may read, and that is the same grant the
-   * endpoint asks for.
+   * Art. 15/20 DSGVO). All three read permissions, not just the one the list
+   * itself needs: the document carries the invoices and the billings too, and
+   * the endpoint asks for the same three since the decision on B-3
+   * (2026-10-04). Without them the button stays here, disabled.
    */
   rowActions: [
     {
       icon: faDownload,
       label: (row) => `Daten von ${personName(row)} exportieren`,
+      permissions: [
+        PERMISSIONS.VIEW_ACCOUNTS,
+        PERMISSIONS.VIEW_INVOICES,
+        PERMISSIONS.VIEW_CONTRACTS,
+      ],
       run: async (row) => {
         const uid = String(row.accountUID);
         downloadJson(

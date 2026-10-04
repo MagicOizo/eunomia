@@ -68,6 +68,13 @@ export interface RowActionConfig {
   to?: (row: ResourceRow) => string;
   /** What it does. Its failure is shown in the row, like a failed delete. */
   run?: (row: ResourceRow) => Promise<void>;
+  /**
+   * What its endpoint asks for beyond being allowed to see the row — all of
+   * them, for the row's account (`accountKey`). Without them the button stays
+   * visible and disabled, as every other action does (CR-26). Absent where the
+   * action asks for nothing the list did not already require.
+   */
+  permissions?: PermissionKey[];
 }
 
 export interface ResourceConfig {

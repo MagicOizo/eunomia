@@ -17,7 +17,32 @@ permissions:
   packages: write
 
 jobs:
+  # First, because the job below moves the Docker `:latest` for any tag without
+  # a pre-release part — and it must not do that for a tag whose commit says a
+  # different version. The check used to sit in `release`, after the image was
+  # already pushed; three tags went red there too late (issues.md 0.18.0-1).
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # TypeScript run without a build step, so a runtime that strips types.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check the version, and the tag where there is one
+        env:
+          TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+        run: |
+          if [ -n "$TAG" ]; then
+            node scripts/version.ts check --tag "$TAG"
+          else
+            node scripts/version.ts check
+          fi
+
   image:
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +88,7 @@ jobs:
   # The release page is what the in-app update check links to, so it is created
   # only after the image it announces has been pushed.
   release:
-    needs: image
+    needs: [version, image]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -77,11 +102,8 @@ jobs:
         with:
           node-version: 24
 
-      - name: Check the tag against the version in the repo
-        env:
-          TAG: ${{ github.ref_name }}
-        run: node scripts/version.ts check --tag "$TAG"
-
+      # No tag check here: the `version` job did it before the image was built,
+      # which is the only order in which it protects `:latest`.
       - name: Publish the release from CHANGELOG.md
         env:
           GH_TOKEN: ${{ github.token }}

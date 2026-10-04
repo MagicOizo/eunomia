@@ -1,7 +1,8 @@
-import { flushPromises, mount } from '@vue/test-utils';
+import { mount } from '@vue/test-utils';
 import axe from 'axe-core';
 import { describe, expect, it } from 'vitest';
 
+import { settled } from '../test/settle';
 import type { InvoiceDto } from './api';
 import SubmitDialog from './SubmitDialog.vue';
 
@@ -47,6 +48,13 @@ const contracts = [
   { value: 'c-new', label: 'X-2 · Beta AG', contractBegin: '2024-01-01', contractEnd: null },
 ];
 
+/**
+ * The selector EuDialog focuses by once it is open — mirrored so this file can
+ * wait for that focus. Where it matches nothing (a dialog with no policy, and
+ * therefore no form) nothing is deferred and there is nothing to wait for.
+ */
+const DIALOG_FOCUSES = '.eu-dialog__body input, .eu-dialog__body select, .eu-dialog__body textarea';
+
 async function openDialog(props: Partial<InstanceType<typeof SubmitDialog>['$props']> = {}) {
   const wrapper = mount(SubmitDialog, {
     props: {
@@ -60,7 +68,20 @@ async function openDialog(props: Partial<InstanceType<typeof SubmitDialog>['$pro
     },
     attachTo: document.body,
   });
-  await flushPromises();
+  // Not just one flush. EuDialog opens the native dialog in `onMounted` and
+  // then defers a focus() into the body with nextTick — here onto the toggle,
+  // the first form control in the body. Landing mid-test, that focus moves the
+  // caret off the policy picker and closes the list a case had just opened, so
+  // this waits for it to have happened (issues.md 0.19.0-2; ../test/settle.ts).
+  await settled(
+    () => wrapper.findAll('button').some((b) => b.text() === 'Einreichen'),
+    'the dialog footer to render its submit button',
+  );
+  await settled(
+    () =>
+      !wrapper.find(DIALOG_FOCUSES).exists() || wrapper.element.contains(document.activeElement),
+    "the dialog's own focus to land inside it",
+  );
   return wrapper;
 }
 
@@ -84,22 +105,36 @@ const canSubmit = (wrapper: Dialog): boolean =>
     .find((b) => b.text() === 'Einreichen')
     ?.attributes('disabled') === undefined;
 
-/** Opens the policy list the way a person does — a click on the field. */
+/**
+ * Opens the policy list the way a person does — a click on the field — and
+ * returns once it is open. The list is `v-if="open"` and the click reaches it
+ * through a render, so reading the options straight after the click is a race
+ * (issues.md 0.19.0-2).
+ */
 async function openList(wrapper: Dialog): Promise<void> {
   const input = wrapper.find('.eu-picker input');
   await input.trigger('focus');
   await input.trigger('click');
+  await settled(() => wrapper.find('[role="listbox"]').exists(), 'the policy list to open');
 }
 
 async function toggleShowAll(wrapper: Dialog): Promise<void> {
   await wrapper.find('.eu-toggle input').setValue(true);
 }
 
-function clickFooter(wrapper: Dialog, text: string): Promise<void> | undefined {
-  return wrapper
-    .findAll('button')
-    .find((b) => b.text() === text)
-    ?.trigger('click');
+/**
+ * Clicks a footer button by its label — and fails saying so when there is no
+ * such button. It used to shrug (`?.trigger`), which turned a missing button
+ * into a confusing failure three assertions later: nothing was emitted and no
+ * error appeared, because nothing had been clicked (issues.md 0.19.0-2).
+ */
+async function clickFooter(wrapper: Dialog, text: string): Promise<void> {
+  const button = wrapper.findAll('button').find((b) => b.text() === text);
+  if (!button) {
+    const labels = wrapper.findAll('button').map((b) => b.text());
+    throw new Error(`No footer button "${text}" — the buttons are ${JSON.stringify(labels)}`);
+  }
+  await button.trigger('click');
 }
 
 describe('SubmitDialog policy choice', () => {

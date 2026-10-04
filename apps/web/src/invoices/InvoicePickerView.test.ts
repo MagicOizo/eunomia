@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { settled } from '../test/settle';
 import InvoicePickerView from './InvoicePickerView.vue';
 import { EMPTY_FILTER, rememberFilter } from './invoice-search';
 
@@ -131,7 +132,9 @@ describe('InvoicePickerView search', () => {
     const wrapper = await mountView();
 
     await wrapper.find('.eu-picker__search input').setValue('2024-100');
-    await flushPromises();
+    // The search goes through a watcher and an await before anything renders,
+    // so the rows are waited for, not assumed (see ../test/settle.ts).
+    await settled(() => wrapper.findAll('.eu-picker__result').length > 0, 'the hit to render');
 
     expect(searchInvoices).toHaveBeenCalledWith(
       expect.objectContaining({ q: '2024-100' }),
@@ -149,7 +152,7 @@ describe('InvoicePickerView search', () => {
     const wrapper = await mountView();
 
     await wrapper.find('.eu-picker__search input').setValue('2024-100');
-    await flushPromises();
+    await settled(() => wrapper.find('.eu-picker__refs').exists(), "the hit's reference line");
 
     const refs = wrapper.find('.eu-picker__refs').text();
     expect(refs).toContain('Praxis Süd');
@@ -164,6 +167,7 @@ describe('InvoicePickerView search', () => {
       expect.objectContaining({ agencyUID: 'AGY_1', q: '' }),
       expect.any(Number),
     );
+    await settled(() => wrapper.findAll('.eu-picker__result').length > 0, 'the hit to render');
     expect(wrapper.findAll('.eu-picker__result')).toHaveLength(1);
     // The agency is chosen in the filter row, so its accounts can be picked.
     expect(selectFor(wrapper, 'Abrechnungsdienstleister').element.value).toBe('AGY_1');
@@ -233,18 +237,17 @@ describe('InvoicePickerView search', () => {
     await wrapper.find('.eu-picker__search input').setValue('gibt-es-nicht');
     await flushPromises();
 
+    await settled(() => !wrapper.text().includes('Wird gesucht'), 'the search to come back');
     expect(wrapper.text()).toContain('Keine Rechnung passt zu dieser Suche.');
   });
 
   it('brings the person tiles back when the filter is cleared', async () => {
     const wrapper = await mountView();
     await wrapper.find('.eu-picker__search input').setValue('2024-100');
-    await flushPromises();
-    expect(wrapper.find('.eu-picker__grid').exists()).toBe(false);
+    await settled(() => !wrapper.find('.eu-picker__grid').exists(), 'the tiles to give way');
 
     await wrapper.find('.eu-picker__search input').setValue('');
-    await flushPromises();
-
+    await settled(() => wrapper.find('.eu-picker__grid').exists(), 'the tiles to come back');
     expect(wrapper.find('.eu-picker__grid').exists()).toBe(true);
   });
 });

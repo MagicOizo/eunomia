@@ -52,6 +52,8 @@ export function createAccountsRouter(pool: Pool, config: AppConfig): Router {
   const canView = createRequirePermission(pool, PERMISSIONS.VIEW_ACCOUNTS, uidFromParams);
   const canManage = createRequirePermission(pool, PERMISSIONS.MANAGE_ACCOUNTS, uidFromParams);
   const canCreate = createRequirePermission(pool, PERMISSIONS.MANAGE_ACCOUNTS);
+  const canViewInvoices = createRequirePermission(pool, PERMISSIONS.VIEW_INVOICES, uidFromParams);
+  const canViewContracts = createRequirePermission(pool, PERMISSIONS.VIEW_CONTRACTS, uidFromParams);
 
   router.get('/', requireAuth, async (_req, res) => {
     const user = getAuthUser(res);
@@ -76,15 +78,30 @@ export function createAccountsRouter(pool: Pool, config: AppConfig): Router {
 
   /**
    * Everything stored about this insured person, in one document (SEC-15).
-   * `VIEW_ACCOUNTS` on this very account and nothing more: whoever may read the
-   * record may read what is stored about it. The browser turns the answer into
-   * a file; the API stays a JSON API and keeps the envelope.
+   *
+   * All three read permissions on this very account, not `VIEW_ACCOUNTS` alone
+   * (decision of 2026-10-04 on B-3 of the review's second pass): the document
+   * carries the invoices, submissions, billings and allocations as well as the
+   * record, and every other way to those asks for `VIEW_INVOICES` or
+   * `VIEW_CONTRACTS`. One permission reaching all of them would have made this
+   * the only door with a weaker lock — "may read the record" is not "may read
+   * everything about the person". I-2 therefore has no exception for it.
+   *
+   * The browser turns the answer into a file; the API stays a JSON API and
+   * keeps the envelope.
    */
-  router.get('/:uid/export', requireAuth, canView, async (req, res) => {
-    const document = await exportAccount(pool, pathParam(req, 'uid'));
-    if (!document) throw notFound('Account');
-    sendData(res, document);
-  });
+  router.get(
+    '/:uid/export',
+    requireAuth,
+    canView,
+    canViewInvoices,
+    canViewContracts,
+    async (req, res) => {
+      const document = await exportAccount(pool, pathParam(req, 'uid'));
+      if (!document) throw notFound('Account');
+      sendData(res, document);
+    },
+  );
 
   router.post('/', requireAuth, canCreate, async (req, res) => {
     const data = base.parse(req.body);

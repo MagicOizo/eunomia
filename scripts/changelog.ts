@@ -11,10 +11,11 @@
  *   node scripts/changelog.ts title <version>     # the heading text, for --title
  */
 
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const CHANGELOG_URL = new URL('../CHANGELOG.md', import.meta.url);
+import { type RepoFiles, workingTree } from './repo-files.ts';
+
+const CHANGELOG = 'CHANGELOG.md';
 
 export interface ChangelogSection {
   /** The heading without its `## ` marker, e.g. `0.10.0-slice.1 — 2026-09-25`. */
@@ -27,9 +28,15 @@ export interface ChangelogSection {
  * Finds the section a version is documented in, or null if there is none. A
  * heading counts as that version's when its first word is exactly the version,
  * which keeps the date (or any other suffix) in the heading free-form.
+ *
+ * `files` says which CHANGELOG.md to look in: the working tree by default, or
+ * the one a commit holds when the version check is about a tag (repo-files.ts).
  */
-export function readChangelogSection(version: string): ChangelogSection | null {
-  const lines = readFileSync(CHANGELOG_URL, 'utf8').split('\n');
+export function readChangelogSection(
+  version: string,
+  files: RepoFiles = workingTree,
+): ChangelogSection | null {
+  const lines = files(CHANGELOG).split('\n');
   const start = lines.findIndex(
     (line) => line.startsWith('## ') && line.slice(3).trim().split(/\s+/)[0] === version,
   );

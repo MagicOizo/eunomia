@@ -1,7 +1,9 @@
+import { PERMISSIONS } from '@eunomia/shared';
 import { faFilter } from '@fortawesome/free-solid-svg-icons';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { NO_PERMISSION } from '../../lib/error-messages';
 import type { ResourceConfig } from '../../resources/config';
 import { grant } from '../../test/permissions';
 import type { SelectOption } from './EuSelectField.vue';
@@ -134,6 +136,41 @@ describe('ResourceView search', () => {
     await button!.trigger('click');
     await flushPromises();
     expect(wrapper.find('.eu-resource__error').exists()).toBe(true);
+  });
+
+  /**
+   * A row action may need more than seeing the row does: the account export
+   * hands out the person's invoices and billings and asks for all three read
+   * permissions (B-3 of the review's second pass). Without them the button
+   * stays where it is and says why, as every other action does since CR-26.
+   */
+  it('disables a row action whose permissions are missing, and says why', async () => {
+    const run = vi.fn<(row: Record<string, unknown>) => Promise<void>>();
+    const exportAction = {
+      icon: faFilter,
+      label: (row: Record<string, unknown>) => `Daten von ${String(row.facilityName)} exportieren`,
+      permissions: [PERMISSIONS.VIEW_ACCOUNTS, PERMISSIONS.VIEW_INVOICES],
+      run,
+    };
+    // One of the two, so the action is refused on the "all of them" rule and
+    // not merely on holding nothing at all.
+    grant({ global: [PERMISSIONS.VIEW_ACCOUNTS, PERMISSIONS.MANAGE_FACILITIES] });
+    const wrapper = await mountView({ ...config, rowActions: [exportAction] });
+
+    const button = wrapper
+      .findAll('tbody tr button')
+      .find((one) => one.attributes('aria-label') === 'Daten von Praxis Nord exportieren');
+    expect(button).toBeDefined();
+    expect(button!.attributes('disabled')).toBeDefined();
+    expect(button!.attributes('title')).toBe(NO_PERMISSION);
+
+    grant({ global: [PERMISSIONS.VIEW_ACCOUNTS, PERMISSIONS.VIEW_INVOICES] });
+    await flushPromises();
+    const allowed = wrapper
+      .findAll('tbody tr button')
+      .find((one) => one.attributes('aria-label') === 'Daten von Praxis Nord exportieren');
+    expect(allowed!.attributes('disabled')).toBeUndefined();
+    expect(allowed!.attributes('title')).toBe('Daten von Praxis Nord exportieren');
   });
 
   it('renders a row action as a link to its target', async () => {

@@ -298,6 +298,19 @@ A tag with a pre-release part (`-slice.1`) publishes an image plus a GitHub **pr
 leaves `:latest` alone; a final tag (`v0.10.0`) moves `:latest` and publishes a full release, which
 is what the in-app update check shows to admins.
 
+**A wrong tag is stopped before it leaves.** The `pre-push` hook checks every `v*` tag on its way
+out against the version in **the commit that tag names** — not against the working tree, which is
+the distinction that matters when the bump was forgotten in the release commit:
+
+```bash
+node scripts/version.ts check --tag v0.10.0 --at v0.10.0   # what the hook runs
+```
+
+The same check now runs first in the `Image & release` workflow, in its own `version` job that
+`image` depends on. That order is the point: `image` moves the Docker `:latest` for any tag without
+a pre-release part, so a check running after it arrives too late. Three tags went wrong exactly that
+way before either bolt existed (`Notes/issues.md`, 0.18.0-1).
+
 ## Software Bill of Materials (SBOM)
 
 Generate a [CycloneDX](https://cyclonedx.org/) SBOM on demand — none is committed to the repo,

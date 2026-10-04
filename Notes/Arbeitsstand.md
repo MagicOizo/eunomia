@@ -26,9 +26,23 @@ Startseite.
 Die Reihenfolge ist bindend: Scheibe 1 steht vor dem Tag `v0.19.0`, weil genau ein Tag ohne
 Bindestrich dreimal unbemerkt das Docker-`:latest` verschoben hat. 5a steht vor 5b.
 
-- [ ] **1 — Die letzten drei Befunde der Review-Arbeit** (`0.19.0-slice.6`). Die Tag-Prüfung vor dem
+- [x] **1 — Die letzten drei Befunde der Review-Arbeit** (`0.19.0-slice.6`). Die Tag-Prüfung vor dem
       Push (`issues.md` 0.18.0-1), das Export-Recht (0.19.0-1, SEC-Review §8 B-3) und die zwei
       flackernden Web-Tests (0.19.0-2). Danach ist von der Review-Arbeit nichts offen.
+      Umgesetzt mit v0.19.0-slice.6 (Slice 70). Drei Dinge gingen über die Punkte hinaus: (1) `scripts/` war
+      von keinem Test-Glob erfasst — das Skript, das jedes Release bewacht, war nie außerhalb eines
+      Releases gelaufen; es gibt jetzt `npm run test:scripts` und `scripts/version.test.ts`, und
+      `check` wirft statt `process.exit` zu rufen, damit es überhaupt prüfbar ist. (2) Die
+      Berechtigung einer `rowActions`-Aktion war nicht ausdrückbar (`RowActionConfig` kannte kein
+      Recht), so dass der Export-Knopf ohne die Rechte ins Leere gelaufen wäre statt deaktiviert zu
+      sein — die CR-26-Regel gilt jetzt auch für Zeilen-Aktionen. (3) Die Ursache des Flackerns ist
+      gefunden und nicht umgangen: `EuDialog` schiebt nach dem Öffnen mit `nextTick` ein `focus()`
+      auf das erste Feld im Körper nach — bei `SubmitDialog` den Schalter —, und landet dieser
+      Fokus mitten in einem Fall, schließt er die gerade geöffnete Liste.
+      Gewarnt sei vor der Stelle, die zwei Reviews überlebt hat: `clickFooter` zuckte bei einem
+      fehlenden Knopf nur mit den Achseln (`?.trigger`). Daraus wurde eine irreführende Zusicherung
+      drei Zeilen später — „nichts emittiert, keine Fehlermeldung", weil nichts geklickt worden war.
+      Ein Helfer, der stillschweigend nichts tut, verbirgt genau den Befund, den er zeigen müsste.
 - [ ] **Release 0.19.0.** Eigener Commit, keine Slice-Nummer.
 - [ ] **2 — Eingabe-Politur** (`0.20.0-slice.1`). IBAN mit Leerzeichen (0.15.0-1) und typische
       Zahlungsziele (0.15.0-2).

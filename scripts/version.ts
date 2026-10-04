@@ -12,13 +12,19 @@
  * Usage:
  *   node scripts/version.ts set <version> [--force]
  *   node scripts/version.ts next slice|minor|patch|major [--force]
- *   node scripts/version.ts check [--tag <vX.Y.Z>]
+ *   node scripts/version.ts check [--tag <vX.Y.Z>] [--at <commit-ish>]
+ *
+ * `--at` reads every file from that commit instead of from the working tree,
+ * which is what `check --tag` has to do before a tag is pushed: the tag names a
+ * commit, and the bump has to be in *that* commit (see .husky/pre-push).
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { compareVersions, parseVersion, type ParsedVersion } from '../apps/api/src/lib/semver.ts';
 import { readChangelogSection } from './changelog.ts';
+import { committed, type RepoFiles, workingTree } from './repo-files.ts';
 
 /** Every workspace that carries the version; `''` is the repo root. */
 const WORKSPACES = ['', 'apps/api', 'apps/web', 'packages/shared'];
@@ -41,8 +47,8 @@ function fileUrl(relativePath: string): URL {
   return new URL(`../${relativePath}`, import.meta.url);
 }
 
-function readJson(relativePath: string): Json {
-  return JSON.parse(readFileSync(fileUrl(relativePath), 'utf8')) as Json;
+function readJson(relativePath: string, files: RepoFiles = workingTree): Json {
+  return JSON.parse(files(relativePath)) as Json;
 }
 
 /**
@@ -54,8 +60,8 @@ function writeJson(relativePath: string, value: Json): void {
   writeFileSync(fileUrl(relativePath), `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function currentVersion(): string {
-  const version = readJson('package.json').version;
+function currentVersion(files: RepoFiles = workingTree): string {
+  const version = readJson('package.json', files).version;
   if (typeof version !== 'string') fail('The root package.json has no version.');
   return version;
 }
@@ -138,18 +144,28 @@ function setVersion(version: string, force: boolean): void {
   );
 }
 
-function check(tag: string | null): void {
-  const version = currentVersion();
+/**
+ * Checks that the version is the same everywhere, that CHANGELOG.md documents
+ * it, and — with a tag — that the tag agrees with it. `files` decides what
+ * "everywhere" means: the working tree (CI, `npm run version:check`) or one
+ * commit's tree (the pre-push hook, which has to judge the tagged commit).
+ *
+ * Throws rather than exiting, so it can be called from a test with a `files`
+ * of its own; `main` turns the message into the exit code. Returns the line it
+ * would print on success.
+ */
+export function check(tag: string | null, files: RepoFiles = workingTree): string {
+  const version = currentVersion(files);
   const problems: string[] = [];
 
   for (const workspace of WORKSPACES.slice(1)) {
     const path = packageJsonPath(workspace);
-    const found = readJson(path).version;
+    const found = readJson(path, files).version;
     if (found !== version)
       problems.push(`${path} says ${String(found)}, package.json says ${version}`);
   }
 
-  const lockfile = readJson('package-lock.json');
+  const lockfile = readJson('package-lock.json', files);
   if (lockfile.version !== version) {
     problems.push(
       `package-lock.json says ${String(lockfile.version)}, package.json says ${version}`,
@@ -165,7 +181,7 @@ function check(tag: string | null): void {
     }
   }
 
-  if (!readChangelogSection(version)) {
+  if (!readChangelogSection(version, files)) {
     problems.push(`CHANGELOG.md has no "## ${version}" section`);
   }
 
@@ -175,12 +191,12 @@ function check(tag: string | null): void {
   }
 
   if (problems.length > 0) {
-    fail(`Version metadata is inconsistent:\n${problems.map((line) => `  - ${line}`).join('\n')}`);
+    throw new Error(
+      `Version metadata is inconsistent:\n${problems.map((line) => `  - ${line}`).join('\n')}`,
+    );
   }
 
-  console.log(
-    `Version ${version} is consistent across the workspaces, the lockfile and CHANGELOG.md.`,
-  );
+  return `Version ${version} is consistent across the workspaces, the lockfile and CHANGELOG.md.`;
 }
 
 function main(argv: string[]): void {
@@ -201,7 +217,14 @@ function main(argv: string[]): void {
       const tagIndex = args.indexOf('--tag');
       const tag = tagIndex === -1 ? null : args[tagIndex + 1];
       if (tagIndex !== -1 && !tag) fail('--tag needs a value, e.g. --tag v0.10.0');
-      check(tag ?? null);
+      const atIndex = args.indexOf('--at');
+      const at = atIndex === -1 ? null : args[atIndex + 1];
+      if (atIndex !== -1 && !at) fail('--at needs a value, e.g. --at v0.10.0 or --at HEAD');
+      try {
+        console.log(check(tag ?? null, at === null ? workingTree : committed(at)));
+      } catch (error) {
+        fail(error instanceof Error ? error.message : String(error));
+      }
       break;
     }
     default:
@@ -209,4 +232,7 @@ function main(argv: string[]): void {
   }
 }
 
-main(process.argv.slice(2));
+// Only act as a CLI when run directly — the test imports `check`.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main(process.argv.slice(2));
+}
