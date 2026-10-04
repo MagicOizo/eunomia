@@ -63,6 +63,6 @@ export async function loadAuthorizedContract(
   const contract = await getRow(pool, contractsTable, contractUID);
   if (!contract) throw notFound('Contract');
   const allowed = await hasPermission(pool, userId, permission, contract.accountUID);
-  if (!allowed) throw forbidden();
+  if (!allowed) throw forbidden(permission, contract.accountUID);
   return contract;
 }

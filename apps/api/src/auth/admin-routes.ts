@@ -9,6 +9,12 @@ import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { placeholders } from '../crud/repository.js';
 import { badRequest, notFound } from '../lib/api-error.js';
+import {
+  auditUserCreated,
+  auditUserDeactivated,
+  auditUserRolesChanged,
+  auditUserUpdated,
+} from '../lib/audit.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
 import { hashPassword } from '../lib/password.js';
 import {
@@ -122,6 +128,7 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
       surname: input.surname ?? null,
       passwordHash: await hashPassword(input.password),
     });
+    auditUserCreated({ actor: getAuthUser(res).uuidText, user: created.uuidText });
     sendData(res, await getUser(pool, created.uuidText), 201);
   });
 
@@ -149,6 +156,14 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
     // A new password is exactly the situation one changes a password for, so
     // the sessions it was meant to lock out have to go with it (SEC-05).
     if (input.password !== undefined) await deleteActiveRefreshTokens(pool, userId);
+    // The keys the body carried, never their values — `password` appears here
+    // as a name and nowhere as a secret (SEC-09, rule 1 in lib/audit.ts).
+    auditUserUpdated({
+      actor: getAuthUser(res).uuidText,
+      user: uuid,
+      fields: Object.keys(input),
+      status: input.status,
+    });
     sendData(res, await getUser(pool, uuid));
   });
 
@@ -159,6 +174,7 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
     await assertKeepsAnAdmin(uuid, false);
     const affected = await softDeleteUser(pool, uuid);
     if (affected === 0) throw notFound('User');
+    auditUserDeactivated({ actor: getAuthUser(res).uuidText, user: uuid });
     res.status(204).end();
   });
 
@@ -179,6 +195,12 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
     await assertKeepsAnAdmin(uuid, willRemainAdmin);
 
     await setGlobalRoles(pool, userId, roleUIDs);
+    auditUserRolesChanged({
+      actor: getAuthUser(res).uuidText,
+      user: uuid,
+      scope: 'global',
+      roles: roleUIDs,
+    });
     sendData(res, await getUser(pool, uuid));
   });
 
@@ -187,6 +209,12 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
     const { grants } = accountRolesSchema.parse(req.body);
     const userId = await requireUserId(uuid);
     await setAccountRoles(pool, userId, grants);
+    auditUserRolesChanged({
+      actor: getAuthUser(res).uuidText,
+      user: uuid,
+      scope: 'account',
+      roles: grants.map((grant) => `${grant.accountUID}:${grant.roleUID}`),
+    });
     sendData(res, await getUser(pool, uuid));
   });
 

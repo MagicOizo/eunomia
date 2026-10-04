@@ -293,6 +293,17 @@ Nachweis und Fundstelle. Hier steht nur, was das für die Planung bedeutet:
   `'self'`, ohne `unsafe-inline` und ohne `unsafe-eval`. `upgrade-insecure-requests` ist
   ausdrücklich nicht gesetzt — es würde die eigene http-Instanz zerlegen. Eine Instanz ohne fremde
   Proxy-Konfiguration ist damit nicht ungeschützt.
+- **Der Audit-Trail ist eine Liste, keine Gewohnheit** (Scheibe 17, SEC-09). Die vierzehn
+  Ereignisse stehen als Katalog in `lib/audit.ts`; ein Name lässt sich dort nicht vertippen und ein
+  Feld nicht erfinden. Zwei Regeln sind dabei nicht verhandelbar und werden dort auch geprüft: eine
+  Zeile trägt UIDs und nie ein Label (I-7 — ein Papierkorb-Eintrag heißt mit Rechnungsnummer und
+  dem Namen der behandelten Person), und `SETTINGS_CHANGED` nennt Schlüssel und nie Werte. Die
+  einzige personenbezogene Ausnahme ist die E-Mail-Adresse bei einer fehlgeschlagenen Anmeldung,
+  ohne die sich ein gezielter Angriff nicht von einem Spray unterscheiden lässt. 401 und 403 werden
+  an einer Stelle geschrieben, im `error-handler` — auch die 37 Routen, die erst im Handler prüfen,
+  kommen dort vorbei. Ein **abgelaufener** Access-Token schweigt: er ist der Normalfall jedes
+  offenen Browser-Tabs, und eine Zeile dafür begrübe die übrigen. `DEV.md` listet alle vierzehn,
+  und der Test hält die Liste in beide Richtungen.
 - **Abhängigkeiten sind ein CI-Schritt, kein Review-Thema**: `npm audit --omit=dev
   --audit-level=high` läuft bei jedem Push (SEC-10). Im Laufzeit-Image stecken seit Scheibe 15 nur
   noch die Abhängigkeiten der API — die SPA ist ein statisches Bündel und braucht ihre eigenen nicht

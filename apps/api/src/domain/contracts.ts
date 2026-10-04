@@ -98,7 +98,7 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
     const requestedAccount = parseQuery(req, listQuery).accountUID;
     if (requestedAccount !== undefined) {
       if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_CONTRACTS, requestedAccount))) {
-        throw forbidden();
+        throw forbidden(PERMISSIONS.VIEW_CONTRACTS, requestedAccount);
       }
       where.push('c.accountUID = ?');
       params.push(requestedAccount);
@@ -162,7 +162,7 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
       PERMISSIONS.MANAGE_CONTRACTS,
       data.accountUID,
     );
-    if (!allowed) throw forbidden();
+    if (!allowed) throw forbidden(PERMISSIONS.MANAGE_CONTRACTS, data.accountUID);
 
     const contract = await withTransaction(pool, async (conn) => {
       const created = await insertRow(conn, contractsTable, data);

@@ -2,13 +2,14 @@ import { ERROR_CODES, PERMISSIONS } from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 
-import { createRequireAuth, createRequirePermission } from '../auth/middleware.js';
+import { createRequireAuth, createRequirePermission, getAuthUser } from '../auth/middleware.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
 import { type Queryable, hardDeleteRow, restoreRow, softDeleteRow } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { ApiError, conflict, notFound } from '../lib/api-error.js';
+import { auditTrashPurged, auditTrashRestored } from '../lib/audit.js';
 import { isSqlError } from '../lib/error-handler.js';
 import { linksFrom, linksTo } from './trash-references.js';
 import { type TrashEntry, TRASH_ENTITIES, entityOfTable, entityOfUid } from './trash-registry.js';
@@ -191,8 +192,9 @@ async function restoreEntry(pool: Pool, located: Located): Promise<number> {
 /**
  * Removes the record for good, together with the deleted records below it and
  * the link rows that belong to it. Refuses while something active points at it.
+ * Answers how many further records went with it, for the audit line.
  */
-async function purgeEntry(pool: Pool, located: Located): Promise<void> {
+async function purgeEntry(pool: Pool, located: Located): Promise<number> {
   const stopping = await blockers(pool, located);
   if (stopping.length > 0) {
     throw conflict('The record is still referenced by active records', {
@@ -204,7 +206,7 @@ async function purgeEntry(pool: Pool, located: Located): Promise<void> {
     });
   }
 
-  await withTransaction(pool, async (conn) => {
+  return withTransaction(pool, async (conn) => {
     const below = await deletedDescendants(conn, located);
     // Children first, the record last — the foreign keys are all RESTRICT.
     for (const one of [...below, located]) {
@@ -222,6 +224,7 @@ async function purgeEntry(pool: Pool, located: Located): Promise<void> {
     // can show, so it follows its invoices into the trash — the same rule as
     // withdrawing the last invoice by hand (see submissions.ts).
     await softDeleteEmptySubmissions(conn);
+    return below.length;
   });
 }
 
@@ -260,14 +263,30 @@ export function createTrashRouter(pool: Pool, config: AppConfig): Router {
     sendData(res, { groups: await listTrash(pool) });
   });
 
+  // Both lines name the kind and the UID and never the label: a trash entry's
+  // label is an invoice number and the treated person's name (SEC-09, I-7).
   router.post('/:uid/restore', requireAuth, requireTrash, async (req, res) => {
     const located = await locateOr404(pool, pathParam(req, 'uid'));
-    sendData(res, { restored: await restoreEntry(pool, located) });
+    const restored = await restoreEntry(pool, located);
+    auditTrashRestored({
+      actor: getAuthUser(res).uuidText,
+      kind: located.entity.key,
+      uid: located.uid,
+      // The record itself is part of the count; what came with it is the rest.
+      alsoRestored: restored - 1,
+    });
+    sendData(res, { restored });
   });
 
   router.delete('/:uid', requireAuth, requireTrash, async (req, res) => {
     const located = await locateOr404(pool, pathParam(req, 'uid'));
-    await purgeEntry(pool, located);
+    const alsoRemoved = await purgeEntry(pool, located);
+    auditTrashPurged({
+      actor: getAuthUser(res).uuidText,
+      kind: located.entity.key,
+      uid: located.uid,
+      alsoRemoved,
+    });
     res.status(204).end();
   });
 

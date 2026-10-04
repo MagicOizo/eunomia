@@ -77,7 +77,9 @@ export async function authorizeAccount(
   permission: PermissionKey,
   accountUID: string,
 ): Promise<void> {
-  if (!(await hasPermission(db, userId, permission, accountUID))) throw forbidden();
+  if (!(await hasPermission(db, userId, permission, accountUID))) {
+    throw forbidden(permission, accountUID);
+  }
 }
 
 /**

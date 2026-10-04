@@ -3,7 +3,16 @@ import { timingSafeEqual } from 'node:crypto';
 import type { Pool } from 'mariadb';
 
 import type { AuthConfig } from '../config/env.js';
-import { logEvent } from '../lib/log.js';
+import {
+  type LoginFailure,
+  type SourceIp,
+  auditLoginFailed,
+  auditLoginOk,
+  auditLogout,
+  auditPasswordChanged,
+  auditRefreshReuse,
+  auditSetupCompleted,
+} from '../lib/audit.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import {
   invalidCredentials,
@@ -82,6 +91,7 @@ export async function setupFirstAdmin(
   config: AuthConfig,
   input: SetupInput,
   providedToken: string | undefined,
+  ip: SourceIp,
 ): Promise<AuthUser> {
   if (config.setupToken === undefined) throw setupDisabled();
   if (providedToken === undefined || !safeEquals(providedToken, config.setupToken)) {
@@ -97,19 +107,39 @@ export async function setupFirstAdmin(
     passwordHash,
   });
   await assignGlobalRole(pool, user.userId, ADMIN_ROLE_NAME);
+  auditSetupCompleted({ user: user.uuidText, email: user.email, ip });
   return user;
 }
 
-/** Verifies credentials and issues a session, or throws invalidCredentials. */
+/**
+ * Verifies credentials and issues a session, or throws invalidCredentials.
+ *
+ * The three ways to fail are told apart for the log and only for the log
+ * (SEC-09): the caller hears the same sentence either way, so an attacker
+ * still cannot probe which addresses exist, while the operator can tell a
+ * password being guessed from a deactivated account being tried again. The
+ * dummy hash above keeps the timing equal regardless.
+ */
 export async function login(
   pool: Pool,
   config: AuthConfig,
   input: LoginInput,
+  ip: SourceIp,
 ): Promise<IssuedSession> {
   const user = await findUserByEmailWithHash(pool, input.email);
   const passwordOk = await verifyPassword(input.password, user?.passwordHash ?? DUMMY_HASH);
-  if (!user || !passwordOk || user.userStatus !== 1) throw invalidCredentials();
 
+  if (!user || !passwordOk || user.userStatus !== 1) {
+    const reason: LoginFailure = !user
+      ? 'unknown_user'
+      : !passwordOk
+        ? 'bad_password'
+        : 'user_inactive';
+    auditLoginFailed({ email: input.email, ip, reason });
+    throw invalidCredentials();
+  }
+
+  auditLoginOk({ user: user.uuidText, ip });
   return issueSession(pool, config, user);
 }
 
@@ -133,7 +163,7 @@ async function noteRefreshReuse(pool: Pool, tokenHash: string): Promise<void> {
   if (owner === null || owner.revokedAt === null) return;
 
   const ended = await deleteActiveRefreshTokens(pool, owner.userId);
-  logEvent('warn', 'AUTH_REFRESH_REUSE', { user: owner.uuidText, sessionsEnded: ended });
+  auditRefreshReuse({ user: owner.uuidText, sessionsEnded: ended });
 }
 
 /**
@@ -170,21 +200,37 @@ export async function changeOwnPassword(
   user: AuthUser,
   input: ChangePasswordInput,
   currentRefreshToken: string | undefined,
+  ip: SourceIp,
 ): Promise<void> {
   const passwordHash = await findPasswordHashByUserId(pool, user.userId);
   if (passwordHash === null) throw invalidCurrentPassword();
   if (!(await verifyPassword(input.currentPassword, passwordHash))) throw invalidCurrentPassword();
 
   await updatePasswordHash(pool, user.userId, await hashPassword(input.newPassword));
-  await deleteActiveRefreshTokens(
+  const sessionsEnded = await deleteActiveRefreshTokens(
     pool,
     user.userId,
     currentRefreshToken === undefined ? undefined : hashRefreshToken(currentRefreshToken),
   );
+  auditPasswordChanged({ user: user.uuidText, sessionsEnded, ip });
 }
 
-/** Revokes the presented refresh token. Idempotent — an unknown token is a no-op. */
-export async function logout(pool: Pool, presentedToken: string | undefined): Promise<void> {
+/**
+ * Revokes the presented refresh token. Idempotent — an unknown token is a no-op.
+ *
+ * The owner is looked up purely so the audit line can name a user; without it
+ * the only thing an ended session would say is that some cookie went away.
+ * An unknown token still logs, as `user=unknown`: that is the shape of someone
+ * sending a made-up cookie, which is worth seeing.
+ */
+export async function logout(
+  pool: Pool,
+  presentedToken: string | undefined,
+  ip: SourceIp,
+): Promise<void> {
   if (!presentedToken) return;
-  await revokeRefreshToken(pool, hashRefreshToken(presentedToken));
+  const tokenHash = hashRefreshToken(presentedToken);
+  const owner = await findRefreshTokenOwner(pool, tokenHash);
+  await revokeRefreshToken(pool, tokenHash);
+  auditLogout({ user: owner?.uuidText ?? null, ip });
 }

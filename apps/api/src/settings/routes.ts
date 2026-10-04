@@ -8,6 +8,7 @@ import { getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { ApiError } from '../lib/api-error.js';
+import { auditSettingsChanged } from '../lib/audit.js';
 import { type Mailer, type MailerDeps, createMailer } from '../mail/mailer.js';
 import { createMailSettingsStore } from '../mail/store.js';
 import {
@@ -97,6 +98,16 @@ export function createSettingsRouter(
     }
 
     await setSettings(pool, updates, config.configEncryptionKey, getAuthUser(res).userId);
+
+    // Keys only. A value here would mean the mail password in a log line the
+    // moment someone changes it (SEC-09, rule 2 in lib/audit.ts) — and the one
+    // place the plaintext is in reach is exactly this handler.
+    const changed = [...updates.entries()];
+    auditSettingsChanged({
+      actor: getAuthUser(res).uuidText,
+      set: changed.filter(([, value]) => value !== null).map(([key]) => key),
+      cleared: changed.filter(([, value]) => value === null).map(([key]) => key),
+    });
 
     sendData(res, await snapshot());
   });

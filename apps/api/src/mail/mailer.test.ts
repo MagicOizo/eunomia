@@ -5,6 +5,7 @@ import { ERROR_CODES } from '@eunomia/shared';
 
 import { ApiError } from '../lib/api-error.js';
 import { type ResolvedSettings, SETTING_KEYS, fallbackOf } from '../settings/registry.js';
+import { captureLog } from '../test/log-capture.js';
 import {
   type MailSendStatus,
   type MailTransport,
@@ -76,25 +77,6 @@ function stubTransport(failure?: Error) {
     };
   };
   return { createTransport, options, sent };
-}
-
-/** Swallows the log lines so the test output stays readable; returns what was logged. */
-function captureLog<T>(run: () => Promise<T>): Promise<{ result: T; lines: string[] }> {
-  const lines: string[] = [];
-  const original = { log: console.log, warn: console.warn, error: console.error };
-  const collect =
-    () =>
-    (...args: unknown[]): void => {
-      lines.push(args.map(String).join(' '));
-    };
-  console.log = collect();
-  console.warn = collect();
-  console.error = collect();
-  return run()
-    .then((result) => ({ result, lines }))
-    .finally(() => {
-      Object.assign(console, original);
-    });
 }
 
 const clock = (): Date => new Date('2026-09-24T10:00:00.000Z');

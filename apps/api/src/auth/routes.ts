@@ -33,13 +33,13 @@ export function createAuthRouter(pool: Pool, config: AppConfig): Router {
   router.post('/setup', async (req, res) => {
     const input = setupSchema.parse(req.body);
     const providedToken = req.header('X-Setup-Token') ?? undefined;
-    const user = await setupFirstAdmin(pool, config.auth, input, providedToken);
+    const user = await setupFirstAdmin(pool, config.auth, input, providedToken, req.ip);
     res.status(201).json({ user: publicUser(user) });
   });
 
   router.post('/auth/login', async (req, res) => {
     const input = loginSchema.parse(req.body);
-    const session = await login(pool, config.auth, input);
+    const session = await login(pool, config.auth, input, req.ip);
     setRefreshCookie(res, session.refreshToken, session.refreshExpiresAt, config.isProduction);
     res.json({ accessToken: session.accessToken, user: publicUser(session.user) });
   });
@@ -56,12 +56,18 @@ export function createAuthRouter(pool: Pool, config: AppConfig): Router {
   // for oneself always costs the old one.
   router.post('/auth/password', requireAuth, async (req, res) => {
     const input = changePasswordSchema.parse(req.body);
-    await changeOwnPassword(pool, getAuthUser(res), input, readRefreshCookie(req.headers.cookie));
+    await changeOwnPassword(
+      pool,
+      getAuthUser(res),
+      input,
+      readRefreshCookie(req.headers.cookie),
+      req.ip,
+    );
     res.status(204).end();
   });
 
   router.post('/auth/logout', async (req, res) => {
-    await logout(pool, readRefreshCookie(req.headers.cookie));
+    await logout(pool, readRefreshCookie(req.headers.cookie), req.ip);
     clearRefreshCookie(res, config.isProduction);
     res.status(204).end();
   });

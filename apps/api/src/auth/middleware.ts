@@ -1,5 +1,6 @@
 import type { PermissionKey } from '@eunomia/shared';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import { errors as joseErrors } from 'jose';
 import type { Pool } from 'mariadb';
 
 import type { AppConfig } from '../config/env.js';
@@ -34,11 +35,18 @@ export function guardInfo(handler: unknown): GuardInfo | undefined {
   return typeof handler === 'function' ? (handler as Partial<Guard>)[GUARD] : undefined;
 }
 
+/**
+ * The authenticated user attached by requireAuth, or undefined. Express types
+ * `res.locals` as a bag of `any`, so this is the one place that says what
+ * lives under the key — and the only reader of it.
+ */
+export function tryGetAuthUser(res: Response): AuthUser | undefined {
+  return res.locals[AUTH_USER_KEY] as AuthUser | undefined;
+}
+
 /** Retrieves the authenticated user attached by requireAuth (throws if absent). */
 export function getAuthUser(res: Response): AuthUser {
-  // Express types `res.locals` as a bag of `any`, so this is the one place
-  // that says what lives under the key — and the only reader of it.
-  const user = res.locals[AUTH_USER_KEY] as AuthUser | undefined;
+  const user = tryGetAuthUser(res);
   if (!user) throw new Error('getAuthUser called without requireAuth in the chain');
   return user;
 }
@@ -54,22 +62,31 @@ function bearerToken(header: string | undefined): string | undefined {
  * Verifies the access token and loads the current user onto `res.locals`.
  * Any failure (missing/invalid/expired token, unknown or deactivated user)
  * results in a uniform 401 rather than leaking which part failed.
+ *
+ * The reason does travel — on the error, not in the answer — because the audit
+ * trail has to tell a forged token apart from one that simply aged out
+ * (SEC-09, and `lib/audit.ts` on why only the latter stays silent). That is
+ * also why the expiry is caught by its own jose error class instead of by a
+ * bare `catch`: "expired" and "tampered with" used to be the same line here.
  */
 export function createRequireAuth(pool: Pool, config: AppConfig): RequestHandler {
   const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
     void (async () => {
       const token = bearerToken(req.headers.authorization);
-      if (!token) throw unauthenticated();
+      if (!token) throw unauthenticated('no_token');
 
       let uuid: string;
       try {
         uuid = await verifyAccessToken(token, config.auth.jwtSecret);
-      } catch {
-        throw unauthenticated();
+      } catch (error) {
+        throw unauthenticated(
+          error instanceof joseErrors.JWTExpired ? 'token_expired' : 'invalid_token',
+        );
       }
 
       const user = await findUserByUuid(pool, uuid);
-      if (!user || user.userStatus !== 1) throw unauthenticated();
+      if (!user) throw unauthenticated('unknown_user');
+      if (user.userStatus !== 1) throw unauthenticated('user_inactive');
 
       res.locals[AUTH_USER_KEY] = user;
     })().then(next, next);
@@ -93,7 +110,7 @@ export function createRequirePermission(
       const user = getAuthUser(res);
       const accountUID = accountUIDFrom?.(req);
       const allowed = await hasPermission(pool, user.userId, permission, accountUID);
-      if (!allowed) throw forbidden();
+      if (!allowed) throw forbidden(permission, accountUID);
     })().then(next, next);
   };
   return Object.assign(requirePermission, {

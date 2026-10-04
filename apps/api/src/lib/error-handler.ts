@@ -2,7 +2,10 @@ import { ERROR_CODES } from '@eunomia/shared';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 
+import { ForbiddenError, UnauthenticatedError } from '../auth/errors.js';
+import { tryGetAuthUser } from '../auth/middleware.js';
 import { ApiError } from './api-error.js';
+import { auditForbidden, auditUnauthenticated } from './audit.js';
 
 /** MariaDB driver error shape we care about (a subset of SqlError). */
 interface SqlErrorLike {
@@ -43,17 +46,57 @@ function mapSqlError(err: SqlErrorLike): ApiError | null {
 }
 
 /**
+ * Writes the audit line for a refused request (SEC-09). This is the one place
+ * worth doing it: every refusal ends here, including the 37 routes that check
+ * inside the handler rather than behind a guard (SEC-17), so there is no
+ * second code path that could forget.
+ *
+ * An expired access token is the one refusal that stays silent — see
+ * `lib/audit.ts`. Note what is NOT covered here either: a rejected refresh
+ * token on /auth/refresh. The alarming case of that, a token shown twice, has
+ * had AUTH_REFRESH_REUSE since the session slice; the rest is a 30-day expiry
+ * or the race between logging out and refreshing, i.e. normal operation.
+ */
+function auditRefusal(err: unknown, req: Request, res: Response): void {
+  if (err instanceof UnauthenticatedError) {
+    if (err.reason === 'token_expired') return;
+    auditUnauthenticated({
+      reason: err.reason,
+      method: req.method,
+      path: req.path,
+      ip: req.ip,
+    });
+    return;
+  }
+  if (err instanceof ForbiddenError) {
+    auditForbidden({
+      // A 403 always has a user behind it: the permission check runs after
+      // requireAuth. Read without throwing all the same, because an error
+      // handler is the last place that should produce an error of its own.
+      user: tryGetAuthUser(res)?.uuidText ?? 'unknown',
+      permission: err.permission,
+      account: err.accountUID,
+      method: req.method,
+      path: req.path,
+      ip: req.ip,
+    });
+  }
+}
+
+/**
  * Terminal error middleware turning known error types into a uniform JSON
  * envelope `{ error: { code, message } }`. Unknown errors are logged and
  * reported as a generic 500 so internals never leak to clients.
  */
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Express needs the 4-arg shape
   _next: NextFunction,
 ): void {
+  auditRefusal(err, req, res);
+
   const apiError = err instanceof ApiError ? err : isSqlError(err) ? mapSqlError(err) : null;
   if (apiError) {
     res.status(apiError.httpStatus).json({

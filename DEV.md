@@ -157,6 +157,45 @@ A failure line carries the recipient, the host, the mail server's error code and
 a password. The settings page shows the same message next to the red status, and it survives a
 restart (it is stored with the settings).
 
+### The audit trail
+
+Everything security-relevant the API does writes one line in the same format, from one place
+(`apps/api/src/lib/audit.ts`). After an incident these are what say who did what; while nothing is
+wrong, `AUTH_LOGIN_FAILED` is the one worth watching. All fourteen:
+
+```bash
+docker logs eunomia 2>&1 | grep AUTH_LOGIN_OK         # a session was issued
+docker logs eunomia 2>&1 | grep AUTH_LOGIN_FAILED     # ip, attempted email and why it failed
+docker logs eunomia 2>&1 | grep AUTH_LOGOUT           # a session ended on purpose
+docker logs eunomia 2>&1 | grep AUTH_PASSWORD_CHANGED # someone changed their own password
+docker logs eunomia 2>&1 | grep AUTH_SETUP_COMPLETED  # the first admin was created — once, ever
+docker logs eunomia 2>&1 | grep AUTH_UNAUTHENTICATED  # a request without a usable token
+docker logs eunomia 2>&1 | grep AUTH_FORBIDDEN        # a request without the permission it needed
+docker logs eunomia 2>&1 | grep AUTH_REFRESH_REUSE    # a refresh token shown twice: likely theft
+docker logs eunomia 2>&1 | grep USER_CREATED          # a new user account
+docker logs eunomia 2>&1 | grep USER_UPDATED          # which fields changed, never their values
+docker logs eunomia 2>&1 | grep USER_DEACTIVATED      # a user account was switched off
+docker logs eunomia 2>&1 | grep USER_ROLES_CHANGED    # the new set of roles or account grants
+docker logs eunomia 2>&1 | grep TRASH_PURGED          # a record was deleted for good
+docker logs eunomia 2>&1 | grep TRASH_RESTORED        # a record came back out of the trash
+docker logs eunomia 2>&1 | grep SETTINGS_CHANGED      # which setting keys were written or cleared
+docker logs eunomia 2>&1 | grep -E 'event=(AUTH|USER|TRASH|SETTINGS)_' # the whole trail
+```
+
+Two rules hold for every one of them, and `apps/api/src/lib/audit.test.ts` is where they are
+written down: **a line carries UIDs, never labels** — a purged invoice appears as its kind and its
+UID, not as its number and the treated person's name — and **`SETTINGS_CHANGED` names keys, never
+values**, so changing the mail password does not put it in the log. The one personal datum that
+does appear is the email address on a failed login, because a line without it cannot tell an attack
+on one account from a sweep across many.
+
+**An expired access token writes nothing.** Every open browser tab retires one every fifteen
+minutes; a line for each would bury the rest. A token that is malformed, forged, or belongs to a
+user who is gone or switched off does get one, as `reason=`.
+
+This list is not decoration: the test reads this file and fails if an event is missing here, or if
+an event named here no longer exists.
+
 ### Payment reminders
 
 The only thing the API does without being asked. A timer wakes every five minutes and runs the

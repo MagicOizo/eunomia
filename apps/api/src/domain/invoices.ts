@@ -149,7 +149,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const requestedAccount = filters.accountUID;
     if (requestedAccount !== undefined) {
       if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_INVOICES, requestedAccount))) {
-        throw forbidden();
+        throw forbidden(PERMISSIONS.VIEW_INVOICES, requestedAccount);
       }
       where.push('i.accountUID = ?');
       params.push(requestedAccount);
@@ -225,7 +225,7 @@ export function createInvoicesRouter(pool: Pool, config: AppConfig): Router {
     const { accountUID: requestedAccount } = parseQuery(req, yearsQuery);
     if (requestedAccount !== undefined) {
       if (!(await hasPermission(pool, user.userId, PERMISSIONS.VIEW_INVOICES, requestedAccount))) {
-        throw forbidden();
+        throw forbidden(PERMISSIONS.VIEW_INVOICES, requestedAccount);
       }
       where.push('accountUID = ?');
       params.push(requestedAccount);

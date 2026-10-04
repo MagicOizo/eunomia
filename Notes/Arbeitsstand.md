@@ -274,5 +274,31 @@ ausdrücklich vor einer anderen steht.
       `InvoicePickerView.test.ts` ist beim ersten, kalten Abdeckungslauf einmal rot geworden
       (`.eu-picker__refs` leer), in fünf weiteren Läufen nicht mehr — die Datei gehört nicht zu
       dieser Scheibe, aber der langsamere CI-Schritt kann es wieder sichtbar machen.
-- [ ] **17 — Audit-Trail.** SEC-09.
+- [x] **17 — Audit-Trail.** SEC-09.
+      Umgesetzt mit v0.19.0-slice.3 (Slice 67). Vier Festlegungen des Autors prägen das Ergebnis:
+      die fehlgeschlagene Anmeldung nennt IP **und** versuchte E-Mail, geloggt wird nur das
+      Unroutinierte (jede 403, eine 401 nur bei gefälschtem Token oder unbekanntem/deaktiviertem
+      Nutzer — ein abgelaufener Access-Token schweigt), die Ereignisse stehen als getypter Katalog
+      in `lib/audit.ts` statt als `logEvent`-Aufrufe an den Fundstellen, und vier Ereignisse kamen
+      über den Review hinaus dazu (`AUTH_SETUP_COMPLETED`, `AUTH_PASSWORD_CHANGED`,
+      `TRASH_RESTORED`, `AUTH_LOGOUT`). Aus den sieben vorgeschlagenen wurden so vierzehn.
+      Drei Dinge gingen darüber hinaus: (1) 401 und 403 werden an **einer** Stelle geschrieben, im
+      `error-handler` — die einzige, durch die auch die 37 Routen kommen, die erst im Handler
+      prüfen; dafür tragen `UnauthenticatedError` und `ForbiddenError` Grund bzw. fehlendes Recht
+      als Feld mit, ausdrücklich nicht in `details`, so dass die Antwort an den Client um kein
+      Zeichen abweicht. (2) `AUTH_REFRESH_REUSE` aus Scheibe 7 ist in den Katalog gewandert — ein
+      dokumentiertes Ereignis außerhalb der Liste ist eines, das der Dokumentationstest nicht
+      halten kann. (3) `captureLog` stand lokal im Mailer-Test und liegt jetzt in
+      `src/test/log-capture.ts`. Abweichend vom Plan sind die Nachweise **nicht** in die vier
+      bestehenden Integrationssuiten gestreut, sondern in eine eigene
+      (`lib/audit.integration.test.ts`), die die Spur in zehn Schritten einmal durchläuft — ein
+      Befund, der quer durch die App liegt, liest sich als ein Weg besser denn als zehn Zusätze in
+      Suiten, die von etwas anderem handeln. Gewarnt sei vor der Stelle, die den Test zuerst rot
+      gemacht hat: `updateUser` endet auf `AND userStatus <> -1`, ein deaktivierter Nutzer kommt
+      über die Admin-API also nicht zurück — die Deaktivierung muss im Durchlauf zuletzt stehen.
+      Rot geprüft: ein Ereignis aus `DEV.md` entfernt (fällt), ein erfundenes ergänzt (fällt), die
+      Ausnahme für den abgelaufenen Token entfernt (die Nicht-Zusicherung fällt). Von Hand gegen
+      eine eigene Instanz auf `eunomia_test` (die Entwicklungsdaten blieben unberührt): alle
+      vierzehn Zeilen gesehen, ein echt abgelaufener Token schreibt keine, und die Ausgabe des
+      ganzen Laufs enthält keines der durchgereichten Passwörter und kein einziges Label.
 - [ ] **18 — Aufbewahrung, Löschung, Auskunft.** SEC-15.

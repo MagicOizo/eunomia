@@ -7,6 +7,32 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.19.0-slice.3 — 2026-10-04
+
+The app keeps a record of itself. Until now the log knew about mail, reminders and the update
+check, and about nothing a person did: not a single login, refused request, user, role, deletion or
+setting. A password being guessed was invisible, and after an incident there was no way to say who
+had deleted what. For health data that traceability is not a convenience — it is part of the
+protection.
+
+- **Fourteen events, one line each.** Signing in and failing to sign in; a request turned away for
+  want of a token or a permission; a user created, changed, switched off; roles and account grants
+  granted; a record restored or deleted for good; the settings written. Each is a fixed word an
+  operator can filter on — `docker logs eunomia | grep TRASH_PURGED` — and all fourteen are listed
+  in `DEV.md` with what they mean.
+- **A failed login says who was aimed at and from where**, so a sweep across many accounts reads
+  differently from a hundred tries against one. The answer to the caller is unchanged: it still
+  does not reveal whether the address exists.
+- **What never appears in a line.** No record's label — a purged invoice is its kind and its id,
+  not its number and the treated person's name — and no setting's value, so changing the mail
+  password does not write it into the log. Both rules sit in one module and are checked by its
+  test.
+- **An expired login is not an incident.** Every open browser tab retires a token every fifteen
+  minutes; those write nothing. A token that is malformed, forged, or belongs to a user who is gone
+  or switched off does, and says which.
+- **The list in the handbook cannot go stale.** The test reads `DEV.md` and fails if an event is
+  missing from it, or if the handbook still advertises a search for an event that no longer exists.
+
 ## 0.19.0-slice.2 — 2026-10-04
 
 Nothing in this release changes what the app does. It changes what the build knows: three promises
