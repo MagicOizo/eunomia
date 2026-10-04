@@ -284,8 +284,14 @@ Nachweis und Fundstelle. Hier steht nur, was das für die Planung bedeutet:
   wie jeder andere Befund in Scheiben abgearbeitet.
 - Schwerpunkt des ersten Durchgangs: SEC-01 (ausführbare Schemata im Dokument-Link), SEC-02 (keine
   Security-Header/CSP) und SEC-09 (kein Audit-Trail). Der Rest ist geordnet, aber nachrangig.
-- Nach dem Code-Review folgt eine **Delta-Nachprüfung** auf den dabei berührten Dateien, bevor 1.0.0
-  gebumpt wird (Abschnitt 8 des Reviews).
+- **Die Nachprüfung vor 1.0.0 ist erledigt** (04.10.2026, Scheibe 69; Abschnitt 8 des Reviews).
+  Geplant war ein Delta auf den berührten Dateien, durchgeführt wurde ein vollständiger Durchgang je
+  Invariante — bei 266 angefassten Dateien *ist* das Delta der ganze Code. Alle dreizehn gelten.
+  Was für die Planung daraus folgt: I-1, I-2, I-3, I-8 und I-13 sind jetzt maschinell gesichert,
+  I-6, I-11 und I-12 durch vorhandene Prüfungen mitgedeckt; **I-4, I-5, I-7 und I-10 bleiben
+  gelesen, nicht geprüft** — eine Scheibe, die SQL baut, Spalten whitelistet, loggt oder eine
+  Berechtigung auflöst, hat dafür keinen Test als Netz und muss von Hand gegen die Regel gelesen
+  werden.
 - **Die Header sind Sache der App, nicht des Proxys** (Scheibe 15, SEC-02). `helmet` sitzt vor allen
   Routern, die CSP steht ausgeschrieben in `app.ts` und wird von `app.test.ts` geprüft. Zwei
   Lockerungen sind benannt und begründet: `img-src data:` für den GiroCode und
@@ -2134,8 +2140,8 @@ dem Laden stumm, nach „Jetzt prüfen" steht `v3.5.43 verfügbar` darin — ohn
 Adresse —, eine zweite Prüfung ohne Fund nimmt ihn wieder weg, und nach dem Abmelden ist er fort.
 
 ## Slice 51 — Tote Pfade und Namen im Kleinen (umgesetzt 2026-09-29)
-**Anlass:** Erste Scheibe des Pakets „Die zwei Reviews auf dem Weg zu 1.0.0" (Block I,
-[Arbeitsstand.md](Arbeitsstand.md)), und die kleinste: CR-28, CR-35, CR-36, CR-31 und CR-21. Alle
+**Anlass:** Erste Scheibe des Pakets „Die zwei Reviews auf dem Weg zu 1.0.0" (Block I des Schnitts
+in [Code-Review.md](Code-Review.md) §7), und die kleinste: CR-28, CR-35, CR-36, CR-31 und CR-21. Alle
 fünf Befunde haben dieselbe Form — der Code behauptet etwas, das nicht stimmt: eine Sammeldatei, die
 keine öffentliche Oberfläche ist; zwei Demo-Endpunkte, die nur noch leben, weil Tests sie benutzen;
 exportierte Helfer ohne Aufrufer; ein Dateiname gegen die Konvention; ein Prüfmuster, das mehr
@@ -2166,6 +2172,52 @@ und `l` ab; die drei umgeschriebenen Wächter-Fälle grün), 301 Web-Tests, Lint
 Build beider Apps, `version:check`. Kein Browser-Nachweis: keine der fünf Änderungen ist sichtbar —
 ein Dateiname, zwei Endpunkte, die kein Client aufruft, zwei `export`-Schlüsselwörter und eine
 Zeichenklasse, die strenger wird als das, was je vergeben wurde.
+
+## Slices 52–69 — Die Review-Arbeit (umgesetzt 2026-09-29 bis 2026-10-04)
+
+Ab hier wird die Scheibe nicht mehr hier geplant. Das Paket „Die zwei Reviews auf dem Weg zu 1.0.0"
+hatte seinen Schnitt schon: 54 Befunde (17 SEC, 37 CR), geschnitten in 18 Scheiben in vier Blöcken,
+nachzulesen in [Code-Review.md](Code-Review.md) §7. Begründung, Fundstelle, Aufwand und Risiko je
+Befund stehen in [Code-Review.md](Code-Review.md) bzw. [Sicherheits-Review.md](Sicherheits-Review.md)
+unter der CR-/SEC-Nummer; **was daraus geworden ist, steht am Punkt in [issues.md](issues.md)** —
+dort trägt jeder Befund den Vermerk `Umgesetzt mit vX.Y.Z-slice.N` und darunter, was abweichend oder
+über den Review hinaus entschieden wurde. Der Changelog erzählt dasselbe nach außen.
+
+Die Liste ist deshalb nur eine Landkarte von der Slice-Nummer auf den Befund:
+
+| Slice | Version | Scheibe | Befunde |
+| --- | --- | --- | --- |
+| 51 | `0.16.0-slice.2` | 1 — Tote Pfade und Namen im Kleinen | CR-21, CR-28, CR-31, CR-35, CR-36 |
+| 52 | `0.16.0-slice.3` | 2 — Kleine Korrekturen an der API | CR-06, CR-12, CR-13, CR-14, CR-22, SEC-12, SEC-16 |
+| 53 | `0.16.0-slice.4` | 3 — Ein Name für die Kontoverbindung | CR-20 |
+| 54 | `0.16.0-slice.5` | 4 — Die Helfer durchsetzen | CR-08, CR-09, CR-10, CR-11, CR-23 |
+| 55 | `0.16.0-slice.6` | 5 — Das geteilte Paket | CR-01, CR-02, CR-03, CR-04, CR-05 |
+| 56 | `0.17.0-slice.1` | 6 — Der Client hält die Sitzung | CR-24, CR-25 |
+| 57 | `0.17.0-slice.2` | 7 — Anmeldung und Sitzungen | SEC-05, SEC-06, SEC-07, SEC-08 |
+| 58 | `0.17.0-slice.3` | 8 — Kontotrennung an einem Ort | CR-07, SEC-03, SEC-04 |
+| 59 | `0.18.0-slice.1` | 9 — `invoices.ts` schneiden | CR-15 |
+| 60 | `0.18.0-slice.2` | 10 — Grenzen an den Eingängen | CR-18, SEC-01, SEC-11 |
+| 61 | `0.18.0-slice.3` | 11 — Dialoge und große Ansichten | CR-29, CR-30 |
+| 62 | `0.18.0-slice.4` | 12 — Die Oberfläche lernt das Rechtemodell | CR-26 |
+| 63 | `0.18.0-slice.5` | 13 — Weniger Fragen an die Datenbank | CR-16, CR-17, CR-27 |
+| 64 | `0.18.0-slice.6` | 14 — Typen statt Zusicherungen | CR-19 |
+| 65 | `0.19.0-slice.1` | 15 — Header, Image, Abhängigkeiten | CR-37, SEC-02, SEC-10, SEC-13, SEC-14 |
+| 66 | `0.19.0-slice.2` | 16 — Prüfbar statt dokumentiert | CR-32, CR-33, CR-34, SEC-17 |
+| 67 | `0.19.0-slice.3` | 17 — Audit-Trail | SEC-09 |
+| 68 | `0.19.0-slice.4` | 18 — Aufbewahrung, Löschung, Auskunft | SEC-15 |
+| 69 | `0.19.0-slice.5` | Nachprüfung der Invarianten I-1 bis I-13 | §8 des Sicherheits-Reviews |
+
+**Was aus dem Paket in diesen Plan gewandert ist** — und damit das ist, was eine spätere Scheibe
+lesen muss, statt die Entscheidung neu zu treffen:
+
+- §2.1 — genau ein API-Container (Scheibe 15).
+- §2.4 — die zwölf Rechte, ihre Einteilung instanzweit/kontobezogen, die Regeln für die Oberfläche
+  (Scheibe 12) und `MANAGE_TRASH` als benannte Ausnahme zur Kontotrennung (Scheibe 8).
+- §2.8 — das Vokabular der drei „Konten" (Scheibe 3) und „Typen statt Zusicherungen" (Scheibe 14).
+- §2.9 — dass eine Minor-Nummer übersprungen werden darf, und warum `0.16.0` nie erschienen ist.
+- §2.10 — Header und CSP als Sache der App (Scheibe 15), der Audit-Katalog (Scheibe 17) und der
+  Stand der Invarianten nach der Nachprüfung (Scheibe 69).
+- §2.11 — Aufbewahrung, Löschung, Auskunft (Scheibe 18).
 
 ## Backlog aus der Produktionsnutzung
 
