@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import express, { type Express } from 'express';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import type { Pool } from 'mariadb';
 
 import { createUserAdminRouter } from './auth/admin-routes.js';
@@ -38,6 +39,36 @@ export interface AppDependencies {
   webRoot?: string;
 }
 
+/**
+ * The Content-Security-Policy for the one origin this server hands out: the
+ * API under /api/v1 and the SPA it serves itself. Written out instead of taken
+ * from helmet's defaults, because every relaxation here has a named reason —
+ * and because this is the layer that keeps an injected URL from becoming code
+ * in the origin that holds the access token (Sicherheits-Review, SEC-01/02).
+ */
+const CSP_DIRECTIVES = {
+  'default-src': ["'self'"],
+  'script-src': ["'self'"],
+  'connect-src': ["'self'"],
+  // The brand fonts are self-hosted (apps/web/src/design-system/fonts.css).
+  'font-src': ["'self'"],
+  // The GiroCode is rendered as an SVG data URL, not fetched
+  // (apps/web/src/invoices/PaymentQrPopover.vue).
+  'img-src': ["'self'", 'data:'],
+  // Vue writes :style bindings as inline style attributes, and
+  // @fortawesome/fontawesome-svg-core inserts a <style> element of its own.
+  // Both need 'unsafe-inline'; scripts do not, which is what matters.
+  'style-src': ["'self'", "'unsafe-inline'"],
+  'object-src': ["'none'"],
+  'base-uri': ["'self'"],
+  'form-action': ["'self'"],
+  'frame-ancestors': ["'none'"],
+  // Deliberately NO upgrade-insecure-requests: the documented deployment is
+  // reachable over plain http (http://localhost:3000, TLS at the proxy), and
+  // the directive would upgrade this origin's own subresources to https, where
+  // nothing answers.
+};
+
 /** Builds a rate limiter that responds with our JSON error envelope on 429. */
 function limiter(windowMs: number, max: number) {
   return rateLimit({
@@ -61,6 +92,24 @@ function limiter(windowMs: number, max: number) {
  */
 export function createApp(deps?: AppDependencies): Express {
   const app = express();
+  // Security headers first, so they are on every answer — including the ones
+  // the error handler writes and the 404 of a route that does not exist. Also
+  // on the deps-less app, which is what the header test builds.
+  app.disable('x-powered-by');
+  app.use(
+    helmet({
+      contentSecurityPolicy: { useDefaults: false, directives: CSP_DIRECTIVES },
+      // Half a year, and the proxy in front may well set its own. A browser
+      // ignores it over plain http, so it costs a LAN instance nothing.
+      strictTransportSecurity: { maxAge: 15552000, includeSubDomains: true },
+      // The full path would otherwise travel to every externally linked
+      // document (an invoice scan on someone else's server).
+      referrerPolicy: { policy: 'no-referrer' },
+      // helmet would say SAMEORIGIN; nothing here is ever framed, and this is
+      // the old header saying what frame-ancestors above already says.
+      xFrameOptions: { action: 'deny' },
+    }),
+  );
   // Written out rather than left to the default: 100 kB is what Express 5 uses
   // today, and the only body that comes close is a settings write or a billing
   // with its allocations. A major upgrade must not be able to move the limit

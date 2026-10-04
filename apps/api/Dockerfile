@@ -32,7 +32,17 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
-RUN npm ci --omit=dev
+# Only what the API itself runs. A plain `npm ci --omit=dev` installs the
+# *runtime* dependencies of every workspace, so the image carried vue, pinia,
+# vue-router, @fortawesome/* and qrcode as well — and nothing in the container
+# ever executes them, because the SPA is a static bundle built in the stage
+# above. They also dragged two known vulnerabilities into the image
+# (postcss and nanoid, via vue -> @vue/compiler-sfc).
+# The web workspace's manifest is still copied: npm ci checks the lockfile
+# against every workspace. The link it leaves behind points at a directory
+# this stage does not have, so it goes.
+RUN npm ci --omit=dev -w apps/api --include-workspace-root \
+  && rm -f node_modules/@eunomia/web
 
 # ---------- Production image ----------
 FROM node:24-alpine AS production

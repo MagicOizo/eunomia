@@ -7,6 +7,45 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.19.0-slice.1 — 2026-10-04
+
+The first of the last block: everything that lies outside the application code. The app itself looks
+and behaves exactly as before — what changed is what a browser is allowed to do with it, what the
+production image contains, how the container runs, and what the backup documentation demands of you.
+
+**Read this before updating:** the app's port is now published on `127.0.0.1` instead of on every
+interface of the host. With a reverse proxy on the same machine — the documented setup — nothing
+changes for you. If you reach the app directly from your network, set `BIND_ADDRESS=0.0.0.0` in
+`.env` before updating, or it will stop answering.
+
+- **The app sends security headers of its own.** It sent none: no Content-Security-Policy, no
+  `nosniff`, no referrer policy, no frame protection, and it announced its server software in every
+  answer. There is a policy now, written out rather than taken from a library's defaults: scripts may
+  only come from the app itself, never inline and never from a string, so a link or a field that
+  smuggled in code would no longer get it executed. Two relaxations are named in the code: images
+  may be data URLs, because the payment QR code is one, and inline styles are allowed, because Vue
+  and the icon set write them. The full path of a page no longer travels to externally linked
+  documents, and over HTTPS the app asks the browser to stay there.
+- **The production image carries only what the API runs.** It also installed the frontend's
+  libraries — Vue, the router, the icon set, the QR encoder — although the interface in the image is
+  a finished bundle that needs none of them at runtime. They brought two of the three known
+  vulnerabilities in the image with them. The image is 357 MB instead of 408 MB.
+- **Known vulnerabilities are a build step now.** All seven advisories across the project are fixed
+  (transitive updates only, nothing moved to a new major), and every push is checked from now on, so
+  the next one shows up the day it arrives instead of at the next review.
+- **The container runs with less.** Read-only filesystem, no capabilities, no path to more
+  privileges, and memory and CPU limits so a problem in the app cannot take the host with it. The
+  database keeps what its startup genuinely needs, and still has limits.
+- **Backups: the documentation now says what it expects.** The dump is the complete case record in
+  plain text — health data. The scripts deliberately hold no key; the README shows how to encrypt on
+  the host with `age` or `gpg` in both directions and states the rules: encrypted at rest, a copy
+  off this host, deleted when its retention is up, and restored once so you know it works. Both
+  scripts also report failure properly now: a backup whose dump died used to come out truncated with
+  a success code, and a restore fed an encrypted file said "Restore complete" without writing a row.
+- **Migrations run one instance at a time.** Two containers starting together would have applied the
+  same migration twice, because the bookkeeping table is only written afterwards. The second one
+  waits for the first now, then finds nothing left to do.
+
 ## 0.18.0 — 2026-10-03
 
 Everything from the six previews below, as one release: the third of four blocks working off the

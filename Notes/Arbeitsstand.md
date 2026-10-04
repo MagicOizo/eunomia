@@ -214,7 +214,34 @@ ausdrücklich vor einer anderen steht.
 
 ### Block IV — Betrieb und Nachweis (Release 0.19.0)
 
-- [ ] **15 — Header, Image, Abhängigkeiten.** SEC-02, SEC-10, SEC-13, SEC-14, CR-37.
+- [x] **15 — Header, Image, Abhängigkeiten.** SEC-02, SEC-10, SEC-13, SEC-14, CR-37.
+      Umgesetzt mit v0.19.0-slice.1 (Slice 65). Vier Festlegungen des Autors prägen das Ergebnis:
+      `helmet` statt eigener Middleware, die Backup-Verschlüsselung bleibt auf dem Host (das Skript
+      kennt keinen Schlüssel, die Passphrase kommt nie in den Container), der Port bindet auf
+      `127.0.0.1` mit `BIND_ADDRESS` als ausdrücklichem Ausweg, und die Migrationen laufen unter
+      `GET_LOCK` statt nur unter einer Annahme in der README. Die CSP steht ausgeschrieben statt aus
+      helmets Vorgabe genommen: Skripte auf `'self'`, ohne `unsafe-inline` und ohne `unsafe-eval`,
+      und genau zwei benannte Lockerungen — `img-src data:` für den GiroCode,
+      `style-src 'unsafe-inline'` für Vues `:style` und FontAwesomes eigenen `<style>`-Block.
+      Fünf Dinge gingen über den Review hinaus: (1) `upgrade-insecure-requests` ist ausdrücklich
+      abgeschaltet — helmets Vorgabe enthält es, und auf der dokumentierten http-Instanz hübe es die
+      eigenen Subresourcen auf https, wo nichts antwortet (als Prüfung festgehalten, damit es keine
+      spätere Hand wieder hereinnimmt); (2) das Laufzeit-Image installiert nur noch die
+      Abhängigkeiten der API — es trug vue, pinia, vue-router, @fortawesome/* und qrcode mit, obwohl
+      die SPA ein statisches Bündel ist, und mit vue kamen zwei der drei Produktionsbefunde (postcss,
+      nanoid) überhaupt erst herein: 408 MB wurden 357 MB; (3) `PORT` ging in den Container, die
+      Port-Abbildung nannte auf der Container-Seite aber fest 3000 — mit einem anderen `PORT` zeigte
+      der veröffentlichte Port ins Leere (im Smoke-Test rot gesehen); (4) `backup.sh` und
+      `restore.sh` setzen `pipefail`, weil ein gescheiterter `mariadb-dump` durch das nachgeschaltete
+      `gzip` hindurch Erfolg meldete — ein abgeschnittenes Backup, das wie ein gutes aussieht — und
+      ein versehentlich verschlüsselt eingespeistes Archiv „Restore complete“ sagte, ohne eine Zeile
+      zu schreiben; (5) `withConnection()` steht neben `withTransaction()`, damit die Sperre eine
+      eigene Sitzung bekommt, ohne dass `getConnection()` wieder aus `db/transaction.ts` ausbricht.
+      Geprüft gegen das echte Produktionsimage in einem eigenen Compose-Projekt (read-only, ohne
+      Capabilities, Grenzen und Loopback-Bindung in `docker inspect` nachgesehen, Backup und Restore
+      im gehärteten Container gefahren) und im Browser gegen die gebaute SPA: Anmeldung,
+      Arbeitsbereich, Rechnungen samt GiroCode-Popover, Policen, Papierkorb, Einstellungen, Nutzer
+      und Profil — null CSP-Verstöße.
 - [ ] **16 — Prüfbar statt dokumentiert.** SEC-17, CR-32, CR-33, CR-34.
 - [ ] **17 — Audit-Trail.** SEC-09.
 - [ ] **18 — Aufbewahrung, Löschung, Auskunft.** SEC-15.

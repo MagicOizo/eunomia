@@ -43,6 +43,13 @@ jobs:
 
       - run: npm ci
 
+      # The dependencies that reach a browser or the production image, checked
+      # on the push that introduced them instead of at the next review. Dev
+      # tooling is omitted (it never ships), and only high/critical fails the
+      # build — a moderate advisory in a transitive package must not stop a
+      # hotfix from being merged. `npm audit fix` is usually the whole answer.
+      - run: npm audit --omit=dev --audit-level=high
+
       # Catches version drift between the workspaces, the lockfile and
       # CHANGELOG.md on the push that caused it, not at tagging time.
       - run: npm run version:check

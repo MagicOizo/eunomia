@@ -9,7 +9,14 @@
 # restart the API so migrations bring an older backup up to the current schema:
 #
 #   docker compose restart api
+#
+# An encrypted backup is decrypted on the host and piped in from there (see the
+# README) — this script expects the gzipped dump itself.
 set -eu
+# Without this, input that is not a gzipped dump — an encrypted file piped in
+# by mistake — would fail in gunzip while the exit code came from mariadb, and
+# the script would report a restore that never happened.
+set -o pipefail
 
 export MYSQL_PWD="$DB_PASSWORD"
 gunzip -c | mariadb -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" "$DB_NAME"

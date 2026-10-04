@@ -36,11 +36,39 @@ services:
       UPDATE_CHECK_TOKEN: ${UPDATE_CHECK_TOKEN:-}
       UPDATE_CHECK_TTL_SECONDS: ${UPDATE_CHECK_TTL_SECONDS:-}
       CONFIG_ENCRYPTION_KEY: ${CONFIG_ENCRYPTION_KEY:-}
+    # Bound to the loopback interface by default: with a reverse proxy on this
+    # host in front (the documented setup), anything reachable on another
+    # interface would be reachable past the proxy — and so past its TLS and its
+    # access rules. Set BIND_ADDRESS=0.0.0.0 in .env to publish the app on the
+    # network without a proxy (see README, "Deploy").
+    #
+    # PORT is on both sides because it is also passed into the container above:
+    # the app (and its health check) listen on it, so a PORT other than 3000
+    # would otherwise be published onto a port nothing answers on.
     ports:
-      - '${PORT:-3000}:3000'
+      - '${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:${PORT:-3000}'
     depends_on:
       db:
         condition: service_healthy
+    # The container never writes to its filesystem: the API logs to stdout and
+    # the backup/restore scripts stream through STDOUT/STDIN. /tmp is a tmpfs so
+    # the mariadb client has scratch space if it ever wants it.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Node listens on 3000 and runs as eunomia:nodejs, so it needs no
+    # capability at all, and nothing in the image is setuid.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # So a runaway in here cannot take the host with it. Raise these if your
+    # host is larger; the app itself is comfortable well below them.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
 
   db:
     image: mariadb:11
@@ -66,6 +94,17 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    # Deliberately without `read_only` and `cap_drop` — unlike the api image,
+    # the mariadb entrypoint chowns its data directory and drops to the mysql
+    # user on first start, which needs both a writable filesystem and the
+    # capabilities for it.
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
 
 volumes:
   db_data:

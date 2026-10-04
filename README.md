@@ -26,8 +26,21 @@ This pulls a **pre-built, versioned image** from the GitHub Container Registry
 MariaDB container — no source checkout or local build needed, just this `docker-compose.yml` and
 `.env`. Pin a release with `EUNOMIA_VERSION` in `.env` (defaults to `latest`). The whole app is
 then reachable at `http://localhost:${PORT}` (default `3000`) — the SPA at `/`, the API under
-`/api/v1`. Schema migrations run automatically on container start. Put the reverse proxy in front
-for TLS; `TRUST_PROXY` makes rate limiting use the real client IP.
+`/api/v1`. Schema migrations run automatically on container start — run **one** API container; a
+second one starting at the same time waits for the first one's migrations (an advisory lock in the
+database) rather than applying them twice. Put the reverse proxy in front for TLS; `TRUST_PROXY`
+makes rate limiting use the real client IP.
+
+The port is published on **`127.0.0.1` only**, because that is what a reverse proxy on the same
+host needs: a port on another interface would be reachable past the proxy, and so past its TLS and
+its access rules. If you reach the app directly from your network instead, set `BIND_ADDRESS=0.0.0.0`
+in `.env` — and then make sure something else terminates TLS, because the app speaks plain HTTP.
+The API container additionally runs with a read-only filesystem, no capabilities,
+`no-new-privileges` and memory/CPU limits; the app itself needs none of what those take away.
+
+The app sends its own security headers, Content-Security-Policy included, so it is not relying on
+the proxy for them. If your proxy adds headers of its own, prefer replacing them over sending two —
+two `Content-Security-Policy` headers are intersected, and the result is usually a broken page.
 
 The database container is not published to the host (reachable only from the API on the compose
 network) and is bootstrapped from the same `DB_*` values the API connects with — a dedicated
@@ -69,7 +82,45 @@ docker compose restart api
 Restore brings an **older** backup up to the current schema (the API migrates on the restart). It
 also works into a fresh instance: `docker compose up -d` on an empty database, then restore — the
 db container creates the app user + schema, the dump recreates the tables + data, the API migrates
-on restart. Keep the dump files on durable storage or copy them off-host.
+on restart.
+
+### Backups hold health data — encrypt them
+
+A dump is the complete case record in plain text: insured persons by name, every invoice with its
+facility and amount, every submission and reimbursement. Under the GDPR that is Article 9 data. The
+only thing a dump cannot give away are the secrets in the system settings (SMTP password, GitHub
+token), which stay encrypted with `CONFIG_ENCRYPTION_KEY` — and that key is **not** in the dump, so
+keep it with your other secrets or a restored backup cannot read them.
+
+The scripts deliberately know no key: encryption happens on the host, where the key is. Pipe the
+backup through [age](https://github.com/FiloSottile/age) (one recipient key, nothing to remember)
+or `gpg` (a passphrase):
+
+```bash
+# age — encrypt to your public key, decrypt with the matching identity file:
+docker compose exec -T api /app/scripts/backup.sh \
+  | age -r "$AGE_RECIPIENT" > eunomia-$(date +%F).sql.gz.age
+age -d -i ~/.age/eunomia.key eunomia-2026-01-01.sql.gz.age \
+  | docker compose exec -T api /app/scripts/restore.sh
+
+# gpg — symmetric, with a passphrase you keep elsewhere:
+docker compose exec -T api /app/scripts/backup.sh \
+  | gpg --symmetric --cipher-algo AES256 -o eunomia-$(date +%F).sql.gz.gpg
+gpg -d eunomia-2026-01-01.sql.gz.gpg \
+  | docker compose exec -T api /app/scripts/restore.sh
+```
+
+**The rules this instance expects you to follow:**
+
+- **Encrypted at rest, always.** An unencrypted dump does not belong in a working directory, a
+  home directory, a cloud sync folder or an email. If you write one for a moment, delete it in the
+  same command line.
+- **Off this host, at least one copy.** A backup on the same disk as the database is not a backup.
+- **Kept no longer than it is useful.** Decide on a retention span — a year of monthly dumps is
+  plenty for a household instance — and actually delete what falls out of it. Old dumps carry data
+  the app itself has long since deleted.
+- **Restorable, as tested.** A backup nobody has restored once is a hope, not a backup. Restore
+  into a scratch instance (`docker compose -p eunomia-check up -d` on an empty volume) and log in.
 
 ## Updating
 

@@ -65,6 +65,18 @@ Ergänzung nach Durchsicht des ersten Umsetzungsversuchs (siehe 1.4) und Klärun
 - versionierung der API
 - Möglichst sicherer Aufbau der Datenbank (erster Versuch der App nutzte z.B. Random Root-PW, siehe Projektdateien dort)
 - Für die Prod soll der docker compose Aufruf möglichst einfach sein (verwendung von compose file ohne -f in der commandline oder von .env ohne -env-file etc.). Idealerweise soll ein docker compose up -d reichen
+- **Genau ein API-Container** (festgelegt mit Scheibe 15, SEC-13/CR-37). Horizontale Skalierung ist
+  kein Ziel; damit die Annahme nicht nur dasteht, sind die Migrationen seit v0.19.0-slice.1 durch
+  eine Datenbanksperre (`GET_LOCK('eunomia:migrate')`) serialisiert — eine zweite Instanz wartet und
+  findet danach nichts mehr zu tun, statt dieselbe Migration parallel anzuwenden.
+- **Der Port gehört ans Loopback.** Die Abbildung bindet standardmäßig auf `127.0.0.1`, weil der
+  Reverse Proxy auf demselben Host steht; ein Port auf einer anderen Schnittstelle wäre am Proxy und
+  damit an dessen TLS und Zugriffsregeln vorbei erreichbar. `BIND_ADDRESS` ist der ausdrückliche
+  Ausweg für den Betrieb ohne Proxy. Der API-Container läuft außerdem mit schreibgeschütztem
+  Dateisystem, ohne Capabilities, mit `no-new-privileges` und mit Speicher-/CPU-Grenzen.
+- **Das Backup kennt keinen Schlüssel.** Der Dump ist Klartext mit Art.-9-Daten; verschlüsselt wird
+  auf dem Host (`age`/`gpg`), wo der Schlüssel liegt. Die README sagt verbindlich, wohin Backups
+  gehören, wie lange sie bleiben und dass sie verschlüsselt sein müssen.
 
 ## 2.2 Technologie-Entscheidungen
 
@@ -274,6 +286,17 @@ Nachweis und Fundstelle. Hier steht nur, was das für die Planung bedeutet:
   Security-Header/CSP) und SEC-09 (kein Audit-Trail). Der Rest ist geordnet, aber nachrangig.
 - Nach dem Code-Review folgt eine **Delta-Nachprüfung** auf den dabei berührten Dateien, bevor 1.0.0
   gebumpt wird (Abschnitt 8 des Reviews).
+- **Die Header sind Sache der App, nicht des Proxys** (Scheibe 15, SEC-02). `helmet` sitzt vor allen
+  Routern, die CSP steht ausgeschrieben in `app.ts` und wird von `app.test.ts` geprüft. Zwei
+  Lockerungen sind benannt und begründet: `img-src data:` für den GiroCode und
+  `style-src 'unsafe-inline'` für Vues `:style`-Bindings und FontAwesome. Skripte bleiben auf
+  `'self'`, ohne `unsafe-inline` und ohne `unsafe-eval`. `upgrade-insecure-requests` ist
+  ausdrücklich nicht gesetzt — es würde die eigene http-Instanz zerlegen. Eine Instanz ohne fremde
+  Proxy-Konfiguration ist damit nicht ungeschützt.
+- **Abhängigkeiten sind ein CI-Schritt, kein Review-Thema**: `npm audit --omit=dev
+  --audit-level=high` läuft bei jedem Push (SEC-10). Im Laufzeit-Image stecken seit Scheibe 15 nur
+  noch die Abhängigkeiten der API — die SPA ist ein statisches Bündel und braucht ihre eigenen nicht
+  mehr.
 
 Der Datenbestand fällt unter Art. 9 DSGVO. Das ist keine Formalie, sondern der Grund, warum
 Nachvollziehbarkeit (SEC-09), Löschfristen (SEC-15) und Backup-Verschlüsselung (SEC-14) in diesem

@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { DatabaseConfig } from '../config/env.js';
-import { runMigrations } from './migrate.js';
+import { MIGRATION_LOCK, runMigrations } from './migrate.js';
 import { createPool, waitForDatabase } from './pool.js';
+import { withConnection } from './transaction.js';
 import { createMigrator } from './umzug.js';
 
 const EXPECTED_TABLES = [
@@ -793,6 +794,54 @@ test('migration 016 freezes each invoice on the account it showed, and drops the
     await migrator.up();
   } finally {
     await cleanup().catch(() => undefined);
+    await pool.end();
+  }
+});
+
+test('a second instance waits for the migration lock instead of migrating too', async (t) => {
+  const config = databaseConfigFromEnv();
+  if (!config) {
+    t.skip('no database configured (DB_* env vars unset)');
+    return;
+  }
+
+  const pool = createPool(config);
+  try {
+    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
+  } catch {
+    await pool.end();
+    t.skip('database not reachable');
+    return;
+  }
+
+  // A pool of its own, because the lock is per session: this one stands in for
+  // the container that started first and is still migrating.
+  const other = createPool(config);
+  try {
+    await runMigrations(pool);
+
+    await withConnection(other, async (conn) => {
+      const held = await conn.query<Array<{ locked: number | null }>>(
+        'SELECT GET_LOCK(?, 5) AS locked',
+        [MIGRATION_LOCK],
+      );
+      assert.equal(held[0]?.locked, 1, 'the test has to hold the lock first');
+
+      // Waits its timeout, then says what is going on instead of applying the
+      // same migration a second time.
+      await assert.rejects(
+        runMigrations(pool, { lockTimeoutSeconds: 1 }),
+        /locked by another instance/,
+      );
+
+      await conn.query('SELECT RELEASE_LOCK(?)', [MIGRATION_LOCK]);
+    });
+
+    // And with the lock free it runs again — which also shows the successful
+    // run above gave the lock back.
+    await runMigrations(pool, { lockTimeoutSeconds: 1 });
+  } finally {
+    await other.end();
     await pool.end();
   }
 });
