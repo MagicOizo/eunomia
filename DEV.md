@@ -161,7 +161,7 @@ restart (it is stored with the settings).
 
 Everything security-relevant the API does writes one line in the same format, from one place
 (`apps/api/src/lib/audit.ts`). After an incident these are what say who did what; while nothing is
-wrong, `AUTH_LOGIN_FAILED` is the one worth watching. All fourteen:
+wrong, `AUTH_LOGIN_FAILED` is the one worth watching. All seventeen:
 
 ```bash
 docker logs eunomia 2>&1 | grep AUTH_LOGIN_OK         # a session was issued
@@ -175,11 +175,15 @@ docker logs eunomia 2>&1 | grep AUTH_REFRESH_REUSE    # a refresh token shown tw
 docker logs eunomia 2>&1 | grep USER_CREATED          # a new user account
 docker logs eunomia 2>&1 | grep USER_UPDATED          # which fields changed, never their values
 docker logs eunomia 2>&1 | grep USER_DEACTIVATED      # a user account was switched off
+docker logs eunomia 2>&1 | grep USER_RESTORED         # a deleted user was brought back
+docker logs eunomia 2>&1 | grep USER_PURGED           # a user was removed for good
 docker logs eunomia 2>&1 | grep USER_ROLES_CHANGED    # the new set of roles or account grants
 docker logs eunomia 2>&1 | grep TRASH_PURGED          # a record was deleted for good
 docker logs eunomia 2>&1 | grep TRASH_RESTORED        # a record came back out of the trash
+docker logs eunomia 2>&1 | grep RETENTION_SWEPT       # what the retention period removed
 docker logs eunomia 2>&1 | grep SETTINGS_CHANGED      # which setting keys were written or cleared
-docker logs eunomia 2>&1 | grep -E 'event=(AUTH|USER|TRASH|SETTINGS)_' # the whole trail
+docker logs eunomia 2>&1 | grep 'actor=system'        # everything the instance did unattended
+docker logs eunomia 2>&1 | grep -E 'event=(AUTH|USER|TRASH|RETENTION|SETTINGS)_' # the whole trail
 ```
 
 Two rules hold for every one of them, and `apps/api/src/lib/audit.test.ts` is where they are
@@ -188,6 +192,10 @@ UID, not as its number and the treated person's name — and **`SETTINGS_CHANGED
 values**, so changing the mail password does not put it in the log. The one personal datum that
 does appear is the email address on a failed login, because a line without it cannot tell an attack
 on one account from a sweep across many.
+
+**Not every actor is a person.** The retention period (see below) removes records on a timer and
+writes the same `TRASH_PURGED` and `USER_PURGED` lines a button would, with `actor=system` instead
+of a user's UUID — the act is the same, only nobody pressed anything.
 
 **An expired access token writes nothing.** Every open browser tab retires one every fifteen
 minutes; a line for each would bury the rest. A token that is malformed, forged, or belongs to a
@@ -213,6 +221,40 @@ other).
 On the settings page, **Vorschau** renders what would go out without sending or remembering
 anything, and **Jetzt ausführen** does it for real. With the reminders switched off both answer 409
 rather than quietly mailing everyone.
+
+### The retention period
+
+The second thing the API does without being asked (SEC-15). A timer sweeps once at start and then
+daily: everything in the Papierkorb whose deletion is older than `retention.trashDays` goes for
+good, and with it every user deleted longer ago than that. It lives in `src/index.ts` for the same
+reason as the reminders above, and it deletes through the trash's own `purgeEntry`, so an unattended
+sweep follows exactly the rules the button in the Papierkorb follows.
+
+Four things are worth knowing before switching it on:
+
+- **It is off by default** (`retention.enabled`), with 90 days as the period. An instance that
+  updates into this version deletes nothing until someone says so.
+- **It only touches the Papierkorb and deleted users.** Active invoices, policies and accounts have
+  no retention period at all (see `Notes/eunomia-plan.md` §2.11).
+- **A record nothing dated is never swept.** Rows deleted before the Papierkorb existed carry no
+  `deletedAt`; they stay until a hand removes them.
+- **A record something active still points at stays**, is counted as `skipped`, and is tried again
+  at the next sweep.
+
+On the settings page, **Probelauf** counts what would go without removing anything — it works even
+while the period is switched off, which is how one decides to switch it on — and **Jetzt aufräumen**
+does it for real, which the switch does gate (409, as with the reminders). What the last sweep did
+is stored in `retention.lastRun*` and shown next to the section's heading. The log lines are
+`TRASH_PURGED` / `USER_PURGED` with `actor=system` and one `RETENTION_SWEPT` summary.
+
+### The account export
+
+`GET /api/v1/accounts/:uid/export` answers with everything stored about one insured person, and the
+list of Versicherte has a button that saves it as a file. It needs `VIEW_ACCOUNTS` for that very
+account. Deleted rows are part of it, values come as stored (ISO dates, plain numbers), and nothing
+about another person travels with it. `account-export.integration.test.ts` holds an inventory of
+every table of the schema against `information_schema`: each one is either in the export or carries
+a reason why not, so a new table with a link to a person fails the suite until someone decides.
 
 ## Production image (build locally / release)
 

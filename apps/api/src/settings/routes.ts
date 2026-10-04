@@ -17,6 +17,7 @@ import {
   createReminderRunner,
 } from '../reminders/runner.js';
 import { createReminderStore } from '../reminders/store.js';
+import { readRetentionSettings, sweepRetention } from '../retention/sweep.js';
 import { type SettingKey, type SettingValue, validateIncoming } from './registry.js';
 import { getPublicSettings, setSettings } from './repository.js';
 
@@ -176,6 +177,35 @@ export function createSettingsRouter(
         ? await readableBy(getAuthUser(res).userId, result.preview)
         : { shown: [], hidden: 0 };
     sendData(res, { ...result, preview: preview.shown, previewHidden: preview.hidden });
+  });
+
+  /**
+   * Empties the trash of what has aged out, now instead of at the next daily
+   * sweep. `dryRun` counts and removes nothing — and it works even while the
+   * period is switched off, because seeing what a period would take away is how
+   * one decides to switch it on. The real run does not bypass the switch (as
+   * with the reminders).
+   *
+   * The answer carries numbers per kind and **no labels**: `MANAGE_SETTINGS`
+   * says nothing about reading invoices, and a trash entry's label is an
+   * invoice number and the treated person's name (the lesson of SEC-03).
+   */
+  router.post('/settings/retention/run', async (req, res) => {
+    const { dryRun } = runSchema.parse(req.body ?? {});
+    if (dryRun !== true) {
+      const { enabled } = await readRetentionSettings(pool, config.configEncryptionKey);
+      if (!enabled) {
+        throw new ApiError(
+          409,
+          ERROR_CODES.RETENTION_DISABLED,
+          'The retention period is switched off',
+        );
+      }
+    }
+    sendData(
+      res,
+      await sweepRetention(pool, { encryptionKey: config.configEncryptionKey, dryRun }),
+    );
   });
 
   return router;

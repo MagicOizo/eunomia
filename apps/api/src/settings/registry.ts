@@ -13,7 +13,7 @@ import { badRequest } from '../lib/api-error.js';
  * storage is key-value (migration 009).
  */
 
-export type SettingSection = 'mail' | 'updateCheck' | 'reminders';
+export type SettingSection = 'mail' | 'updateCheck' | 'reminders' | 'retention';
 
 export type SettingValue = string | number | boolean | null;
 
@@ -136,6 +136,58 @@ export const SETTINGS = {
   /** How many mails the last run sent — 0 is a perfectly good answer. */
   'reminders.lastRunSent': {
     section: 'reminders',
+    type: 'int',
+    fallback: null,
+    min: 0,
+    max: 1_000_000,
+    readonly: true,
+  },
+
+  /*
+   * The retention period (SEC-15, Scheibe 18). What the trash holds is deleted
+   * data, and deleted data about health has no business lying around for ever;
+   * after the period it goes for good, together with users that were deleted
+   * longer ago than that.
+   *
+   * The switch defaults to OFF although the period defaults to 90 days: an
+   * instance that updates into this version must not start deleting because
+   * nobody read the changelog. Switching it on is a decision, and the page
+   * offers a dry run first.
+   */
+  'retention.enabled': { section: 'retention', type: 'bool', fallback: false },
+  /**
+   * Days a deleted record stays in the trash. Ten years is the upper bound —
+   * past that the setting says "never" more honestly than a number does.
+   */
+  'retention.trashDays': {
+    section: 'retention',
+    type: 'int',
+    fallback: 90,
+    min: 1,
+    max: 3650,
+  },
+  /**
+   * Status of the last sweep, written by the sweep itself (retention/sweep.ts).
+   * Unlike `reminders.lastRunAt` this is NOT a watermark: the sweep runs when
+   * the timer says so, because a DELETE does not care what time it is.
+   */
+  'retention.lastRunAt': { section: 'retention', type: 'string', fallback: null, readonly: true },
+  /** 'ok' | 'error' — a plain string, as with the mail and reminder status. */
+  'retention.lastRunResult': {
+    section: 'retention',
+    type: 'string',
+    fallback: null,
+    readonly: true,
+  },
+  'retention.lastRunError': {
+    section: 'retention',
+    type: 'string',
+    fallback: null,
+    readonly: true,
+  },
+  /** How many records the last sweep removed for good — 0 is a fine answer. */
+  'retention.lastRunPurged': {
+    section: 'retention',
     type: 'int',
     fallback: null,
     min: 0,

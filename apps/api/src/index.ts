@@ -11,6 +11,7 @@ import { createMailSettingsStore } from './mail/store.js';
 import { createReminderRunner } from './reminders/runner.js';
 import { startReminderScheduler } from './reminders/schedule.js';
 import { createReminderStore } from './reminders/store.js';
+import { startRetentionSweep } from './retention/sweep.js';
 
 const config = loadConfig();
 const pool = createPool(config.database);
@@ -64,10 +65,19 @@ const tokenCleanup = startRefreshTokenCleanup(pool, {
   retentionMs: config.auth.refreshTokenTtlSeconds * 1000,
 });
 
+/*
+ * The retention period empties the trash of what has aged out of it (SEC-15),
+ * here for the same reason as the two timers above. While it is switched off —
+ * which it is until an administrator says otherwise — the tick only reads the
+ * settings.
+ */
+const retention = startRetentionSweep(pool, { encryptionKey: config.configEncryptionKey });
+
 /** Closes the HTTP server and database pool on shutdown signals. */
 async function shutdown(): Promise<void> {
   scheduler.stop();
   tokenCleanup.stop();
+  retention.stop();
   server.close();
   await pool.end();
 }

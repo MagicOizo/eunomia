@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { onMounted, ref } from 'vue';
+import { faPen, faPlus, faRotateLeft, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { computed, onMounted, ref } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
+import EuCollapsibleSection from '../design-system/components/EuCollapsibleSection.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { describeError } from '../lib/errors';
+import { germanDateTime } from '../lib/format';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/table-sort';
 import {
@@ -18,6 +20,8 @@ import {
   deleteUser,
   listRoles,
   listUsers,
+  purgeUser,
+  restoreUser,
   setAccountRoles,
   setGlobalRoles,
   updateUser,
@@ -26,6 +30,13 @@ import RolesOverview from './RolesOverview.vue';
 import UserFormDialog, { type UserFormPayload } from './UserFormDialog.vue';
 
 const users = ref<AdminUserDto[]>([]);
+/**
+ * The list carries the deleted users too (`status === -1`), so the two tables
+ * below come out of one request. Everywhere else in the app a deleted user is
+ * simply gone.
+ */
+const active = computed(() => users.value.filter((user) => user.status !== -1));
+const deleted = computed(() => users.value.filter((user) => user.status === -1));
 const roles = ref<RoleDto[]>([]);
 const accountOptions = ref<SelectOption[]>([]);
 const loading = ref(true);
@@ -34,11 +45,16 @@ const loadError = ref<string | null>(null);
 const dialogOpen = ref(false);
 const editing = ref<AdminUserDto | null>(null);
 const deleteTarget = ref<AdminUserDto | null>(null);
+const purgeTarget = ref<AdminUserDto | null>(null);
 
 /** The same sentence for both: the e-mail address is what can collide. */
 const DUPLICATE_EMAIL = 'Diese E-Mail-Adresse wird bereits verwendet.';
 const form = useDialogAction(reload);
 const removal = useDialogAction(reload);
+const purge = useDialogAction(reload);
+/** Per-row error in the deleted table, keyed by UUID, as the trash does it. */
+const rowErrors = ref<Record<string, string>>({});
+const busyUuid = ref<string | null>(null);
 
 function userSortValue(u: AdminUserDto, key: string): string | number {
   switch (key) {
@@ -56,13 +72,13 @@ function userSortValue(u: AdminUserDto, key: string): string | number {
       return '';
   }
 }
-const sort = useTableSort(users, userSortValue);
+const sort = useTableSort(active, userSortValue);
 
 async function reload(): Promise<void> {
   loading.value = true;
   loadError.value = null;
   try {
-    users.value = await listUsers();
+    users.value = await listUsers(true);
     roles.value = await listRoles();
     const accounts = await listResource<{
       accountUID: string;
@@ -124,6 +140,32 @@ async function confirmDelete(): Promise<void> {
     () => deleteUser(target.uuid),
     () => (deleteTarget.value = null),
     DUPLICATE_EMAIL,
+  );
+}
+
+/**
+ * Brings a deleted user back. It returns deactivated, which the sentence in the
+ * table says — nobody should have to guess whether a login works again.
+ */
+async function restore(user: AdminUserDto): Promise<void> {
+  rowErrors.value = { ...rowErrors.value, [user.uuid]: '' };
+  busyUuid.value = user.uuid;
+  try {
+    await restoreUser(user.uuid);
+    await reload();
+  } catch (error) {
+    rowErrors.value = { ...rowErrors.value, [user.uuid]: describeError(error) };
+  } finally {
+    busyUuid.value = null;
+  }
+}
+
+async function confirmPurge(): Promise<void> {
+  const target = purgeTarget.value;
+  if (!target) return;
+  await purge.run(
+    () => purgeUser(target.uuid),
+    () => (purgeTarget.value = null),
   );
 }
 </script>
@@ -199,6 +241,64 @@ async function confirmDelete(): Promise<void> {
       </table>
     </div>
 
+    <!-- Deleted users were invisible until Scheibe 18: the row stayed in the
+         table with name and address, and no mask could reach it (SEC-15). -->
+    <EuCollapsibleSection
+      v-if="!loading && !loadError && deleted.length > 0"
+      class="eu-users__deleted"
+      :title="`Gelöschte Nutzer (${deleted.length})`"
+      initially-collapsed
+    >
+      <p class="eu-users__hint">
+        Ein gelöschter Nutzer kann sich nicht anmelden und steht in keiner Auswahl.
+        Wiederhergestellt kommt er deaktiviert zurück. Endgültig gelöscht gehen Name, Adresse,
+        Rollen, Konto-Zugriffe, Sitzungen und Erinnerungs-Vermerke mit — das ist nicht umkehrbar.
+        Ist eine Aufbewahrungsfrist eingestellt, geschieht es nach ihrem Ablauf von selbst.
+      </p>
+      <div class="eu-users__table-wrap">
+        <table class="eu-users__table">
+          <thead>
+            <tr>
+              <th>E-Mail</th>
+              <th>Name</th>
+              <th>Gelöscht am</th>
+              <th class="eu-users__actions-head">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="user in deleted" :key="user.uuid">
+              <td>{{ user.email }}</td>
+              <td>{{ [user.firstname, user.surname].filter(Boolean).join(' ') }}</td>
+              <td>{{ user.deletedAt === null ? 'unbekannt' : germanDateTime(user.deletedAt) }}</td>
+              <td class="eu-users__actions">
+                <EuButton
+                  variant="secondary"
+                  icon-only
+                  :icon="faRotateLeft"
+                  :disabled="busyUuid === user.uuid"
+                  aria-label="Wiederherstellen"
+                  title="Nutzer wiederherstellen (kommt deaktiviert zurück)"
+                  @click="restore(user)"
+                />
+                <EuButton
+                  variant="secondary"
+                  icon-only
+                  :icon="faTrash"
+                  :disabled="busyUuid === user.uuid"
+                  aria-label="Endgültig löschen"
+                  title="Nutzer endgültig löschen"
+                  @click="purgeTarget = user"
+                />
+                <p v-if="rowErrors[user.uuid]" class="eu-users__error" role="alert">
+                  {{ rowErrors[user.uuid] }}
+                </p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </EuCollapsibleSection>
+
     <RolesOverview v-if="!loading && !loadError" :roles="roles" />
 
     <UserFormDialog
@@ -218,6 +318,22 @@ async function confirmDelete(): Promise<void> {
       <template #footer>
         <EuButton variant="secondary" @click="deleteTarget = null">Abbrechen</EuButton>
         <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
+      </template>
+    </EuDialog>
+
+    <EuDialog
+      :open="purgeTarget !== null"
+      title="Nutzer endgültig löschen"
+      @close="purgeTarget = null"
+    >
+      <p>
+        Nutzer „{{ purgeTarget?.email }}“ endgültig löschen? Name, Adresse, Rollen, Konto-Zugriffe,
+        Sitzungen und Erinnerungs-Vermerke gehen mit. Das lässt sich nicht rückgängig machen.
+      </p>
+      <p v-if="purge.error" class="eu-users__error" role="alert">{{ purge.error }}</p>
+      <template #footer>
+        <EuButton variant="secondary" @click="purgeTarget = null">Abbrechen</EuButton>
+        <EuButton :disabled="purge.busy" @click="confirmPurge">Endgültig löschen</EuButton>
       </template>
     </EuDialog>
   </section>
@@ -272,5 +388,10 @@ async function confirmDelete(): Promise<void> {
 }
 .eu-users__actions button + button {
   margin-left: 0.4rem;
+}
+
+/* The deleted users sit below the table, not against it. */
+.eu-users__deleted {
+  margin-top: 1.5rem;
 }
 </style>

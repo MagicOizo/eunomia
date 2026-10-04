@@ -8,7 +8,7 @@ import { apiData } from '../lib/api';
 
 export interface PublicSetting {
   key: string;
-  section: 'mail' | 'updateCheck' | 'reminders';
+  section: 'mail' | 'updateCheck' | 'reminders' | 'retention';
   isSecret: boolean;
   readonly: boolean;
   /** Always null for a secret — the plaintext never leaves the API. */
@@ -49,6 +49,30 @@ export interface ReminderRunResult {
   previewHidden: number;
 }
 
+/**
+ * What a sweep of the retention period did, or would do
+ * (apps/api/src/retention/sweep.ts). Numbers only, never a label: the page is
+ * guarded by MANAGE_SETTINGS, which says nothing about reading invoices.
+ */
+export interface RetentionRunResult {
+  ranAt: string;
+  days: number;
+  cutoff: string;
+  /** Expired trash entries removed for good. */
+  purged: number;
+  users: number;
+  /** Entries something active still points at; the next sweep tries again. */
+  skipped: number;
+  byKind: Array<{
+    kind: string;
+    singular: string;
+    plural: string;
+    purged: number;
+    skipped: number;
+  }>;
+  dryRun: boolean;
+}
+
 export type SettingWrite = Record<string, string | number | boolean | null>;
 
 export async function loadSettings(): Promise<SettingsSnapshot> {
@@ -75,6 +99,17 @@ export async function sendTestMail(): Promise<{ recipient: string; status: MailS
  */
 export async function runReminders(dryRun: boolean): Promise<ReminderRunResult> {
   return apiData<ReminderRunResult>('/settings/reminders/run', {
+    method: 'POST',
+    body: { dryRun },
+  });
+}
+
+/**
+ * Empties the trash of what has aged out. A dry run only counts — and works
+ * while the period is switched off, which is how one decides to switch it on.
+ */
+export async function runRetention(dryRun: boolean): Promise<RetentionRunResult> {
+  return apiData<RetentionRunResult>('/settings/retention/run', {
     method: 'POST',
     body: { dryRun },
   });

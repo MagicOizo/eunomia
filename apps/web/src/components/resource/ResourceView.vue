@@ -18,7 +18,7 @@ import {
   listResource,
   updateResource,
 } from '../../lib/resource';
-import type { ColumnConfig, ResourceConfig } from '../../resources/config';
+import type { ColumnConfig, ResourceConfig, RowActionConfig } from '../../resources/config';
 import { useAuthStore } from '../../stores/auth';
 import type { SelectOption } from './EuSelectField.vue';
 import ResourceDetailDialog from './ResourceDetailDialog.vue';
@@ -52,6 +52,27 @@ const detailUid = ref<string | null>(null);
 
 const confirmTarget = ref<ResourceRow | null>(null);
 const removal = useDialogAction(reload);
+
+/**
+ * The row action currently running, by its label, and what it said if it
+ * failed. A row action that does something (the account export) is the one
+ * place in this view where a failure belongs to no dialog.
+ */
+const busyAction = ref<string | null>(null);
+const actionError = ref<string | null>(null);
+
+async function runRowAction(action: RowActionConfig, row: ResourceRow): Promise<void> {
+  if (!action.run) return;
+  actionError.value = null;
+  busyAction.value = action.label(row);
+  try {
+    await action.run(row);
+  } catch (error) {
+    actionError.value = describeError(error);
+  } finally {
+    busyAction.value = null;
+  }
+}
 
 // Article-neutral so it reads correctly for every gender ("Police anlegen")
 // instead of a wrong "Neue Police".
@@ -253,6 +274,7 @@ async function confirmDelete(): Promise<void> {
       >
     </div>
 
+    <p v-if="actionError" class="eu-resource__error" role="alert">{{ actionError }}</p>
     <p v-if="loading" class="eu-resource__hint">Wird geladen…</p>
     <p v-else-if="loadError" class="eu-resource__error" role="alert">{{ loadError }}</p>
     <p v-else-if="rows.length === 0" class="eu-resource__hint">
@@ -297,7 +319,10 @@ async function confirmDelete(): Promise<void> {
                 icon-only
                 :icon="action.icon"
                 :aria-label="action.label(row)"
-                :to="action.to(row)"
+                :title="action.label(row)"
+                :to="action.to?.(row)"
+                :disabled="busyAction === action.label(row)"
+                @click="action.run ? runRowAction(action, row) : undefined"
               />
               <EuButton
                 variant="secondary"

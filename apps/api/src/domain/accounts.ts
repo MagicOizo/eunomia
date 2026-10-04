@@ -18,6 +18,7 @@ import {
 } from '../crud/repository.js';
 import { notFound } from '../lib/api-error.js';
 import { ENTITY_PREFIX, entityIdPattern } from '../lib/ids.js';
+import { exportAccount } from './account-export.js';
 
 export const accountsTable = crudTable({
   table: 'Accounts',
@@ -71,6 +72,18 @@ export function createAccountsRouter(pool: Pool, config: AppConfig): Router {
     const row = await getRow(pool, accountsTable, pathParam(req, 'uid'));
     if (!row) throw notFound('Account');
     sendData(res, row);
+  });
+
+  /**
+   * Everything stored about this insured person, in one document (SEC-15).
+   * `VIEW_ACCOUNTS` on this very account and nothing more: whoever may read the
+   * record may read what is stored about it. The browser turns the answer into
+   * a file; the API stays a JSON API and keeps the envelope.
+   */
+  router.get('/:uid/export', requireAuth, canView, async (req, res) => {
+    const document = await exportAccount(pool, pathParam(req, 'uid'));
+    if (!document) throw notFound('Account');
+    sendData(res, document);
   });
 
   router.post('/', requireAuth, canCreate, async (req, res) => {

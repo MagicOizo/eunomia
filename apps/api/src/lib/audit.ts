@@ -13,7 +13,7 @@ import { logEvent } from './log.js';
  * documented search string (`docker logs eunomia | grep TRASH_PURGED`), so it
  * is an interface. Here it cannot be mistyped, and a field cannot be invented
  * at a call site — which is also what keeps the two rules below enforceable in
- * one place rather than in fourteen.
+ * one place rather than in seventeen.
  *
  * **Rule 1 — no case data in a line (invariant I-7).** A line carries UIDs,
  * not labels. A trash entry reads as "Rechnung 2026-0042, Max Mustermann" in
@@ -50,9 +50,12 @@ export const AUDIT_EVENTS = [
   'USER_CREATED',
   'USER_UPDATED',
   'USER_DEACTIVATED',
+  'USER_RESTORED',
+  'USER_PURGED',
   'USER_ROLES_CHANGED',
   'TRASH_PURGED',
   'TRASH_RESTORED',
+  'RETENTION_SWEPT',
   'SETTINGS_CHANGED',
 ] as const;
 
@@ -87,9 +90,21 @@ export type AuthFailure =
  * call to be accepted.
  */
 type Actor = {
-  /** The acting user's UUID. */
+  /**
+   * The acting user's UUID — or `SYSTEM_ACTOR` for the one caller that is not
+   * a person (the retention sweep).
+   */
   actor: string;
 };
+
+/**
+ * Who acted when nobody did: the retention period (retention/sweep.ts) removes
+ * records on a timer, and the line it writes is the same `TRASH_PURGED` an
+ * administrator's button writes — the act is identical, only the actor is not a
+ * user. A fixed word rather than an empty field, so `grep 'actor=system'`
+ * answers "what did the instance delete by itself".
+ */
+export const SYSTEM_ACTOR = 'system';
 
 /** What identifies the request a guard refused. */
 type RequestOrigin = {
@@ -193,6 +208,25 @@ export function auditUserDeactivated(fields: Actor & { user: string }): void {
 }
 
 /**
+ * A deleted user brought back. Warn, because it hands an account its way in
+ * again — the counterpart of the deletion, not a correction of a typo. It
+ * returns deactivated (see `restoreUser`), so the line is not yet a login that
+ * works.
+ */
+export function auditUserRestored(fields: Actor & { user: string }): void {
+  logEvent('warn', 'USER_RESTORED', fields);
+}
+
+/**
+ * A user removed for good: name, address and every role, grant, session and
+ * reminder note of theirs are gone, and this line is all that is left. The
+ * UUID and never the address, as everywhere outside a failed login (rule 1).
+ */
+export function auditUserPurged(fields: Actor & { user: string }): void {
+  logEvent('warn', 'USER_PURGED', fields);
+}
+
+/**
  * Both role routes replace the whole set, so the line is the new state, not a
  * delta. `roles` is a list of role UIDs for the global set and of
  * `accountUID:roleUID` pairs for the account-scoped one; `count` is there so a
@@ -223,6 +257,25 @@ export function auditTrashRestored(
   fields: Actor & { kind: string; uid: string; alsoRestored: number },
 ): void {
   logEvent('info', 'TRASH_RESTORED', fields);
+}
+
+/**
+ * One line per sweep of the retention period, in addition to the
+ * `TRASH_PURGED` and `USER_PURGED` lines of the records themselves: without it
+ * nothing would say which period did the removing.
+ *
+ * Written only when something actually went — a daily line reading `purged=0`
+ * is noise in a log meant to be grepped (the same stance as auth/cleanup.ts),
+ * and an entry held back is not news every day either. `skipped` counts the
+ * records something active still points at; they are tried again next time.
+ */
+export function auditRetentionSwept(fields: {
+  days: number;
+  purged: number;
+  users: number;
+  skipped: number;
+}): void {
+  logEvent('warn', 'RETENTION_SWEPT', fields);
 }
 
 /** Keys only, never values (rule 2). `cleared` are the ones written back to null. */

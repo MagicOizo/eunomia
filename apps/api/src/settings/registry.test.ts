@@ -7,6 +7,7 @@ import { ApiError } from '../lib/api-error.js';
 import {
   SETTING_KEYS,
   fallbackOf,
+  isReadonlyKey,
   isSecretKey,
   isSettingKey,
   parseStoredValue,
@@ -82,6 +83,27 @@ test('the port must be a whole number inside the valid range', () => {
   assert.deepEqual(validateIncoming('mail.port', 465), ['mail.port', 465]);
   for (const value of [0, 65536, 587.5, '587', true]) {
     rejects('mail.port', value, ERROR_CODES.SETTING_INVALID_VALUE);
+  }
+});
+
+test('the retention period is a whole number of days, off by default', () => {
+  assert.deepEqual(validateIncoming('retention.trashDays', 1), ['retention.trashDays', 1]);
+  assert.deepEqual(validateIncoming('retention.trashDays', 3650), ['retention.trashDays', 3650]);
+  for (const value of [0, 3651, 90.5, '90', true]) {
+    rejects('retention.trashDays', value, ERROR_CODES.SETTING_INVALID_VALUE);
+  }
+  // The switch is off until someone turns it on: an instance that updates into
+  // this version must not start deleting on its own (SEC-15).
+  assert.equal(fallbackOf('retention.enabled'), false);
+  assert.equal(fallbackOf('retention.trashDays'), 90);
+  // What the sweep reports is its own to write, never a client's.
+  for (const key of [
+    'retention.lastRunAt',
+    'retention.lastRunResult',
+    'retention.lastRunError',
+    'retention.lastRunPurged',
+  ] as const) {
+    assert.equal(isReadonlyKey(key), true);
   }
 });
 

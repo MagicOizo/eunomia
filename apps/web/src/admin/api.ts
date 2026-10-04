@@ -6,6 +6,8 @@ export interface AdminUserDto {
   firstname: string;
   surname: string | null;
   status: number;
+  /** When the user was deleted — null unless `status` is -1 (SEC-15). */
+  deletedAt: string | null;
   globalRoles: string[];
   accountGrants: Array<{ accountUID: string; roleName: string }>;
 }
@@ -18,8 +20,13 @@ export interface RoleDto {
   permissions: string[];
 }
 
-export async function listUsers(): Promise<AdminUserDto[]> {
-  return apiData<AdminUserDto[]>('/users');
+/**
+ * The users. `includeDeleted` adds the deleted ones (`status === -1`), which
+ * only the user administration asks for — everywhere else a deleted user is
+ * gone.
+ */
+export async function listUsers(includeDeleted = false): Promise<AdminUserDto[]> {
+  return apiData<AdminUserDto[]>(includeDeleted ? '/users?includeDeleted=true' : '/users');
 }
 
 export async function createUser(body: {
@@ -40,6 +47,16 @@ export async function updateUser(
 
 export async function deleteUser(uuid: string): Promise<void> {
   await apiFetch(`/users/${uuid}`, { method: 'DELETE' });
+}
+
+/** Brings a deleted user back — deactivated, not active (see the API). */
+export async function restoreUser(uuid: string): Promise<AdminUserDto> {
+  return apiData<AdminUserDto>(`/users/${uuid}/restore`, { method: 'POST' });
+}
+
+/** Removes a deleted user for good. Not undoable. */
+export async function purgeUser(uuid: string): Promise<void> {
+  await apiFetch(`/users/${uuid}/permanent`, { method: 'DELETE' });
 }
 
 export async function setGlobalRoles(uuid: string, roleUIDs: string[]): Promise<AdminUserDto> {

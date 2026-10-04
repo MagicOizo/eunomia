@@ -103,6 +103,39 @@ describe('ResourceView search', () => {
     expect(wrapper.text()).toContain('Noch keine Leistungserbringer erfasst.');
   });
 
+  /**
+   * The other kind of row action (Scheibe 18): one that runs something instead
+   * of leading somewhere — the account export fetches a document and hands it
+   * to the browser. Its failure belongs in the view, because it belongs to no
+   * dialog.
+   */
+  it('runs a row action that does something, and reports its failure', async () => {
+    const run = vi.fn<(row: Record<string, unknown>) => Promise<void>>();
+    const action = {
+      icon: faFilter,
+      label: (row: Record<string, unknown>) => `Daten von ${String(row.facilityName)} exportieren`,
+      run,
+    };
+    run.mockResolvedValueOnce();
+    const wrapper = await mountView({ ...config, rowActions: [action] });
+
+    expect(wrapper.find('tbody tr a').exists()).toBe(false);
+    const button = wrapper
+      .findAll('tbody tr button')
+      .find((one) => one.attributes('aria-label') === 'Daten von Praxis Nord exportieren');
+    expect(button).toBeDefined();
+
+    await button!.trigger('click');
+    await flushPromises();
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ facilityUID: 'f-1' }));
+    expect(wrapper.find('.eu-resource__error').exists()).toBe(false);
+
+    run.mockRejectedValueOnce(new Error('kaputt'));
+    await button!.trigger('click');
+    await flushPromises();
+    expect(wrapper.find('.eu-resource__error').exists()).toBe(true);
+  });
+
   it('renders a row action as a link to its target', async () => {
     const wrapper = await mountView({
       ...config,

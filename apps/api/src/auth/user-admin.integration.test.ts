@@ -170,6 +170,98 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
         409, // duplicate email
       );
     });
+    await t.test('a deleted user is visible, comes back, and can go for good', async () => {
+      const created = await request(app).post('/api/v1/users').set(admin).send({
+        email: 'temp@example.com',
+        firstname: 'Temp',
+        surname: 'Nutzer',
+        password: 'temppass1',
+      });
+      assert.equal(created.status, 201);
+      const uuid = created.body.data.uuid as string;
+      // Something of this user's that the database has to clean up with it.
+      await request(app)
+        .put(`/api/v1/users/${uuid}/account-roles`)
+        .set(admin)
+        .send({ grants: [{ accountUID: accountB, roleUID: nutzerRole.roleUID }] });
+
+      const list = async (includeDeleted: boolean): Promise<Array<Record<string, unknown>>> => {
+        const res = await request(app)
+          .get(includeDeleted ? '/api/v1/users?includeDeleted=true' : '/api/v1/users')
+          .set(admin);
+        assert.equal(res.status, 200);
+        return res.body.data as Array<Record<string, unknown>>;
+      };
+      const find = async (includeDeleted: boolean): Promise<Record<string, unknown> | undefined> =>
+        (await list(includeDeleted)).find((one) => one.uuid === uuid);
+
+      assert.equal((await find(false))?.deletedAt, null, 'an active user has no deletion moment');
+
+      assert.equal((await request(app).delete(`/api/v1/users/${uuid}`).set(admin)).status, 204);
+      assert.equal(await find(false), undefined, 'gone from the ordinary list');
+      const deleted = await find(true);
+      assert.equal(deleted?.status, -1);
+      assert.match(String(deleted?.deletedAt), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+
+      // Restoring brings it back DEACTIVATED, not active.
+      const restored = await request(app).post(`/api/v1/users/${uuid}/restore`).set(admin);
+      assert.equal(restored.status, 200);
+      assert.equal(restored.body.data.status, 0);
+      assert.equal(restored.body.data.deletedAt, null);
+      assert.equal(
+        (await request(app).post(`/api/v1/users/${uuid}/restore`).set(admin)).body.error.code,
+        'USER_NOT_DELETED',
+        'a user that is not deleted cannot be restored',
+      );
+      assert.equal(
+        (await request(app).delete(`/api/v1/users/${uuid}/permanent`).set(admin)).status,
+        409,
+        'and cannot be removed for good either',
+      );
+
+      // And now for good.
+      await request(app).delete(`/api/v1/users/${uuid}`).set(admin);
+      assert.equal(
+        (await request(app).delete(`/api/v1/users/${uuid}/permanent`).set(admin)).status,
+        204,
+      );
+      assert.equal(await find(true), undefined, 'not even among the deleted any more');
+      const grants = await pool.query<Array<{ n: number }>>(
+        `SELECT COUNT(*) AS n FROM UserAccountRoles uar
+          JOIN Users u ON u.userID = uar.userID WHERE u.uuidText = ?`,
+        [uuid],
+      );
+      assert.equal(Number(grants[0]?.n), 0, 'the database cleaned up what hung on the user');
+      // The address is free again, which is the point of a final delete.
+      assert.equal(
+        (
+          await request(app)
+            .post('/api/v1/users')
+            .set(admin)
+            .send({ email: 'temp@example.com', firstname: 'Neu', password: 'temppass2' })
+        ).status,
+        201,
+      );
+    });
+
+    await t.test('the final delete refuses an unknown user and the caller', async () => {
+      assert.equal(
+        (
+          await request(app)
+            .delete('/api/v1/users/11111111-1111-1111-1111-111111111111/permanent')
+            .set(admin)
+        ).status,
+        404,
+      );
+      const self = await request(app).delete(`/api/v1/users/${adminUuid}/permanent`).set(admin);
+      assert.equal(self.status, 400);
+      assert.equal(self.body.error.code, 'SELF_ACCOUNT_ACTION');
+    });
+
+    await t.test('a malformed includeDeleted is a 400, not a silent no', async () => {
+      const res = await request(app).get('/api/v1/users?includeDeleted=ja').set(admin);
+      assert.equal(res.status, 400);
+    });
   } finally {
     await pool.end();
   }

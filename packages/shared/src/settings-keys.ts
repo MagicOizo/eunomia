@@ -30,6 +30,12 @@ export const SETTING_KEYS = [
   'reminders.lastRunResult',
   'reminders.lastRunError',
   'reminders.lastRunSent',
+  'retention.enabled',
+  'retention.trashDays',
+  'retention.lastRunAt',
+  'retention.lastRunResult',
+  'retention.lastRunError',
+  'retention.lastRunPurged',
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];

@@ -6,19 +6,19 @@ import { createRequireAuth, createRequirePermission, getAuthUser } from '../auth
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
 import { pathParam } from '../crud/params.js';
-import { type Queryable, hardDeleteRow, restoreRow, softDeleteRow } from '../crud/repository.js';
+import { type Queryable, restoreRow } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { ApiError, conflict, notFound } from '../lib/api-error.js';
 import { auditTrashPurged, auditTrashRestored } from '../lib/audit.js';
 import { isSqlError } from '../lib/error-handler.js';
-import { linksFrom, linksTo } from './trash-references.js';
+import { purgeEntry } from './trash-purge.js';
+import { linksFrom } from './trash-references.js';
 import { type TrashEntry, TRASH_ENTITIES, entityOfTable, entityOfUid } from './trash-registry.js';
 import {
   type Counted,
   type Located,
   attachedCounts,
   batchOf,
-  blockers,
   childEdges,
   deletedDescendants,
   descendantsOf,
@@ -42,7 +42,8 @@ import {
  *  - **Deleting for good takes along what hangs on the record and is itself in
  *    the trash**, plus the link rows that are not records of their own. It is
  *    refused only while something ACTIVE still points at it, and then the
- *    answer says what.
+ *    answer says what. That half lives in `trash-purge.ts`, because the
+ *    retention sweep removes records too and must do it the same way.
  *
  * Not account-scoped, and that is a rule rather than a gap: `MANAGE_TRASH` is an
  * instance-wide permission like `MANAGE_USERS` (see Notes/eunomia-plan.md 2.4,
@@ -187,58 +188,6 @@ async function restoreEntry(pool: Pool, located: Located): Promise<number> {
     for (const child of [...batch].reverse()) await restoreOne(conn, child);
     return batch.length + 1;
   });
-}
-
-/**
- * Removes the record for good, together with the deleted records below it and
- * the link rows that belong to it. Refuses while something active points at it.
- * Answers how many further records went with it, for the audit line.
- */
-async function purgeEntry(pool: Pool, located: Located): Promise<number> {
-  const stopping = await blockers(pool, located);
-  if (stopping.length > 0) {
-    throw conflict('The record is still referenced by active records', {
-      code: ERROR_CODES.STILL_REFERENCED,
-      details: {
-        entry: { singular: located.entity.singular, label: located.entry.label },
-        blockers: stopping,
-      },
-    });
-  }
-
-  return withTransaction(pool, async (conn) => {
-    const below = await deletedDescendants(conn, located);
-    // Children first, the record last — the foreign keys are all RESTRICT.
-    for (const one of [...below, located]) {
-      for (const link of await linksTo(conn, one.entity.table.table, one.entity.table.uidColumn)) {
-        if (entityOfTable(link.table)) continue;
-        // A link is not a record of its own (migration 007): it goes with the
-        // row it links. What the database cascades itself is left to it.
-        if (link.deleteRule === 'RESTRICT' || link.deleteRule === 'NO ACTION') {
-          await conn.query(`DELETE FROM ${link.table} WHERE ${link.column} = ?`, [one.uid]);
-        }
-      }
-      await hardDeleteRow(conn, one.entity.table, one.uid);
-    }
-    // A submission that just lost its last invoice is an empty shell no view
-    // can show, so it follows its invoices into the trash — the same rule as
-    // withdrawing the last invoice by hand (see submissions.ts).
-    await softDeleteEmptySubmissions(conn);
-    return below.length;
-  });
-}
-
-/** Soft-deletes every active submission left without invoices. */
-async function softDeleteEmptySubmissions(db: Queryable): Promise<void> {
-  const rows = await db.query<Array<{ submissionUID: string }>>(
-    `SELECT s.submissionUID FROM Submissions s
-      WHERE s.submissionStatus <> -1
-        AND NOT EXISTS (SELECT 1 FROM SubmissionInvoices si
-                         WHERE si.submissionUID = s.submissionUID)`,
-  );
-  const entity = TRASH_ENTITIES.find((one) => one.key === 'submission');
-  if (!entity) return;
-  for (const row of rows) await softDeleteRow(db, entity.table, row.submissionUID);
 }
 
 /** The deleted record behind a UID, or a 404 — the entity comes from its prefix. */

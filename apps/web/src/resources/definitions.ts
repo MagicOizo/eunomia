@@ -1,5 +1,5 @@
 import { PERMISSIONS } from '@eunomia/shared';
-import { faFilter } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faFilter } from '@fortawesome/free-solid-svg-icons';
 
 import AgencyDetailDialog from '../agencies/AgencyDetailDialog.vue';
 import {
@@ -9,6 +9,8 @@ import {
   type ContractKind,
 } from '../contracts/api';
 import ContractDetailDialog from '../contracts/ContractDetailDialog.vue';
+import { apiData } from '../lib/api';
+import { downloadJson, isoToday } from '../lib/download';
 import { germanDate, germanMoney } from '../lib/format';
 import type { ResourceRow } from '../lib/resource';
 import type { ResourceConfig } from './config';
@@ -47,6 +49,25 @@ const accounts: ResourceConfig = {
   lookups: {
     accounts: { path: '/accounts', idKey: 'accountUID', label: personName },
   },
+  /**
+   * Everything the instance has stored about this person, as a file (SEC-15,
+   * Art. 15/20 DSGVO). No permission of its own: the list already shows only
+   * the insured persons this user may read, and that is the same grant the
+   * endpoint asks for.
+   */
+  rowActions: [
+    {
+      icon: faDownload,
+      label: (row) => `Daten von ${personName(row)} exportieren`,
+      run: async (row) => {
+        const uid = String(row.accountUID);
+        downloadJson(
+          `eunomia-export-${uid}-${isoToday()}.json`,
+          await apiData<unknown>(`/accounts/${uid}/export`),
+        );
+      },
+    },
+  ],
   detailTitle: (row) => `Versicherter: ${personName(row)}`,
 };
 

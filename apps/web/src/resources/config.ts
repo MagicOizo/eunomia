@@ -52,16 +52,22 @@ export interface LookupConfig {
 }
 
 /**
- * An action in a row that leads somewhere else instead of changing the record
- * — e.g. "show the invoices of this agency" (Slice 45). It is rendered as a
- * link, so it opens in a new tab like any other.
+ * An action in a row that does not change the record: either it leads somewhere
+ * else — "show the invoices of this agency" (Slice 45), rendered as a link so
+ * it opens in a new tab like any other — or it runs something, like the account
+ * export of Scheibe 18, which fetches a document and hands it to the browser.
+ *
+ * Exactly one of `to` and `run` is given; a link that also ran something would
+ * be two things at once.
  */
 export interface RowActionConfig {
   icon: IconDefinition;
   /** The accessible name, naming the record it is about. */
   label: (row: ResourceRow) => string;
   /** Where it leads, as a route path. */
-  to: (row: ResourceRow) => string;
+  to?: (row: ResourceRow) => string;
+  /** What it does. Its failure is shown in the row, like a failed delete. */
+  run?: (row: ResourceRow) => Promise<void>;
 }
 
 export interface ResourceConfig {

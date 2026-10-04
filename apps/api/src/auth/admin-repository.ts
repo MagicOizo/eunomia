@@ -15,6 +15,13 @@ export interface AdminUser {
   firstname: string;
   surname: string | null;
   status: number;
+  /**
+   * When the user was deleted, as local time `YYYY-MM-DDTHH:MM:SS` — the same
+   * shape the trash hands over, so the web reads it with `germanDateTime`.
+   * Null for every user that is not deleted, and for one deleted before
+   * migration 018 recorded the moment.
+   */
+  deletedAt: string | null;
   globalRoles: string[];
   accountGrants: Array<{ accountUID: string; roleName: string }>;
 }
@@ -38,8 +45,16 @@ export async function userIdByUuid(pool: Pool, uuid: string): Promise<number | n
   return rows[0]?.userID ?? null;
 }
 
-/** Lists all non-deleted users with their global roles and account grants. */
-export async function listUsers(pool: Pool): Promise<AdminUser[]> {
+/**
+ * Lists users with their global roles and account grants. Deleted users
+ * (`userStatus = -1`) are left out unless they are asked for: that keeps every
+ * existing caller — and the login, the reminders, the pickers — on the set they
+ * had, and the one mask that deals with deleted users asks for them (SEC-15).
+ */
+export async function listUsers(
+  pool: Pool,
+  options: { includeDeleted?: boolean } = {},
+): Promise<AdminUser[]> {
   const users = await pool.query<
     Array<{
       userID: number;
@@ -48,10 +63,14 @@ export async function listUsers(pool: Pool): Promise<AdminUser[]> {
       firstname: string;
       surname: string | null;
       status: number;
+      deletedAt: string | null;
     }>
   >(
-    `SELECT userID, uuidText AS uuid, email, firstname, surname, userStatus AS status
-       FROM Users WHERE userStatus <> -1 ORDER BY email`,
+    `SELECT userID, uuidText AS uuid, email, firstname, surname, userStatus AS status,
+            DATE_FORMAT(deletedAt, '%Y-%m-%dT%H:%i:%s') AS deletedAt
+       FROM Users
+      WHERE ${options.includeDeleted === true ? 'TRUE' : 'userStatus <> -1'}
+      ORDER BY email`,
   );
   const globalRoles = await pool.query<Array<{ userID: number; roleName: string }>>(
     `SELECT ur.userID, r.roleName FROM UserRoles ur JOIN Roles r ON r.roleID = ur.roleID`,
@@ -67,6 +86,7 @@ export async function listUsers(pool: Pool): Promise<AdminUser[]> {
     firstname: u.firstname,
     surname: u.surname,
     status: u.status,
+    deletedAt: u.deletedAt,
     globalRoles: globalRoles.filter((g) => g.userID === u.userID).map((g) => g.roleName),
     accountGrants: grants
       .filter((g) => g.userID === u.userID)
@@ -74,9 +94,13 @@ export async function listUsers(pool: Pool): Promise<AdminUser[]> {
   }));
 }
 
-/** Fetches a single non-deleted user by UUID with roles/grants, or null. */
-export async function getUser(pool: Pool, uuid: string): Promise<AdminUser | null> {
-  const users = await listUsers(pool);
+/** Fetches a single user by UUID with roles/grants, or null. */
+export async function getUser(
+  pool: Pool,
+  uuid: string,
+  options: { includeDeleted?: boolean } = {},
+): Promise<AdminUser | null> {
+  const users = await listUsers(pool, options);
   return users.find((u) => u.uuid === uuid) ?? null;
 }
 
@@ -116,14 +140,66 @@ export async function updateUser(
   return result.affectedRows;
 }
 
-/** Soft-deletes a user (userStatus = -1). Returns rows affected. */
+/**
+ * Soft-deletes a user (userStatus = -1) and records when. The moment is what
+ * the mask shows and what the retention period counts from (migration 018).
+ */
 export async function softDeleteUser(pool: Pool, uuid: string): Promise<number> {
   const result = await execute(
     pool,
-    `UPDATE Users SET userStatus = -1 WHERE uuidText = ? AND userStatus <> -1`,
+    `UPDATE Users SET userStatus = -1, deletedAt = NOW(6)
+      WHERE uuidText = ? AND userStatus <> -1`,
     [uuid],
   );
   return result.affectedRows;
+}
+
+/**
+ * Brings a deleted user back — **deactivated**, not active (userStatus = 0).
+ * A login that returns must not be live by surprise; whoever restores it can
+ * switch it on in the same mask, and that is then a second, deliberate step.
+ */
+export async function restoreUser(pool: Pool, uuid: string): Promise<number> {
+  const result = await execute(
+    pool,
+    `UPDATE Users SET userStatus = 0, deletedAt = NULL
+      WHERE uuidText = ? AND userStatus = -1`,
+    [uuid],
+  );
+  return result.affectedRows;
+}
+
+/**
+ * Removes a deleted user for good. Only a deleted row can go, so a mistaken
+ * call cannot take an active login with it.
+ *
+ * What hangs on the user is left to the database, which says what it wants
+ * itself: `UserRoles`, `UserAccountRoles`, `RefreshTokens` and
+ * `InvoiceReminders` cascade (a role assignment or a sent-reminder note means
+ * nothing without its user), while `SystemSettings.updatedByUserID` is set to
+ * NULL — who last wrote a setting is audit information that deliberately
+ * outlives the account (migrations 002, 009, 010).
+ */
+export async function hardDeleteUser(pool: Pool, uuid: string): Promise<number> {
+  const result = await execute(pool, `DELETE FROM Users WHERE uuidText = ? AND userStatus = -1`, [
+    uuid,
+  ]);
+  return result.affectedRows;
+}
+
+/**
+ * The UUIDs of users deleted before `cutoff` — the candidates of the retention
+ * sweep (retention/sweep.ts). As in the trash, a deletion without a recorded
+ * moment never ages out.
+ */
+export async function expiredDeletedUsers(pool: Pool, cutoff: Date): Promise<string[]> {
+  const rows = await pool.query<Array<{ uuid: string }>>(
+    `SELECT uuidText AS uuid FROM Users
+      WHERE userStatus = -1 AND deletedAt IS NOT NULL AND deletedAt < ?
+      ORDER BY deletedAt`,
+    [cutoff],
+  );
+  return rows.map((row) => row.uuid);
 }
 
 /**

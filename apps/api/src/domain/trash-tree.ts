@@ -91,6 +91,29 @@ export async function loadAll(db: Queryable, entity: TrashEntity): Promise<Locat
   return rows.map((row) => locate(entity, row));
 }
 
+/**
+ * Every deleted row of an entity whose deletion is older than `cutoff` — the
+ * candidates of the retention sweep (SEC-15), oldest first.
+ *
+ * `deletedAt IS NOT NULL` is the whole point of the condition and not
+ * decoration: a row deleted before Slice 39 carries no moment at all, so it
+ * has no age either, and inventing one would delete data on the strength of a
+ * guess. Those rows stay until a hand removes them.
+ */
+export async function loadExpired(
+  db: Queryable,
+  entity: TrashEntity,
+  cutoff: Date,
+): Promise<Located[]> {
+  const rows = await db.query<Row[]>(
+    `${entity.listSql} AND ${entity.alias}.deletedAt IS NOT NULL
+       AND ${entity.alias}.deletedAt < ?
+     ORDER BY ${entity.alias}.deletedAt, uid`,
+    [cutoff],
+  );
+  return rows.map((row) => locate(entity, row));
+}
+
 /** Who hangs on whom: the marker of a record against its deleted children. */
 export type ChildMap = Map<string, Located[]>;
 

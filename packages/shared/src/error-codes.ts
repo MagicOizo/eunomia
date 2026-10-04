@@ -86,6 +86,11 @@ export const ERROR_CODES = {
   // User administration
   SELF_ACCOUNT_ACTION: 'SELF_ACCOUNT_ACTION',
   LAST_ADMIN: 'LAST_ADMIN',
+  /**
+   * The user is not deleted, so it can neither be restored nor removed for
+   * good. Both actions exist only for a row with `userStatus = -1` (SEC-15).
+   */
+  USER_NOT_DELETED: 'USER_NOT_DELETED',
 
   // System settings and mail (see settings/registry.ts, mail/mailer.ts)
   /** Key is not in the settings registry — a typo, or an outdated client. */
@@ -102,6 +107,12 @@ export const ERROR_CODES = {
   MAIL_SEND_FAILED: 'MAIL_SEND_FAILED',
   /** Payment reminders are switched off; the run button does not bypass that. */
   REMINDERS_DISABLED: 'REMINDERS_DISABLED',
+  /**
+   * The retention period is switched off; as with the reminders, the button
+   * does not bypass the switch. A dry run is allowed either way — seeing what
+   * a period would take away is how one decides to switch it on (SEC-15).
+   */
+  RETENTION_DISABLED: 'RETENTION_DISABLED',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

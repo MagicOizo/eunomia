@@ -301,4 +301,50 @@ ausdrücklich vor einer anderen steht.
       eine eigene Instanz auf `eunomia_test` (die Entwicklungsdaten blieben unberührt): alle
       vierzehn Zeilen gesehen, ein echt abgelaufener Token schreibt keine, und die Ausgabe des
       ganzen Laufs enthält keines der durchgereichten Passwörter und kein einziges Label.
-- [ ] **18 — Aufbewahrung, Löschung, Auskunft.** SEC-15.
+- [x] **18 — Aufbewahrung, Löschung, Auskunft.** SEC-15.
+      Umgesetzt mit v0.19.0-slice.4 (Slice 68). Vier Festlegungen des Autors prägen das Ergebnis:
+      die Frist ist ein eigener Abschnitt der Einstellungen (Schalter, Vorgabe **aus**, und Tage,
+      Vorgabe 90) mit Statusfeldern wie bei den Erinnerungen; sie gilt für den Papierkorb und
+      gelöschte Nutzer und **nie** für aktive Daten; Nutzer werden in der Nutzerverwaltung
+      endgültig gelöscht statt im Papierkorb; und der Export je Versicherter gehört in diese
+      Scheibe. Die Regeln stehen jetzt in §2.11 des Plans.
+      Die Abweichung vom Review (Nutzer **nicht** in den Papierkorb) hat drei Gründe, die beim
+      Lesen des Codes entstanden sind: ein Restore dort gäbe einem `MANAGE_TRASH`-Inhaber die
+      Wiederherstellung einer **Anmeldung** in die Hand, obwohl Zugang zu vergeben `MANAGE_USERS`
+      ist; die Papierkorb-Mechanik leitet Kinder, Blocker und Anhänge aus Fremdschlüsseln ab, die
+      bei `Users` auf `userID` zeigen und nicht auf `uuidText` — sie liefe leer und täuschte eine
+      Prüfung nur vor; und `entityOfUid` löst die Art über ein Präfix auf, das eine UUID nicht hat
+      (`a`, `b`, `c`, `e`, `f` kollidieren). Migration 018 gibt `Users` trotzdem ein `deletedAt`,
+      weil Maske und Frist einen Zeitpunkt brauchen; Migration 013 hatte das ausdrücklich
+      ausgeschlossen, der Kommentar der neuen sagt, was sich geändert hat. Wiederherstellen bringt
+      den Nutzer **deaktiviert** zurück, nie aktiv.
+      Fünf Dinge gingen über den Review hinaus: (1) `purgeEntry` ist aus `trash.ts` in ein
+      Geschwister `trash-purge.ts` gewandert, das die Route **und** der Lauf lesen — ein
+      unbeaufsichtigtes Löschen darf keine eigenen Regeln entwickeln; (2) die Einstellungsseite hat
+      einen Probelauf, der zählt und nichts anfasst und auch bei abgeschalteter Frist läuft, weil
+      genau das die Entscheidung zum Einschalten trägt (der echte Lauf antwortet abgeschaltet 409
+      wie die Erinnerungen); (3) seine Antwort nennt Zahlen je Art und kein Label — die Lehre aus
+      SEC-03, denn `MANAGE_SETTINGS` sagt nichts über das Lesen von Rechnungen; (4) der
+      Audit-Katalog kennt jetzt `actor=system` als dokumentiertes Wort für alles, was ein Timer
+      tut, dazu `USER_RESTORED`, `USER_PURGED` und `RETENTION_SWEPT`; (5) die Vollständigkeit des
+      Exports wird geprüft statt behauptet (Inventarliste aller 27 Tabellen gegen
+      `information_schema`, je Tabelle ein Platz im Export oder ein Satz, warum nicht, dazu der
+      Nachweis, dass jede beanspruchte Tabelle im Dokument wirklich ankommt).
+      Gewarnt sei vor zwei Stellen: `InvoiceReminders` trägt den Empfänger als `userID`, weshalb
+      dieser eine Zweig des Exports seine Spalten namentlich wählt statt `SELECT *`; und die
+      `RETENTION_SWEPT`-Zeile wird nur geschrieben, wenn wirklich etwas ging — ein zurückgehaltener
+      Eintrag ist nicht jeden Tag eine Nachricht. Rot geprüft: `deletedAt IS NOT NULL` aus dem
+      Kandidaten-SQL entfernt (undatierte Einträge gingen mit, drei Prüfungen fallen), die
+      Statusbedingung des endgültigen Löschens entfernt (eine), eine Tabelle aus der
+      Export-Inventarliste gestrichen (eine), `SELECT *` im Erinnerungs-Zweig (eine), ein
+      Audit-Ereignis aus `DEV.md` entfernt (eine).
+      Von Hand gegen die Entwicklungsinstanz: der Export einer Versicherten gegen die Datenbank
+      gezählt — zwölf Zweige, jede Zahl gleich (3 Policen, 14 Rechnungen, 6 Beitragsstände, 4
+      Konditionen, 6 Staffelstufen, 3 Jahre, 4 Einreichungen mit 9 Rechnungen, 5 Abrechnungen mit 8
+      Erstattungen, 16 Behandlungstage, 1 Ausschluss); Probelauf und Lauf mit einer Frist von einem
+      Tag (2 Einträge gingen, einer blieb, weil eine aktive Rechnung auf ihn zeigt); und der ganze
+      Weg eines Nutzers — löschen, im Abschnitt wiederfinden, wiederherstellen (kommt **inaktiv**
+      zurück), erneut löschen, endgültig löschen. Danach `npm run dev:reset`. Beobachtet und nicht
+      angefasst: `SubmitDialog.a11y.test.ts` ist einmal im vollen Lauf rot geworden und in den
+      Läufen davor und danach nicht — dieselbe Art Flackern wie bei `InvoicePickerView.test.ts` in
+      Scheibe 16.

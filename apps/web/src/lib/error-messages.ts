@@ -275,6 +275,8 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
   // Nutzerverwaltung
   SELF_ACCOUNT_ACTION: () => 'Diese Aktion ist für das eigene Konto nicht möglich.',
   LAST_ADMIN: () => 'Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.',
+  USER_NOT_DELETED: () =>
+    'Dieser Nutzer ist nicht gelöscht. Bitte die Seite neu laden — die Liste ist nicht mehr aktuell.',
 
   // System-Einstellungen und E-Mail-Versand
   SETTING_UNKNOWN: () =>
@@ -295,6 +297,8 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
       : 'Der Versand über den eingetragenen Mailserver ist fehlgeschlagen.',
   REMINDERS_DISABLED: () =>
     'Die Zahlungserinnerungen sind ausgeschaltet. Ohne sie verschickt ein Lauf nichts.',
+  RETENTION_DISABLED: () =>
+    'Die Aufbewahrungsfrist ist ausgeschaltet. Der Probelauf zeigt trotzdem, was sie entfernen würde.',
 };
 
 /**

@@ -141,6 +141,8 @@ export const SETTING_LABELS: Partial<Record<SettingKey, string>> = {
   'reminders.timeZone': 'Zeitzone',
   'reminders.repeatDays': 'Erneut erinnern nach (Tagen)',
   'reminders.appUrl': 'URL dieser Instanz (für den Link in der Mail)',
+  'retention.enabled': 'Papierkorb automatisch leeren',
+  'retention.trashDays': 'Gelöschtes endgültig entfernen nach (Tagen)',
 };
 
 /**

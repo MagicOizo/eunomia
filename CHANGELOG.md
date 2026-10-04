@@ -7,6 +7,39 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.19.0-slice.4 — 2026-10-04
+
+Health data that was deleted stayed anyway. The trash kept every deleted record for as long as the
+instance lived, a deleted user kept their name and address in the table for ever and could not even
+be looked at any more, and there was no way to say what the instance had stored about a person. All
+three are closed here — the last of the findings the two reviews before 1.0 turned up.
+
+- **A retention period the trash empties itself by.** After a set number of days a deleted record
+  goes for good, and with it every user deleted longer ago than that. It is **off by default**, with
+  90 days as the suggested period: an instance that updates into this version must not start
+  deleting because nobody read a changelog. Before switching it on, a dry run on the settings page
+  says exactly how much it would take and from which kinds of record, without touching anything.
+- **It deletes the way the button does.** The daily sweep goes through the very same code the
+  Papierkorb's "delete for good" uses, so an unattended deletion follows the same rules: what hangs
+  below a record and is deleted itself goes with it, and a record something in use still points at
+  stays and is tried again next time. Records from before the Papierkorb existed carry no deletion
+  date and are never swept — a period must not delete on the strength of a moment nobody wrote down.
+- **Deleted users can be seen, brought back, or removed for good.** The user administration now has
+  a section for them, with the day they were deleted. Restoring brings an account back
+  **deactivated**, never live, so a returning login is a second, deliberate step. Removing one for
+  good takes their roles, account access, sessions and reminder notes with it, and frees their
+  address again; who last changed a setting deliberately outlives the account.
+- **Everything stored about one insured person, as a file.** The list of insured persons has an
+  export: one JSON document with the person, their policies, premiums, terms, bonus scale, recorded
+  years, invoices, treatment days, exclusions, submissions, billings and reimbursements — values as
+  stored, deleted rows included, and nothing about anybody else. It needs the same permission as
+  reading the record itself. The build holds a list of every table in the database against the
+  database: each one is either in the export or carries a written reason why not, so a new kind of
+  record cannot quietly fall out of an export again.
+- **The log says what the instance did on its own.** A sweep writes one line per record it removed,
+  marked `actor=system`, plus a summary — and writes nothing at all on a day it removed nothing.
+  Restoring and finally deleting a user have their own lines too.
+
 ## 0.19.0-slice.3 — 2026-10-04
 
 The app keeps a record of itself. Until now the log knew about mail, reminders and the update

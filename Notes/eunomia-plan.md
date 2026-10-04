@@ -311,7 +311,76 @@ Nachweis und Fundstelle. Hier steht nur, was das für die Planung bedeutet:
 
 Der Datenbestand fällt unter Art. 9 DSGVO. Das ist keine Formalie, sondern der Grund, warum
 Nachvollziehbarkeit (SEC-09), Löschfristen (SEC-15) und Backup-Verschlüsselung (SEC-14) in diesem
-Projekt Befunde sind und nicht Komfortwünsche.
+Projekt Befunde sind und nicht Komfortwünsche. Was aus der Löschfrist und der Auskunft geworden
+ist, steht in 2.11.
+
+## 2.11 Aufbewahrung, Löschung, Auskunft (festgelegt 2026-10-04, Scheibe 18, schließt SEC-15)
+
+Drei Lücken im Umgang mit Art.-9-Daten hingen zusammen: der Papierkorb hielt gelöschte Datensätze
+unbegrenzt, ein gelöschter Nutzer blieb mit Name und Adresse für immer stehen, und es gab keinen
+Weg, die zu einer Person gespeicherten Daten auszugeben. Die Antworten darauf sind Regeln und
+gehören deshalb hierher, nicht nur in den Code.
+
+**Die Aufbewahrungsfrist.** Eine Systemeinstellung (`retention.enabled`, `retention.trashDays`), ein
+täglicher Lauf (`apps/api/src/retention/sweep.ts`), und vier Festlegungen:
+
+- **Die Vorgabe ist aus**, die Frist selbst 90 Tage. Eine Instanz, die in diese Version
+  hineinaktualisiert, darf nicht zu löschen beginnen, weil niemand den Changelog gelesen hat.
+  Einschalten ist eine Entscheidung; die Einstellungsseite bietet vorher einen Probelauf, der zählt
+  und nichts anfasst.
+- **Die Frist gilt für den Papierkorb und für gelöschte Nutzer, nie für aktive Daten.** Eine Frist
+  auf Rechnungen oder Policen wäre eine fachliche Entscheidung über Falldaten; SEC-15 verlangt sie
+  nicht, und dieses Projekt trifft sie nicht nebenbei.
+- **Gelöscht wird mit derselben Mechanik wie von Hand** (`domain/trash-purge.ts`, von der Route und
+  vom Lauf gelesen): was unter einem Eintrag hängt und selbst gelöscht ist, geht mit — auch wenn es
+  jünger als die Frist ist; ein Eintrag, auf den noch etwas Aktives zeigt, bleibt stehen und wird
+  beim nächsten Lauf wieder versucht. Es gibt keinen zweiten Löschweg mit eigenen Regeln.
+- **Ohne Löschdatum keine Frist.** Einträge aus der Zeit vor dem Papierkorb (Slice 39) und Nutzer,
+  die vor Migration 018 gelöscht wurden, tragen kein `deletedAt`; sie altern nie. Eine Frist darf
+  nicht auf einen Zeitpunkt löschen, den niemand aufgeschrieben hat — dieselbe Haltung wie bei der
+  undatierten Kontoverbindung aus Slice 38.
+
+Der Lauf hat **keine Uhrzeit-Einstellung**, anders als die Erinnerungen: ein DELETE interessiert
+nicht, wann es läuft, eine Mail kommt bei einem Menschen an. Für den Audit-Trail selbst gibt es
+keine Frist — er geht nach stdout und ist damit Sache des Betreibers, wie die Aufbewahrung der
+Backups (README, Scheibe 15).
+
+**Nutzer löschen — in der Nutzerverwaltung, nicht im Papierkorb.** Der Sicherheits-Review empfiehlt,
+Nutzer in den Papierkorb aufzunehmen; der Autor hat dagegen entschieden, aus drei Gründen:
+
+- Ein Restore im Papierkorb gäbe einem Inhaber von `MANAGE_TRASH` die Wiederherstellung einer
+  **Anmeldung** in die Hand. Zugang zu vergeben ist `MANAGE_USERS` (2.4).
+- Die Papierkorb-Mechanik leitet Kinder, Blocker und Anhänge aus den Fremdschlüsseln ab. Die zeigen
+  bei `Users` auf `userID` und nicht auf `uuidText`; für Nutzer liefe sie leer und täuschte eine
+  Prüfung nur vor.
+- `entityOfUid` löst die Art eines Datensatzes über ein Präfix auf, das eine UUID nicht hat — `a`,
+  `b`, `c`, `e`, `f` kollidieren mit bestehenden Präfixen.
+
+Stattdessen: Migration 018 gibt `Users` ein `deletedAt`, die Liste zeigt die gelöschten Nutzer in
+einem eigenen Abschnitt, und zwei Aktionen stehen dort. **Wiederherstellen bringt den Nutzer
+deaktiviert zurück** (Status 0), nie aktiv — eine zurückkehrende Anmeldung darf nicht überraschend
+funktionieren. **Endgültig löschen** entfernt die Zeile; was daran hängt, räumt die Datenbank selbst:
+Rollen, Konto-Zugriffe, Sitzungen und Erinnerungs-Vermerke kaskadieren,
+`SystemSettings.updatedByUserID` wird NULL — wer eine Einstellung zuletzt angefasst hat, überlebt das
+Konto absichtlich (Migrationen 002, 009, 010).
+
+**Die Auskunft.** `GET /accounts/:uid/export` gibt alles, was zu einem Versicherten gespeichert ist,
+als ein JSON-Dokument; in der Liste der Versicherten lädt ein Knopf die Datei herunter. Das Recht
+ist `VIEW_ACCOUNTS` auf genau dieses Konto — wer den Datensatz lesen darf, darf lesen, was zu ihm
+gespeichert ist. Drei Festlegungen:
+
+- **Gelöschte Zeilen sind dabei**, mit Status und Löschdatum. Eine Auskunft über gespeicherte Daten,
+  die einen Teil des Gespeicherten verschweigt, wäre keine.
+- **Werte wie gespeichert**, nicht wie die Oberfläche sie zeigt (ISO-Datum, Zahl statt „120,00 €“).
+  Das Dokument ist ein Datenbestand und soll sich mit der Datenbank vergleichen lassen.
+- **Keine Daten anderer Personen.** Eine Zahlungserinnerung erscheint mit Stufe und Tag, nicht mit
+  ihrem Empfänger; die Rechte-Zuweisungen zu diesem Konto bleiben außen vor; `leadAccountUID` bleibt
+  eine UID, der Export zieht keine Familie mit sich.
+
+Die Vollständigkeit ist geprüft, nicht behauptet: `account-export.integration.test.ts` hält eine
+Inventarliste aller Tabellen des Schemas gegen `information_schema` — jede Tabelle ist entweder im
+Export, mit der Stelle, an der sie erscheint, oder sie trägt einen Satz, warum nicht. Eine neue
+Tabelle mit Personenbezug bricht den Test, bis jemand sie einordnet.
 
 ---
 

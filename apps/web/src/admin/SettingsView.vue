@@ -6,13 +6,15 @@ import { computed, onMounted, ref } from 'vue';
 import { describeError } from '../lib/errors';
 import MailSection from './MailSection.vue';
 import ReminderSection from './ReminderSection.vue';
+import RetentionSection from './RetentionSection.vue';
 import UpdateSection from './UpdateSection.vue';
 import { type SettingsSnapshot, loadSettings } from './settings-api';
 
 /**
- * System settings (Slice 30, extended in Slice 31). The first area of the admin
- * section. This file holds only what the three sections share: the snapshot
- * they are filled from, and the notice that secrets cannot be stored at all.
+ * System settings (Slice 30, extended in Slice 31 and Scheibe 18). The first
+ * area of the admin section. This file holds only what the four sections share:
+ * the snapshot they are filled from, and the notice that secrets cannot be
+ * stored at all.
  *
  * Each section writes its own keys and hands back the snapshot the API answered
  * with, so the one below always sees what the one above just saved — the mail
@@ -52,6 +54,7 @@ onMounted(async () => {
       <UpdateSection :snapshot="snapshot" @snapshot="snapshot = $event" />
       <MailSection :snapshot="snapshot" @snapshot="snapshot = $event" />
       <ReminderSection :snapshot="snapshot" @snapshot="snapshot = $event" />
+      <RetentionSection :snapshot="snapshot" @snapshot="snapshot = $event" />
     </template>
   </div>
 </template>

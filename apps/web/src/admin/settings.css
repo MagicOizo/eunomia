@@ -63,6 +63,16 @@
   color: var(--eu-color-status-done-fg);
 }
 
+/* What a retention sweep touched, per kind of record — a short list under the
+   sentence that sums it up. */
+.eu-settings__list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-family: var(--eu-font-data);
+  font-size: 0.875rem;
+  color: var(--eu-color-text-muted);
+}
+
 /* The rendered mail, shown verbatim in a dry run. It wraps rather than scrolls
    sideways: a preview that needs a horizontal scrollbar on a phone is no
    preview. */
