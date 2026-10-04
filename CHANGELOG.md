@@ -7,6 +7,39 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.19.0-slice.2 — 2026-10-04
+
+Nothing in this release changes what the app does. It changes what the build knows: three promises
+that until now lived in a comment or in a review document are checked on every push, and the test
+suites report how much of the code they actually cover.
+
+- **Every endpoint's authorization is written down, and the build holds it.** All 83 routes were
+  already guarded — that was never in doubt — but only 33 of them carry that guard where anyone can
+  see it. Thirty-seven check inside the handler, sometimes only in the service function the handler
+  calls, and the remaining thirteen need nothing beyond being signed in; so a new route that forgot
+  its check would look exactly like its neighbours. There is now one list that
+  names, for every single route, either the guard on it or the place where it checks. A new route
+  fails the suite until someone adds it to that list, and the suite also refuses a list entry whose
+  route has disappeared. On top of that it refuses a guard that asks for an instance-wide permission
+  per insured person — a grant that can never be satisfied — and it proves over HTTP that each of
+  the 78 guarded routes answers "not signed in" with nothing more than that.
+- **The rights model has its own test.** The rules the whole access control rests on — a global
+  grant covers every insured person, an account-scoped one covers exactly one, a deactivated role
+  grants nothing — were only ever exercised by whatever the workflow tests happened to walk
+  through. They now have a test of their own: two insured persons, four users, every function of
+  the model.
+- **Test coverage is measured.** Both suites report their coverage and CI prints the numbers; today
+  they stand at 98 % of the API's lines and 68 % of the frontend's. Nothing fails on a percentage —
+  the point for now is that a fall becomes visible instead of being discovered at the next review.
+- **Three rules of the interface are checked instead of assumed.** That saving the mail settings
+  with an empty password field does _not_ delete the stored password; that a new year's terms are
+  taken over from the previous year complete with its bonus scale, and say which year they came
+  from; and that one insurer letter books all its reimbursements in a single request, with the
+  bonus-forfeit flag written only afterwards, so a refused booking leaves the letter untouched.
+- **The test suite stopped repeating itself.** Ten of the backend's integration suites carried the
+  same forty lines of setup, each with slightly different omissions — one of them already carried a
+  note about leftovers from another suite's run. They share one now.
+
 ## 0.19.0-slice.1 — 2026-10-04
 
 The first of the last block: everything that lies outside the application code. The app itself looks

@@ -1,6 +1,6 @@
 {
   "name": "eunomia",
-  "version": "0.19.0-slice.1",
+  "version": "0.19.0-slice.2",
   "private": true,
   "description": "Self-hosted web app for managing the private health-insurance (PKV) billing process.",
   "license": "MIT",
@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "typecheck": "npm run build --workspace packages/shared && npm run typecheck --workspace apps/api && npm run typecheck --workspace apps/web",
     "test": "npm run test --workspace packages/shared && npm run test --workspace apps/api && npm run test --workspace apps/web",
+    "test:coverage": "npm run test:coverage --workspace packages/shared && npm run test:coverage --workspace apps/api && npm run test:coverage --workspace apps/web",
     "build": "npm run build --workspace packages/shared && npm run build --workspace apps/api && npm run build --workspace apps/web",
     "version:set": "node scripts/version.ts set",
     "version:next": "node scripts/version.ts next",

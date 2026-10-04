@@ -60,6 +60,9 @@ jobs:
 
       - run: npm run typecheck
 
-      - run: npm run test
+      # With coverage: the number is printed, never gated (CR-32). A threshold
+      # follows once the figure has stood for a while; until then a step that
+      # fails on a percentage would only teach people to ignore it.
+      - run: npm run test:coverage
 
       - run: npm run build

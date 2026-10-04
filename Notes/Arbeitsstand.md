@@ -242,6 +242,37 @@ ausdrücklich vor einer anderen steht.
       im gehärteten Container gefahren) und im Browser gegen die gebaute SPA: Anmeldung,
       Arbeitsbereich, Rechnungen samt GiroCode-Popover, Policen, Papierkorb, Einstellungen, Nutzer
       und Profil — null CSP-Verstöße.
-- [ ] **16 — Prüfbar statt dokumentiert.** SEC-17, CR-32, CR-33, CR-34.
+- [x] **16 — Prüfbar statt dokumentiert.** SEC-17, CR-32, CR-33, CR-34.
+      Umgesetzt mit v0.19.0-slice.2 (Slice 66). Vier Festlegungen des Autors prägen das Ergebnis:
+      die Mounts stehen als Daten in `app.ts` (`API_MOUNTS`), die Kontoseite von SEC-17 wird als
+      Inventarliste mit benannten Ausnahmen geprüft statt als 403-Durchgang mit Fixtures, der
+      Vorbau der zehn Integrationstests wandert in einen gemeinsamen `src/test/harness.ts`, und die
+      Abdeckung wird gemessen statt begrenzt. Der Umbau in `app.ts` war keine Wahl: Express 5
+      behält den Mount-Pfad eines Routers nicht (kein `regexp`, kein `path` — der Matcher schließt
+      das Muster ein), die Routentabelle ist aus dem gebauten App also nicht rekonstruierbar, wie
+      der Review annimmt. Innerhalb eines Routers ist die Wirkung eines
+      `router.use('/users', requireAuth)` dagegen feststellbar, indem man seinen Matcher mit dem
+      Routenpfad **aufruft** — `/users/:uuid` trifft, `/roles` nicht; darauf steht die Erkennung der
+      beiden `use`-bewachten Router. Fünf Dinge gingen über den Review hinaus: (1) jeder in
+      `src/domain|auth|routes|settings` deklarierte Router muss in `API_MOUNTS` stehen — die Liste
+      wird aus den Quelldateien gelesen, nicht aus einem zweiten Verzeichnis, weil eine Liste sich
+      selbst nicht fehlen kann; (2) kein Wächter prüft ein instanzweites Recht kontobezogen, womit
+      die Zusage aus SEC-04 zweimal gehalten wird — strukturell im Routentest und gegen die
+      Datenbank im Rechtemodell-Test; (3) `GUARD`, ein Symbol-Deskriptor auf den beiden
+      Middleware-Fabriken, weil `router.use` nichts hinterlässt, woran ein Test den Wächter
+      erkennen könnte; (4) `resetData` ist aus zehn Varianten eine geworden — es waren zehnmal
+      dieselbe Liste mit verschiedenen Auslassungen, und eine davon trug schon einen Vermerk über
+      Reste aus dem Lauf einer anderen Suite; (5) `reminders.integration.test.ts` hätte bei der
+      Zusammenlegung lautlos seinen `configEncryptionKey` verloren (die Lint-Warnung über das
+      unbenutzte `randomBytes` hat es verraten). Gemessene Abdeckung: `packages/shared` 100 %,
+      API 97,72 / 90,04 / 93,69 (Zeilen/Zweige/Funktionen), Web 68,33 / 68,65 / 56,99 — ohne
+      Schwelle, mit der Grenze in DEV.md, dass `node --test` nur geladene Dateien zählt. Rot
+      geprüft: eine Route ohne `requireAuth` (drei Prüfungen fallen), ein Router aus `API_MOUNTS`
+      entfernt (zwei), `MANAGE_TRASH` kontobezogen geprüft (eine), ein veralteter Listeneintrag
+      (eine), `if (mail.password !== '')` entfernt (eine), die Schreibreihenfolge in
+      `saveBillingAllocations` vertauscht (zwei). Beobachtet und nicht angefasst:
+      `InvoicePickerView.test.ts` ist beim ersten, kalten Abdeckungslauf einmal rot geworden
+      (`.eu-picker__refs` leer), in fünf weiteren Läufen nicht mehr — die Datei gehört nicht zu
+      dieser Scheibe, aber der langsamere CI-Schritt kann es wieder sichtbar machen.
 - [ ] **17 — Audit-Trail.** SEC-09.
 - [ ] **18 — Aufbewahrung, Löschung, Auskunft.** SEC-15.

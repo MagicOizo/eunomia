@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { DatabaseConfig } from '../config/env.js';
 import { MIGRATION_LOCK, runMigrations } from './migrate.js';
-import { createPool, waitForDatabase } from './pool.js';
+import { createPool } from './pool.js';
 import { withConnection } from './transaction.js';
 import { createMigrator } from './umzug.js';
+import { openTestDatabase } from '../test/harness.js';
 
 const EXPECTED_TABLES = [
   'Accounts',
@@ -27,37 +27,13 @@ const EXPECTED_TABLES = [
   'Allocations',
 ];
 
-/** Reads DB config from the environment, or null when it isn't fully set. */
-function databaseConfigFromEnv(): DatabaseConfig | null {
-  const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-  if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) return null;
-  return {
-    host: DB_HOST,
-    port: Number(process.env.DB_PORT ?? 3306),
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-  };
-}
-
 // This test needs a real MariaDB. It runs in CI (which provides one) and is
 // skipped locally when no DB env is configured, so `npm test` stays runnable
 // without a database.
 test('migrations create every table and are idempotent', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   try {
     await runMigrations(pool);
@@ -83,19 +59,9 @@ test('migrations create every table and are idempotent', async (t) => {
 });
 
 test('migration 006 drops contract workflow data but keeps invoices and master data', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   try {
     await runMigrations(pool);
@@ -175,19 +141,9 @@ test('migration 006 drops contract workflow data but keeps invoices and master d
 });
 
 test('migration 007 moves submissions into SubmissionInvoices and back', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   const cleanup = async (): Promise<void> => {
     for (const sql of [
@@ -273,19 +229,9 @@ test('migration 007 moves submissions into SubmissionInvoices and back', async (
 });
 
 test('migration 008 adds the bonus scale, the year records and the billing flag, and back', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   const schema = async (): Promise<{ tables: string[]; hasFlag: boolean }> => {
     const tables = await pool.query<Array<{ name: string }>>(
@@ -327,19 +273,9 @@ test('migration 008 adds the bonus scale, the year records and the billing flag,
 });
 
 test('migration 011 moves a billing onto its policy and guards the number, and back', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   const cleanup = async (): Promise<void> => {
     for (const sql of [
@@ -453,19 +389,9 @@ test('migration 011 moves a billing onto its policy and guards the number, and b
 });
 
 test('migration 012 turns an agency account into a history, and back', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   const cleanup = async (): Promise<void> => {
     for (const sql of [
@@ -539,19 +465,9 @@ test('migration 012 turns an agency account into a history, and back', async (t)
 });
 
 test('migration 014 gives every invoice its treatment day, and takes it back', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   const cleanup = async (): Promise<void> => {
     for (const sql of [
@@ -616,19 +532,9 @@ test('migration 014 gives every invoice its treatment day, and takes it back', a
 });
 
 test('migration 015 adds the "not covered" mark and takes it back', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   const columnsOfInvoices = async (): Promise<string[]> => {
     const rows = await pool.query<Array<{ COLUMN_NAME: string }>>(
@@ -688,19 +594,9 @@ test('migration 015 adds the "not covered" mark and takes it back', async (t) =>
 });
 
 test('migration 016 freezes each invoice on the account it showed, and drops the dates', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool } = opened;
 
   const cleanup = async (): Promise<void> => {
     for (const sql of [
@@ -799,24 +695,13 @@ test('migration 016 freezes each invoice on the account it showed, and drops the
 });
 
 test('a second instance waits for the migration lock instead of migrating too', async (t) => {
-  const config = databaseConfigFromEnv();
-  if (!config) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-
-  const pool = createPool(config);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool, database } = opened;
 
   // A pool of its own, because the lock is per session: this one stands in for
   // the container that started first and is still migrating.
-  const other = createPool(config);
+  const other = createPool(database);
   try {
     await runMigrations(pool);
 

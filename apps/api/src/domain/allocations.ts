@@ -87,6 +87,14 @@ interface CandidateInvoice {
  *
  * The policy, not the submission, is what decides: one letter of the insurer
  * regularly answers invoices submitted on different days (see Slice 37).
+ *
+ * **Account separation hangs on `submittedHere`** (SEC-17). This query is given
+ * a `contractUID` and asks no permission of its own; what keeps a booking
+ * inside the caller's accounts is that `assertEntriesBookable` rejects every
+ * invoice without `submittedHere`, and that a submission was account-checked
+ * when it was made (`assertInvoicesSubmittable` in submissions.ts). Loosening
+ * that rule — accepting an invoice that is merely eligible, say — would open
+ * cross-account access here without touching a single authorization call.
  */
 async function loadCandidates(
   conn: Queryable,

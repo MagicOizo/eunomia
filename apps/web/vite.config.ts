@@ -19,5 +19,16 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
+    // Measured, not gated (CR-32): the number is printed so a fall is visible,
+    // and a threshold follows once it has stood for a while. `include` is what
+    // counts the components no test touches — without it the figure would only
+    // describe the files a test happens to import, which is the question
+    // nobody is asking.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text'],
+      include: ['src/**/*.{ts,vue}'],
+      exclude: ['src/**/*.{test,spec}.ts', 'src/test/**', 'src/main.ts', 'src/**/*.d.ts'],
+    },
   },
 });

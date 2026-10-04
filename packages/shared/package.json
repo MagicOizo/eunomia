@@ -1,6 +1,6 @@
 {
   "name": "@eunomia/shared",
-  "version": "0.19.0-slice.1",
+  "version": "0.19.0-slice.2",
   "private": true,
   "description": "Rules and contracts shared between apps/api and apps/web.",
   "type": "module",
@@ -15,6 +15,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test --test-concurrency=1 'src/**/*.test.ts'",
+    "test:coverage": "tsx --test --test-concurrency=1 --experimental-test-coverage --test-coverage-exclude='src/**/*.test.ts' 'src/**/*.test.ts'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }

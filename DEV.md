@@ -59,8 +59,17 @@ npm run format               # Prettier: format the whole repo (format:check onl
 npm run lint                 # ESLint across the whole repo
 npm run typecheck            # tsc / vue-tsc, no emit
 npm run test                  # backend (node:test) + frontend (vitest)
+npm run test:coverage         # the same suites, with a coverage table per workspace
 npm run build                 # production build of every workspace
 ```
+
+Coverage is **measured, not gated** (CR-32): CI prints the three tables and no threshold fails the
+build, so the numbers are visible before anyone argues about a floor. Read them with one caveat:
+`node --test` reports only the files the tests actually load, and `--test-coverage-include` does not
+change that. For the API that leaves out `src/index.ts` and the seed scripts, and in
+`packages/shared` the pure data modules (`permissions.ts`, `error-codes.ts`, …) never appear — so
+their 100 % means "everything measured", not "everything there is". Vitest has no such gap: the web
+config sets `all: true`, so a component no test touches is counted as zero.
 
 The backend integration tests need a MariaDB and **skip** when no `DB_*` env is set, so
 `npm run test` is runnable without a database (CI provides one). To run them against a database,

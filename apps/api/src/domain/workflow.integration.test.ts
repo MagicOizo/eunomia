@@ -5,32 +5,10 @@ import type { Pool } from 'mariadb';
 import request from 'supertest';
 
 import { createApp } from '../app.js';
-import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
 import type { Row } from '../crud/repository.js';
-import { createPool, waitForDatabase } from '../db/pool.js';
 import { hashPassword } from '../lib/password.js';
-
-/**
- * The full invoice workflow loop (Slice 5 DoD): create -> submit -> bill ->
- * allocate -> settle, plus the cross-entity invariants and account scoping.
- * Slice 17 adds the multi-policy loop: partial reimbursement at x, remainder
- * at y, exclusions, withdrawal and the "no enrichment" rule.
- * Slice 19 checks the reimbursement plan against that recorded reality.
- * Skips when no DB is configured; CI provides one.
- */
-
-function databaseConfigFromEnv(): DatabaseConfig | null {
-  const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-  if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) return null;
-  return {
-    host: DB_HOST,
-    port: Number(process.env.DB_PORT ?? 3306),
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-  };
-}
+import { bootstrapAdmin, openTestDatabase, resetData, testConfig } from '../test/harness.js';
 
 /**
  * Whether the reported validation issues include a length complaint about this
@@ -49,59 +27,6 @@ function tooBigOn(details: unknown, field: string): boolean {
         (issue as { path: unknown[] }).path.includes(field),
     )
   );
-}
-
-const SETUP_TOKEN = 'workflow-setup-token';
-
-function testConfig(database: DatabaseConfig): AppConfig {
-  return {
-    nodeEnv: 'test',
-    port: 0,
-    isProduction: false,
-    database,
-    auth: {
-      jwtSecret: 'workflow-secret',
-      accessTokenTtlSeconds: 900,
-      refreshTokenTtlSeconds: 3600,
-      setupToken: SETUP_TOKEN,
-    },
-    trustProxy: 1,
-    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
-    // Disabled so no test ever reaches out to GitHub.
-    updateCheck: {
-      enabled: false,
-      repository: 'MagicOizo/eunomia',
-      token: undefined,
-      cacheTtlMs: 0,
-    },
-    // No encryption key: these suites store no secrets.
-    configEncryptionKey: null,
-  };
-}
-
-async function resetData(pool: Pool): Promise<void> {
-  for (const stmt of [
-    'DELETE FROM Allocations',
-    'DELETE FROM ServiceBillings',
-    'DELETE FROM SubmissionInvoices',
-    'DELETE FROM InvoiceExclusions',
-    'DELETE FROM InvoiceTreatmentDays',
-    'DELETE FROM Invoices',
-    'DELETE FROM Submissions',
-    'DELETE FROM ContractPremiums',
-    'DELETE FROM ContractBonusTiers',
-    'DELETE FROM ContractYears',
-    'DELETE FROM ContractTerms',
-    'DELETE FROM Contracts',
-    'DELETE FROM InsuranceCompanies',
-    'DELETE FROM RefreshTokens',
-    'DELETE FROM UserAccountRoles',
-    'DELETE FROM UserRoles',
-    'DELETE FROM Users',
-    'DELETE FROM Accounts',
-  ]) {
-    await pool.query(stmt);
-  }
 }
 
 async function scopedNutzer(
@@ -146,25 +71,15 @@ async function userWithoutGrants(
 }
 
 test('invoice workflow: full loop, invariants and scoping', async (t) => {
-  const database = databaseConfigFromEnv();
-  if (!database) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(database);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool, database } = opened;
 
   try {
     await runMigrations(pool);
     await resetData(pool);
 
-    const config = testConfig(database);
+    const config = testConfig({ database });
     /**
      * The app on a counted pool. CR-16 was a query count that grew with the
      * data, so the proof is a number rather than a promise: the same request
@@ -192,14 +107,7 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
     };
     const app = createApp({ pool: counting, config });
 
-    await request(app)
-      .post('/api/v1/setup')
-      .set('X-Setup-Token', SETUP_TOKEN)
-      .send({ email: 'admin@example.com', password: 'adminpass1', firstname: 'Ada' });
-    const adminLogin = await request(app)
-      .post('/api/v1/auth/login')
-      .send({ email: 'admin@example.com', password: 'adminpass1' });
-    const admin = { Authorization: `Bearer ${adminLogin.body.accessToken}` };
+    const { admin } = await bootstrapAdmin(app);
 
     const post = (path: string, body: object, headers: Record<string, string> = admin) =>
       request(app).post(path).set(headers).send(body);

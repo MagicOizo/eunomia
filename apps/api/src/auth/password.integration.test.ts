@@ -1,66 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Pool } from 'mariadb';
 import request from 'supertest';
 
 import { createApp } from '../app.js';
-import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
-import { createPool, waitForDatabase } from '../db/pool.js';
 import { cleanupRefreshTokens } from './cleanup.js';
-
-/**
- * Passwords and sessions (SEC-05 to SEC-08): changing one's own password
- * against the old one, what that does to the other sessions, what an admin's
- * password reset does to them, and the sweep that keeps RefreshTokens from
- * growing forever. Skips without a DB; CI provides one.
- */
-
-function databaseConfigFromEnv(): DatabaseConfig | null {
-  const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-  if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) return null;
-  return {
-    host: DB_HOST,
-    port: Number(process.env.DB_PORT ?? 3306),
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-  };
-}
-
-const SETUP_TOKEN = 'password-setup-token';
-
-function testConfig(database: DatabaseConfig): AppConfig {
-  return {
-    nodeEnv: 'test',
-    port: 0,
-    isProduction: false,
-    database,
-    auth: {
-      jwtSecret: 'password-secret',
-      accessTokenTtlSeconds: 900,
-      refreshTokenTtlSeconds: 3600,
-      setupToken: SETUP_TOKEN,
-    },
-    trustProxy: 1,
-    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
-    updateCheck: {
-      enabled: false,
-      repository: 'MagicOizo/eunomia',
-      token: undefined,
-      cacheTtlMs: 0,
-    },
-    configEncryptionKey: null,
-  };
-}
-
-async function resetAuthData(pool: Pool): Promise<void> {
-  await pool.query('DELETE FROM RefreshTokens');
-  await pool.query('DELETE FROM UserAccountRoles');
-  await pool.query('DELETE FROM UserRoles');
-  await pool.query('DELETE FROM Users');
-}
+import { SETUP_TOKEN, openTestDatabase, resetData, testConfig } from '../test/harness.js';
 
 /** Pulls the refresh_token value out of a Set-Cookie header (string or array). */
 function refreshCookieValue(setCookie: string | string[] | undefined): string | undefined {
@@ -70,26 +16,15 @@ function refreshCookieValue(setCookie: string | string[] | undefined): string | 
 }
 
 test('passwords and sessions', async (t) => {
-  const database = databaseConfigFromEnv();
-  if (!database) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-
-  const pool = createPool(database);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool, database } = opened;
 
   try {
     await runMigrations(pool);
-    await resetAuthData(pool);
+    await resetData(pool);
 
-    const config = testConfig(database);
+    const config = testConfig({ database });
     const app = createApp({ pool, config });
 
     const admin = { email: 'admin@example.com', password: 'adminpass12', firstname: 'Ada' };

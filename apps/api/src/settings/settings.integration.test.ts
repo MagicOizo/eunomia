@@ -3,73 +3,13 @@ import { randomBytes } from 'node:crypto';
 import test from 'node:test';
 
 import { ERROR_CODES } from '@eunomia/shared';
-import type { Pool } from 'mariadb';
 import request from 'supertest';
 
 import { createApp } from '../app.js';
-import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
-import { createPool, waitForDatabase } from '../db/pool.js';
+import { bootstrapAdmin, openTestDatabase, resetData, testConfig } from '../test/harness.js';
 
-/**
- * System settings and the test mail (Slice 30): the permission gate, the three
- * write cases, that a secret is encrypted at rest and never handed back, and
- * that a failed send is recorded rather than swallowed. Skips without a DB; CI
- * provides one.
- */
-
-function databaseConfigFromEnv(): DatabaseConfig | null {
-  const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-  if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) return null;
-  return {
-    host: DB_HOST,
-    port: Number(process.env.DB_PORT ?? 3306),
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-  };
-}
-
-const SETUP_TOKEN = 'test-setup-token';
 const ENCRYPTION_KEY = randomBytes(32);
-
-function testConfig(database: DatabaseConfig, encryptionKey: Buffer | null): AppConfig {
-  return {
-    nodeEnv: 'test',
-    port: 0,
-    isProduction: false,
-    database,
-    auth: {
-      jwtSecret: 'test-secret-please-ignore',
-      accessTokenTtlSeconds: 900,
-      refreshTokenTtlSeconds: 3600,
-      setupToken: SETUP_TOKEN,
-    },
-    trustProxy: 1,
-    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
-    // Disabled so no test ever reaches out to GitHub.
-    updateCheck: {
-      enabled: false,
-      repository: 'MagicOizo/eunomia',
-      token: undefined,
-      cacheTtlMs: 0,
-    },
-    configEncryptionKey: encryptionKey,
-  };
-}
-
-async function resetData(pool: Pool): Promise<void> {
-  // SystemSettings references Users, so it goes before the user rows.
-  for (const stmt of [
-    'DELETE FROM SystemSettings',
-    'DELETE FROM UserAccountRoles',
-    'DELETE FROM UserRoles',
-    'DELETE FROM RefreshTokens',
-    'DELETE FROM Users',
-  ]) {
-    await pool.query(stmt);
-  }
-}
 
 interface PublicSettingRow {
   key: string;
@@ -87,36 +27,21 @@ function setting(body: { data: { settings: PublicSettingRow[] } }, key: string):
 }
 
 test('system settings: gating, write cases, encryption at rest, mail status', async (t) => {
-  const database = databaseConfigFromEnv();
-  if (!database) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(database);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool, database } = opened;
 
   try {
     await runMigrations(pool);
     await resetData(pool);
 
-    const app = createApp({ pool, config: testConfig(database, ENCRYPTION_KEY) });
+    const app = createApp({
+      pool,
+      config: testConfig({ database, configEncryptionKey: ENCRYPTION_KEY }),
+    });
 
     // Bootstrap admin, plus a plain user for the permission check.
-    const setup = await request(app)
-      .post('/api/v1/setup')
-      .set('X-Setup-Token', SETUP_TOKEN)
-      .send({ email: 'admin@example.com', password: 'adminpass1', firstname: 'Ada' });
-    assert.equal(setup.status, 201, JSON.stringify(setup.body));
-    const adminLogin = await request(app)
-      .post('/api/v1/auth/login')
-      .send({ email: 'admin@example.com', password: 'adminpass1' });
-    const admin = { Authorization: `Bearer ${adminLogin.body.accessToken}` };
+    const { admin } = await bootstrapAdmin(app);
 
     const roles = (await request(app).get('/api/v1/roles').set(admin)).body.data as Array<{
       roleUID: string;
@@ -275,7 +200,7 @@ test('system settings: gating, write cases, encryption at rest, mail status', as
     });
 
     await t.test('without CONFIG_ENCRYPTION_KEY a secret cannot be stored', async () => {
-      const keyless = createApp({ pool, config: testConfig(database, null) });
+      const keyless = createApp({ pool, config: testConfig({ database }) });
       const login = await request(keyless)
         .post('/api/v1/auth/login')
         .send({ email: 'admin@example.com', password: 'adminpass1' });

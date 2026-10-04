@@ -7,97 +7,14 @@ import type { Pool } from 'mariadb';
 import request from 'supertest';
 
 import { createApp } from '../app.js';
-import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
-import { createPool, waitForDatabase } from '../db/pool.js';
 import { ApiError } from '../lib/api-error.js';
 import { generateEntityId } from '../lib/ids.js';
 import { hashPassword } from '../lib/password.js';
 import type { MailMessage, MailSendStatus, Mailer } from '../mail/mailer.js';
 import { createReminderRunner } from './runner.js';
 import { createReminderStore } from './store.js';
-
-/**
- * Payment reminders end to end (Slice 31): the permission gate, the refusal
- * while switched off, what a dry run does and does not do, that a real run
- * mails the right person about the right invoices, and that the second run
- * stays quiet. The mailer is stubbed — the SMTP side is covered in
- * mail/mailer.test.ts; what matters here is the database and the API.
- *
- * Skips without a database; CI provides one. IT DELETES DATA — point DB_NAME
- * at a throwaway schema.
- */
-
-function databaseConfigFromEnv(): DatabaseConfig | null {
-  const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-  if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) return null;
-  return {
-    host: DB_HOST,
-    port: Number(process.env.DB_PORT ?? 3306),
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-  };
-}
-
-const SETUP_TOKEN = 'test-setup-token';
-
-function testConfig(database: DatabaseConfig): AppConfig {
-  return {
-    nodeEnv: 'test',
-    port: 0,
-    isProduction: false,
-    database,
-    auth: {
-      jwtSecret: 'test-secret-please-ignore',
-      accessTokenTtlSeconds: 900,
-      refreshTokenTtlSeconds: 3600,
-      setupToken: SETUP_TOKEN,
-    },
-    trustProxy: 1,
-    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
-    updateCheck: {
-      enabled: false,
-      repository: 'MagicOizo/eunomia',
-      token: undefined,
-      cacheTtlMs: 0,
-    },
-    configEncryptionKey: randomBytes(32),
-  };
-}
-
-async function resetData(pool: Pool): Promise<void> {
-  // Leftovers from another suite's run may still reference the invoices, so
-  // the whole workflow chain goes first — in foreign-key order.
-  for (const stmt of [
-    'DELETE FROM InvoiceReminders',
-    'DELETE FROM Allocations',
-    'DELETE FROM ServiceBillings',
-    'DELETE FROM SubmissionInvoices',
-    'DELETE FROM InvoiceExclusions',
-    'DELETE FROM InvoiceTreatmentDays',
-    'DELETE FROM Invoices',
-    'DELETE FROM Submissions',
-    'DELETE FROM ContractPremiums',
-    'DELETE FROM ContractBonusTiers',
-    'DELETE FROM ContractYears',
-    'DELETE FROM ContractTerms',
-    'DELETE FROM Contracts',
-    'DELETE FROM InsuranceCompanies',
-    'DELETE FROM SystemSettings',
-    'DELETE FROM UserAccountRoles',
-    'DELETE FROM UserRoles',
-    'DELETE FROM RefreshTokens',
-    'DELETE FROM Users',
-    'DELETE FROM Accounts',
-    // A role built by a test (see the preview test below); the seeded system
-    // roles stay, because the migration owns them.
-    'DELETE FROM RolePermissions WHERE roleID IN (SELECT roleID FROM Roles WHERE isSystem = 0)',
-    'DELETE FROM Roles WHERE isSystem = 0',
-  ]) {
-    await pool.query(stmt);
-  }
-}
+import { bootstrapAdmin, openTestDatabase, resetData, testConfig } from '../test/harness.js';
 
 const EMPTY_STATUS: MailSendStatus = {
   lastSendAt: null,
@@ -132,36 +49,19 @@ function dayOffset(offset: number): string {
 }
 
 test('payment reminders: gating, dry run, delivery and the quiet second run', async (t) => {
-  const database = databaseConfigFromEnv();
-  if (!database) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(database);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool, database } = opened;
 
   try {
     await runMigrations(pool);
     await resetData(pool);
 
-    const config = testConfig(database);
+    const config = testConfig({ database, configEncryptionKey: randomBytes(32) });
 
     const app = createApp({ pool, config });
 
-    await request(app)
-      .post('/api/v1/setup')
-      .set('X-Setup-Token', SETUP_TOKEN)
-      .send({ email: 'admin@example.com', password: 'adminpass1', firstname: 'Ada' });
-    const adminLogin = await request(app)
-      .post('/api/v1/auth/login')
-      .send({ email: 'admin@example.com', password: 'adminpass1' });
-    const admin = { Authorization: `Bearer ${adminLogin.body.accessToken}` };
+    const { admin } = await bootstrapAdmin(app);
 
     // Two insured persons, three invoices: one overdue each, and one still far
     // off — so "only what is due" and "only my accounts" are both visible.

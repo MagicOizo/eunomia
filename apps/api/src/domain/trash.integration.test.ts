@@ -6,85 +6,9 @@ import type { Pool } from 'mariadb';
 import request from 'supertest';
 
 import { createApp } from '../app.js';
-import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
-import { createPool, waitForDatabase } from '../db/pool.js';
 import { hashPassword } from '../lib/password.js';
-
-/**
- * The Papierkorb (Slice 39): what a deleted record looks like in it, what it
- * takes to bring it back, and what stops it from going for good. The three
- * rules the author set are checked as their own cases — a restore is one
- * transaction, it never breaks a rule the masks enforce, and every failure
- * names the record it hung on. Skips when no DB is configured; CI provides one.
- */
-
-function databaseConfigFromEnv(): DatabaseConfig | null {
-  const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-  if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) return null;
-  return {
-    host: DB_HOST,
-    port: Number(process.env.DB_PORT ?? 3306),
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-  };
-}
-
-const SETUP_TOKEN = 'trash-setup-token';
-
-function testConfig(database: DatabaseConfig): AppConfig {
-  return {
-    nodeEnv: 'test',
-    port: 0,
-    isProduction: false,
-    database,
-    auth: {
-      jwtSecret: 'trash-secret',
-      accessTokenTtlSeconds: 900,
-      refreshTokenTtlSeconds: 3600,
-      setupToken: SETUP_TOKEN,
-    },
-    trustProxy: 1,
-    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
-    updateCheck: {
-      enabled: false,
-      repository: 'MagicOizo/eunomia',
-      token: undefined,
-      cacheTtlMs: 0,
-    },
-    configEncryptionKey: null,
-  };
-}
-
-async function resetData(pool: Pool): Promise<void> {
-  for (const stmt of [
-    'DELETE FROM Allocations',
-    'DELETE FROM ServiceBillings',
-    'DELETE FROM SubmissionInvoices',
-    'DELETE FROM InvoiceExclusions',
-    'DELETE FROM InvoiceReminders',
-    'DELETE FROM InvoiceTreatmentDays',
-    'DELETE FROM Invoices',
-    'DELETE FROM Submissions',
-    'DELETE FROM ContractPremiums',
-    'DELETE FROM ContractBonusTiers',
-    'DELETE FROM ContractYears',
-    'DELETE FROM ContractTerms',
-    'DELETE FROM Contracts',
-    'DELETE FROM AgencyBankAccounts',
-    'DELETE FROM CollectionAgencies',
-    'DELETE FROM InsuranceCompanies',
-    'DELETE FROM Facilities',
-    'DELETE FROM RefreshTokens',
-    'DELETE FROM UserAccountRoles',
-    'DELETE FROM UserRoles',
-    'DELETE FROM Users',
-    'DELETE FROM Accounts',
-  ]) {
-    await pool.query(stmt);
-  }
-}
+import { bootstrapAdmin, openTestDatabase, resetData, testConfig } from '../test/harness.js';
 
 interface TrashEntryDto {
   uid: string;
@@ -106,25 +30,15 @@ interface TrashGroupDto {
 }
 
 test('trash: list, restore and delete for good', async (t) => {
-  const database = databaseConfigFromEnv();
-  if (!database) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-  const pool = createPool(database);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool, database } = opened;
 
   try {
     await runMigrations(pool);
     await resetData(pool);
 
-    const config = testConfig(database);
+    const config = testConfig({ database });
     /**
      * The app on a counted pool. CR-17 was a query count that grew with the
      * number of entries, so the proof is a number rather than a promise: a
@@ -152,14 +66,7 @@ test('trash: list, restore and delete for good', async (t) => {
     };
     const app = createApp({ pool: counting, config });
 
-    await request(app)
-      .post('/api/v1/setup')
-      .set('X-Setup-Token', SETUP_TOKEN)
-      .send({ email: 'admin@example.com', password: 'adminpass1', firstname: 'Ada' });
-    const adminLogin = await request(app)
-      .post('/api/v1/auth/login')
-      .send({ email: 'admin@example.com', password: 'adminpass1' });
-    const admin = { Authorization: `Bearer ${adminLogin.body.accessToken}` };
+    const { admin } = await bootstrapAdmin(app);
 
     const post = (path: string, body: object, headers: Record<string, string> = admin) =>
       request(app).post(path).set(headers).send(body);

@@ -1,6 +1,6 @@
 {
   "name": "@eunomia/api",
-  "version": "0.19.0-slice.1",
+  "version": "0.19.0-slice.2",
   "private": true,
   "description": "Eunomia backend API.",
   "type": "module",
@@ -16,6 +16,7 @@
     "seed": "tsx src/seed/seed.ts",
     "seed:reset": "tsx src/seed/seed.ts --reset",
     "test": "tsx --test --test-concurrency=1 'src/**/*.test.ts'",
+    "test:coverage": "tsx --test --test-concurrency=1 --experimental-test-coverage --test-coverage-exclude='src/**/*.test.ts' --test-coverage-exclude='src/test/**' --test-coverage-exclude='../../packages/**' 'src/**/*.test.ts'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

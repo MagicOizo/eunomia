@@ -1,68 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Pool } from 'mariadb';
 import request from 'supertest';
 
 import { createApp } from '../app.js';
-import type { AppConfig, DatabaseConfig } from '../config/env.js';
 import { runMigrations } from '../db/migrate.js';
-import { createPool, waitForDatabase } from '../db/pool.js';
 import { generateEntityId } from '../lib/ids.js';
 import { hashPassword } from '../lib/password.js';
-
-/**
- * End-to-end auth flow against a real MariaDB. Skips when no DB is configured,
- * so `npm test` stays runnable locally without one; CI provides a database.
- */
-
-function databaseConfigFromEnv(): DatabaseConfig | null {
-  const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env;
-  if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) return null;
-  return {
-    host: DB_HOST,
-    port: Number(process.env.DB_PORT ?? 3306),
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-  };
-}
-
-const SETUP_TOKEN = 'test-setup-token';
-
-function testConfig(database: DatabaseConfig): AppConfig {
-  return {
-    nodeEnv: 'test',
-    port: 0,
-    isProduction: false,
-    database,
-    auth: {
-      jwtSecret: 'test-secret-please-ignore',
-      accessTokenTtlSeconds: 900,
-      refreshTokenTtlSeconds: 3600,
-      setupToken: SETUP_TOKEN,
-    },
-    trustProxy: 1,
-    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
-    // Disabled so no test ever reaches out to GitHub.
-    updateCheck: {
-      enabled: false,
-      repository: 'MagicOizo/eunomia',
-      token: undefined,
-      cacheTtlMs: 0,
-    },
-    // No encryption key: these suites store no secrets.
-    configEncryptionKey: null,
-  };
-}
-
-/** Removes all user/session data so the suite is repeatable on a shared DB. */
-async function resetAuthData(pool: Pool): Promise<void> {
-  await pool.query('DELETE FROM RefreshTokens');
-  await pool.query('DELETE FROM UserAccountRoles');
-  await pool.query('DELETE FROM UserRoles');
-  await pool.query('DELETE FROM Users');
-}
+import { SETUP_TOKEN, openTestDatabase, resetData, testConfig } from '../test/harness.js';
 
 /** Pulls the refresh_token value out of a Set-Cookie header (string or array). */
 function refreshCookieValue(setCookie: string | string[] | undefined): string | undefined {
@@ -72,26 +17,15 @@ function refreshCookieValue(setCookie: string | string[] | undefined): string | 
 }
 
 test('auth flow: setup, login, protected access, scoping, refresh, logout', async (t) => {
-  const database = databaseConfigFromEnv();
-  if (!database) {
-    t.skip('no database configured (DB_* env vars unset)');
-    return;
-  }
-
-  const pool = createPool(database);
-  try {
-    await waitForDatabase(pool, { retries: 5, delayMs: 500 });
-  } catch {
-    await pool.end();
-    t.skip('database not reachable');
-    return;
-  }
+  const opened = await openTestDatabase(t);
+  if (!opened) return;
+  const { pool, database } = opened;
 
   try {
     await runMigrations(pool);
-    await resetAuthData(pool);
+    await resetData(pool);
 
-    const config = testConfig(database);
+    const config = testConfig({ database });
     const app = createApp({ pool, config });
     const adminCreds = { email: 'admin@example.com', password: 'supersecret1', firstname: 'Ada' };
 

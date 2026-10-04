@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import express, { type Express } from 'express';
+import express, { type Express, type Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import type { Pool } from 'mariadb';
@@ -38,6 +38,46 @@ export interface AppDependencies {
   /** Absolute path to the built SPA (apps/web/dist). When present, the API serves it. */
   webRoot?: string;
 }
+
+/**
+ * Where every database-backed router hangs, as data rather than as a sequence
+ * of `app.use` calls — so a test can walk the same list and assert that each
+ * route it finds is guarded (SEC-17, Sicherheits-Review I-1/I-2). A router that
+ * is mounted is a router that is checked: there is no second list that could
+ * fall out of step, because this one IS the mounting.
+ *
+ * Express 5 keeps no mount path on a router layer (no `regexp`, no `path` — the
+ * matcher closes over the pattern), so the prefix is not recoverable from the
+ * built app. It has to be readable here or nowhere.
+ *
+ * `versionRouter` is deliberately not in the list: it needs no pool, doubles as
+ * the container health check, and is the one route that answers before anyone
+ * has logged in — see the exception list of I-1.
+ */
+export const API_MOUNTS: ReadonlyArray<{
+  path: string;
+  create: (pool: Pool, config: AppConfig) => Router;
+}> = [
+  { path: '/api/v1', create: createAuthRouter },
+  { path: '/api/v1', create: createUserAdminRouter },
+  { path: '/api/v1', create: createUpdateCheckRouter },
+  { path: '/api/v1', create: createSettingsRouter },
+  { path: '/api/v1/accounts', create: createAccountsRouter },
+  { path: '/api/v1/accounts', create: createReimbursementPlanRouter },
+  { path: '/api/v1/companies', create: createInsuranceCompaniesRouter },
+  { path: '/api/v1/contracts', create: createContractsRouter },
+  { path: '/api/v1/contracts', create: createContractPremiumsRouter },
+  { path: '/api/v1/contracts', create: createContractTermsRouter },
+  { path: '/api/v1/contracts', create: createContractYearsRouter },
+  { path: '/api/v1/facilities', create: createFacilitiesRouter },
+  { path: '/api/v1/agencies', create: createCollectionAgenciesRouter },
+  { path: '/api/v1/agencies', create: createAgencyPaymentDetailsRouter },
+  { path: '/api/v1/invoices', create: createInvoicesRouter },
+  { path: '/api/v1/submissions', create: createSubmissionsRouter },
+  { path: '/api/v1/billings', create: createServiceBillingsRouter },
+  { path: '/api/v1/allocations', create: createAllocationsRouter },
+  { path: '/api/v1/trash', create: createTrashRouter },
+];
 
 /**
  * The Content-Security-Policy for the one origin this server hands out: the
@@ -139,25 +179,9 @@ export function createApp(deps?: AppDependencies): Express {
 
   if (deps) {
     const { pool, config, webRoot } = deps;
-    app.use('/api/v1', createAuthRouter(pool, config));
-    app.use('/api/v1', createUserAdminRouter(pool, config));
-    app.use('/api/v1', createUpdateCheckRouter(pool, config));
-    app.use('/api/v1', createSettingsRouter(pool, config));
-    app.use('/api/v1/accounts', createAccountsRouter(pool, config));
-    app.use('/api/v1/accounts', createReimbursementPlanRouter(pool, config));
-    app.use('/api/v1/companies', createInsuranceCompaniesRouter(pool, config));
-    app.use('/api/v1/contracts', createContractsRouter(pool, config));
-    app.use('/api/v1/contracts', createContractPremiumsRouter(pool, config));
-    app.use('/api/v1/contracts', createContractTermsRouter(pool, config));
-    app.use('/api/v1/contracts', createContractYearsRouter(pool, config));
-    app.use('/api/v1/facilities', createFacilitiesRouter(pool, config));
-    app.use('/api/v1/agencies', createCollectionAgenciesRouter(pool, config));
-    app.use('/api/v1/agencies', createAgencyPaymentDetailsRouter(pool, config));
-    app.use('/api/v1/invoices', createInvoicesRouter(pool, config));
-    app.use('/api/v1/submissions', createSubmissionsRouter(pool, config));
-    app.use('/api/v1/billings', createServiceBillingsRouter(pool, config));
-    app.use('/api/v1/allocations', createAllocationsRouter(pool, config));
-    app.use('/api/v1/trash', createTrashRouter(pool, config));
+    for (const mount of API_MOUNTS) {
+      app.use(mount.path, mount.create(pool, config));
+    }
 
     // In production the built SPA is served by this same server (same origin, so
     // the httpOnly refresh cookie works without proxy tricks). Absent in dev/
