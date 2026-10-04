@@ -158,11 +158,8 @@ export async function queryInvoices(
        LEFT JOIN ServiceBillings b ON b.billingUID = a.billingUID AND b.billingStatus <> -1
       WHERE ${where}
       GROUP BY i.invoiceID
-      ORDER BY i.invoiceDate DESC, i.invoiceUID${
-        // Safe to inline: zod has narrowed it to an integer within range.
-        limit === undefined ? '' : ` LIMIT ${limit}`
-      }`,
-    params,
+      ORDER BY i.invoiceDate DESC, i.invoiceUID${limit === undefined ? '' : ' LIMIT ?'}`,
+    limit === undefined ? params : [...params, limit],
   );
 }
 

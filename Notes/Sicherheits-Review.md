@@ -93,9 +93,19 @@ begründet ändern — sie sind nicht Beschreibung, sondern Vorgabe.
 Leistungsabrechnung oder Buchung liest oder schreibt, hält die Berechtigung **auf deren Konto** —
 über `authorizeAccount`/`loadAuthorizedContract` bei Einzelzugriff, über `accountFilter`
 (auf `getAccessibleAccounts`) als `WHERE`-Einschränkung bei Listen. Eine Liste ohne Kontofilter ist
-ein Fehler, kein Sonderfall. Die **einzige** Ausnahme ist abschließend benannt und begründet: der
-Papierkorb hinter dem instanzweiten `MANAGE_TRASH` (siehe SEC-04 und §2.4 des Plans) — ein
-gelöschter Eintrag kann den Verweis auf seinen Versicherten selbst verloren haben.
+ein Fehler, kein Sonderfall. Die Ausnahmen sind abschließend benannt und begründet:
+
+1. der Papierkorb hinter dem instanzweiten `MANAGE_TRASH` (siehe SEC-04 und §2.4 des Plans) — ein
+   gelöschter Eintrag kann den Verweis auf seinen Versicherten selbst verloren haben;
+2. der Export einer Versicherten (`GET /accounts/:uid/export`, SEC-15): er trägt Rechnungen,
+   Einreichungen, Abrechnungen und Buchungen, verlangt aber nur `VIEW_ACCOUNTS` **auf genau diesem
+   Konto** — die Entscheidung von §2.11 des Plans, wer den Datensatz lesen darf, darf lesen, was zu
+   ihm gespeichert ist. Mit den beiden Systemrollen ist das heute ohne Wirkung (die Rolle „Nutzer"
+   trägt `VIEW_INVOICES` und `VIEW_CONTRACTS` mit), und Rollen lassen sich über die API nicht
+   anlegen. Gefunden bei der Nachprüfung (§8), offen als Punkt in `issues.md`.
+
+**Die zweite Ausnahme ist eine Grenze, keine Erlaubnis:** jeder *weitere* Weg zu Falldaten braucht
+die Berechtigung seiner Art.
 
 **I-3 `accountUID` ist unveränderlich.** Rechnung und Police lassen sich nicht zwischen Versicherten
 verschieben; die Update-Schemata nehmen das Feld ausdrücklich heraus. Ein Verschieben bräuchte eine
@@ -120,18 +130,23 @@ Refresh-Token lebt ausschließlich im httpOnly-Cookie mit `SameSite=Strict` und 
 `/api/v1/auth` — daraus folgt zugleich, dass die API keinen CSRF-Schutz braucht, weil kein
 API-Aufruf ambient authentifiziert ist.
 
-**I-9 Keine unkontrollierte URL wird zur Senke.** Eine URL aus Benutzereingabe darf nur dann in ein
-`href` oder `window.open` gelangen, wenn ihr Schema auf `http`/`https` geprüft wurde. Der Prüfer
-dafür existiert: `isHttpUrl` in `settings/registry.ts`. **`z.string().url()` genügt dieser Regel
-nicht** — siehe SEC-01.
+**I-9 Keine unkontrollierte URL wird zur Senke.** Eine URL aus Benutzereingabe **oder aus einer
+fremden Antwort** darf nur dann in ein `href` oder `window.open` gelangen, wenn ihr Schema auf
+`http`/`https` geprüft wurde. Der Prüfer dafür ist `isHttpUrl` in `packages/shared/src/http-url.ts`
+(`@eunomia/shared`), gelesen von den Schemata der API und von den Senken im Web.
+**`z.string().url()` genügt dieser Regel nicht** — siehe SEC-01. Die Erweiterung auf fremde
+Antworten kam mit der Nachprüfung (§8): die Release-URL des Update-Checks ist keine Benutzereingabe
+und lief trotzdem ungeprüft in zwei `href`.
 
 **I-10 Rechte werden bei jeder Anfrage frisch aufgelöst.** Der Access-Token trägt nur die
 Nutzer-UUID, keine Berechtigungen. Ein entzogener Grant und eine Deaktivierung wirken sofort statt
 erst beim Ablauf des Tokens.
 
 **I-11 Ausgehende Aufrufe gehen an feste Ziele.** Der Update-Check spricht fest `api.github.com` an;
-konfigurierbar ist nur der `owner/repo`-Slug, und der ist regex-geprüft. Eine Einstellung, aus der
-eine beliebige Ziel-URL wird, ist ein SSRF und braucht eine eigene Begründung.
+konfigurierbar ist nur der `owner/repo`-Slug, und der ist regex-geprüft — als Umgebungsvariable
+`UPDATE_CHECK_REPO`, geprüft beim Start in `config/env.ts` (`repositorySlug`), nicht als Einstellung
+in der Datenbank. Eine Konfiguration, aus der eine beliebige Ziel-URL wird, ist ein SSRF und braucht
+eine eigene Begründung.
 
 **I-12 Die Testmail geht nur an die eigene Adresse.** Eine Instanz mit fremdem SMTP-Konto darf nicht
 zum Versandweg für Dritte werden.
@@ -507,9 +522,12 @@ nicht angenommen:
 - **Secrets:** AES-256-GCM mit 96-Bit-Nonce aus `randomBytes`, Authentifizierungs-Tag geprüft,
   selbstbeschreibendes Format für spätere Algorithmuswechsel. Schlüssel nur aus der Umgebung,
   Fehlkonfiguration bricht beim Start ab. Plaintext verlässt die API nie.
-- **SQL:** durchgängig parametrisiert. Jede der geprüften Template-Literal-Stellen
-  (`trash-registry.ts`, `seed/helpers.ts`, `admin-repository.ts:109`, `contracts.ts:101`,
-  `collection-agencies.ts:92`) setzt nur Konstanten aus dem Code oder generierte `?`-Platzhalter ein.
+- **SQL:** durchgängig parametrisiert. Bei der Nachprüfung (§8) wurde das über alle
+  Interpolationsstellen des Produktionscodes gelesen, nicht über eine Auswahl: Tabellen- und
+  Spaltennamen kommen aus dem Code (`trash-registry.ts`, `trash-tree.ts`, `crud/repository.ts`,
+  `account-export.ts`), jede Werteinterpolation ist ein generierter `?`-Platzhalter. Die zwei
+  Ausnahmen — ein eingesetztes `LIMIT` in der Rechnungs- und in der Abrechnungsliste — sind dort
+  behoben worden.
 - **Mass Assignment:** ausgeschlossen durch `pickColumns` gegen eine Spalten-Whitelist.
 - **Kontotrennung:** `accountUID` ist bei Rechnung und Police aus den Update-Schemata ausdrücklich
   herausgenommen, mit Begründung im Code. Einreichungen prüfen jede Rechnung gegen das Konto der
@@ -518,7 +536,7 @@ nicht angenommen:
   abgebildet, alles andere wird geloggt und als generischer 500 beantwortet. Keine Stacktraces nach
   außen. Ein Authentifizierungsfehler ist immer derselbe 401, egal woran es lag.
 - **Frontend:** kein `v-html` im gesamten Projekt. Access-Token nur in einer Pinia-Ref, nie in
-  `localStorage`.
+  `localStorage` — seit §8 als Quell-Scan in `stores/auth.spec.ts` geprüft, nicht mehr nur zugesagt.
 - **Cookie:** `httpOnly`, `secure` in Produktion, `SameSite=Strict`, Pfad auf `/api/v1/auth`
   begrenzt.
 - **Update-Check:** Ziel-Host fest verdrahtet, nur der `owner/repo`-Slug konfigurierbar und
@@ -531,7 +549,8 @@ nicht angenommen:
   eigenen Konto sind gesperrt.
 - **Rate-Limiting:** 10 Anfragen pro 15 Minuten auf Login/Refresh/Setup, 300 pro Minute auf die
   übrige API, mit `trust proxy` für die echte Client-IP.
-- **Seed:** verweigert `NODE_ENV=production`.
+- **Seed:** verweigert `NODE_ENV=production` — seit §8 als Test, der den Seed wirklich startet
+  (`seed/seed.test.ts`).
 
 ## 7 Bewusst akzeptierte Risiken
 
@@ -550,9 +569,142 @@ nicht angenommen:
 
 ## 8 Nachprüfung vor 1.0.0
 
-Nach dem Code-Review (Meilenstein B) und dessen Umbauten: Delta-Prüfung **nur** auf den dabei
-berührten Dateien, gegen die Invarianten I-1 bis I-13. Zu prüfen ist insbesondere, ob ein
-Datei-Schnitt eine Autorisierung aus einem Handler herausgelöst hat, ohne sie neu anzubringen — das
-ist bei SEC-17 der wahrscheinlichste Weg, sich etwas einzufangen.
+Geplant war eine Delta-Prüfung **nur** auf den von Meilenstein B berührten Dateien, gegen I-1 bis
+I-13, mit besonderem Blick darauf, ob ein Datei-Schnitt eine Autorisierung aus einem Handler
+herausgelöst hat, ohne sie neu anzubringen — bei SEC-17 der wahrscheinlichste Weg, sich etwas
+einzufangen.
 
-Der Abschnitt wird bei dieser Nachprüfung mit ihrem Ergebnis fortgeschrieben.
+Durchgeführt am 04.10.2026 (v0.19.0-slice.5), und zwar als **vollständiger Durchgang je Invariante**
+statt als Delta. Der Grund steht in den Zahlen: die 18 Scheiben haben 266 Dateien angefasst,
+darunter `app.ts`, `crud/repository.ts`, `db/transaction.ts`, alle Domain-Dateien, das geteilte
+Paket und 43 Dateien im Web. Ein Delta auf dieser Menge ist der ganze Code; ihn als Delta zu lesen
+hätte nur den Anschein einer engeren Prüfung gehabt.
+
+### Was je Invariante geprüft wurde
+
+- **I-1 (gehalten, maschinell).** `auth/route-guards.test.ts` läuft grün: 15 Prüfungen über alle
+  **87** Routen, die die App heute beantwortet (die Untergrenze der Suite steht bei 83, also sind
+  seit Scheibe 16 vier dazugekommen: `POST /users/:uuid/restore`,
+  `DELETE /users/:uuid/permanent`, `POST /settings/retention/run`, `GET /accounts/:uid/export`).
+  Ohne `requireAuth` antworten genau die fünf benannten Routen, und jede der übrigen 82 beantwortet
+  eine Anfrage ohne Token mit 401 — nicht nur in der Kette gelesen, sondern über HTTP beobachtet.
+- **I-2 (gehalten, mit einer neuen benannten Ausnahme).** Die vier neuen Routen tragen ihren
+  Wächter als Middleware und sind richtig eingeordnet (Export kontobezogen, Aufbewahrung und
+  Nutzer-Löschung instanzweit). Darüber hinaus wurde von Hand nachgelesen, was der Test nur
+  **behaupten** kann: die 37 Einträge der `DECLARED`-Tabelle mit einer Prüfung im Handler sagen,
+  *wo* sie sitzt, und genau diese Stellen sind im Code nachgesehen — einschließlich der beiden, die
+  sie an eine Service-Funktion weiterreichen (`POST /billings/:uid/allocations` →
+  `createAllocationsForBilling`, `PATCH /allocations/:uid` → `updateAllocation`, beide mit
+  `authorizeAccount(MANAGE_INVOICES)` auf dem Konto der Rechnung). Kein Schnitt der 18 Scheiben hat
+  eine Autorisierung verloren. Alle sieben Listen tragen ihren `accountFilter`. Der Befund zum
+  Export steht unten.
+- **I-3 (gehalten, jetzt geprüft).** `accountUID` ist aus den Update-Schemata von Rechnung
+  (`domain/invoices.ts`) und Police (`domain/contracts.ts`) herausgenommen; das Gegenstück bei den
+  Abrechnungen ist `contractUID` (`service-billings.ts`), und die Buchung kennt in ihrem
+  Patch-Schema überhaupt nur `receiptNumber` und `reimbursement`. Die Einreichung hat keinen
+  Update-Weg. Neu als Prüfung festgehalten, siehe unten.
+- **I-4 (ein Befund, behoben).** Alle Interpolationsstellen des Produktionscodes gelesen. Was in
+  ein Template-Literal eingesetzt wird, ist Tabellen-/Spaltenname oder Alias aus dem Code, ein
+  `placeholders(...)`-Ausdruck oder eine aus einer lokalen Liste gebaute `WHERE`-Kette; die beiden
+  dynamischen Spaltenlisten (`allocations.ts`, `admin-repository.ts`) lesen ihre Namen aus im Code
+  stehenden Tupeln. Zwei Stellen setzten einen **Wert aus der Anfrage** ein — siehe Befunde.
+- **I-5 (gehalten).** Jeder Schreibweg geht durch `pickColumns` gegen `t.columns` oder durch eine
+  ausbuchstabierte Spaltenliste. `insertManyRows` nimmt die Spalten als Vereinigung über alle
+  Zeilen (Scheibe 10), was die Whitelist nicht aufweicht: die Vereinigung wird gegen `t.columns`
+  gebildet, nicht gegen die Schlüssel der Zeilen. Kein `INSERT`/`UPDATE` übernimmt Schlüssel aus
+  dem Request-Body.
+- **I-6 (gehalten).** `getPublicSettings` setzt für ein `secret` ausdrücklich `value: null` und
+  lässt nur `isSet` übrig; die vorhandenen Prüfungen tragen die Regel
+  (`settings/registry.test.ts`: „only the password and the GitHub token are secrets";
+  `settings.integration.test.ts`: `isSet` nach dem Schreiben, und der gespeicherte Wert ist
+  verschlüsselt). Keine neue Prüfung nötig.
+- **I-7 (gehalten).** Alle 34 Log-Stellen des Produktionscodes gelesen. Geschrieben werden Host,
+  Fehlercode, Fehlertext, Ereignisname und Schlüssel**namen** — der Schreibweg der Einstellungen
+  nennt ausdrücklich nur die Keys (`settings/routes.ts`), und `SETTINGS_SECRET_UNREADABLE` trägt
+  `key: settingKey`, nicht den Wert.
+- **I-8 (gehalten, jetzt geprüft).** Kein `localStorage`, kein `sessionStorage`, kein
+  `document.cookie` im Web — außer in dem Kommentar, der die Regel nennt. Neu als Prüfung
+  festgehalten, siehe unten.
+- **I-9 (ein Befund, behoben).** Alle Senken im Web nachgesehen, Templates **und** Zuweisungen in
+  JavaScript: `InvoiceWorkspaceView` und `BillingsView` prüfen mit `isHttpUrl` vor dem
+  `window.open`; `PaymentInfoPopover` rendert sein `href` nur innerhalb eines
+  `v-if="isHttpUrl(...)"`; `PaymentQrPopover` zeigt eine selbst gebaute `data:`-URL, und
+  `lib/download.ts` setzt ein `href` auf eine eigene `blob:`-URL. Offen waren die zwei `href` auf
+  die Release-URL des Update-Checks — siehe Befunde.
+- **I-10 (gehalten).** Der Access-Token trägt nur `sub` (`auth/tokens.ts`). `createRequireAuth`
+  lädt den Nutzer bei **jeder** Anfrage und weist ihn ab, wenn `userStatus !== 1`;
+  `hasPermission` fragt jedes Mal die Datenbank, ohne Cache. Eine Deaktivierung und ein entzogener
+  Grant wirken damit sofort.
+- **I-11 (gehalten).** Ziel fest verdrahtet (`https://api.github.com/repos/…`), der Slug kommt aus
+  `UPDATE_CHECK_REPO` und wird beim Start regex-geprüft. Die Formulierung der Invariante sprach von
+  einer Einstellung; es ist eine Umgebungsvariable, und das steht jetzt dort.
+- **I-12 (gehalten).** `POST /settings/mail/test` nimmt keinen Empfänger aus dem Body, sondern
+  `getAuthUser(res).email`. Unverändert seit Scheibe 7.
+- **I-13 (gehalten, jetzt geprüft).** Die Absage steht als erste Zeile in `main()` von `seed.ts`.
+  Weil `main()` modulprivat ist und nur als Einsprungpunkt läuft, hielt die Regel bisher nichts —
+  neu als Prüfung festgehalten, siehe unten.
+
+### Befunde
+
+- **B-1 (I-4, behoben).** `domain/invoice-queries.ts` und `domain/service-billings.ts` setzten den
+  `limit`-Wert der Anfrage als Zahl in das SQL ein, je mit dem Kommentar, zod habe ihn auf einen
+  Integer verengt. Das stimmt und war nicht ausnutzbar — aber I-4 kennt diese Ausnahme nicht, und
+  die dritte Liste (`domain/allocations.ts`) machte es längst richtig mit `LIMIT ?`. Beide Stellen
+  sind darauf umgestellt. I-4 hat damit keine Ausnahme mehr, und die Zusage in §6 („durchgängig
+  parametrisiert") ist wieder wahr.
+- **B-2 (I-9, behoben).** `lib/update-check.ts` nahm das `html_url` der GitHub-Antwort mit
+  `z.string().url()` — genau die Prüfung, die I-9 für unzureichend erklärt, weil sie
+  `javascript:` durchlässt. Der Wert wird als `releaseUrl` weitergegeben und landet in zwei `href`
+  (`AppFooter`, `UpdateSection`), beide ohne eigene Prüfung. Praktisch nicht ausnutzbar: die
+  Antwort kommt über TLS von `api.github.com`. Behoben am Eingang statt an den Senken
+  (`.refine(isHttpUrl)`), weil es dort eine Stelle ist und an den Senken zwei; eine Antwort mit
+  einer anderen URL-Art gilt jetzt als `no_release`. Als Fall festgehalten und rot geprüft.
+  I-9 ist dabei um fremde Antworten erweitert worden: dass die Regel nur von „Benutzereingabe"
+  sprach, ist der Grund, warum diese Stelle durch zwei Reviews gekommen ist.
+- **B-3 (I-2, als Grenze benannt, Punkt offen).** `GET /accounts/:uid/export` liefert Rechnungen,
+  Einreichungen, Abrechnungen und Buchungen einer Versicherten, verlangt aber nur `VIEW_ACCOUNTS`
+  auf diesem Konto — das war die Entscheidung zu SEC-15 (§2.11 des Plans: wer den Datensatz lesen
+  darf, darf lesen, was zu ihm gespeichert ist). Mit den beiden Systemrollen hat das keine Wirkung,
+  weil „Nutzer" `VIEW_INVOICES` und `VIEW_CONTRACTS` mitträgt und Rollen über die API nicht
+  anlegbar sind; eine Rolle, die in der Datenbank anders zusammengesetzt wird, hätte sie. Nicht
+  eigenmächtig geändert, weil es eine Entscheidung des Autors ist: als zweite Ausnahme in I-2
+  geschrieben und als Punkt in `issues.md` offen, wo über zusätzliche Prüfungen auf
+  `VIEW_INVOICES`/`VIEW_CONTRACTS` entschieden wird.
+
+### Was jetzt geprüft statt zugesagt ist
+
+Vor dieser Nachprüfung waren I-1 und I-2 maschinell gesichert und die elf anderen Prosa. Drei haben
+eine Prüfung bekommen — jede dort, wo es bisher **keine** gab, und jede rot geprüft (Regel von Hand
+gebrochen, Fall fällt, zurückgenommen):
+
+- **I-3** in `domain/workflow.integration.test.ts`: ein `PATCH` mit fremdem `accountUID` auf
+  Rechnung und Police antwortet 200, lässt den Datensatz aber bei seiner Person. Als
+  Verhaltensprüfung statt als Quell-Scan, weil die Update-Schemata modulprivat sind.
+- **I-8** in `stores/auth.spec.ts`: ein Scan über alle Quelldateien des Webs (Kommentare entfernt,
+  damit die eine Stelle, die die Regel nennt, sie nicht bricht). Dazu die Prüfung, dass der Scan
+  überhaupt Dateien findet — ein leerer Durchgang darf nicht als sauberer gelten.
+- **I-13** in `seed/seed.test.ts`: der Seed wird als Kindprozess gestartet, wie `npm run seed` es
+  tut, mit einer von Hand gebauten Umgebung ohne jede `DB_*`-Variable — er kann also keine
+  Datenbank erreichen. Geprüft wird die **Meldung**, nicht der Exit-Code: ohne die Regel wäre der
+  Lauf am fehlenden `DB_HOST` gescheitert und hätte denselben Code geliefert.
+
+**I-4, I-5, I-7 und I-10 bleiben gelesen, nicht geprüft.** Eine Prüfung dafür müsste SQL-Strings,
+Log-Felder oder die Frische einer Auflösung erkennen; was davon billig zu bauen ist, erkennt sie
+unzuverlässig, und eine Prüfung, die nicht greift, täuscht Sicherheit nur vor. Für I-4 ist der
+Ersatz, dass es nach B-1 keine Stelle mehr gibt, an der ein Wert eingesetzt wird — ein neuer
+Einsetzer fällt beim Lesen auf, weil er der einzige wäre.
+
+### Beobachtet, nicht angefasst
+
+- `MAIL_SEND_OK` und `MAIL_SEND_FAILED` schreiben die Empfängeradresse ins Log. Kein Geheimnis,
+  also kein Bruch von I-7 — aber eine Adresse, und damit die einzige Stelle, an der ein Log etwas
+  über eine Person sagt. Für einen Betreiber, der ohnehin die Einstellungen liest, vertretbar.
+- Der Pfad `POST /agencies/:uid/accounts` heißt noch nach dem alten Wort: er verwaltet die
+  Kontoverbindungen eines Abrechnungsdienstleisters (`AgencyBankAccounts`), nicht Konten von
+  Versicherten — für I-2 ohne Belang, beim Lesen der Routentabelle aber kurz irritierend.
+
+### Stand
+
+I-1 bis I-13 gelten. Zwei Befunde behoben und durch Prüfungen festgehalten, einer als benannte
+Grenze in I-2 und als offener Punkt in `issues.md`. Damit ist die Nachprüfung erledigt, und 1.0.0
+hängt nur noch an der Entscheidung zu B-3.

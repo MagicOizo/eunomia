@@ -23,9 +23,21 @@ Zwei Prüfungen nacheinander, dann die Befunde in Scheiben abarbeiten, dann 1.0.
       Sitzungsabbruch bei parallelen Anfragen); alles andere ist Wartbarkeit.
 - [x] **Scheiben schneiden.** Alle 54 Befunde (17 SEC, 37 CR) werden vor 1.0.0 umgesetzt —
       es gibt keine Frist, auf die das Release zuläuft. 18 Scheiben in vier Blöcken, unten.
-- [ ] **Delta-Nachprüfung** der Invarianten I-1 bis I-13 auf allem, was die Scheiben angefasst haben
+- [x] **Delta-Nachprüfung** der Invarianten I-1 bis I-13 auf allem, was die Scheiben angefasst haben
       (Abschnitt 8 des Sicherheits-Reviews).
-- [ ] **1.0.0 bumpen.**
+      Umgesetzt mit v0.19.0-slice.5 (Slice 69). Als vollständiger Durchgang je Invariante statt als
+      Delta, weil die 18 Scheiben 266 Dateien angefasst haben — ein Delta auf dieser Menge ist der
+      ganze Code, und es als Delta zu lesen hätte nur den Anschein einer engeren Prüfung gehabt.
+      Alle dreizehn gelten. Zwei Befunde behoben: ein `limit` aus der Anfrage stand in zwei von drei
+      Listen als Zahl im SQL statt als `?` (I-4; die dritte machte es längst richtig), und das
+      `html_url` der GitHub-Antwort war nur mit `z.string().url()` geprüft — genau der Prüfung, die
+      I-9 für unzureichend erklärt — und lief in zwei `href`. Drei Invarianten haben eine Prüfung
+      bekommen, wo es bisher keine gab (I-3, I-8, I-13), jede rot geprüft. Der dritte Befund ist
+      nicht behoben, sondern benannt: der Export einer Versicherten trägt Falldaten, verlangt aber
+      nur `VIEW_ACCOUNTS` — eine Entscheidung des Autors zu SEC-15, deshalb als zweite Ausnahme in
+      I-2 und als Punkt in `issues.md` unter `0.19.0`, nicht eigenmächtig geändert.
+- [ ] **1.0.0 bumpen.** Davor die Entscheidung zu dem einen Punkt aus der Nachprüfung
+      (`issues.md`, `0.19.0`: welche Rechte der Export verlangt).
 
 ## Die 18 Scheiben
 

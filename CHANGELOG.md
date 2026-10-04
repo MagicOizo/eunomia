@@ -7,6 +7,33 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.19.0-slice.5 — 2026-10-04
+
+The two reviews before 1.0 set thirteen security invariants and asked for one more pass over them
+once the findings had been worked through. This is that pass, and it is the last item of the review
+work. Nothing here is a feature; two of the three findings are closed, and three of the rules can
+now be checked by running the tests instead of by reading the code.
+
+- **A list limit is a parameter again.** Two of the three list endpoints put the requested `limit`
+  into the SQL as a number rather than as a placeholder. Not exploitable — it had been narrowed to
+  an integer in range before it got there — but the rule says values reach the database as
+  parameters, with no exceptions, and the third list already did it that way. Both now match it.
+- **The release URL is checked where it arrives.** The update check read GitHub's link to the
+  release with a validation that accepts `javascript:` — the very one the review had ruled
+  insufficient for links a person types — and the footer and the settings page put it straight into
+  a link. It now passes the same check an invoice document link does, at the point where the answer
+  enters rather than at the two places that display it.
+- **Three rules are tested, not just written down.** That the access token never reaches browser
+  storage, that an invoice or a policy cannot be moved to another insured person, and that the
+  development seed refuses to run against a production environment: each had been true and each had
+  rested on nobody changing it. Each is now a test, and each was checked by breaking the rule by
+  hand and watching the test fall.
+- **One question left for the owner, written down.** The export of everything stored about one
+  insured person asks for permission to view that person's record, and hands out their invoices and
+  billings with it — which is what it was built to do, but it is the one place where a single
+  permission reaches data that otherwise needs its own. It is recorded as an open point rather than
+  changed, because what it should ask for is a decision, not a bug.
+
 ## 0.19.0-slice.4 — 2026-10-04
 
 Health data that was deleted stayed anyway. The trash kept every deleted record for as long as the

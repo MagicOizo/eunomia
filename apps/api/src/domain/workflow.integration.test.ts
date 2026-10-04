@@ -969,6 +969,31 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       assert.equal(forTwo, forOne, 'the second policy costs no further query');
     });
 
+    /**
+     * I-3 as a check instead of a promise: both update schemas take `accountUID`
+     * out, so a body that carries one is not refused — the field is dropped,
+     * and the record stays with the person it was created for. Moving one would
+     * need permission on both accounts, which is why it does not exist.
+     */
+    await t.test(
+      'I-3: neither an invoice nor a policy can be moved to another person',
+      async () => {
+        const movedInvoice = await request(app)
+          .patch(`/api/v1/invoices/${inv1}`)
+          .set(admin)
+          .send({ accountUID: accountB, invoiceNumber: 'R-1' });
+        assert.equal(movedInvoice.status, 200);
+        assert.equal(movedInvoice.body.data.accountUID, accountA);
+
+        const movedContract = await request(app)
+          .patch(`/api/v1/contracts/${contractA}`)
+          .set(admin)
+          .send({ accountUID: accountB, contractNumber: 'PKV-A' });
+        assert.equal(movedContract.status, 200);
+        assert.equal(movedContract.body.data.accountUID, accountA);
+      },
+    );
+
     await t.test('account scoping: a scoped user is confined to their account', async () => {
       const user = await scopedNutzer(pool, app, 'user@example.com', accountA);
 

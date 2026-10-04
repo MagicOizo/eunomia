@@ -1,3 +1,4 @@
+import { isHttpUrl } from '@eunomia/shared';
 import { z } from 'zod';
 
 import type { UpdateCheckConfig } from '../config/env.js';
@@ -40,10 +41,19 @@ export interface UpdateStatus {
   reason?: UpdateUnavailableReason;
 }
 
-/** The fields we use from GitHub's release payload; everything else is dropped. */
+/**
+ * The fields we use from GitHub's release payload; everything else is dropped.
+ *
+ * `html_url` ends up in an `href` in the footer and on the settings page, so it
+ * passes the same `isHttpUrl` the invoice link does: `.url()` alone accepts
+ * `javascript:`, which is the whole point of SEC-01 and of I-9. The answer
+ * comes from api.github.com over TLS, so this is a wall, not a patch — but the
+ * rule says the scheme is checked where the URL enters, not where it is
+ * trusted.
+ */
 const releaseSchema = z.object({
   tag_name: z.string(),
-  html_url: z.string().url(),
+  html_url: z.string().url().refine(isHttpUrl),
   prerelease: z.boolean().default(false),
   draft: z.boolean().default(false),
 });

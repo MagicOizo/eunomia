@@ -235,8 +235,11 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
       having.push('COALESCE(SUM(al.reimbursement), 0) <= ?');
       havingParams.push(filters.maxReimbursement);
     }
-    // Safe to inline: zod has narrowed it to an integer within range.
-    const limit = filters.limit === undefined ? '' : ` LIMIT ${filters.limit}`;
+    // A parameter like every other value, not an inlined number: zod has
+    // narrowed it to an integer in range by now, but I-4 knows no exceptions,
+    // and the clause and its value have to stay in step.
+    const limit = filters.limit === undefined ? '' : ' LIMIT ?';
+    const limitParams = filters.limit === undefined ? [] : [filters.limit];
 
     const rows = await pool.query<Array<Row & { billingUID: string }>>(
       `SELECT b.billingUID, b.billingDate, b.billingNumber, b.documentLink,
@@ -254,7 +257,7 @@ export function createServiceBillingsRouter(pool: Pool, config: AppConfig): Rout
         GROUP BY b.billingID
         ${having.length > 0 ? `HAVING ${having.join(' AND ')}` : ''}
         ORDER BY b.billingDate DESC, b.billingUID${limit}`,
-      [...params, ...havingParams],
+      [...params, ...havingParams, ...limitParams],
     );
 
     // The invoice numbers come as their own query rather than a GROUP_CONCAT:

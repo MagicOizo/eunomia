@@ -149,6 +149,19 @@ test('an unexpected payload shape is ignored', async () => {
   assert.equal((await check()).status, 'unavailable');
 });
 
+test('I-9: a release URL that is not http(s) is ignored, not handed to the footer', async () => {
+  const { fetchImpl } = stubFetch(() =>
+    releaseResponse('v1.0.0', { html_url: 'javascript:alert(document.domain)' }),
+  );
+  const check = createUpdateChecker(config, '0.9.0', { fetch: fetchImpl });
+
+  const result = await check();
+
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.reason, 'no_release');
+  assert.equal(result.releaseUrl, null);
+});
+
 test('a successful answer is cached until the TTL expires', async () => {
   const { fetchImpl, calls } = stubFetch(() => releaseResponse('v1.0.0'));
   let clock = 1_000_000;
