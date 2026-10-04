@@ -43,7 +43,9 @@ Bindestrich dreimal unbemerkt das Docker-`:latest` verschoben hat. 5a steht vor 
       fehlenden Knopf nur mit den Achseln (`?.trigger`). Daraus wurde eine irreführende Zusicherung
       drei Zeilen später — „nichts emittiert, keine Fehlermeldung", weil nichts geklickt worden war.
       Ein Helfer, der stillschweigend nichts tut, verbirgt genau den Befund, den er zeigen müsste.
-- [ ] **Release 0.19.0.** Eigener Commit, keine Slice-Nummer.
+- [x] **Release 0.19.0.** Eigener Commit, keine Slice-Nummer. Der Abschnitt im `CHANGELOG.md` zieht
+      die Scheiben 1–6 zusammen; Tag und Push macht der Autor
+      (`git tag -a v0.19.0 -m "v0.19.0"`).
 - [ ] **2 — Eingabe-Politur** (`0.20.0-slice.1`). IBAN mit Leerzeichen (0.15.0-1) und typische
       Zahlungsziele (0.15.0-2).
 - [ ] **3 — Abgerechnet schon bei der Zuordnung** (`0.20.0-slice.2`). 0.15.0-4.

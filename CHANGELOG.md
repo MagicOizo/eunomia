@@ -7,6 +7,59 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.19.0 — 2026-10-04
+
+Everything from the six previews below, as one release: the fourth and last of the blocks working
+off the security and code reviews on the way to 1.0.0. With it all 54 findings are closed, the
+thirteen rules the security review set down have been read through once more, and nothing of that
+work is left open.
+
+Most of this release is about an instance being safe to run and able to account for itself. The
+server now sends its own security headers instead of hoping a proxy does; deleted health data no
+longer stays for ever; and the log can finally answer who signed in, who was refused, and who
+deleted what.
+
+- **The app protects its own origin.** It sent no security header at all — no content policy, no
+  frame protection, no referrer policy — and announced its server software in every response. It
+  now sends a content policy written out in full rather than taken from a library's defaults, with
+  exactly two relaxations, each named and reasoned in the source. That policy is the layer that
+  turns a stored, malicious link from "your session is gone" into "the click does nothing".
+- **Deleted data is deleted.** The trash kept every deleted record for as long as the instance
+  lived, and a deleted user kept their name and address in the table for ever. There is now an
+  optional retention period — **off by default**, 90 days suggested — that empties the trash and
+  removes long-deleted users for good, using the very same code the "delete for good" button uses.
+  Before switching it on, a dry run says exactly what it would take and from which kinds of record,
+  without touching anything.
+- **Everything stored about one insured person, as a file.** The list of insured persons has an
+  export: one document with the person, their policies, premiums, terms, bonus scale, invoices,
+  submissions, billings, reimbursements and treatment days, deleted rows included, values as
+  stored. Its completeness is tested rather than claimed — every table of the schema is either in
+  the document or carries a line saying why not.
+- **The log says who did what.** Fourteen events, as a catalogue rather than as scattered calls:
+  signing in and failing to, a refused permission, a user created, changed, deactivated, restored
+  or removed, roles granted, the trash emptied, settings changed. A line carries ids and never a
+  label, so the log itself never becomes a second copy of the case data. A merely expired token
+  stays silent — otherwise every open browser tab would write a line every fifteen minutes and bury
+  the interesting ones.
+- **Every endpoint is covered, and that is now checked.** All 87 endpoints were covered before, but
+  some checked inside the handler, so an unguarded one looked the same as a guarded one. A test now
+  walks the real routing table: every endpoint either carries a visible guard or an entry saying
+  where it checks, and the five deliberately open ones are listed and checked in both directions.
+  A new endpoint that forgets its guard fails the build.
+- **A hardened container, a backup that can be encrypted, and no known vulnerabilities.** The API
+  port binds to the loopback interface by default, the container runs read-only without extra
+  privileges and within memory and CPU limits, and the runtime image no longer ships the frontend's
+  dependencies — 408 MB became 357 MB, and two of its three known vulnerabilities came in with
+  them. Backup and restore now fail loudly instead of reporting success after writing nothing, and
+  the README says where backups belong and that they must be encrypted. Dependencies are audited on
+  every push.
+- **Migrations cannot run twice.** Two containers starting at once would have applied the same
+  migration in parallel; the run now holds a lock, and the assumption that exactly one API
+  container runs is written down instead of merely held.
+- **A mistyped version tag is caught before it is pushed.** Three releases went out wrong because
+  the tag did not match the version in the commit it named, and the only check ran after the image
+  had already been published. It runs first now, and on the machine that made the tag.
+
 ## 0.19.0-slice.6 — 2026-10-04
 
 The last three items the two reviews before 1.0 left lying about. None of them is a feature; one
