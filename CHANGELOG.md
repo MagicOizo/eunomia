@@ -7,6 +7,21 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.1.0 — 2026-10-05
+
+The first feature after 1.0.0, released as the preview below: a no-claims bonus can now be
+recorded the way insurers state it.
+
+- **Bonus tiers can be a factor of the monthly premium.** A tier holds either a number of monthly
+  premiums ("1.5 Monatsbeiträge", fractions allowed) or, as before, an amount in €, and both can be
+  mixed in one scale; every tier recorded so far keeps its amount. A factor applies to the year's
+  average **bonus-relevant monthly premium**, a new figure on each premium entry next to the full
+  premium, so a mid-year adjustment counts for the part of the year it is in force. A year with a
+  running month that has no bonus-relevant premium shows "Beitrag fehlt" instead of a guess, and
+  the reimbursement optimiser treats it like a year without a bonus. A factor scale carries on
+  without being re-entered every year, and the policy dialog shows how a forecast came about
+  ("1,5 × Ø 410,00 €").
+
 ## 1.1.0-slice.1 — 2026-10-05
 
 - **Bonus tiers can be a factor of the monthly premium.** Insurers state their no-claims bonus as a

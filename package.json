@@ -1,6 +1,6 @@
 {
   "name": "eunomia",
-  "version": "1.1.0-slice.1",
+  "version": "1.1.0",
   "private": true,
   "description": "Self-hosted web app for managing the private health-insurance (PKV) billing process.",
   "license": "MIT",
