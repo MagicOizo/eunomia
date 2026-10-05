@@ -103,5 +103,7 @@ Bindestrich dreimal unbemerkt das Docker-`:latest` verschoben hat. 5a steht vor 
       Gewarnt sei vor der schmalen Ansicht: bei mehr Jahren als in die Breite passen, scrollt die
       Grafik in ihrer Karte und öffnet bei den neuesten Jahren — die Achsenbeschriftung links ist
       dann aus dem Bild. Die Tabelle trägt dieselben Zahlen.
-- [ ] **Release 0.20.0**, danach die Entscheidung zu 1.0.0 (§2.9: eine Entscheidung des Autors am
-      Produktionsstand).
+- [x] **Release 0.20.0**, danach die Entscheidung zu 1.0.0 (§2.9: eine Entscheidung des Autors am
+      Produktionsstand). Eigener Commit, keine Slice-Nummer; der Abschnitt im `CHANGELOG.md` zieht
+      die Scheiben 2–5b zusammen. Tag und Push macht der Autor
+      (`git tag -a v0.20.0 -m "v0.20.0"`).

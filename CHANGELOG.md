@@ -7,6 +7,34 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.20.0 — 2026-10-05
+
+Everything from the five previews below, as one release: the last findings from everyday use that
+were still open on the way to 1.0.0. None of them is large; together they take the remaining second
+trips and guesses out of the daily work, and the start page finally says something about the
+household instead of listing the areas the sidebar lists anyway.
+
+- **The start page is a dashboard.** Tiles with the number of invoices since the first one, what
+  they came to, what was reimbursed, what the household carried itself and the bonus received; a
+  chart per treatment year, with the same figures as a table underneath; and a card per insured
+  person with what is still to be paid, what is still on its way to a reimbursement, and for each
+  running policy the deductible left and where the bonus stands. The figures come from a new
+  endpoint, `GET /api/v1/dashboard`, and the policy figures from the reimbursement plan itself, so
+  the start page and the plan cannot disagree. Every figure only appears where the user may see it
+  anyway.
+- **Leistungsabrechnungen can be found across every policy.** A search above the policy tiles
+  matches the billing number, an invoice number it pays, the policy number or the insured person,
+  and a switch "Nur ohne Zuordnung" lists every letter that has nothing booked on it yet. A hit
+  leads to its policy's list with that row marked, and the back arrow brings the search back.
+- **An invoice can be marked as billed while its reimbursement is booked.** Each invoice card in
+  the booking dialog has its own switch, saved together with the amounts — no second trip into the
+  invoice just to move it from "teilabgerechnet" to "abgerechnet".
+- **An IBAN may be written the way it is printed.** Spaces and lower case are understood as
+  notation wherever the number arrives; what is stored is the number itself, and every list shows
+  it in groups.
+- **The usual payment terms are one click away.** The Zahlungsziel field offers immediately, 14, 15
+  or 30 days, each with the date it works out to from the invoice date.
+
 ## 0.20.0-slice.5 — 2026-10-05
 
 - **The start page shows the household's figures.** The shortcut cards to the areas — which the
