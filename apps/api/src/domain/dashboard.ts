@@ -216,6 +216,7 @@ export function createDashboardRouter(pool: Pool, config: AppConfig): Router {
           contractNumber: policy.contractNumber,
           companyName: policy.companyName,
           contractKind: policy.contractKind,
+          hasTerms: policy.hasTerms,
           deductible: policy.deductible,
           deductibleUsed: policy.deductibleUsed,
           deductibleLeft:
@@ -225,6 +226,9 @@ export function createDashboardRouter(pool: Pool, config: AppConfig): Router {
             policy.bonusStatus === 'at-stake' || policy.bonusStatus === 'paid'
               ? policy.bonusAmount
               : 0,
+          // What the bonus badge needs to say "in danger" rather than "safe".
+          pendingClaims: policy.pendingClaims,
+          tiersInherited: policy.tiersInherited,
           recommendation: policy.recommendation,
           status: policy.status,
         })),

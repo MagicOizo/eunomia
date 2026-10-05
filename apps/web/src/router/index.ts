@@ -12,7 +12,7 @@ import ProfileView from '../profile/ProfileView.vue';
 import { resourceConfigs } from '../resources/definitions';
 import TrashView from '../trash/TrashView.vue';
 import { useAuthStore } from '../stores/auth';
-import DashboardView from '../views/DashboardView.vue';
+import DashboardView from '../dashboard/DashboardView.vue';
 import LoginView from '../views/LoginView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 import { routeRejection } from './guard';

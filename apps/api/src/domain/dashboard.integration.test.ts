@@ -206,9 +206,12 @@ test('dashboard: the figures, under the permission of each', async (t) => {
       assert.equal(first?.year, year);
       assert.equal(policy?.contractNumber, 'PKV-A');
       for (const key of [
+        'hasTerms',
         'deductible',
         'deductibleUsed',
         'bonusStatus',
+        'pendingClaims',
+        'tiersInherited',
         'recommendation',
         'status',
       ]) {

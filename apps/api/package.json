@@ -1,6 +1,6 @@
 {
   "name": "@eunomia/api",
-  "version": "0.20.0-slice.4",
+  "version": "0.20.0-slice.5",
   "private": true,
   "description": "Eunomia backend API.",
   "type": "module",

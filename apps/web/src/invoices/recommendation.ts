@@ -169,7 +169,12 @@ export interface BonusView extends BadgeView {
  * at risk (the recommendation uses the policy, or a submission there is still
  * unanswered), forfeited, received, or none at all.
  */
-export function bonusView(policy: PlanPolicyDto): BonusView {
+export function bonusView(
+  policy: Pick<
+    PlanPolicyDto,
+    'bonusStatus' | 'bonusAmount' | 'recommendation' | 'pendingClaims' | 'tiersInherited'
+  >,
+): BonusView {
   const inherited = policy.tiersInherited ? ' (Staffel nicht aktualisiert)' : '';
   switch (policy.bonusStatus) {
     case 'at-stake': {

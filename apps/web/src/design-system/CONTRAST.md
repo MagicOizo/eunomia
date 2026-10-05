@@ -62,6 +62,24 @@ works, and replaced with `#1d6fd6` for general use).
 | billed    | `#a8d4ff` on `#123a5c` | 7.58:1 ✅ |
 | done      | `#9ee8ac` on `#163d1d` | 8.49:1 ✅ |
 
+## Chart series
+
+The year chart on the start page (`DashboardYearChart.vue`) draws three series in a categorical
+order of its own — never the status scale, whose colours mean a state. The three hues were checked
+for colour-vision separation (deutan/protan/tritan) against each surface, and their ratio as a
+non-text mark against it is:
+
+| Token                | Light on `#ffffff`  | Dark on `#1c1c28`   |
+| -------------------- | ------------------- | ------------------- |
+| `--eu-color-chart-1` | `#2a78d6` 4.42:1 ✅ | `#3987e5` 4.63:1 ✅ |
+| `--eu-color-chart-2` | `#eb6834` 3.20:1 ✅ | `#d95926` 4.34:1 ✅ |
+| `--eu-color-chart-3` | `#1baf7a` 2.82:1 ⚠️ | `#199e70` 4.95:1 ✅ |
+
+The light aqua falls short of 3:1. The chart is therefore never the only carrier of its figures:
+it always has a legend, and the same figures stand beside it as a table. Text in the chart never
+wears a series colour. `--eu-color-chart-grid` (`#e6e6ec` / `#2c2c38`) is the hairline grid and is
+recessive on purpose.
+
 ## Focus ring: contrast is not enough, it also has to be visible
 
 The ring (`global.css`, `:focus-visible`) is painted **outside** the element's border box:

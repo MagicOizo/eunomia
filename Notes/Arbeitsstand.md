@@ -88,6 +88,20 @@ Bindestrich dreimal unbemerkt das Docker-`:latest` verschoben hat. 5a steht vor 
       Gewarnt sei vor der README: sie nannte `GET /contracts/:uid/reimbursement-analysis`, das es
       nicht gibt — nachgezogen auf den Erstattungsplan; wie die Endpunkt-Tabelle aus Slice 72 von
       keinem Test gedeckt.
-- [ ] **5b — Das Dashboard: die Seite** (`0.20.0-slice.5`). 0.15.0-3, Web-Hälfte.
+- [x] **5b — Das Dashboard: die Seite** (`0.20.0-slice.5`). 0.15.0-3, Web-Hälfte.
+      Umgesetzt mit v0.20.0-slice.5 (Slice 75). Die Startseite zeigt Kacheln (jede nur mit ihrem
+      Recht), eine Jahresgrafik als eigenes Inline-SVG (Erstattet + Eigenanteil gestapelt, Bonus
+      daneben; Tooltip beim Überfahren, dieselben Zahlen als Tabelle darunter) und je Person eine
+      Karte mit Zahlungsampel, laufenden Erstattungen und den Policen des Jahres. Die
+      Bereichs-Karten sind weg. Die Grafik hat eigene Farb-Token `--eu-color-chart-1..3`, nicht die
+      Status-Skala; das helle Aqua liegt unter 3:1 auf Weiß, deshalb gibt es immer Legende und
+      Tabelle (`CONTRAST.md`).
+      Über den Punkt hinaus: die Dashboard-Antwort trug `pendingClaims`, `tiersInherited` und
+      `hasTerms` nicht — ohne sie hätte der Bonus „Sicher“ gesagt, während eine Einreichung noch
+      unbeantwortet ist. Die drei reichen jetzt aus dem Plan durch, und `bonusView` nimmt nur noch,
+      was es braucht.
+      Gewarnt sei vor der schmalen Ansicht: bei mehr Jahren als in die Breite passen, scrollt die
+      Grafik in ihrer Karte und öffnet bei den neuesten Jahren — die Achsenbeschriftung links ist
+      dann aus dem Bild. Die Tabelle trägt dieselben Zahlen.
 - [ ] **Release 0.20.0**, danach die Entscheidung zu 1.0.0 (§2.9: eine Entscheidung des Autors am
       Produktionsstand).

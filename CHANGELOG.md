@@ -7,6 +7,24 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.20.0-slice.5 — 2026-10-05
+
+- **The start page shows the household's figures.** The shortcut cards to the areas — which the
+  sidebar lists anyway — are gone; in their place the start page shows the figures of the previous
+  preview. At the top, tiles with the number of invoices since the first one, what they came to,
+  what was reimbursed, what the household carried itself, the bonus received, and how many insured
+  persons and running policies there are. Below, a chart per treatment year: what was reimbursed
+  with the self-borne rest stacked on top, and the bonus paid for that year beside it; hovering a
+  year shows its figures, and the same figures open as a table underneath. Last, a card per insured
+  person: what is still to be paid and how much of it is due or overdue, how many invoices are
+  still on their way to a reimbursement, and for each policy running this year what the
+  reimbursement plan recommends, how much deductible is left and where the bonus stands. The name
+  leads to that person's invoices. A tile only appears when the user may see its figure — a zero
+  would otherwise claim something the page does not know.
+- The bonus on the start page says "in danger" while a submission at that policy is still
+  unanswered, as it does in the invoice summary — the figures endpoint now passes on the three
+  details of the plan that judgement needs.
+
 ## 0.20.0-slice.4 — 2026-10-05
 
 - **The figures for a start page that says something.** The start page is about to trade its

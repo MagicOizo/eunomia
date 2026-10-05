@@ -332,7 +332,7 @@ the first invoice and per treatment year; per insured person what is still unpai
 under way, and how the running year stands at each policy (deductible left, bonus at stake — the
 same numbers as the reimbursement plan). Each figure is read under the permission of the way it
 otherwise comes from (`VIEW_INVOICES`, `VIEW_CONTRACTS`, `VIEW_ACCOUNTS`); without any, the answer
-is empty rather than a 403.
+is empty rather than a 403. The web app's start page shows them.
 
 **Bonus & claim-free years** (per policy, `VIEW_CONTRACTS` / `MANAGE_CONTRACTS`): a policy's
 yearly terms (`POST/PATCH /api/v1/contracts/:uid/terms`) carry its bonus scale (`bonusTiers`:

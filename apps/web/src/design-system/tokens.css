@@ -69,6 +69,16 @@
   --eu-color-status-done-bg: #ddf3df;
   --eu-color-status-done-fg: #146328;
 
+  /* Chart series (the start page's year chart). A categorical order of their
+     own, never the status scale: a colour there means a state, here only
+     "which series". Checked for colour-vision separation on both surfaces;
+     the aqua is under 3:1 on white, so the chart always carries a legend and
+     a table of its figures. */
+  --eu-color-chart-1: #2a78d6;
+  --eu-color-chart-2: #eb6834;
+  --eu-color-chart-3: #1baf7a;
+  --eu-color-chart-grid: #e6e6ec;
+
   /* Typography */
   --eu-font-heading: FallingSkyBold, Arial, Helvetica, sans-serif;
   --eu-font-body: FallingSky, Arial, Helvetica, sans-serif;
@@ -106,5 +116,10 @@
     --eu-color-status-billed-fg: #a8d4ff;
     --eu-color-status-done-bg: #163d1d;
     --eu-color-status-done-fg: #9ee8ac;
+
+    --eu-color-chart-1: #3987e5;
+    --eu-color-chart-2: #d95926;
+    --eu-color-chart-3: #199e70;
+    --eu-color-chart-grid: #2c2c38;
   }
 }
