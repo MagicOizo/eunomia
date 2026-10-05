@@ -229,3 +229,61 @@ describe('BillingsView: a new billing opens the booking dialog', () => {
     expect(dialog.props('presetBilling')).toBe('s-1');
   });
 });
+
+/**
+ * The billing search across every policy leads here with `?billing=` (issues.md
+ * 0.15.0-5): the row it found is marked, focused and named as the one meant —
+ * and only for as long as it answers that search.
+ */
+describe('BillingsView: the row a search led to', () => {
+  const other: BillingListDto = { ...billing, billingUID: 's-2', billingNumber: 'LA-2' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApiData();
+    listResource.mockResolvedValue([]);
+    searchBillings.mockResolvedValue([billing, other]);
+  });
+
+  async function mountFocused(focusBillingUID: string) {
+    const wrapper = mount(BillingsView, {
+      props: { contractUID: CONTRACT, focusBillingUID },
+      global: { stubs: { RouterLink: true } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    return wrapper;
+  }
+
+  function markedRows(wrapper: Awaited<ReturnType<typeof mountFocused>>) {
+    return wrapper.findAll('tbody tr').filter((row) => row.attributes('aria-current') === 'true');
+  }
+
+  it('marks and focuses exactly the found row', async () => {
+    const wrapper = await mountFocused('s-2');
+
+    const marked = markedRows(wrapper);
+    expect(marked).toHaveLength(1);
+    expect(marked[0].text()).toContain('LA-2');
+    expect(marked[0].classes()).toContain('is-found');
+    expect(document.activeElement).toBe(marked[0].element);
+    wrapper.unmount();
+  });
+
+  it('marks nothing for a billing that is not on this policy', async () => {
+    const wrapper = await mountFocused('s-elsewhere');
+
+    expect(markedRows(wrapper)).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it('lets go of the mark once the list is filtered', async () => {
+    const wrapper = await mountFocused('s-1');
+    expect(markedRows(wrapper)).toHaveLength(1);
+
+    await wrapper.find('.eu-billings__search input').setValue('LA');
+
+    expect(markedRows(wrapper)).toHaveLength(0);
+    wrapper.unmount();
+  });
+});

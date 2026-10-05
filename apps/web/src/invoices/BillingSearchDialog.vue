@@ -109,7 +109,7 @@ function confirm(): void {
         <EuCurrencyField v-model="filters.min" label="Erstattung ab" />
         <EuCurrencyField v-model="filters.max" label="Erstattung bis" />
       </div>
-      <EuToggle v-model="filters.unlinked" label="Nur unverknüpfte Abrechnungen" />
+      <EuToggle v-model="filters.unlinked" label="Nur ohne Zuordnung" />
 
       <h3 class="eu-bsearch__heading">Suchergebnis</h3>
       <p v-if="loading" class="eu-form__note" role="status">Wird gesucht…</p>

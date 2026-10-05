@@ -67,8 +67,15 @@ Bindestrich dreimal unbemerkt das Docker-`:latest` verschoben hat. 5a steht vor 
       Gewarnt sei vor der README: ihre Endpunkt-Tabelle nannte `POST /api/v1/allocations`, einen
       Weg, den es seit dem Umbau auf billing-gebundene Buchung nicht mehr gibt — nachgezogen, aber
       die Tabelle ist von keinem Test gedeckt und kann wieder still veralten.
-- [ ] **4 — Leistungsabrechnungen finden** (`0.20.0-slice.3`). 0.15.0-5; reines Web, die API kann es
-      schon.
+- [x] **4 — Leistungsabrechnungen finden** (`0.20.0-slice.3`). 0.15.0-5; reines Web, die API kann es
+      schon. Umgesetzt mit v0.20.0-slice.3 (Slice 73). Die Suche sitzt über den Vertrags-Kacheln von
+      `/billings`, gebaut wie die Rechnungssuche; Freitext + „Nur ohne Zuordnung“, Treffer führt
+      auf die Policen-Seite mit markierter Zeile, der Zurück-Pfeil holt die Suche zurück.
+      Der Schalter hieß an zwei Stellen „unverknüpft“ — jetzt überall „Nur ohne Zuordnung“.
+      Gewarnt sei vor den Dev-Daten: der Seed enthält **keine** Abrechnung ohne Zuordnung, der
+      Schalter zeigt dort also nur „keine“. Zum Nachfahren liegen in den Dev-Daten jetzt
+      `LA-2026-901` (PKV-2020-0001) und `LA-2026-902` (ZV-2022-0042), angelegt über die Oberfläche;
+      `npm run dev:reset` räumt sie wieder ab.
 - [ ] **5a — Das Dashboard: die Zahlen** (`0.20.0-slice.4`). 0.15.0-3, API-Hälfte.
 - [ ] **5b — Das Dashboard: die Seite** (`0.20.0-slice.5`). 0.15.0-3, Web-Hälfte.
 - [ ] **Release 0.20.0**, danach die Entscheidung zu 1.0.0 (§2.9: eine Entscheidung des Autors am

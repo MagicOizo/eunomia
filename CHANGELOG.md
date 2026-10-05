@@ -7,6 +7,19 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.20.0-slice.3 — 2026-10-05
+
+- **Leistungsabrechnungen can be found across every policy.** Until now a billing could only be
+  searched for inside its own policy, so finding "the letter that paid R-2026-114" meant guessing
+  the policy first — while invoices have had a search across everything for a long time. The
+  Leistungsabrechnungen page now has the same kind of search above its policy tiles: one text field
+  that matches the billing number, an invoice number it pays, the policy number or the insured
+  person, and a switch "Nur ohne Zuordnung" that on its own lists every letter that has nothing
+  booked on it yet — the ones still waiting for their invoices. A hit leads to its policy's list
+  with that row marked and focused, and the back arrow brings the search back, as with invoices.
+  The search stays in the address bar, so it survives a reload. The same switch on the policy page
+  and in the billing picker was called "unverknüpft" there; all three now use the one name.
+
 ## 0.20.0-slice.2 — 2026-10-05
 
 - **An invoice can be marked as billed while its reimbursement is booked.** Entering a

@@ -144,9 +144,14 @@ export const router = createRouter({
       meta: { title: 'Mein Konto', requiresAuth: true },
     },
     {
+      // Like /invoices: the search across every policy keeps its filter in the URL.
       path: '/billings',
       name: '/billings',
       component: BillingPickerView,
+      props: (route) => ({
+        q: queryString(route.query.q),
+        unlinked: queryString(route.query.unlinked),
+      }),
       meta: {
         title: 'Leistungsabrechnungen',
         requiresAuth: true,
@@ -157,7 +162,11 @@ export const router = createRouter({
       path: '/billings/:contractUID',
       name: 'billings-contract',
       component: BillingsView,
-      props: true,
+      // `billing` comes from the billing search on /billings: the row to mark.
+      props: (route) => ({
+        contractUID: route.params.contractUID,
+        focusBillingUID: queryString(route.query.billing),
+      }),
       // No permission in the meta: the account hangs on the policy, not on the
       // path, so there is nothing here to check it against. Without the right
       // the API answers 403 and the page shows that sentence.

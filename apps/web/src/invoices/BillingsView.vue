@@ -10,7 +10,7 @@ import {
   faUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -42,7 +42,11 @@ import BillingDialog from './BillingDialog.vue';
 import type { CommonPolicy } from './eligibility';
 import BillingFormDialog from './BillingFormDialog.vue';
 
-const props = defineProps<{ contractUID: string }>();
+const props = defineProps<{
+  contractUID: string;
+  /** The billing the search across every policy led here (see billing-search.ts). */
+  focusBillingUID?: string;
+}>();
 
 const auth = useAuthStore();
 
@@ -132,11 +136,46 @@ async function loadBillings(): Promise<void> {
 }
 
 const scheduleFilter = useDebouncedCallback(() => void loadBillings());
-watch(filters, scheduleFilter);
+watch(filters, () => {
+  foundUID.value = null;
+  scheduleFilter();
+});
+
+/**
+ * The billing a search led here, while it is still worth pointing at. It
+ * answers one search: a filter, and every reload after a change, drop it again
+ * — as the invoice workspace does with its found row.
+ */
+const foundUID = ref<string | null>(null);
+const foundRow = ref<HTMLTableRowElement | null>(null);
+function keepFoundRow(uid: string, el: unknown): void {
+  if (uid === foundUID.value) foundRow.value = (el as HTMLTableRowElement | null) ?? null;
+}
+
+/**
+ * Marks the found billing and brings its row into view and onto the keyboard;
+ * aria-current lets a screen reader name it as the one meant. Only the vertical
+ * move is wanted — see InvoiceTable's revealFound for why the sideways scroll
+ * is put back.
+ */
+async function markFound(): Promise<void> {
+  const wanted = props.focusBillingUID;
+  if (wanted === undefined || !billings.value.some((b) => b.billingUID === wanted)) return;
+  foundUID.value = wanted;
+  await nextTick();
+  const row = foundRow.value;
+  if (row === null) return;
+  const wrap = row.closest('.eu-billings__table-wrap');
+  const keepLeft = wrap?.scrollLeft ?? 0;
+  row.focus({ preventScroll: true });
+  row.scrollIntoView({ block: 'center' });
+  if (wrap) wrap.scrollLeft = keepLeft;
+}
 
 async function load(): Promise<void> {
   loading.value = true;
   loadError.value = null;
+  foundUID.value = null;
   try {
     const contract = await apiData<{
       contractNumber: string;
@@ -174,7 +213,10 @@ async function load(): Promise<void> {
   }
 }
 
-onMounted(load);
+onMounted(async () => {
+  await load();
+  await markFound();
+});
 
 /** The second line against a link a browser must not follow — see SEC-01. */
 function openDocument(b: BillingListDto): void {
@@ -306,7 +348,11 @@ function confirmDelete(): void {
         <EuTextField v-model="filters.to" label="Abrechnung bis" type="date" />
         <EuCurrencyField v-model="filters.min" label="Erstattung ab" />
         <EuCurrencyField v-model="filters.max" label="Erstattung bis" />
-        <EuToggle v-model="filters.unlinked" class="eu-billings__toggle" label="Nur unverknüpfte" />
+        <EuToggle
+          v-model="filters.unlinked"
+          class="eu-billings__toggle"
+          label="Nur ohne Zuordnung"
+        />
       </div>
 
       <p v-if="billings.length === 0 && filtered" class="eu-billings__hint" role="status">
@@ -317,7 +363,7 @@ function confirmDelete(): void {
         Rechnungs-Workflow über „Abrechnung zuordnen".
       </p>
 
-      <div v-else class="eu-billings__table-wrap">
+      <div v-else class="eu-billings__table-wrap eu-scroll-focus-safe">
         <table class="eu-billings__table">
           <thead>
             <tr>
@@ -351,7 +397,14 @@ function confirmDelete(): void {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="b in sort.sorted" :key="b.billingUID">
+            <tr
+              v-for="b in sort.sorted"
+              :key="b.billingUID"
+              :ref="(el) => keepFoundRow(b.billingUID, el)"
+              :class="{ 'is-found': b.billingUID === foundUID }"
+              :aria-current="b.billingUID === foundUID ? 'true' : undefined"
+              :tabindex="b.billingUID === foundUID ? -1 : undefined"
+            >
               <td>{{ b.billingNumber }}</td>
               <td>{{ germanDate(b.billingDate) }}</td>
               <td class="eu-billings__num">{{ germanMoney(b.reimbursedTotal) }}</td>
@@ -625,6 +678,15 @@ function confirmDelete(): void {
 
 .eu-billings__actions button + button {
   margin-left: 0.35rem;
+}
+
+/* The row the billing search led to, drawn like the invoice workspace's. */
+.eu-billings__table tbody tr.is-found > td {
+  background-color: color-mix(in srgb, var(--eu-color-accent) 12%, transparent);
+}
+
+.eu-billings__table tbody tr.is-found > td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--eu-color-accent);
 }
 
 .eu-billings__table .eu-billings__num {
