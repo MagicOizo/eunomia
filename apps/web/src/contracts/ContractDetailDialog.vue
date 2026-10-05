@@ -26,7 +26,6 @@ import { describeError } from '../lib/errors';
 import { germanDate, germanMoney, plural } from '../lib/format';
 import {
   BONUS_FORFEIT_RULE_LABEL,
-  type BonusTierDto,
   type BonusYearDto,
   CONTRACT_KIND_LABEL,
   type ContractDetailDto,
@@ -42,6 +41,7 @@ import {
   updateContract,
 } from './api';
 import { useAuthStore } from '../stores/auth';
+import { factorLabel, factorShort, forecastBasis } from './bonus-labels';
 import ContractYearDialog from './ContractYearDialog.vue';
 import PremiumFormDialog from './PremiumFormDialog.vue';
 import TermsFormDialog from './TermsFormDialog.vue';
@@ -270,8 +270,6 @@ const termsPeriod = (t: TermsDto): string =>
       ? String(t.validFromYear)
       : `${t.validFromYear} – ${t.validToYear}`;
 const percent = (value: number): string => `${new Intl.NumberFormat('de-DE').format(value)} %`;
-const tierLabel = (tier: BonusTierDto): string =>
-  `ab ${tier.claimFreeYears} J.: ${germanMoney(tier.bonusAmount)}`;
 
 // --- Year history (claim-free years & bonus) ---------------------------------
 
@@ -305,6 +303,7 @@ const scaleOutdated = (y: BonusYearDto): boolean =>
   y.tiersInherited && y.hasBonusScale && !y.forfeited && y.actualBonus === null;
 
 function expectedLabel(y: BonusYearDto): string {
+  if (y.premiumMissing) return 'Beitrag fehlt';
   if (y.expectedBonus === null) return 'keine Konditionen';
   if (!y.hasBonusScale) return 'kein Bonus';
   return germanMoney(y.expectedBonus);
@@ -416,6 +415,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
               <tr>
                 <th scope="col">Gültig</th>
                 <th scope="col" class="eu-contract__num">Monatsbeitrag</th>
+                <th scope="col" class="eu-contract__num">bonusrelevant</th>
                 <th scope="col" class="eu-contract__actions">Aktionen</th>
               </tr>
             </thead>
@@ -431,6 +431,9 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                   </span>
                 </td>
                 <td class="eu-contract__num">{{ germanMoney(premium.monthlyPremium) }}</td>
+                <td class="eu-contract__num">
+                  {{ germanMoney(premium.bonusRelevantPremium) }}
+                </td>
                 <td class="eu-contract__actions">
                   <EuButton
                     variant="secondary"
@@ -459,7 +462,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                 </td>
               </tr>
               <tr v-if="contract.premiums.length > 1">
-                <td colspan="3" class="eu-contract__more">
+                <td colspan="4" class="eu-contract__more">
                   <button
                     type="button"
                     :aria-expanded="showOlder.premiums"
@@ -523,7 +526,13 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                 <td>
                   <ul v-if="terms.bonusTiers.length > 0" class="eu-contract__tiers">
                     <li v-for="tier in terms.bonusTiers" :key="tier.claimFreeYears">
-                      {{ tierLabel(tier) }}
+                      ab {{ tier.claimFreeYears }} J.:
+                      <abbr
+                        v-if="tier.bonusFactor !== null"
+                        :title="factorLabel(tier.bonusFactor)"
+                        >{{ factorShort(tier.bonusFactor) }}</abbr
+                      >
+                      <template v-else>{{ germanMoney(tier.bonusAmount) }}</template>
                     </li>
                   </ul>
                   <template v-else>kein Bonus</template>
@@ -616,6 +625,12 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                 <td class="eu-contract__num">{{ y.claimFreeStreak }}</td>
                 <td class="eu-contract__num">
                   {{ expectedLabel(y) }}
+                  <span v-if="!y.forfeited && forecastBasis(y)" class="eu-contract__stale">
+                    {{ forecastBasis(y) }}
+                  </span>
+                  <span v-if="y.premiumMissing" class="eu-contract__stale">
+                    bonusrelevanter Beitrag nicht für jeden Monat erfasst
+                  </span>
                   <span v-if="scaleOutdated(y)" class="eu-contract__stale">
                     nicht aktualisiert (Staffel {{ y.termsFromYear }})
                   </span>

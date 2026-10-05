@@ -13,6 +13,7 @@ import { addTo } from '../lib/group.js';
 import { oneOf } from '../lib/one-of.js';
 import {
   type BonusClaim,
+  type BonusPremium,
   type BonusYear,
   type BonusYearRecord,
   computeBonusTimeline,
@@ -28,11 +29,12 @@ export interface BonusRows {
   claims: Map<string, BonusClaim[]>;
   yearRecords: Map<string, BonusYearRecord[]>;
   terms: Map<string, TermsWithTiers[]>;
+  premiums: Map<string, BonusPremium[]>;
 }
 
 /**
- * Everything the bonus timeline needs, for any number of policies at once: four
- * queries for all of them instead of four per policy (CR-16). A claim row is
+ * Everything the bonus timeline needs, for any number of policies at once: five
+ * queries for all of them instead of five per policy (CR-16). A claim row is
  * one allocation from an active billing of the policy, or — while nothing has
  * answered the invoice here yet — one pending row with a NULL reimbursement.
  */
@@ -42,7 +44,8 @@ export async function loadBonusRows(
 ): Promise<BonusRows> {
   const claims = new Map<string, BonusClaim[]>();
   const yearRecords = new Map<string, BonusYearRecord[]>();
-  if (contractUIDs.length === 0) return { claims, yearRecords, terms: new Map() };
+  const premiums = new Map<string, BonusPremium[]>();
+  if (contractUIDs.length === 0) return { claims, yearRecords, terms: new Map(), premiums };
   const uids = [...contractUIDs];
 
   const claimRows = await db.query<
@@ -89,7 +92,14 @@ export async function loadBonusRows(
     addTo(yearRecords, contractUID, { ...row, bonusForfeited: toFlag(row.bonusForfeited) });
   }
 
-  return { claims, yearRecords, terms: await loadTermsWithTiers(db, uids) };
+  const premiumRows = await db.query<Array<BonusPremium & { contractUID: string }>>(
+    `SELECT contractUID, validFrom, bonusRelevantPremium FROM ContractPremiums
+      WHERE contractUID IN (${placeholders(uids)}) AND premiumStatus <> -1`,
+    uids,
+  );
+  for (const { contractUID, ...row } of premiumRows) addTo(premiums, contractUID, row);
+
+  return { claims, yearRecords, terms: await loadTermsWithTiers(db, uids), premiums };
 }
 
 /**
@@ -112,6 +122,9 @@ export function bonusTimelineFrom(
     claims: rows.claims.get(contract.contractUID) ?? [],
     yearRecords: rows.yearRecords.get(contract.contractUID) ?? [],
     terms: rows.terms.get(contract.contractUID) ?? [],
+    premiums: rows.premiums.get(contract.contractUID) ?? [],
+    contractBegin: contract.contractBegin,
+    contractEnd: contract.contractEnd,
   });
 }
 

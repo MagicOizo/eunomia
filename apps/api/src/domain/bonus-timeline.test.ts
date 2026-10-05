@@ -11,9 +11,9 @@ import {
 
 // Scale from the author's example (PKV x): 1 year → 300 €, 2 → 450 €, 4 → 600 €.
 const scale = [
-  { claimFreeYears: 1, bonusAmount: 300 },
-  { claimFreeYears: 2, bonusAmount: 450 },
-  { claimFreeYears: 4, bonusAmount: 600 },
+  { claimFreeYears: 1, bonusAmount: 300, bonusFactor: null },
+  { claimFreeYears: 2, bonusAmount: 450, bonusFactor: null },
+  { claimFreeYears: 4, bonusAmount: 600, bonusFactor: null },
 ];
 
 const base: BonusTimelineInput = {
@@ -25,6 +25,9 @@ const base: BonusTimelineInput = {
   claims: [],
   yearRecords: [],
   terms: [{ validFromYear: 2021, bonusTiers: scale }],
+  premiums: [],
+  contractBegin: '2021-01-01',
+  contractEnd: null,
 };
 
 const run = (overrides: Partial<BonusTimelineInput>): BonusYear[] =>
@@ -128,7 +131,10 @@ test('scale per year: later terms apply from their year, older ones are inherite
   const years = run({
     terms: [
       { validFromYear: 2021, bonusTiers: scale },
-      { validFromYear: 2023, bonusTiers: [{ claimFreeYears: 1, bonusAmount: 500 }] },
+      {
+        validFromYear: 2023,
+        bonusTiers: [{ claimFreeYears: 1, bonusAmount: 500, bonusFactor: null }],
+      },
     ],
   });
   assert.deepEqual(
@@ -156,7 +162,12 @@ test('no terms yet: no expected bonus; terms without scale: no bonus at all', ()
 
 test('a streak below the lowest tier earns nothing', () => {
   const years = run({
-    terms: [{ validFromYear: 2021, bonusTiers: [{ claimFreeYears: 4, bonusAmount: 600 }] }],
+    terms: [
+      {
+        validFromYear: 2021,
+        bonusTiers: [{ claimFreeYears: 4, bonusAmount: 600, bonusFactor: null }],
+      },
+    ],
   });
   assert.deepEqual(
     years.map((y) => y.expectedBonus),
@@ -200,4 +211,123 @@ test('the terms in force are the latest ones that had started', () => {
 
 test('a policy without any terms has none in force', () => {
   assert.equal(termsInForce([], 2025), null);
+});
+
+/*
+ * Factor tiers (Slice 76): the insurer's scale in monthly premiums, applied to
+ * the year's average bonus-relevant premium.
+ */
+const factorScale = [
+  { claimFreeYears: 1, bonusAmount: null, bonusFactor: 1 },
+  { claimFreeYears: 3, bonusAmount: null, bonusFactor: 1.5 },
+];
+const premium = (validFrom: string, bonusRelevantPremium: number | null) => ({
+  validFrom,
+  bonusRelevantPremium,
+});
+
+test('a factor tier multiplies the average bonus-relevant premium', () => {
+  const years = run({
+    terms: [{ validFromYear: 2021, bonusTiers: factorScale }],
+    premiums: [premium('2021-01-01', 400)],
+  });
+  assert.deepEqual(
+    years.map((y) => [y.expectedBonus, y.bonusFactor, y.relevantPremiumAverage]),
+    [
+      [400, 1, 400],
+      [400, 1, 400],
+      [600, 1.5, 400],
+      [600, 1.5, 400],
+      [600, 1.5, 400],
+    ],
+  );
+  assert.ok(
+    years.every((y) => !y.tiersInherited && !y.premiumMissing),
+    'a factor never ages',
+  );
+});
+
+test('a premium adjustment mid-year counts pro rata over the months', () => {
+  const years = run({
+    terms: [{ validFromYear: 2021, bonusTiers: factorScale }],
+    premiums: [premium('2021-01-01', 400), premium('2023-07-01', 420)],
+  });
+  const year = byYear(years, 2023);
+  assert.equal(year.relevantPremiumAverage, 410);
+  assert.equal(year.expectedBonus, 615);
+  assert.equal(byYear(years, 2024).expectedBonus, 630);
+});
+
+test('a premium starting mid-month counts from the following month', () => {
+  const years = run({
+    terms: [{ validFromYear: 2021, bonusTiers: factorScale }],
+    premiums: [premium('2021-01-01', 400), premium('2021-12-15', 520)],
+  });
+  assert.equal(byYear(years, 2021).relevantPremiumAverage, 400);
+  assert.equal(byYear(years, 2022).relevantPremiumAverage, 520);
+});
+
+test('a policy starting mid-year averages over the months it runs', () => {
+  const years = run({
+    contractBegin: '2021-04-15',
+    terms: [{ validFromYear: 2021, bonusTiers: factorScale }],
+    premiums: [premium('2021-04-15', 300), premium('2021-10-01', 390)],
+  });
+  // April–September at 300, October–December at 390: (6 × 300 + 3 × 390) / 9.
+  assert.equal(byYear(years, 2021).relevantPremiumAverage, 330);
+  assert.equal(byYear(years, 2021).expectedBonus, 330);
+});
+
+test('a running month without a bonus-relevant premium leaves no forecast', () => {
+  const years = run({
+    terms: [{ validFromYear: 2021, bonusTiers: factorScale }],
+    premiums: [premium('2021-03-01', 400), premium('2022-01-01', null), premium('2023-01-01', 410)],
+    claims: [paid(2024, 50)],
+  });
+  for (const year of [2021, 2022]) {
+    const entry = byYear(years, year);
+    assert.equal(entry.expectedBonus, null, `${year}`);
+    assert.equal(entry.relevantPremiumAverage, null, `${year}`);
+    assert.equal(entry.premiumMissing, true, `${year}`);
+  }
+  assert.equal(byYear(years, 2023).expectedBonus, 615);
+  const forfeited = byYear(years, 2024);
+  assert.equal(forfeited.expectedBonus, 0, 'a forfeited year needs no premium');
+  assert.equal(forfeited.premiumMissing, false);
+});
+
+test('amount and factor tiers mix in one scale; only an inherited amount is outdated', () => {
+  const years = run({
+    terms: [
+      {
+        validFromYear: 2021,
+        bonusTiers: [
+          { claimFreeYears: 1, bonusAmount: 250, bonusFactor: null },
+          { claimFreeYears: 3, bonusAmount: null, bonusFactor: 2 },
+        ],
+      },
+    ],
+    premiums: [premium('2021-01-01', 200)],
+  });
+  assert.deepEqual(
+    years.map((y) => [y.expectedBonus, y.tiersInherited, y.bonusFactor]),
+    [
+      [250, false, null],
+      [250, true, null],
+      [400, false, 2],
+      [400, false, 2],
+      [400, false, 2],
+    ],
+  );
+});
+
+test('the actual bonus is reported next to a factor forecast', () => {
+  const years = run({
+    terms: [{ validFromYear: 2021, bonusTiers: factorScale }],
+    premiums: [premium('2021-01-01', 400)],
+    yearRecords: [{ year: 2023, actualBonus: 598.2, bonusForfeited: null, note: null }],
+  });
+  const year = byYear(years, 2023);
+  assert.equal(year.actualBonus, 598.2);
+  assert.equal(year.expectedBonus, 600);
 });

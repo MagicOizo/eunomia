@@ -158,6 +158,11 @@ const contracts: ResourceConfig = {
     { key: 'contractBegin', label: 'Vertragsbeginn', type: 'date', required: true },
     { key: 'contractEnd', label: 'Vertragsende', type: 'date' },
     { key: 'initialMonthlyPremium', label: 'Monatsbeitrag ab Vertragsbeginn', type: 'currency' },
+    {
+      key: 'initialBonusRelevantPremium',
+      label: 'Bonusrelevanter Monatsbeitrag ab Vertragsbeginn',
+      type: 'currency',
+    },
     { key: 'initialDeductible', label: 'Selbstbeteiligung pro Jahr', type: 'currency' },
     { key: 'initialReimbursementCap', label: 'Erstattungsobergrenze pro Jahr', type: 'currency' },
     {

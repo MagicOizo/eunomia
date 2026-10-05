@@ -9,6 +9,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { germanMoney, plural } from '../lib/format';
 import type { BonusYearDto, ContractYearInput } from './api';
+import { forecastBasis } from './bonus-labels';
 
 /**
  * Records what actually happened in one insurance year of a policy: the bonus
@@ -58,10 +59,15 @@ function submit(): void {
       <p v-if="year" class="eu-form__note">
         Prognose:
         {{
-          year.expectedBonus === null
-            ? 'keine Konditionen erfasst'
-            : germanMoney(year.expectedBonus)
+          year.premiumMissing
+            ? 'offen, der bonusrelevante Beitrag ist nicht für jeden Monat erfasst'
+            : year.expectedBonus === null
+              ? 'keine Konditionen erfasst'
+              : germanMoney(year.expectedBonus)
         }}
+        <template v-if="!year.forfeited && forecastBasis(year)"
+          >({{ forecastBasis(year) }})</template
+        >
         bei {{ plural(year.claimFreeStreak, 'leistungsfreien Jahr', 'leistungsfreien Jahren') }} in
         Folge.
       </p>

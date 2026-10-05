@@ -177,13 +177,19 @@ export const TRASH_ENTITIES: TrashEntity[] = [
     plural: 'Beitragsstände',
     alias: 'b',
     listSql: `SELECT b.premiumUID AS uid, ${DELETED_AT('b')},
-                     b.validFrom, b.monthlyPremium, b.contractUID, c.contractNumber
+                     b.validFrom, b.monthlyPremium, b.bonusRelevantPremium, b.contractUID,
+                     c.contractNumber
                 FROM ContractPremiums b
                 LEFT JOIN Contracts c ON c.contractUID = b.contractUID
                WHERE b.premiumStatus = -1`,
     describe: (row) => ({
       label: `ab ${germanDate(text(row.validFrom))}`,
-      context: context(policy(row), germanMoney(Number(row.monthlyPremium)) + ' im Monat'),
+      context: context(
+        policy(row),
+        row.monthlyPremium === null
+          ? germanMoney(Number(row.bonusRelevantPremium)) + ' bonusrelevant im Monat'
+          : germanMoney(Number(row.monthlyPremium)) + ' im Monat',
+      ),
     }),
     assertRestorable: (db, row) =>
       assertValidityFree(db, premiumSpec, String(row.contractUID), String(row.validFrom), null),

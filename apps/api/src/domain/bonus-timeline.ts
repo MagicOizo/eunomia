@@ -21,9 +21,16 @@
  *    the "1 year" tier.
  *  - The expected bonus of a claim-free year is the highest tier the streak
  *    reaches, taken from the terms in force that year (the top tier applies
- *    to every longer streak). Terms that started in an earlier year are an
- *    inherited forecast ("nicht aktualisiert"), since the insurer usually
- *    announces new amounts each year.
+ *    to every longer streak).
+ *  - A tier holds either an amount in € or a factor in monthly premiums
+ *    (Slice 76). A factor applies to the year's average bonus-relevant
+ *    premium: the months the policy runs in that year, each with the premium
+ *    in force on its first running day, so an adjustment mid-year counts pro
+ *    rata. If any running month has no bonus-relevant premium, there is no
+ *    forecast (`premiumMissing`) rather than a guess.
+ *  - An amount from terms that started in an earlier year is an inherited
+ *    forecast ("nicht aktualisiert"), since insurers announce new amounts each
+ *    year. A factor is the insurer's standing rule and is never outdated.
  */
 
 import type { BonusForfeitRule } from '@eunomia/shared';
@@ -37,14 +44,24 @@ export interface BonusClaim {
   forfeitsBonus: boolean | null;
 }
 
+/** Exactly one of `bonusAmount` and `bonusFactor` is set. */
 export interface BonusTier {
   claimFreeYears: number;
-  bonusAmount: number;
+  bonusAmount: number | null;
+  /** Bonus in monthly bonus-relevant premiums. */
+  bonusFactor: number | null;
 }
 
 export interface BonusTerms {
   validFromYear: number;
   bonusTiers: BonusTier[];
+}
+
+/** A ContractPremiums row, as far as the bonus is concerned. */
+export interface BonusPremium {
+  /** ISO date the premium applies from. */
+  validFrom: string;
+  bonusRelevantPremium: number | null;
 }
 
 /** A ContractYears row: what the author recorded for one year. */
@@ -69,6 +86,11 @@ export interface BonusTimelineInput {
   claims: BonusClaim[];
   yearRecords: BonusYearRecord[];
   terms: BonusTerms[];
+  /** The policy's premium history, in any order. */
+  premiums: BonusPremium[];
+  /** ISO dates of the policy's term; they bound the months a year's average covers. */
+  contractBegin: string;
+  contractEnd: string | null;
 }
 
 export interface BonusYear {
@@ -86,8 +108,14 @@ export interface BonusYear {
   hasBonusScale: boolean;
   /** Year the terms in force were recorded for, or null if none exist. */
   termsFromYear: number | null;
-  /** True when the terms (and scale) were taken over from an earlier year. */
+  /** True when the reached tier is an amount taken over from an earlier year's terms. */
   tiersInherited: boolean;
+  /** Factor of the reached tier, or null when it is an amount (or none is reached). */
+  bonusFactor: number | null;
+  /** The year's average bonus-relevant monthly premium; null if a running month lacks one. */
+  relevantPremiumAverage: number | null;
+  /** The reached tier is a factor, but the average it needs is unknown. */
+  premiumMissing: boolean;
   actualBonus: number | null;
   bonusForfeitedOverride: boolean | null;
   note: string | null;
@@ -125,8 +153,8 @@ export function termsInForce<T extends { validFromYear: number }>(
   return found;
 }
 
-/** The bonus of the highest tier the streak reaches, 0 below the lowest tier. */
-function tierBonus(tiers: BonusTier[], streak: number): number {
+/** The highest tier the streak reaches, null below the lowest tier. */
+function reachedTier(tiers: BonusTier[], streak: number): BonusTier | null {
   let best: BonusTier | null = null;
   for (const tier of tiers) {
     if (
@@ -136,7 +164,46 @@ function tierBonus(tiers: BonusTier[], streak: number): number {
       best = tier;
     }
   }
-  return best?.bonusAmount ?? 0;
+  return best;
+}
+
+const pad2 = (value: number): string => String(value).padStart(2, '0');
+const roundCents = (value: number): number => Math.round(value * 100) / 100;
+
+/**
+ * The average bonus-relevant monthly premium over the months the policy runs
+ * in `year`, or null if one of them has none (or the policy does not run).
+ * Each month takes the premium in force on its first running day — the 1st,
+ * or the contract begin in the first month.
+ */
+export function averageRelevantPremium(
+  premiums: readonly BonusPremium[],
+  contractBegin: string,
+  contractEnd: string | null,
+  year: number,
+): number | null {
+  let sum = 0;
+  let months = 0;
+  for (let month = 1; month <= 12; month += 1) {
+    const monthStart = `${year}-${pad2(month)}-01`;
+    // Day 31 compares as the month's last day for every month in ISO order.
+    const monthEnd = `${year}-${pad2(month)}-31`;
+    if (monthEnd < contractBegin || (contractEnd !== null && monthStart > contractEnd)) continue;
+    const firstDay = monthStart < contractBegin ? contractBegin : monthStart;
+    let inForce: BonusPremium | null = null;
+    for (const premium of premiums) {
+      if (
+        premium.validFrom <= firstDay &&
+        (inForce === null || premium.validFrom > inForce.validFrom)
+      ) {
+        inForce = premium;
+      }
+    }
+    if (inForce?.bonusRelevantPremium == null) return null;
+    sum += inForce.bonusRelevantPremium;
+    months += 1;
+  }
+  return months === 0 ? null : sum / months;
 }
 
 /** Evaluates every year from the counting year up to `lastYear`, oldest first. */
@@ -163,8 +230,22 @@ export function computeBonusTimeline(input: BonusTimelineInput): BonusYear[] {
 
     const terms = termsInForce(input.terms, year);
     const hasBonusScale = (terms?.bonusTiers.length ?? 0) > 0;
+    const tier = terms === null ? null : reachedTier(terms.bonusTiers, streak);
+    const average = averageRelevantPremium(
+      input.premiums,
+      input.contractBegin,
+      input.contractEnd,
+      year,
+    );
+    const bonusFactor = tier?.bonusFactor ?? null;
+    const premiumMissing = bonusFactor !== null && average === null;
     let expectedBonus: number | null = null;
-    if (terms !== null) expectedBonus = forfeited ? 0 : tierBonus(terms.bonusTiers, streak);
+    if (terms !== null) {
+      if (forfeited || tier === null) expectedBonus = 0;
+      else if (bonusFactor !== null)
+        expectedBonus = average === null ? null : roundCents(bonusFactor * average);
+      else expectedBonus = tier.bonusAmount ?? 0;
+    }
 
     years.push({
       year,
@@ -175,7 +256,11 @@ export function computeBonusTimeline(input: BonusTimelineInput): BonusYear[] {
       expectedBonus,
       hasBonusScale,
       termsFromYear: terms?.validFromYear ?? null,
-      tiersInherited: terms !== null && terms.validFromYear < year,
+      tiersInherited:
+        terms !== null && terms.validFromYear < year && tier !== null && bonusFactor === null,
+      bonusFactor,
+      relevantPremiumAverage: average === null ? null : roundCents(average),
+      premiumMissing: premiumMissing && !forfeited,
       actualBonus: record?.actualBonus ?? null,
       bonusForfeitedOverride: override,
       note: record?.note ?? null,

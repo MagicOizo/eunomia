@@ -5,11 +5,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BonusYearDto, ContractDetailDto, PremiumDto, TermsDto } from './api';
 import ContractDetailDialog from './ContractDetailDialog.vue';
 
-const premium = (validFrom: string, monthlyPremium: number, note: string | null): PremiumDto => ({
+const premium = (
+  validFrom: string,
+  monthlyPremium: number | null,
+  note: string | null,
+  bonusRelevantPremium: number | null = null,
+): PremiumDto => ({
   premiumUID: `p-${validFrom}`,
   validFrom,
   validTo: null,
   monthlyPremium,
+  bonusRelevantPremium,
   note,
 });
 
@@ -33,6 +39,9 @@ const year = (y: number, note: string | null = null): BonusYearDto => ({
   hasBonusScale: false,
   termsFromYear: 2020,
   tiersInherited: false,
+  bonusFactor: null,
+  relevantPremiumAverage: null,
+  premiumMissing: false,
   actualBonus: null,
   bonusForfeitedOverride: null,
   note,
@@ -148,6 +157,52 @@ describe('ContractDetailDialog', () => {
     // The year note is shown at all now — it used to be stored and never rendered.
     await toggleIn(wrapper, 'Jahresverlauf').trigger('click');
     expect(rowsUnder(wrapper, 'Jahresverlauf').join(' ')).toContain('Bonus kam erst im Februar');
+
+    wrapper.unmount();
+  });
+
+  it('shows a factor scale with the forecast it was computed from (Slice 76)', async () => {
+    getContract.mockResolvedValueOnce({
+      ...structuredClone(contract),
+      premiums: [premium('2020-01-01', null, null, 400)],
+      terms: [
+        {
+          ...terms(2020),
+          bonusTiers: [
+            { claimFreeYears: 1, bonusAmount: null, bonusFactor: 1 },
+            { claimFreeYears: 3, bonusAmount: null, bonusFactor: 1.5 },
+            { claimFreeYears: 5, bonusAmount: 900, bonusFactor: null },
+          ],
+        },
+      ],
+      years: [
+        { ...year(2020), premiumMissing: true, expectedBonus: null, hasBonusScale: true },
+        {
+          ...year(2021),
+          claimFreeStreak: 3,
+          expectedBonus: 615,
+          hasBonusScale: true,
+          bonusFactor: 1.5,
+          relevantPremiumAverage: 410,
+        },
+      ],
+    });
+    const wrapper = await openDialog();
+
+    expect(rowsUnder(wrapper, 'Beitragsverlauf')[0]).toMatch(/–\s*400,00\s€/);
+    const scale = rowsUnder(wrapper, 'Konditionen je Jahr')[0];
+    expect(scale).toMatch(/ab 1 J.:\s*1-fach/);
+    expect(scale).toMatch(/ab 3 J.:\s*1,5-fach/);
+    expect(scale).toMatch(/ab 5 J.:\s*900,00/);
+    const factors = wrapper.findAll('.eu-contract__tiers abbr').map((a) => a.attributes('title'));
+    expect(factors).toEqual(['1 Monatsbeitrag', '1,5 Monatsbeiträge']);
+    const years = rowsUnder(wrapper, 'Jahresverlauf');
+    expect(years[0]).toMatch(/615,00\s€\s*1,5 × Ø 410,00\s€/);
+    await toggleIn(wrapper, 'Jahresverlauf').trigger('click');
+    expect(rowsUnder(wrapper, 'Jahresverlauf')[1]).toContain('Beitrag fehlt');
+
+    const results = await axe.run(wrapper.element as HTMLElement);
+    expect(results.violations).toEqual([]);
 
     wrapper.unmount();
   });

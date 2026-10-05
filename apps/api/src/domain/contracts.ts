@@ -38,6 +38,7 @@ const base = z.object({
  */
 const createSchema = base.extend({
   initialMonthlyPremium: money.optional(),
+  initialBonusRelevantPremium: money.optional(),
   initialDeductible: money.optional(),
   initialReimbursementCap: money.nullish(),
   initialReimbursementRate: z.number().min(0).max(100).optional(),
@@ -151,6 +152,7 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
     const user = getAuthUser(res);
     const {
       initialMonthlyPremium,
+      initialBonusRelevantPremium,
       initialDeductible,
       initialReimbursementCap,
       initialReimbursementRate,
@@ -166,10 +168,11 @@ export function createContractsRouter(pool: Pool, config: AppConfig): Router {
 
     const contract = await withTransaction(pool, async (conn) => {
       const created = await insertRow(conn, contractsTable, data);
-      if (initialMonthlyPremium !== undefined) {
+      if (initialMonthlyPremium !== undefined || initialBonusRelevantPremium !== undefined) {
         await insertHistoryEntry(conn, 'premiums', created, {
           validFrom: created.contractBegin,
-          monthlyPremium: initialMonthlyPremium,
+          monthlyPremium: initialMonthlyPremium ?? null,
+          bonusRelevantPremium: initialBonusRelevantPremium ?? null,
         });
       }
       const hasInitialTerms =

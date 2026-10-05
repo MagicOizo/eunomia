@@ -22,6 +22,10 @@ import { daysFromToday, seedId, seedRow, seedYear } from './helpers.js';
  * - the child's half is still unbooked, so the second, separate assignment run
  *   can be clicked through in the app (and the "unverknüpft" filter has a hit).
  *
+ * The child's bonus scale is the insurer's rule in monthly premiums (Slice
+ * 76), with a premium adjustment in July of the running year, so the detail
+ * dialog shows a factor forecast over a pro-rata average.
+ *
  * Seed indices live at 14–16, clear of the main seed (0–13) and the example
  * years (20–25), and inside the range `seedId` allows.
  */
@@ -30,6 +34,7 @@ const ids = {
   accountChild: seedId('account', 14),
   contractChild: seedId('contract', 14),
   premiumChild: seedId('premium', 14),
+  premiumChildAdjusted: seedId('premium', 15),
   termsChild: seedId('contractTerms', 14),
   submissionParent: seedId('submission', 14),
   submissionChild: seedId('submission', 15),
@@ -85,7 +90,16 @@ export async function seedFamilyPolicy(pool: Pool, refs: FamilyPolicyRefs): Prom
     contractUID: ids.contractChild,
     validFrom: '2020-01-01',
     monthlyPremium: 120.0,
+    bonusRelevantPremium: 100.0,
     note: 'Kindertarif',
+  });
+  await seedRow(pool, 'ContractPremiums', {
+    premiumUID: ids.premiumChildAdjusted,
+    contractUID: ids.contractChild,
+    validFrom: `${seedYear(0)}-07-01`,
+    monthlyPremium: 132.0,
+    bonusRelevantPremium: 110.0,
+    note: 'Beitragsanpassung',
   });
   await seedRow(pool, 'ContractTerms', {
     termsUID: ids.termsChild,
@@ -94,16 +108,16 @@ export async function seedFamilyPolicy(pool: Pool, refs: FamilyPolicyRefs): Prom
     deductible: 150.0,
     reimbursementCap: 3000.0,
   });
-  const tiers: Array<[claimFreeYears: number, bonusAmount: number]> = [
-    [1, 150],
-    [2, 225],
-    [4, 300],
+  const tiers: Array<[claimFreeYears: number, bonusFactor: number]> = [
+    [1, 1],
+    [2, 1.5],
+    [4, 2],
   ];
-  for (const [claimFreeYears, bonusAmount] of tiers) {
+  for (const [claimFreeYears, bonusFactor] of tiers) {
     await seedRow(pool, 'ContractBonusTiers', {
       termsUID: ids.termsChild,
       claimFreeYears,
-      bonusAmount,
+      bonusFactor,
     });
   }
 

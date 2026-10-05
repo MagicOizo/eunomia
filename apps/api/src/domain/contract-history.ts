@@ -20,6 +20,7 @@ import {
 } from '../crud/repository.js';
 import { withTransaction } from '../db/transaction.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
+import type { BonusTier } from './bonus-timeline.js';
 import { type ContractRow, loadAuthorizedContract } from './contract-access.js';
 
 /**
@@ -36,7 +37,7 @@ const premiumsTable = crudTable({
   uidColumn: 'premiumUID',
   statusColumn: 'premiumStatus',
   entity: 'premium',
-  columns: ['contractUID', 'validFrom', 'monthlyPremium', 'note'],
+  columns: ['contractUID', 'validFrom', 'monthlyPremium', 'bonusRelevantPremium', 'note'],
 });
 
 const termsTable = crudTable({
@@ -47,16 +48,30 @@ const termsTable = crudTable({
   columns: ['contractUID', 'validFromYear', 'deductible', 'reimbursementCap', 'reimbursementRate'],
 });
 
+/**
+ * Both figures are optional on their own: the full premium is information
+ * only, the bonus-relevant one feeds the factor tiers (Slice 76). An entry
+ * needs at least one, which `premiumSpec.assertComplete` checks on the stored
+ * shape, since a PATCH may send only one of them.
+ */
 export const premiumSchema = z.object({
   validFrom: z.string().date(),
-  monthlyPremium: money,
+  monthlyPremium: money.nullish(),
+  bonusRelevantPremium: money.nullish(),
   note: z.string().trim().max(255).nullish(),
 });
 
-const bonusTier = z.object({
-  claimFreeYears: z.number().int().min(1).max(99),
-  bonusAmount: money,
-});
+/** A tier is an amount in € or a factor in monthly premiums, never both. */
+const bonusTier = z
+  .object({
+    claimFreeYears: z.number().int().min(1).max(99),
+    bonusAmount: money.nullish(),
+    bonusFactor: z.number().gt(0).max(99.99).multipleOf(0.01).nullish(),
+  })
+  .refine(
+    (tier) => (tier.bonusAmount == null) !== (tier.bonusFactor == null),
+    'A bonus tier needs either an amount or a factor, not both',
+  );
 
 export const termsSchema = z.object({
   validFromYear: z.number().int().min(1900).max(2999),
@@ -92,6 +107,8 @@ export interface HistorySpec {
    * `String()` and a year with `Number()`.
    */
   assertWithinContract: (contract: ContractRow, validity: unknown) => void;
+  /** Rejects an entry, as it would be stored, that misses a required combination of fields. */
+  assertComplete?: (entry: Record<string, unknown>) => void;
   /** Stores data kept outside the entry's own row, in the same transaction. */
   saveChildren?: (db: Queryable, entryUID: string, data: Record<string, unknown>) => Promise<void>;
 }
@@ -104,6 +121,11 @@ export const premiumSpec: HistorySpec = {
   table: premiumsTable,
   schema: premiumSchema,
   validityColumn: 'validFrom',
+  assertComplete: (entry) => {
+    if (entry.monthlyPremium == null && entry.bonusRelevantPremium == null) {
+      throw badRequest('A premium needs a monthly premium or a bonus-relevant premium');
+    }
+  },
   assertWithinContract: (contract, validity) => {
     const validFrom = String(validity);
     if (validFrom < contract.contractBegin) {
@@ -163,8 +185,13 @@ async function replaceBonusTiers(
   await db.query('DELETE FROM ContractBonusTiers WHERE termsUID = ?', [termsUID]);
   if (tiers.length === 0) return;
   await db.batch(
-    'INSERT INTO ContractBonusTiers (termsUID, claimFreeYears, bonusAmount) VALUES (?, ?, ?)',
-    tiers.map((tier) => [termsUID, tier.claimFreeYears, tier.bonusAmount]),
+    'INSERT INTO ContractBonusTiers (termsUID, claimFreeYears, bonusAmount, bonusFactor) VALUES (?, ?, ?, ?)',
+    tiers.map((tier) => [
+      termsUID,
+      tier.claimFreeYears,
+      tier.bonusAmount ?? null,
+      tier.bonusFactor ?? null,
+    ]),
   );
 }
 
@@ -231,6 +258,7 @@ function createHistoryRouter(pool: Pool, config: AppConfig, spec: HistorySpec): 
       PERMISSIONS.MANAGE_CONTRACTS,
     );
     const data = spec.schema.parse(req.body);
+    spec.assertComplete?.(data);
     const entry = await withTransaction(pool, (conn) =>
       insertHistoryEntry(conn, spec.segment, contract, data),
     );
@@ -248,6 +276,7 @@ function createHistoryRouter(pool: Pool, config: AppConfig, spec: HistorySpec): 
     const entryUID = pathParam(req, 'entryUID');
     const entry = await loadEntry(contract.contractUID, entryUID);
     const data = spec.schema.partial().parse(req.body);
+    spec.assertComplete?.({ ...entry, ...data });
     const validity = data[spec.validityColumn] ?? entry[spec.validityColumn];
     spec.assertWithinContract(contract, validity);
     // The schema has no contractUID, so an entry can never move between contracts.
@@ -308,7 +337,7 @@ export async function listPremiumsWithValidity(
   contract: ContractRow,
 ): Promise<Row[]> {
   const rows = await db.query<Row[]>(
-    `SELECT premiumUID, validFrom, monthlyPremium, note FROM ContractPremiums
+    `SELECT premiumUID, validFrom, monthlyPremium, bonusRelevantPremium, note FROM ContractPremiums
       WHERE contractUID = ? AND premiumStatus <> -1 ORDER BY validFrom`,
     [contract.contractUID],
   );
@@ -330,7 +359,7 @@ interface TermsRow {
 
 /** Terms with their bonus scale (tiers ordered by claim-free years). */
 export interface TermsWithTiers extends Omit<TermsRow, 'contractUID'> {
-  bonusTiers: BonusTierInput[];
+  bonusTiers: BonusTier[];
 }
 
 /**
@@ -354,8 +383,8 @@ export async function loadTermsWithTiers(
       ORDER BY contractUID, validFromYear`,
     uids,
   );
-  const tiers = await db.query<Array<BonusTierInput & { termsUID: string }>>(
-    `SELECT b.termsUID, b.claimFreeYears, b.bonusAmount
+  const tiers = await db.query<Array<BonusTier & { termsUID: string }>>(
+    `SELECT b.termsUID, b.claimFreeYears, b.bonusAmount, b.bonusFactor
        FROM ContractBonusTiers b
        JOIN ContractTerms t ON t.termsUID = b.termsUID
       WHERE t.contractUID IN (${placeholders(uids)}) AND t.termsStatus <> -1
@@ -370,7 +399,11 @@ export async function loadTermsWithTiers(
       validFromYear: Number(row.validFromYear),
       bonusTiers: tiers
         .filter((tier) => tier.termsUID === row.termsUID)
-        .map(({ claimFreeYears, bonusAmount }) => ({ claimFreeYears, bonusAmount })),
+        .map(({ claimFreeYears, bonusAmount, bonusFactor }) => ({
+          claimFreeYears,
+          bonusAmount,
+          bonusFactor,
+        })),
     });
     byContract.set(contractUID, list);
   }

@@ -5,6 +5,7 @@ import { ref } from 'vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
+import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import type { TermsDto, TermsInput } from './api';
@@ -15,6 +16,9 @@ import type { TermsDto, TermsInput } from './api';
  * deductible is an annual figure and never changes mid-year. The scale is
  * bound to the terms, so new bonus amounts mean a new entry; a new entry
  * starts as a copy of `template` ("vom Vorjahr übernehmen").
+ *
+ * A step is either a factor in monthly bonus-relevant premiums — the insurer's
+ * standing rule, which carries on unchanged — or an amount in € (Slice 76).
  */
 const props = defineProps<
   FormDialogProps & {
@@ -35,8 +39,30 @@ const validFromYear = ref('');
 const deductible = ref<number | null>(null);
 const reimbursementCap = ref<number | null>(null);
 const reimbursementRate = ref('');
-/** Scale rows as edited; `years` stays a string until submit, like the year field. */
-const tiers = ref<Array<{ years: string; amount: number | null }>>([]);
+type TierKind = 'factor' | 'amount';
+
+/** Scale rows as edited; `years` and `factor` stay strings until submit, like the year field. */
+const tiers = ref<Array<{ years: string; kind: TierKind; factor: string; amount: number | null }>>(
+  [],
+);
+
+const kindOptions = [
+  { value: 'factor', label: 'Monatsbeiträge' },
+  { value: 'amount', label: 'Betrag in €' },
+];
+
+const factorFormat = new Intl.NumberFormat('de-DE', {
+  maximumFractionDigits: 2,
+  useGrouping: false,
+});
+
+/** A factor as typed in German, "1,5"; NaN unless it is positive with at most two decimals. */
+function parseFactor(text: string): number {
+  const trimmed = text.trim().replace(',', '.');
+  if (!/^\d{1,2}(\.\d{1,2})?$/.test(trimmed)) return NaN;
+  const value = Number(trimmed);
+  return value > 0 ? value : NaN;
+}
 const copiedFrom = ref<number | null>(null);
 
 const { shownError, fail, clear } = useFormDialog(
@@ -51,6 +77,8 @@ const { shownError, fail, clear } = useFormDialog(
     reimbursementRate.value = String(source?.reimbursementRate ?? 100);
     tiers.value = (source?.bonusTiers ?? []).map((tier) => ({
       years: String(tier.claimFreeYears),
+      kind: tier.bonusFactor !== null ? 'factor' : 'amount',
+      factor: tier.bonusFactor !== null ? factorFormat.format(tier.bonusFactor) : '',
       amount: tier.bonusAmount,
     }));
   },
@@ -59,7 +87,12 @@ const { shownError, fail, clear } = useFormDialog(
 
 function addTier(): void {
   const last = tiers.value.at(-1);
-  tiers.value.push({ years: last ? String(Number(last.years) + 1) : '1', amount: null });
+  tiers.value.push({
+    years: last ? String(Number(last.years) + 1) : '1',
+    kind: last?.kind ?? 'factor',
+    factor: '',
+    amount: null,
+  });
 }
 
 function submit(): void {
@@ -74,7 +107,8 @@ function submit(): void {
   }
   const bonusTiers = tiers.value.map((tier) => ({
     claimFreeYears: Number(tier.years),
-    bonusAmount: tier.amount ?? NaN,
+    bonusAmount: tier.kind === 'amount' ? (tier.amount ?? NaN) : null,
+    bonusFactor: tier.kind === 'factor' ? parseFactor(tier.factor) : null,
   }));
   if (
     bonusTiers.some(
@@ -82,10 +116,13 @@ function submit(): void {
         !Number.isInteger(tier.claimFreeYears) ||
         tier.claimFreeYears < 1 ||
         tier.claimFreeYears > 99 ||
-        Number.isNaN(tier.bonusAmount),
+        Number.isNaN(tier.bonusAmount) ||
+        Number.isNaN(tier.bonusFactor),
     )
   ) {
-    return fail('Jede Bonus-Stufe braucht leistungsfreie Jahre (1–99) und einen Betrag.');
+    return fail(
+      'Jede Bonus-Stufe braucht leistungsfreie Jahre (1–99) und einen Betrag oder einen Faktor (z. B. 1,5).',
+    );
   }
   if (new Set(bonusTiers.map((tier) => tier.claimFreeYears)).size !== bonusTiers.length) {
     return fail('Jede Anzahl leistungsfreier Jahre darf nur einmal vorkommen.');
@@ -121,12 +158,21 @@ function submit(): void {
       <fieldset class="eu-tiers">
         <legend>Bonus-Staffel (Beitragsrückerstattung)</legend>
         <p class="eu-form__note">
-          Absoluter Bonus je Stufe, gültig für die Jahre dieser Konditionen. Ohne Stufen hat die
-          Police keinen Bonus.
+          Je Stufe ein Faktor in Monatsbeiträgen – gerechnet mit dem Jahresdurchschnitt des
+          bonusrelevanten Beitrags – oder ein fester Betrag für die Jahre dieser Konditionen. Ohne
+          Stufen hat die Police keinen Bonus.
         </p>
         <div v-for="(tier, index) in tiers" :key="index" class="eu-tiers__row">
           <EuTextField v-model="tier.years" label="Leistungsfreie Jahre" type="number" />
-          <EuCurrencyField v-model="tier.amount" label="Bonus" />
+          <EuEntityPicker
+            :model-value="tier.kind"
+            label="Bonus als"
+            required
+            :options="kindOptions"
+            @update:model-value="tier.kind = ($event as TierKind | null) ?? tier.kind"
+          />
+          <EuTextField v-if="tier.kind === 'factor'" v-model="tier.factor" label="Monatsbeiträge" />
+          <EuCurrencyField v-else v-model="tier.amount" label="Bonus" />
           <EuButton
             variant="secondary"
             icon-only
@@ -173,7 +219,7 @@ function submit(): void {
 
 .eu-tiers__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 1fr) auto;
   align-items: end;
   gap: 0.75rem;
 }
@@ -183,7 +229,8 @@ function submit(): void {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .eu-tiers__row > :nth-child(2) {
+  .eu-tiers__row > :nth-child(2),
+  .eu-tiers__row > :nth-child(3) {
     grid-column: 1;
   }
 }

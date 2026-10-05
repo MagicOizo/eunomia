@@ -87,9 +87,9 @@ test('bonus scale and claim-free years', async (t) => {
       assert.equal(patched.status, 200);
       const detail = await request(app).get(base).set(admin);
       assert.deepEqual(detail.body.data.terms[0].bonusTiers, [
-        { claimFreeYears: 1, bonusAmount: 300 },
-        { claimFreeYears: 2, bonusAmount: 450 },
-        { claimFreeYears: 4, bonusAmount: 600 },
+        { claimFreeYears: 1, bonusAmount: 300, bonusFactor: null },
+        { claimFreeYears: 2, bonusAmount: 450, bonusFactor: null },
+        { claimFreeYears: 4, bonusAmount: 600, bonusFactor: null },
       ]);
       assert.equal(detail.body.data.terms[0].deductible, 200);
     });
@@ -102,6 +102,84 @@ test('bonus scale and claim-free years', async (t) => {
         ],
       });
       assert.equal(res.status, 400);
+    });
+
+    await t.test('a tier needs exactly one of amount and factor', async () => {
+      for (const tier of [
+        { claimFreeYears: 1 },
+        { claimFreeYears: 1, bonusAmount: 300, bonusFactor: 1 },
+        { claimFreeYears: 1, bonusFactor: 0 },
+      ]) {
+        const res = await send('patch', `${base}/terms/${termsUID}`, { bonusTiers: [tier] });
+        assert.equal(res.status, 400, JSON.stringify(tier));
+      }
+    });
+
+    await t.test('factor tiers forecast from the average bonus-relevant premium', async () => {
+      const factorUID = (
+        await send('post', '/api/v1/contracts', {
+          contractNumber: 'PKV-F',
+          companyUID,
+          accountUID: accountB,
+          contractBegin: '2022-01-01',
+          contractEnd: '2023-12-31',
+          initialMonthlyPremium: 520,
+          initialBonusRelevantPremium: 400,
+          initialDeductible: 0,
+        })
+      ).body.data.contractUID as string;
+      const factorBase = `/api/v1/contracts/${factorUID}`;
+      const detail = async () => (await request(app).get(factorBase).set(admin)).body.data;
+
+      const terms = (await detail()).terms[0].termsUID as string;
+      const scaled = await send('patch', `${factorBase}/terms/${terms}`, {
+        bonusTiers: [
+          { claimFreeYears: 1, bonusFactor: 1 },
+          { claimFreeYears: 2, bonusFactor: 1.5 },
+        ],
+      });
+      assert.equal(scaled.status, 200);
+      const adjusted = await send('post', `${factorBase}/premiums`, {
+        validFrom: '2023-07-01',
+        bonusRelevantPremium: 420,
+      });
+      assert.equal(adjusted.status, 201);
+      assert.equal(adjusted.body.data.monthlyPremium, null);
+
+      const data = await detail();
+      assert.deepEqual(
+        data.premiums.map((p: { monthlyPremium: number | null; bonusRelevantPremium: number }) => [
+          p.monthlyPremium,
+          p.bonusRelevantPremium,
+        ]),
+        [
+          [520, 400],
+          [null, 420],
+        ],
+      );
+      assert.deepEqual(
+        data.years.map(
+          (y: YearDto & { bonusFactor: number | null; relevantPremiumAverage: number | null }) => [
+            y.year,
+            y.expectedBonus,
+            y.bonusFactor,
+            y.relevantPremiumAverage,
+            y.tiersInherited,
+          ],
+        ),
+        [
+          [2022, 400, 1, 400, false],
+          [2023, 615, 1.5, 410, false],
+        ],
+      );
+
+      const premiumUID = data.premiums[1].premiumUID as string;
+      const emptied = await send('patch', `${factorBase}/premiums/${premiumUID}`, {
+        bonusRelevantPremium: null,
+      });
+      assert.equal(emptied.status, 400, 'a premium keeps at least one figure');
+      const neither = await send('post', `${factorBase}/premiums`, { validFrom: '2023-09-01' });
+      assert.equal(neither.status, 400);
     });
 
     await t.test('without claims the streak counts on from the start value', async () => {

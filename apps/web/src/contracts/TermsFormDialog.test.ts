@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
+import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import TermsFormDialog from './TermsFormDialog.vue';
 import type { TermsDto, TermsInput } from './api';
@@ -23,8 +24,8 @@ const previousYear: TermsDto = {
   reimbursementCap: 2000,
   reimbursementRate: 80,
   bonusTiers: [
-    { claimFreeYears: 2, bonusAmount: 300 },
-    { claimFreeYears: 1, bonusAmount: 150 },
+    { claimFreeYears: 2, bonusAmount: 300, bonusFactor: null },
+    { claimFreeYears: 1, bonusAmount: 150, bonusFactor: null },
   ],
 };
 
@@ -110,8 +111,8 @@ describe('TermsFormDialog: taking the previous year over', () => {
       reimbursementRate: 80,
       // Entered 2 before 1 in the template; the API gets them in order.
       bonusTiers: [
-        { claimFreeYears: 1, bonusAmount: 150 },
-        { claimFreeYears: 2, bonusAmount: 300 },
+        { claimFreeYears: 1, bonusAmount: 150, bonusFactor: null },
+        { claimFreeYears: 2, bonusAmount: 300, bonusFactor: null },
       ],
     });
   });
@@ -171,5 +172,100 @@ describe('TermsFormDialog: taking the previous year over', () => {
 
     expect(submitted(wrapper)).toBeUndefined();
     expect(wrapper.text()).toContain('Jede Bonus-Stufe braucht leistungsfreie Jahre (1–99)');
+  });
+});
+
+describe('TermsFormDialog: steps as a factor of the monthly premium (Slice 76)', () => {
+  const factorYear: TermsDto = {
+    ...previousYear,
+    bonusTiers: [
+      { claimFreeYears: 1, bonusAmount: null, bonusFactor: 1 },
+      { claimFreeYears: 3, bonusAmount: null, bonusFactor: 1.5 },
+    ],
+  };
+
+  const addTier = async (wrapper: Wrapper) => {
+    const add = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Stufe hinzufügen'));
+    await add?.trigger('click');
+  };
+
+  it('shows a factor in German and submits it as a number', async () => {
+    const wrapper = mountDialog({ template: factorYear });
+    await flushPromises();
+
+    expect(textField(wrapper, 'Monatsbeiträge').props('modelValue')).toBe('1');
+    const factors = wrapper
+      .findAllComponents(EuTextField)
+      .filter((field) => field.props('label') === 'Monatsbeiträge');
+    expect(factors.map((field) => field.props('modelValue'))).toEqual(['1', '1,5']);
+
+    await submit(wrapper);
+
+    expect(submitted(wrapper)?.bonusTiers).toEqual([
+      { claimFreeYears: 1, bonusAmount: null, bonusFactor: 1 },
+      { claimFreeYears: 3, bonusAmount: null, bonusFactor: 1.5 },
+    ]);
+  });
+
+  it('a new step takes the kind of the last one and reads a comma factor', async () => {
+    const wrapper = mountDialog({ template: factorYear });
+    await flushPromises();
+    await addTier(wrapper);
+
+    const rows = wrapper.findAll('.eu-tiers__row');
+    expect(rows).toHaveLength(3);
+    const last = rows[2];
+    expect(last.findAll('input')[0].element.value).toBe('4');
+    await last.findAll('input').at(-1)!.setValue('2,25');
+
+    await submit(wrapper);
+
+    expect(submitted(wrapper)?.bonusTiers.at(-1)).toEqual({
+      claimFreeYears: 4,
+      bonusAmount: null,
+      bonusFactor: 2.25,
+    });
+  });
+
+  it('refuses a factor that is not a positive number with at most two decimals', async () => {
+    for (const typed of ['0', '1,555', 'zwei', '']) {
+      const wrapper = mountDialog({ template: factorYear });
+      await flushPromises();
+      const [first] = wrapper.findAll('.eu-tiers__row');
+      await first.findAll('input').at(-1)!.setValue(typed);
+
+      await submit(wrapper);
+
+      expect(submitted(wrapper), typed).toBeUndefined();
+      expect(wrapper.text()).toContain('einen Betrag oder einen Faktor');
+      wrapper.unmount();
+    }
+  });
+
+  it('switching a step to an amount sends the amount instead of the factor', async () => {
+    const wrapper = mountDialog({ template: factorYear });
+    await flushPromises();
+    const [firstKind] = wrapper.findAllComponents(EuEntityPicker);
+    firstKind.vm.$emit('update:modelValue', 'amount');
+    await flushPromises();
+    await currencyField(wrapper, 'Bonus').vm.$emit('update:modelValue', 320);
+
+    await submit(wrapper);
+
+    expect(submitted(wrapper)?.bonusTiers[0]).toEqual({
+      claimFreeYears: 1,
+      bonusAmount: 320,
+      bonusFactor: null,
+    });
+  });
+
+  it('starts a scale with factor steps when there is none yet', async () => {
+    const wrapper = mountDialog({ template: null });
+    await flushPromises();
+    await addTier(wrapper);
+
+    expect(textField(wrapper, 'Monatsbeiträge').exists()).toBe(true);
   });
 });

@@ -26,14 +26,21 @@ export interface PremiumDto {
   premiumUID: string;
   validFrom: string;
   validTo: string | null;
-  monthlyPremium: number;
+  /** The full monthly premium (information only); null when only the relevant one is known. */
+  monthlyPremium: number | null;
+  /** The part of the premium a factor tier multiplies; at least one of the two is set. */
+  bonusRelevantPremium: number | null;
   note: string | null;
 }
 
-/** One step of a bonus scale: from this many claim-free years on, this bonus in €. */
+/**
+ * One step of a bonus scale: from this many claim-free years on, a bonus of
+ * either an amount in € or a factor in monthly bonus-relevant premiums.
+ */
 export interface BonusTierDto {
   claimFreeYears: number;
-  bonusAmount: number;
+  bonusAmount: number | null;
+  bonusFactor: number | null;
 }
 
 /** Terms (Konditionen) valid from a year; `validToYear` is derived by the API. */
@@ -59,8 +66,14 @@ export interface BonusYearDto {
   expectedBonus: number | null;
   hasBonusScale: boolean;
   termsFromYear: number | null;
-  /** The scale was taken over from an earlier year ("nicht aktualisiert"). */
+  /** The reached amount was taken over from an earlier year ("nicht aktualisiert"). */
   tiersInherited: boolean;
+  /** Factor of the reached tier, null for an amount tier. */
+  bonusFactor: number | null;
+  /** The year's average bonus-relevant monthly premium; null if a month lacks one. */
+  relevantPremiumAverage: number | null;
+  /** The reached tier is a factor, but a running month has no bonus-relevant premium. */
+  premiumMissing: boolean;
   actualBonus: number | null;
   bonusForfeitedOverride: boolean | null;
   note: string | null;
@@ -90,7 +103,10 @@ export interface ContractDetailDto {
   years: BonusYearDto[];
 }
 
-export type PremiumInput = Pick<PremiumDto, 'validFrom' | 'monthlyPremium' | 'note'>;
+export type PremiumInput = Pick<
+  PremiumDto,
+  'validFrom' | 'monthlyPremium' | 'bonusRelevantPremium' | 'note'
+>;
 export type TermsInput = Pick<
   TermsDto,
   'validFromYear' | 'deductible' | 'reimbursementCap' | 'reimbursementRate' | 'bonusTiers'
