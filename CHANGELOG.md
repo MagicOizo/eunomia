@@ -7,6 +7,23 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.20.0-slice.4 — 2026-10-05
+
+- **The figures for a start page that says something.** The start page is about to trade its
+  shortcut cards for a dashboard; this preview delivers its numbers, the page follows in the next
+  one. A new endpoint, `GET /api/v1/dashboard`, sums up everything the user may see: how many
+  invoices since the first one, what they came to, what was reimbursed, what the household carried
+  itself — everything not reimbursed, including invoices still under way and those no insurance
+  covers — and the bonus actually paid out, in total and per treatment year. Per insured person it
+  tells how much is still to be paid (and how much of it is due or overdue, by the same rule as the
+  payment reminders), how many invoices are still on their way to a reimbursement, and for each
+  running policy how much deductible is left this year and which bonus is at stake. Those last
+  figures come from the reimbursement plan itself, so the start page and the plan cannot disagree.
+  Each figure is only counted where the user could see it anyway: invoices need the right to view
+  invoices, policies and bonus the right to view contracts.
+- The README named an endpoint for the reimbursement calculation that does not exist; it now names
+  the reimbursement plan per insured person.
+
 ## 0.20.0-slice.3 — 2026-10-05
 
 - **Leistungsabrechnungen can be found across every policy.** Until now a billing could only be

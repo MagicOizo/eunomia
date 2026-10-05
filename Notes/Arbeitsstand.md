@@ -76,7 +76,18 @@ Bindestrich dreimal unbemerkt das Docker-`:latest` verschoben hat. 5a steht vor 
       Schalter zeigt dort also nur „keine“. Zum Nachfahren liegen in den Dev-Daten jetzt
       `LA-2026-901` (PKV-2020-0001) und `LA-2026-902` (ZV-2022-0042), angelegt über die Oberfläche;
       `npm run dev:reset` räumt sie wieder ab.
-- [ ] **5a — Das Dashboard: die Zahlen** (`0.20.0-slice.4`). 0.15.0-3, API-Hälfte.
+- [x] **5a — Das Dashboard: die Zahlen** (`0.20.0-slice.4`). 0.15.0-3, API-Hälfte.
+      Umgesetzt mit v0.20.0-slice.4 (Slice 74). `GET /api/v1/dashboard` — Gesamt seit der ersten
+      Rechnung, Jahresreihe nach Behandlungsjahr (inkl. reiner Bonus-Jahre), je Person unbezahlt
+      (Ampel-Regel der Erinnerungen, deren Zeitzone) und Erstattungsweg offen, je laufender Police
+      Rest-Selbstbeteiligung und Bonus — aus `loadReimbursementPlan`, dem herausgezogenen Lader des
+      Erstattungsplans, damit beide dasselbe sagen. Jeder Block unter seinem eigenen Recht; Policen
+      je Person nur mit `VIEW_INVOICES` **und** `VIEW_CONTRACTS`.
+      Für 5b: die Antwort hat `since`, `totals`, `years[]` (aufsteigend, mit `bonusPaid`) und
+      `accounts[]` mit `payment`, `workflow`, `year`, `policies[]`; Beträge in Euro als Zahl.
+      Gewarnt sei vor der README: sie nannte `GET /contracts/:uid/reimbursement-analysis`, das es
+      nicht gibt — nachgezogen auf den Erstattungsplan; wie die Endpunkt-Tabelle aus Slice 72 von
+      keinem Test gedeckt.
 - [ ] **5b — Das Dashboard: die Seite** (`0.20.0-slice.5`). 0.15.0-3, Web-Hälfte.
 - [ ] **Release 0.20.0**, danach die Entscheidung zu 1.0.0 (§2.9: eine Entscheidung des Autors am
       Produktionsstand).

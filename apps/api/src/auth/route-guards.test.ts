@@ -74,6 +74,9 @@ const DECLARED: Record<string, Declared> = {
   'GET /api/v1/accounts/:accountUID/reimbursement-plan': handler('authorizeAccount(VIEW_INVOICES)'),
 
   'GET /api/v1/contracts': handler('accountFilter(VIEW_CONTRACTS)'),
+  'GET /api/v1/dashboard': handler(
+    'accountFilter per figure: VIEW_INVOICES, VIEW_CONTRACTS, VIEW_ACCOUNTS (dashboard.ts)',
+  ),
   'GET /api/v1/contracts/:uid': handler('loadAuthorizedContract(VIEW_CONTRACTS)'),
   'POST /api/v1/contracts': handler("hasPermission(MANAGE_CONTRACTS, body's accountUID)"),
   'PATCH /api/v1/contracts/:uid': handler('loadAuthorizedContract(MANAGE_CONTRACTS)'),

@@ -19,6 +19,7 @@ import {
 } from './domain/contract-history.js';
 import { createContractYearsRouter } from './domain/contract-years.js';
 import { createContractsRouter } from './domain/contracts.js';
+import { createDashboardRouter } from './domain/dashboard.js';
 import { createFacilitiesRouter } from './domain/facilities.js';
 import { createInsuranceCompaniesRouter } from './domain/insurance-companies.js';
 import { createInvoicesRouter } from './domain/invoices.js';
@@ -77,6 +78,7 @@ export const API_MOUNTS: ReadonlyArray<{
   { path: '/api/v1/billings', create: createServiceBillingsRouter },
   { path: '/api/v1/allocations', create: createAllocationsRouter },
   { path: '/api/v1/trash', create: createTrashRouter },
+  { path: '/api/v1/dashboard', create: createDashboardRouter },
 ];
 
 /**

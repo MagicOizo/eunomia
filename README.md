@@ -323,8 +323,16 @@ the manual "billed" mark and whether it was paid. An invoice can be submitted to
 (e.g. the remainder to a supplementary insurance), but to each policy at most once and never to
 one it is marked as not reimbursable under; an `allocation` may only link an invoice and a billing
 of the same policy (the invoice submitted there), and all refunds of an invoice together never exceed its amount.
-`GET /api/v1/contracts/:uid/reimbursement-analysis?year=YYYY` runs the deductible/bonus/cap
-calculation and reports whether submitting is worthwhile.
+`GET /api/v1/accounts/:uid/reimbursement-plan?year=YYYY` runs the deductible/bonus/cap
+calculation over all policies of one insured person and reports where submitting is worthwhile.
+
+**Dashboard** — `GET /api/v1/dashboard` gathers the start page's figures over everything the caller
+may see: invoices, reimbursements, the self-borne rest and the bonus actually paid, in total since
+the first invoice and per treatment year; per insured person what is still unpaid and what is still
+under way, and how the running year stands at each policy (deductible left, bonus at stake — the
+same numbers as the reimbursement plan). Each figure is read under the permission of the way it
+otherwise comes from (`VIEW_INVOICES`, `VIEW_CONTRACTS`, `VIEW_ACCOUNTS`); without any, the answer
+is empty rather than a 403.
 
 **Bonus & claim-free years** (per policy, `VIEW_CONTRACTS` / `MANAGE_CONTRACTS`): a policy's
 yearly terms (`POST/PATCH /api/v1/contracts/:uid/terms`) carry its bonus scale (`bonusTiers`:
