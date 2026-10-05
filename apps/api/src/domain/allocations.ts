@@ -43,6 +43,13 @@ export const allocationEntriesSchema = z.object({
         invoiceUID: z.string().regex(entityIdPattern(ENTITY_PREFIX.invoice)),
         receiptNumber: z.string().trim().min(1).max(50).nullish(),
         reimbursement: z.number().min(0).max(99999999.99),
+        /**
+         * "Als abgerechnet markiert" in the same step (issues.md 0.15.0-4): the
+         * letter is often known to be the last word on this invoice. Only `true`
+         * is accepted — a booking may close an invoice but never reopen one;
+         * that stays with `PATCH /invoices/:uid`.
+         */
+        reimbursementClosed: z.literal(true).optional(),
       }),
     )
     .min(1)
@@ -173,6 +180,12 @@ function assertEntriesBookable(candidates: CandidateInvoice[], entries: Allocati
  * its policy, all or nothing — they may come from several submissions. The
  * invoices are locked first so concurrent bookings (and amount edits) are
  * checked against the same totals.
+ *
+ * An entry may also close its invoice. That mark belongs to the same
+ * transaction, so a refused booking closes nothing. The rule the invoice PATCH
+ * checks for it — only a submitted invoice can be marked as billed — needs no
+ * second look here: `assertEntriesBookable` already refused every invoice not
+ * submitted at this billing's policy.
  */
 export async function createAllocationsForBilling(
   pool: Pool,
@@ -201,11 +214,21 @@ export async function createAllocationsForBilling(
     const candidates = await loadCandidates(conn, billing.contractUID, invoiceUIDs);
     assertEntriesBookable(candidates, entries);
 
-    return insertManyRows(
+    // `reimbursementClosed` rides along harmlessly: insertManyRows writes only
+    // the table's own columns. It belongs to the invoice, written below.
+    const created = await insertManyRows(
       conn,
       allocationsTable,
       entries.map((entry) => ({ ...entry, billingUID })),
     );
+    const closing = entries.filter((e) => e.reimbursementClosed).map((e) => e.invoiceUID);
+    if (closing.length > 0) {
+      await conn.query(
+        `UPDATE Invoices SET reimbursementClosed = 1 WHERE invoiceUID IN (${placeholders(closing)})`,
+        closing,
+      );
+    }
+    return created;
   });
 }
 

@@ -151,6 +151,19 @@ describe('BillingsView: booking several invoices at once', () => {
     expect(listCalls()).toBe(3);
   });
 
+  it('hands a card’s closing mark to the booking itself, not to a second request', async () => {
+    // issues.md 0.15.0-4: the mark travels with its entry, so a refused booking
+    // cannot leave an invoice closed.
+    const wrapper = await mountView();
+    await openBooking(wrapper);
+    const closing = [{ ...entries[0], reimbursementClosed: true as const }, entries[1]];
+
+    await book(wrapper, { billingUID: 's-1', entries: closing });
+
+    expect(createAllocations).toHaveBeenCalledWith('s-1', closing);
+    expect(updateBilling).not.toHaveBeenCalled();
+  });
+
   it('writes a changed bonus-forfeit flag only after the amounts went through', async () => {
     const wrapper = await mountView();
     await openBooking(wrapper);

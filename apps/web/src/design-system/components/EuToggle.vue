@@ -5,23 +5,26 @@ import { useId } from 'vue';
  * A slider-style boolean toggle (nicer than a bare checkbox for on/off flags).
  * `bare` is for the display mask, which prints the label in its own column: the
  * text is dropped here but stays as the accessible name, so the screen reader
- * does not meet a nameless checkbox.
+ * does not meet a nameless checkbox. `disabled` shows a value that is not the
+ * user's to change here — it still reads out, it just cannot be flipped.
  */
-withDefaults(defineProps<{ modelValue: boolean; label: string; bare?: boolean }>(), {
-  bare: false,
-});
+withDefaults(
+  defineProps<{ modelValue: boolean; label: string; bare?: boolean; disabled?: boolean }>(),
+  { bare: false, disabled: false },
+);
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 const inputId = useId();
 </script>
 
 <template>
-  <label :for="inputId" class="eu-toggle">
+  <label :for="inputId" class="eu-toggle" :class="{ 'is-disabled': disabled }">
     <input
       :id="inputId"
       type="checkbox"
       class="eu-toggle__input"
       :checked="modelValue"
+      :disabled="disabled"
       :aria-label="bare ? label : undefined"
       @change="emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
     />
@@ -48,6 +51,12 @@ const inputId = useId();
   gap: 0.6rem;
   font-family: var(--eu-font-data);
   cursor: pointer;
+}
+
+/* The same dimming a disabled button gets. */
+.eu-toggle.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* Visually hidden but still focusable/announced. */

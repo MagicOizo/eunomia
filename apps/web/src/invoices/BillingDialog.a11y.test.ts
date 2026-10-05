@@ -164,6 +164,86 @@ describe('BillingDialog amount shortcut', () => {
   });
 });
 
+/**
+ * "Als abgerechnet markieren" per card (issues.md 0.15.0-4): one letter can be
+ * the last word on one invoice and only part of the answer for another.
+ */
+describe('BillingDialog closing mark', () => {
+  type Wrapper = Awaited<ReturnType<typeof openDialog>>;
+
+  async function enterAmount(wrapper: Wrapper, card: number, amount: number) {
+    wrapper.findAllComponents(EuCurrencyField)[card].vm.$emit('update:modelValue', amount);
+    await flushPromises();
+  }
+
+  function closeSwitch(wrapper: Wrapper, card: number) {
+    return wrapper.findAll('.eu-bill__card')[card].get<HTMLInputElement>('.eu-bill__close input');
+  }
+
+  async function save(wrapper: Wrapper) {
+    const button = wrapper.findAll('button').find((b) => b.text() === 'Speichern');
+    if (!button) throw new Error('no Speichern button');
+    await button.trigger('click');
+    const submitted = wrapper.emitted('submit');
+    if (!submitted) throw new Error(`nothing submitted: ${wrapper.text()}`);
+    return (submitted[0][0] as { entries: Array<Record<string, unknown>> }).entries;
+  }
+
+  it('is off by default and sends nothing', async () => {
+    const wrapper = await openDialog();
+    await enterAmount(wrapper, 0, 100);
+    await enterAmount(wrapper, 1, 100);
+
+    expect(closeSwitch(wrapper, 0).element.checked).toBe(false);
+    expect(closeSwitch(wrapper, 0).element.disabled).toBe(false);
+    const entries = await save(wrapper);
+    expect(entries.map((e) => e.reimbursementClosed)).toEqual([undefined, undefined]);
+    wrapper.unmount();
+  });
+
+  it('closes only the invoice whose card says so', async () => {
+    const wrapper = await openDialog();
+    await enterAmount(wrapper, 0, 100);
+    await enterAmount(wrapper, 1, 100);
+    await closeSwitch(wrapper, 0).setValue(true);
+
+    const entries = await save(wrapper);
+    expect(entries.map((e) => [e.invoiceUID, e.reimbursementClosed])).toEqual([
+      ['i-R-1', true],
+      ['i-R-2', undefined],
+    ]);
+    wrapper.unmount();
+  });
+
+  it('stands on and locked where the amount pays off what is open, and is not sent', async () => {
+    const wrapper = await openDialog();
+    // Switched on first, then the amount grows to the open 400: the amount
+    // decides now, and a stored mark would outlive a later correction of it.
+    await closeSwitch(wrapper, 0).setValue(true);
+    await enterAmount(wrapper, 0, 400);
+    await enterAmount(wrapper, 1, 100);
+
+    expect(closeSwitch(wrapper, 0).element.checked).toBe(true);
+    expect(closeSwitch(wrapper, 0).element.disabled).toBe(true);
+    expect(wrapper.findAll('.eu-bill__card')[0].text()).toContain('voll erstattet');
+    expect(wrapper.findAll('.eu-bill__card')[1].text()).not.toContain('voll erstattet');
+
+    const entries = await save(wrapper);
+    expect(entries.map((e) => e.reimbursementClosed)).toEqual([undefined, undefined]);
+    wrapper.unmount();
+  });
+
+  it('has no accessibility violations with a switch locked', async () => {
+    const wrapper = await openDialog();
+    await enterAmount(wrapper, 0, 400);
+    const results = await axe.run(wrapper.element, {
+      rules: { 'color-contrast': { enabled: false } },
+    });
+    expect(results.violations).toEqual([]);
+    wrapper.unmount();
+  });
+});
+
 describe('BillingDialog with several invoices', () => {
   it('shows a card per invoice with its own amount field', async () => {
     const wrapper = await openDialog();

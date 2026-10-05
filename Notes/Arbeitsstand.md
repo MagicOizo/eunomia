@@ -60,7 +60,13 @@ Bindestrich dreimal unbemerkt das Docker-`:latest` verschoben hat. 5a steht vor 
       Gewarnt sei vor `z.preprocess`: dass `bicField.nullish()` „kein BIC" nicht plötzlich als
       Fehler liest, hängt daran, dass zod Nullable/Optional **vor** dem Effect auswertet. Das ist im
       Unit-Test festgenagelt, damit es beim nächsten zod-Sprung nicht stillschweigend kippt.
-- [ ] **3 — Abgerechnet schon bei der Zuordnung** (`0.20.0-slice.2`). 0.15.0-4.
+- [x] **3 — Abgerechnet schon bei der Zuordnung** (`0.20.0-slice.2`). 0.15.0-4.
+      Umgesetzt mit v0.20.0-slice.2 (Slice 72). Ein Schalter je Karte im Zuordnen-Dialog; die
+      Markierung reist mit ihrem Eintrag und wird in derselben Transaktion geschrieben wie die
+      Beträge. Ist das Offene gedeckt, steht der Schalter an und gesperrt und wird nicht geschickt.
+      Gewarnt sei vor der README: ihre Endpunkt-Tabelle nannte `POST /api/v1/allocations`, einen
+      Weg, den es seit dem Umbau auf billing-gebundene Buchung nicht mehr gibt — nachgezogen, aber
+      die Tabelle ist von keinem Test gedeckt und kann wieder still veralten.
 - [ ] **4 — Leistungsabrechnungen finden** (`0.20.0-slice.3`). 0.15.0-5; reines Web, die API kann es
       schon.
 - [ ] **5a — Das Dashboard: die Zahlen** (`0.20.0-slice.4`). 0.15.0-3, API-Hälfte.

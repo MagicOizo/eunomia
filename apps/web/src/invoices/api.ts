@@ -319,6 +319,8 @@ export interface AllocationEntry {
   invoiceUID: string;
   reimbursement: number;
   receiptNumber?: string;
+  /** Marks the invoice "als abgerechnet" with the booking; a booking never reopens one. */
+  reimbursementClosed?: true;
 }
 
 /**

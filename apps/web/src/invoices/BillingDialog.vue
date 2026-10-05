@@ -32,6 +32,12 @@ import { usePresetToggle } from './forfeit-toggle';
  * letter of the insurer regularly answers invoices handed in on different days,
  * so a booking may mix submissions (Slice 37). Each card therefore names the day
  * its invoice was handed in.
+ *
+ * A card can also mark its invoice "als abgerechnet" in the same step (issues.md
+ * 0.15.0-4) — the letter is often known to be the last word on it. Where the
+ * amount covers what is open, the switch stands on and locked and is not sent:
+ * the invoice is abgerechnet by its amount, and a stored mark would outlive a
+ * later correction of that amount.
  */
 const props = defineProps<
   FormDialogProps & {
@@ -57,7 +63,12 @@ const emit = defineEmits<{
   submit: [
     payload: {
       billingUID: string;
-      entries: Array<{ invoiceUID: string; reimbursement: number; receiptNumber?: string }>;
+      entries: Array<{
+        invoiceUID: string;
+        reimbursement: number;
+        receiptNumber?: string;
+        reimbursementClosed?: true;
+      }>;
       /** Only set when it differs from what the billing stores. */
       forfeitsBonus?: boolean;
     },
@@ -67,7 +78,11 @@ const emit = defineEmits<{
 interface EntryInput {
   reimbursement: number | null;
   receiptNumber: string;
+  /** The user's "als abgerechnet markieren"; see fullyCovered() for when it is moot. */
+  close: boolean;
 }
+
+const emptyEntry = (): EntryInput => ({ reimbursement: null, receiptNumber: '', close: false });
 
 const rows = ref<InvoiceDto[]>([]);
 const entries = reactive<Record<string, EntryInput>>({});
@@ -205,10 +220,16 @@ function takeAmount(invoiceUID: string, amount: number): void {
   if (entry) entry.reimbursement = amount;
 }
 
+/** Whether the amount entered on this card pays off everything still open. */
+function fullyCovered(invoice: InvoiceDto): boolean {
+  const amount = entries[invoice.invoiceUID]?.reimbursement ?? null;
+  return amount !== null && Math.round(amount * 100) >= Math.round(invoice.remainingAmount * 100);
+}
+
 function resetEntries(): void {
   for (const key of Object.keys(entries)) delete entries[key];
   for (const invoice of rows.value) {
-    entries[invoice.invoiceUID] = { reimbursement: null, receiptNumber: '' };
+    entries[invoice.invoiceUID] = emptyEntry();
   }
 }
 
@@ -263,7 +284,7 @@ function addInvoice(uid: string | null): void {
   // of leaving "please pick an invoice" standing over the invoice just picked.
   clear();
   rows.value = [...rows.value, invoice];
-  entries[invoice.invoiceUID] = { reimbursement: null, receiptNumber: '' };
+  entries[invoice.invoiceUID] = emptyEntry();
 }
 
 function removeInvoice(uid: string): void {
@@ -329,6 +350,7 @@ function submit(): void {
         invoiceUID: invoice.invoiceUID,
         reimbursement: input.reimbursement ?? 0,
         ...(input.receiptNumber.trim() ? { receiptNumber: input.receiptNumber.trim() } : {}),
+        ...(input.close && !fullyCovered(invoice) ? { reimbursementClosed: true as const } : {}),
       };
     }),
     ...(changed ? { forfeitsBonus: forfeit.value.value } : {}),
@@ -432,12 +454,26 @@ function submit(): void {
               @click="removeInvoice(invoice.invoiceUID)"
             />
           </div>
-          <div class="eu-bill__fields" role="group" :aria-labelledby="numberId(invoice.invoiceUID)">
-            <EuCurrencyField
-              v-model="entries[invoice.invoiceUID].reimbursement"
-              label="Erstattung"
-            />
-            <EuTextField v-model="entries[invoice.invoiceUID].receiptNumber" label="Belegnummer" />
+          <div class="eu-bill__entry" role="group" :aria-labelledby="numberId(invoice.invoiceUID)">
+            <div class="eu-bill__fields">
+              <EuCurrencyField
+                v-model="entries[invoice.invoiceUID].reimbursement"
+                label="Erstattung"
+              />
+              <EuTextField
+                v-model="entries[invoice.invoiceUID].receiptNumber"
+                label="Belegnummer"
+              />
+            </div>
+            <div class="eu-bill__close">
+              <EuToggle
+                :model-value="fullyCovered(invoice) || entries[invoice.invoiceUID].close"
+                :disabled="fullyCovered(invoice)"
+                label="Als abgerechnet markieren"
+                @update:model-value="entries[invoice.invoiceUID].close = $event"
+              />
+              <span v-if="fullyCovered(invoice)" class="eu-bill__covered">voll erstattet</span>
+            </div>
           </div>
         </li>
       </ul>
@@ -563,9 +599,29 @@ function submit(): void {
   text-decoration-style: solid;
 }
 
+.eu-bill__entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .eu-bill__fields {
   display: flex;
   gap: 0.75rem;
+}
+
+/* Centred, not on the baseline: the toggle's baseline is its empty track, which
+   dropped the note below the label's text. */
+.eu-bill__close {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.eu-bill__covered {
+  color: var(--eu-color-text-muted);
+  font-family: var(--eu-font-data);
+  font-size: 0.85rem;
 }
 
 .eu-bill__fields > * {

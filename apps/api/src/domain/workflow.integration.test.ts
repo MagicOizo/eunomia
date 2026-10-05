@@ -803,6 +803,67 @@ test('invoice workflow: full loop, invariants and scoping', async (t) => {
       }
     });
 
+    await t.test('a booking closes the invoices it is told to, and only those', async () => {
+      // issues.md 0.15.0-4: "als abgerechnet markiert" in the same step as the
+      // amount, so a partly reimbursed invoice need not be opened again later.
+      const invB5 = await makeInvoice(accountB, 50, 'R-B5');
+      const invB6 = await makeInvoice(accountB, 50, 'R-B6');
+      await post('/api/v1/submissions', {
+        contractUID: contractB,
+        submittedDate: '2024-06-01',
+        invoiceUIDs: [invB5, invB6],
+      });
+      const billing = (
+        await post('/api/v1/billings', {
+          contractUID: contractB,
+          billingDate: '2024-06-10',
+          billingNumber: 'LA-B-closing',
+        })
+      ).body.data.billingUID as string;
+      const invoice = async (uid: string) =>
+        (await request(app).get(`/api/v1/invoices/${uid}`).set(admin)).body.data;
+
+      // A booking closes, it never reopens: `false` is not something to send.
+      const reopening = await post(`/api/v1/billings/${billing}/allocations`, {
+        entries: [{ invoiceUID: invB5, reimbursement: 10, reimbursementClosed: false }],
+      });
+      assert.equal(reopening.status, 400);
+
+      // All or nothing covers the mark too: a refused booking closes nothing.
+      const refused = await post(`/api/v1/billings/${billing}/allocations`, {
+        entries: [
+          { invoiceUID: invB5, reimbursement: 10, reimbursementClosed: true },
+          { invoiceUID: invB6, reimbursement: 50.01 },
+        ],
+      });
+      assert.equal(refused.status, 409);
+      assert.equal((await invoice(invB5)).reimbursementClosed, false);
+      assert.equal((await invoice(invB5)).workflowStatus, 'eingereicht');
+
+      const booked = await post(`/api/v1/billings/${billing}/allocations`, {
+        entries: [
+          { invoiceUID: invB5, reimbursement: 10, reimbursementClosed: true },
+          { invoiceUID: invB6, reimbursement: 20 },
+        ],
+      });
+      assert.equal(booked.status, 201);
+      const closed = await invoice(invB5);
+      assert.equal(closed.reimbursementClosed, true);
+      assert.equal(closed.workflowStatus, 'abgerechnet');
+      const open = await invoice(invB6);
+      assert.equal(open.reimbursementClosed, false);
+      assert.equal(open.workflowStatus, 'teilabgerechnet');
+
+      // Taken back out, like the case above, so the counts further down hold.
+      assert.equal(
+        (await request(app).delete(`/api/v1/billings/${billing}`).set(admin)).status,
+        204,
+      );
+      for (const uid of [invB5, invB6]) {
+        assert.equal((await request(app).delete(`/api/v1/invoices/${uid}`).set(admin)).status, 204);
+      }
+    });
+
     await t.test('more booked entries than a letter can carry are refused', async () => {
       // The upper bound matters because every entry is its own row in ONE
       // transaction, with every invoice locked FOR UPDATE (SEC-11). Asserted on

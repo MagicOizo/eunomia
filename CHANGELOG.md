@@ -7,6 +7,18 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 0.20.0-slice.2 — 2026-10-05
+
+- **An invoice can be marked as billed while its reimbursement is booked.** Entering a
+  Leistungsabrechnung often settles it: the insurer has said its last word on the invoice, even
+  if it paid only part of it. Until now that took a second trip into the invoice afterwards, just
+  to move it from "teilabgerechnet" to "abgerechnet". Each invoice card in the booking dialog now
+  has its own switch for that, off by default, because one letter can close one invoice and only
+  partly answer another. The mark is saved together with the amounts, so a booking that is refused
+  marks nothing. Where the amount already pays off everything still open, the switch is shown on
+  and locked: the invoice counts as billed because of its amount, and no mark is stored that would
+  stay behind if that amount were corrected later.
+
 ## 0.20.0-slice.1 — 2026-10-04
 
 Two small things about typing, both reported from everyday use.

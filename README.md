@@ -313,7 +313,7 @@ name instead of the agency.
 | Submit invoices to a policy   | `POST /api/v1/submissions` (batch, transactional)                     |
 | Withdraw (no billing yet)     | `DELETE /api/v1/submissions/:uid/invoices/:invoiceUID`                |
 | Record a billing              | `POST /api/v1/billings`                                               |
-| Allocate a refund             | `POST /api/v1/allocations`                                            |
+| Allocate refunds of a billing | `POST /api/v1/billings/:uid/allocations` (batch; may close invoices)  |
 | Mark "not reimbursable under" | `POST /api/v1/invoices/:uid/exclusions` (and `DELETE …/:contractUID`) |
 | Close / settle an invoice     | `PATCH /api/v1/invoices/:uid` (`reimbursementClosed`, `transferDate`) |
 
@@ -322,7 +322,7 @@ An invoice's status (`offen`, `eingereicht`, `teilabgerechnet`, `abgerechnet`, `
 the manual "billed" mark and whether it was paid. An invoice can be submitted to several policies
 (e.g. the remainder to a supplementary insurance), but to each policy at most once and never to
 one it is marked as not reimbursable under; an `allocation` may only link an invoice and a billing
-of the same submission, and all refunds of an invoice together never exceed its amount.
+of the same policy (the invoice submitted there), and all refunds of an invoice together never exceed its amount.
 `GET /api/v1/contracts/:uid/reimbursement-analysis?year=YYYY` runs the deductible/bonus/cap
 calculation and reports whether submitting is worthwhile.
 
