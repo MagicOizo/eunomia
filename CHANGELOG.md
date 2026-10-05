@@ -7,6 +7,34 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.0.0 — 2026-10-05
+
+The first stable release. The code is the same as 0.20.0; what changes is the promise. Eunomia has
+been running the author's household billing in production with real data since 0.9.0, every
+finding from that use and from the security and code reviews is closed, and the round trip it was
+rebuilt for works the way it is meant to.
+
+What 1.0.0 covers:
+
+- **The billing round trip on the policy-based data model.** Invoices with one or more treatment
+  days, submitted at most once per policy, so a supplementary insurance can take what the main one
+  left; Leistungsabrechnungen that may answer invoices from several submissions; reimbursements
+  booked per invoice, with "nicht erstattungsfähig", uncovered bills and direct payment.
+- **Deductible and no-claims bonus per policy and insurance year,** with yearly terms, bonus tiers
+  and claim-free years counted automatically, and a reimbursement optimiser that compares across
+  every policy of a person what to submit and what to carry.
+- **Master data** for people, insurers, policies, providers and collection agencies with several
+  dated bank accounts, a GiroCode for every invoice to be paid, and searches across invoices and
+  billings.
+- **A start page with the household's figures,** payment reminders by e-mail, and system settings
+  with encrypted secrets.
+- **Roles and permissions** per account, an audit trail, a trash bin, data export and deletion per
+  insured person, backup and restore scripts, and an update check that points admins at a newer
+  release.
+
+Upgrading from 0.20.0 needs nothing beyond pulling the new image. The next minor, 1.1.0, is planned
+to derive bonus tiers from an insurer's factor rule instead of entering every amount by hand.
+
 ## 0.20.0 — 2026-10-05
 
 Everything from the five previews below, as one release: the last findings from everyday use that
