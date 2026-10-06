@@ -128,6 +128,7 @@
       "BAD_REQUEST": "The request was not valid.",
       "CONFLICT": "The action is not possible in the current state.",
       "INTERNAL": "An error occurred on the server.",
+      "RATE_LIMITED": "Too many requests. Please try again later.",
       "INVALID_CREDENTIALS": "Email or password is wrong.",
       "INVALID_CURRENT_PASSWORD": "The current password is wrong.",
       "INVALID_REFRESH_TOKEN": "The session has expired. Please sign in again.",
@@ -273,6 +274,10 @@
     "documentLink": "a complete web address with http:// or https://"
   },
   "settingLabels": {
+    "general": {
+      "defaultLocale": "Default language",
+      "defaultFormat": "Default format for numbers and dates"
+    },
     "mail": {
       "enabled": "Send emails",
       "host": "Mail server",
@@ -973,6 +978,125 @@
       "remove": "Remove",
       "removeMarkTitle": "Remove mark",
       "removeMarkQuestion": "Remove the “not reimbursable” mark for {policy}?"
+    },
+    "billingForm": {
+      "createTitle": "New service billing",
+      "editTitle": "Edit billing",
+      "documentLink": "Document link (optional)",
+      "forfeits": "This billing forfeits the bonus",
+      "rule": "Rule of the policy: the bonus is forfeited {rule}.",
+      "numberAndDateRequired": "Please enter the billing number and date.",
+      "contractMissing": "This service billing has no policy.",
+      "create": "Create",
+      "creating": "Creating…"
+    },
+    "submit": {
+      "title": "Submit invoices",
+      "bundled": "{n} invoice is bundled into one submission. | {n} invoices are bundled into one submission.",
+      "noContract": "No policy available: the invoices are already with every policy or are marked as not reimbursable there.",
+      "noneInPeriod": "No policy ran during the treatment period ({period}). With the switch, every policy can be chosen.",
+      "hidden": "{n} policy outside the treatment period is hidden. | {n} policies outside the treatment period are hidden.",
+      "showAll": "Include policies outside the treatment period",
+      "since": "from {date}",
+      "required": "Please choose a policy and the submission date.",
+      "submitting": "Submitting…"
+    },
+    "submission": {
+      "submittedOn": "submitted on {date}",
+      "noBilling": "No service billing recorded yet.",
+      "receipt": "Ref. {number}",
+      "inObjection": "Under objection",
+      "editAllocation": "Change the reimbursement from billing {number}",
+      "editAllocationHint": "Change reimbursement amount and reference number ({number})",
+      "removeAllocation": "Remove the reimbursement from billing {number}",
+      "reimbursed": "Reimbursed",
+      "bill": "Record a billing for {number}",
+      "billHint": "Record a service billing and allocate the reimbursement ({number})",
+      "objection": "Objection at {number}",
+      "objectionHint": "Mark a faulty service billing as under objection ({number})",
+      "withdraw": "Withdraw the submission at {number}"
+    },
+    "objection": {
+      "title": "Objection",
+      "lead": "Service billings for invoice {number}. Mark a faulty billing as under objection to keep track of open claims against the insurer.",
+      "none": "There is no service billing for this invoice yet.",
+      "loadFailed": "The billings could not be loaded.",
+      "dateRequired": "Please enter a date for the objection.",
+      "openSince": "Objection open since {date}",
+      "resolve": "Mark as resolved",
+      "resolvedOn": "Objection resolved on {date}",
+      "date": "Date",
+      "note": "Note (optional)",
+      "file": "File an objection"
+    },
+    "allocation": {
+      "title": "Change reimbursement",
+      "note": "Invoice {invoice} for {amount}, reimbursed through billing {billing} of {date}.",
+      "takeAmount": "Use the invoice amount {amount} as the reimbursement",
+      "takeAmountHint": "Use {amount} as the reimbursement",
+      "amountRequired": "Please enter the reimbursement amount.",
+      "tooMuch": "The reimbursements of all policies together must not exceed the invoice amount — at most {max} is possible here."
+    },
+    "billingSearch": {
+      "title": "Choose a service billing",
+      "policy": "Policy: {policy}",
+      "query": "Billing or invoice number",
+      "from": "Billed from",
+      "to": "Billed until",
+      "min": "Reimbursement from",
+      "max": "Reimbursement up to",
+      "unlinked": "Only without an allocation",
+      "results": "Search results",
+      "searching": "Searching…",
+      "noMatch": "No service billing matches these filters.",
+      "unallocated": "not yet allocated to any invoice",
+      "truncated": "Only the first billing is shown — please narrow the filters. | Only the first {n} billings are shown — please narrow the filters.",
+      "choose": "Choose"
+    },
+    "billingPicker": {
+      "query": "Billing, invoice or policy number, or person",
+      "noMatch": "No service billing matches this search.",
+      "meta": "Billing of {date} · policy {contract}",
+      "truncated": "Only the first service billing is shown. Please narrow the filters. | Only the first {n} service billings are shown. Please narrow the filters.",
+      "lead": "Which policy's service billings do you want to see?",
+      "noContracts": "No policies recorded yet."
+    },
+    "billing": {
+      "title": "Allocate billing",
+      "noInvoiceYet": "No invoice chosen yet — add this service billing's invoices below.",
+      "reimbursedThrough": "{n} invoice is reimbursed through this service billing. | {n} invoices are reimbursed through this service billing.",
+      "noCommonPolicy": "These invoices have no policy in common — they cannot be reimbursed through one service billing.",
+      "billing": "Service billing",
+      "billingDate": "Billing date:",
+      "noFacility": "no provider",
+      "stillOpen": "still open",
+      "openAmount": "open {amount}",
+      "takeOpen": "Use the open amount {amount} as the reimbursement",
+      "submittedOnSeveralDays": "submitted on several days",
+      "dropInvoice": "Leave invoice {number} out of this booking",
+      "markSettled": "Mark as settled",
+      "fullyReimbursed": "fully reimbursed",
+      "addFirst": "Invoice of this policy",
+      "addMore": "Another invoice of this policy",
+      "billingRequired": "Please choose, search for or create a service billing.",
+      "invoiceRequired": "Please choose at least one invoice.",
+      "amountMissing": "Please enter the reimbursement amount for: {invoices}.",
+      "tooMuch": "The reimbursements of all policies together must not exceed the invoice amount — too much for: {invoices}.",
+      "tooMuchItem": "{number} (still open: {open})"
+    },
+    "billings": {
+      "back": "Back to the policy selection",
+      "empty": "There are no service billings for this policy yet. They are created in the invoice workflow with “Allocate billing”.",
+      "reimbursed": "Reimbursed",
+      "objectionOpen": "Under objection since {date}",
+      "resolvedOn": "resolved on {date}",
+      "objectionHint": "File or resolve an objection",
+      "edit": "Edit",
+      "deleteTitle": "Delete billing",
+      "billingOf": "Service billing {number} ({date})",
+      "deleteConfirm": "Really delete service billing {number}?",
+      "deleteWarning": "{n} allocated invoice loses its reimbursement and goes back to “submitted”. | {n} allocated invoices lose their reimbursement and go back to “submitted”.",
+      "deleting": "Deleting…"
     }
   }
 }

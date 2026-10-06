@@ -1,8 +1,9 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import axe from 'axe-core';
 import { describe, expect, it } from 'vitest';
 
 import { settled } from '../test/settle';
+import { withLocale } from '../test/locale';
 import type { InvoiceDto } from './api';
 import SubmitDialog from './SubmitDialog.vue';
 
@@ -223,5 +224,30 @@ describe('SubmitDialog accessibility', () => {
     await toggleShowAll(wrapper);
     expect((await axe.run(wrapper.element, { rules })).violations).toEqual([]);
     wrapper.unmount();
+  });
+});
+
+describe('SubmitDialog in English', () => {
+  it('counts the selection and the hidden policies by number', async () => {
+    await withLocale('en', async () => {
+      const wrapper = mount(SubmitDialog, {
+        props: {
+          open: true,
+          invoices: [invoice('i-1', '2023-06-01')],
+          facilityNames: {},
+          contracts,
+          submitting: false,
+          error: null,
+        },
+        attachTo: document.body,
+      });
+      await flushPromises();
+
+      expect(wrapper.find('.eu-dialog__title').text()).toBe('Submit invoices');
+      expect(wrapper.text()).toContain('1 invoice is bundled into one submission.');
+      expect(wrapper.text()).toContain('1 policy outside the treatment period is hidden.');
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Submit')).toBe(true);
+      wrapper.unmount();
+    });
   });
 });

@@ -7,6 +7,28 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.0-slice.6 — 2026-10-06
+
+The sixth preview of 1.2.0. The UI still starts in German for everyone.
+
+- **The whole invoice area speaks the UI language.** The submission cards in the invoice details,
+  the dialogs for submitting, allocating a billing, changing a reimbursement and filing an
+  objection, the service billings page with its search across policies, and the billing search
+  and form take their texts from the catalogues.
+- **A user's language and format are stored.** `Users.locale` and `Users.formatRegion` (migration
+  020, `NULL` = follow the defaults); `GET /api/v1/me` and the login answer carry both, and
+  `PATCH /api/v1/me` sets them (`{ "locale": "en", "formatRegion": "de-DE" }`, `null` to follow
+  again). The instance gets the defaults `general.defaultLocale` (`de`) and `general.defaultFormat`
+  (empty: from the language). The choice in the profile and the settings follows in 1.2.0.
+- **Mails are written in the recipient's language.** Payment reminders and the test mail come from a
+  small catalogue in the API, German and English, with dates and amounts in the recipient's format:
+  profile first, then the instance default, then German. The reminder preview in the settings shows
+  every mail as its recipient will get it.
+- **The rate limit answers like every other error:** in English with the code `RATE_LIMITED`, which
+  the UI translates.
+- The confirmation for deleting a service billing with one allocated invoice no longer uses the
+  plural verb in German.
+
 ## 1.2.0-slice.5 — 2026-10-06
 
 The fifth preview of 1.2.0. The UI still starts in German for everyone.

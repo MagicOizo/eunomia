@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -8,7 +9,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { useDebouncedCallback } from '../lib/debounce';
 import { describeError } from '../lib/errors';
-import { formatDate, formatMoney, plural } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import { type BillingListDto, searchBillings } from './api';
 
 /**
@@ -27,6 +28,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ close: []; select: [billing: BillingListDto] }>();
+
+const { t } = useI18n();
 
 /** Enough to choose from; more than that is a case for narrower filters. */
 const RESULT_LIMIT = 50;
@@ -96,25 +99,27 @@ function confirm(): void {
 </script>
 
 <template>
-  <EuDialog :open="open" title="Leistungsabrechnung auswählen" @close="emit('close')">
+  <EuDialog :open="open" :title="t('invoices.billingSearch.title')" @close="emit('close')">
     <div class="eu-form">
-      <p class="eu-form__note">Police: {{ policyLabel }}</p>
+      <p class="eu-form__note">{{ t('invoices.billingSearch.policy', { policy: policyLabel }) }}</p>
 
-      <EuTextField v-model="filters.q" label="Abrechnungs- oder Rechnungsnummer" />
+      <EuTextField v-model="filters.q" :label="t('invoices.billingSearch.query')" />
       <div class="eu-bsearch__row">
-        <EuTextField v-model="filters.from" label="Abrechnung ab" type="date" />
-        <EuTextField v-model="filters.to" label="Abrechnung bis" type="date" />
+        <EuTextField v-model="filters.from" :label="t('invoices.billingSearch.from')" type="date" />
+        <EuTextField v-model="filters.to" :label="t('invoices.billingSearch.to')" type="date" />
       </div>
       <div class="eu-bsearch__row">
-        <EuCurrencyField v-model="filters.min" label="Erstattung ab" />
-        <EuCurrencyField v-model="filters.max" label="Erstattung bis" />
+        <EuCurrencyField v-model="filters.min" :label="t('invoices.billingSearch.min')" />
+        <EuCurrencyField v-model="filters.max" :label="t('invoices.billingSearch.max')" />
       </div>
-      <EuToggle v-model="filters.unlinked" label="Nur ohne Zuordnung" />
+      <EuToggle v-model="filters.unlinked" :label="t('invoices.billingSearch.unlinked')" />
 
-      <h3 class="eu-bsearch__heading">Suchergebnis</h3>
-      <p v-if="loading" class="eu-form__note" role="status">Wird gesucht…</p>
+      <h3 class="eu-bsearch__heading">{{ t('invoices.billingSearch.results') }}</h3>
+      <p v-if="loading" class="eu-form__note" role="status">
+        {{ t('invoices.billingSearch.searching') }}
+      </p>
       <p v-else-if="results.length === 0" class="eu-form__note" role="status">
-        Keine Leistungsabrechnung passt zu diesen Filtern.
+        {{ t('invoices.billingSearch.noMatch') }}
       </p>
       <ul v-else class="eu-bsearch__results eu-scroll-focus-safe">
         <li v-for="billing in results" :key="billing.billingUID">
@@ -130,21 +135,22 @@ function confirm(): void {
             <span class="eu-bsearch__date">{{ formatDate(billing.billingDate) }}</span>
             <span class="eu-bsearch__amount">{{ formatMoney(billing.reimbursedTotal) }}</span>
             <span class="eu-bsearch__invoices">
-              {{ billing.invoiceNumbers ?? 'noch keiner Rechnung zugeordnet' }}
+              {{ billing.invoiceNumbers ?? t('invoices.billingSearch.unallocated') }}
             </span>
           </button>
         </li>
       </ul>
       <p v-if="truncated" class="eu-form__hint">
-        Es werden die ersten
-        {{ plural(RESULT_LIMIT, 'Abrechnung', 'Abrechnungen') }} gezeigt — bitte enger filtern.
+        {{ t('invoices.billingSearch.truncated', RESULT_LIMIT) }}
       </p>
       <p v-if="error" class="eu-form__error" role="alert">{{ error }}</p>
     </div>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
-      <EuButton :disabled="chosen === null" @click="confirm">Auswählen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.close') }}</EuButton>
+      <EuButton :disabled="chosen === null" @click="confirm">{{
+        t('invoices.billingSearch.choose')
+      }}</EuButton>
     </template>
   </EuDialog>
 </template>

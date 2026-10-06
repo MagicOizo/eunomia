@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -20,6 +21,8 @@ const emit = defineEmits<{
   /** A billing's objection state changed — parent reloads so the badge updates. */
   changed: [];
 }>();
+
+const { t } = useI18n();
 
 const billings = ref<BillingDto[]>([]);
 const loading = ref(false);
@@ -62,7 +65,7 @@ async function load(): Promise<void> {
     }
   } catch (err) {
     error.value =
-      err instanceof HttpError ? describeError(err) : 'Abrechnungen konnten nicht geladen werden.';
+      err instanceof HttpError ? describeError(err) : t('invoices.objection.loadFailed');
   } finally {
     loading.value = false;
   }
@@ -84,7 +87,7 @@ async function run(billingUID: string, action: () => Promise<unknown>): Promise<
     await load();
     emit('changed');
   } catch (err) {
-    error.value = err instanceof HttpError ? describeError(err) : 'Aktion fehlgeschlagen.';
+    error.value = err instanceof HttpError ? describeError(err) : t('errors.actionFailed');
   } finally {
     busyUID.value = null;
   }
@@ -93,7 +96,7 @@ async function run(billingUID: string, action: () => Promise<unknown>): Promise<
 function file(billing: BillingDto): void {
   const form = forms[billing.billingUID];
   if (!form?.date) {
-    error.value = 'Bitte ein Datum für den Widerspruch angeben.';
+    error.value = t('invoices.objection.dateRequired');
     return;
   }
   void run(billing.billingUID, () =>
@@ -113,15 +116,14 @@ function resolve(billing: BillingDto): void {
 </script>
 
 <template>
-  <EuDialog :open="open" title="Widerspruch" @close="emit('close')">
+  <EuDialog :open="open" :title="t('invoices.objection.title')" @close="emit('close')">
     <p v-if="invoice" class="eu-obj__lead">
-      Leistungsabrechnungen zu Rechnung {{ invoice.invoiceNumber }}. Markiere eine fehlerhafte
-      Abrechnung als Widerspruch, um offene Forderungen gegenüber der Versicherung nachzuhalten.
+      {{ t('invoices.objection.lead', { number: invoice.invoiceNumber }) }}
     </p>
 
-    <p v-if="loading" class="eu-obj__hint">Wird geladen…</p>
+    <p v-if="loading" class="eu-obj__hint">{{ t('common.loading') }}</p>
     <p v-else-if="billings.length === 0" class="eu-obj__hint">
-      Zu dieser Rechnung gibt es noch keine Leistungsabrechnung.
+      {{ t('invoices.objection.none') }}
     </p>
 
     <ul v-else class="eu-obj__list">
@@ -135,7 +137,7 @@ function resolve(billing: BillingDto): void {
         <!-- Open objection: show it and offer to resolve. -->
         <template v-if="isOpen(billing)">
           <p class="eu-obj__state eu-obj__state--open">
-            Widerspruch offen seit {{ formatDate(billing.objectionDate) }}
+            {{ t('invoices.objection.openSince', { date: formatDate(billing.objectionDate) }) }}
           </p>
           <p v-if="billing.objectionNote" class="eu-obj__note">{{ billing.objectionNote }}</p>
           <EuButton
@@ -143,14 +145,18 @@ function resolve(billing: BillingDto): void {
             :disabled="busyUID === billing.billingUID"
             @click="resolve(billing)"
           >
-            Als aufgelöst markieren
+            {{ t('invoices.objection.resolve') }}
           </EuButton>
         </template>
 
         <!-- Resolved objection: history only. -->
         <template v-else-if="billing.objectionDate">
           <p class="eu-obj__state eu-obj__state--resolved">
-            Widerspruch aufgelöst am {{ formatDate(billing.objectionResolvedDate) }}
+            {{
+              t('invoices.objection.resolvedOn', {
+                date: formatDate(billing.objectionResolvedDate),
+              })
+            }}
           </p>
           <p v-if="billing.objectionNote" class="eu-obj__note">{{ billing.objectionNote }}</p>
         </template>
@@ -158,11 +164,18 @@ function resolve(billing: BillingDto): void {
         <!-- No objection yet: file one. -->
         <template v-else>
           <div class="eu-obj__form">
-            <EuTextField v-model="forms[billing.billingUID].date" label="Datum" type="date" />
-            <EuTextField v-model="forms[billing.billingUID].note" label="Notiz (optional)" />
+            <EuTextField
+              v-model="forms[billing.billingUID].date"
+              :label="t('invoices.objection.date')"
+              type="date"
+            />
+            <EuTextField
+              v-model="forms[billing.billingUID].note"
+              :label="t('invoices.objection.note')"
+            />
           </div>
           <EuButton :disabled="busyUID === billing.billingUID" @click="file(billing)">
-            Widerspruch einlegen
+            {{ t('invoices.objection.file') }}
           </EuButton>
         </template>
       </li>
@@ -171,7 +184,7 @@ function resolve(billing: BillingDto): void {
     <p v-if="error" class="eu-obj__error" role="alert">{{ error }}</p>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.close') }}</EuButton>
     </template>
   </EuDialog>
 </template>

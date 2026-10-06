@@ -249,16 +249,18 @@ test('passwords and sessions', async (t) => {
         config: { ...config, rateLimit: { ...config.rateLimit, authMax: 3, authWindowMs: 60_000 } },
       });
       const session = await openSession({ email: user.email, password: adminSet });
-      let lastStatus = 0;
+      let last: request.Response | undefined;
       for (let i = 0; i < 5; i += 1) {
-        lastStatus = (
-          await request(strict)
-            .post('/api/v1/auth/password')
-            .set('Authorization', `Bearer ${session.accessToken}`)
-            .send({ currentPassword: 'guessing', newPassword: 'whatever12345' })
-        ).status;
+        last = await request(strict)
+          .post('/api/v1/auth/password')
+          .set('Authorization', `Bearer ${session.accessToken}`)
+          .send({ currentPassword: 'guessing', newPassword: 'whatever12345' });
       }
-      assert.equal(lastStatus, 429);
+      assert.equal(last?.status, 429);
+      // English with a code, like every other API error — the web translates it.
+      assert.deepEqual(last?.body, {
+        error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' },
+      });
     });
   } finally {
     await pool.end();

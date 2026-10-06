@@ -91,6 +91,22 @@ test('system settings: gating, write cases, encryption at rest, mail status', as
       assert.equal(setting(res.body, 'mail.password').isSecret, true);
       assert.equal(setting(res.body, 'mail.password').isSet, false);
       assert.equal(setting(res.body, 'mail.lastSendAt').readonly, true);
+      assert.equal(setting(res.body, 'general.defaultLocale').value, 'de');
+      assert.equal(setting(res.body, 'general.defaultFormat').value, null);
+    });
+
+    await t.test('the instance language and format are stored and cleared', async () => {
+      const write = (values: Record<string, unknown>) =>
+        request(app).put('/api/v1/settings').set(admin).send({ values });
+
+      const set = await write({ 'general.defaultLocale': 'en', 'general.defaultFormat': 'en-US' });
+      assert.equal(set.status, 200);
+      assert.equal(setting(set.body, 'general.defaultLocale').value, 'en');
+      assert.equal(setting(set.body, 'general.defaultFormat').value, 'en-US');
+
+      const cleared = await write({ 'general.defaultLocale': null, 'general.defaultFormat': null });
+      assert.equal(setting(cleared.body, 'general.defaultLocale').value, 'de');
+      assert.equal(setting(cleared.body, 'general.defaultFormat').value, null);
     });
 
     await t.test('writing the mail configuration stores values and hides the secret', async () => {
@@ -146,6 +162,8 @@ test('system settings: gating, write cases, encryption at rest, mail status', as
         [{ 'mail.lastSendResult': 'ok' }, ERROR_CODES.SETTING_READONLY],
         [{ 'mail.port': 70000 }, ERROR_CODES.SETTING_INVALID_VALUE],
         [{ 'mail.enabled': 'true' }, ERROR_CODES.SETTING_INVALID_VALUE],
+        [{ 'general.defaultLocale': 'fr' }, ERROR_CODES.SETTING_INVALID_VALUE],
+        [{ 'general.defaultFormat': 'fr-FR' }, ERROR_CODES.SETTING_INVALID_VALUE],
       ];
       for (const [values, code] of cases) {
         const res = await request(app).put('/api/v1/settings').set(admin).send({ values });

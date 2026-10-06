@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 
 import EuTextField from '../design-system/components/EuTextField.vue';
@@ -47,6 +48,7 @@ const props = defineProps<{ q?: string; unlinked?: string }>();
 const RESULT_LIMIT = 50;
 
 const router = useRouter();
+const { t } = useI18n();
 
 const contracts = ref<ContractRow[]>([]);
 const personByAccount = ref<Map<string, string>>(new Map());
@@ -127,16 +129,20 @@ onMounted(async () => {
       <EuTextField
         v-model="filter.q"
         class="eu-picker__search"
-        label="Abrechnungs-, Rechnungs-, Policennummer oder Person"
+        :label="t('invoices.billingPicker.query')"
       />
-      <EuToggle v-model="filter.unlinked" class="eu-picker__toggle" label="Nur ohne Zuordnung" />
+      <EuToggle
+        v-model="filter.unlinked"
+        class="eu-picker__toggle"
+        :label="t('invoices.billingSearch.unlinked')"
+      />
     </div>
 
     <template v-if="searchActive">
-      <p v-if="searching" class="eu-picker__hint">Wird gesucht…</p>
+      <p v-if="searching" class="eu-picker__hint">{{ t('invoices.billingSearch.searching') }}</p>
       <p v-else-if="searchError" class="eu-picker__error" role="alert">{{ searchError }}</p>
       <p v-else-if="results.length === 0" class="eu-picker__hint" role="status">
-        Keine Leistungsabrechnung passt zu dieser Suche.
+        {{ t('invoices.billingPicker.noMatch') }}
       </p>
 
       <ul v-else class="eu-picker__results">
@@ -146,27 +152,33 @@ onMounted(async () => {
             <span class="eu-picker__person">{{ billing.personName }}</span>
             <span class="eu-picker__amount">{{ formatMoney(billing.reimbursedTotal) }}</span>
             <span class="eu-picker__meta">
-              Abrechnung vom {{ formatDate(billing.billingDate) }} · Police
-              {{ billing.contractNumber }}
+              {{
+                t('invoices.billingPicker.meta', {
+                  date: formatDate(billing.billingDate),
+                  contract: billing.contractNumber,
+                })
+              }}
             </span>
             <span class="eu-picker__refs">{{
-              billing.invoiceNumbers ?? 'noch keiner Rechnung zugeordnet'
+              billing.invoiceNumbers ?? t('invoices.billingSearch.unallocated')
             }}</span>
           </RouterLink>
         </li>
       </ul>
       <p v-if="truncated" class="eu-picker__hint" role="status">
-        Es werden die ersten {{ RESULT_LIMIT }} Leistungsabrechnungen gezeigt. Bitte enger filtern.
+        {{ t('invoices.billingPicker.truncated', RESULT_LIMIT) }}
       </p>
     </template>
 
     <template v-else>
       <p class="eu-picker__lead">
-        Für welchen Vertrag möchtest du die Leistungsabrechnungen ansehen?
+        {{ t('invoices.billingPicker.lead') }}
       </p>
 
-      <p v-if="loading" class="eu-picker__hint">Wird geladen…</p>
-      <p v-else-if="tiles.length === 0" class="eu-picker__hint">Noch keine Verträge erfasst.</p>
+      <p v-if="loading" class="eu-picker__hint">{{ t('common.loading') }}</p>
+      <p v-else-if="tiles.length === 0" class="eu-picker__hint">
+        {{ t('invoices.billingPicker.noContracts') }}
+      </p>
 
       <ul v-else class="eu-picker__grid">
         <li v-for="tile in tiles" :key="tile.contractUID">

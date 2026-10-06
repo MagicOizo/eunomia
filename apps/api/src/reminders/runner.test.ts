@@ -27,6 +27,8 @@ const SETTINGS: ReminderSettings = {
   timeZone: 'Europe/Berlin',
   repeatDays: 7,
   appUrl: null,
+  defaultLocale: 'de',
+  defaultFormat: null,
 };
 
 /** 08:00 Berlin on 2026-09-24, so the run's calendar day is that day. */
@@ -54,6 +56,8 @@ interface StubOptions {
     userId: number;
     email: string;
     name: string;
+    locale?: string | null;
+    formatRegion?: string | null;
     all: boolean;
     accountUIDs: string[];
   }>;
@@ -75,9 +79,11 @@ function stubStore(options: StubOptions = {}) {
     writeStatus: async (status) => void statuses.push(status),
     listPayableInvoices: async () => options.invoices ?? [invoice()],
     listRecipients: async () =>
-      options.recipients ?? [
-        { userId: 1, email: 'max@example.com', name: 'Max', all: true, accountUIDs: [] },
-      ],
+      (
+        options.recipients ?? [
+          { userId: 1, email: 'max@example.com', name: 'Max', all: true, accountUIDs: [] },
+        ]
+      ).map((recipient) => ({ locale: null, formatRegion: null, ...recipient })),
     listReminders: async () => options.history ?? [],
     recordReminders: async (records) => void recorded.push(...records),
   };
@@ -199,6 +205,32 @@ test('a recipient hears only about the accounts they may see', async () => {
   assert.equal(sent.length, 1);
   assert.match(sent[0]?.text ?? '', /2026-0001/);
   assert.ok(!(sent[0]?.text ?? '').includes('2026-0002'));
+});
+
+test('every recipient reads their own language, else the instance default', async () => {
+  const { store } = stubStore({
+    settings: { defaultLocale: 'en' },
+    recipients: [
+      { userId: 1, email: 'de@example.com', name: 'Max', locale: 'de', all: true, accountUIDs: [] },
+      {
+        userId: 2,
+        email: 'us@example.com',
+        name: 'Sam',
+        formatRegion: 'en-US',
+        all: true,
+        accountUIDs: [],
+      },
+    ],
+  });
+  const { mailer, sent } = stubMailer();
+
+  await createReminderRunner(store, mailer, { now: () => NOW }).run();
+
+  assert.equal(sent[0]?.subject, 'Eunomia: 1 fällige Zahlung');
+  assert.match(sent[0]?.text ?? '', /fällig am 29\.09\.2026/);
+  // No language of their own: the instance's English, with their US dates.
+  assert.equal(sent[1]?.subject, 'Eunomia: 1 payment due');
+  assert.match(sent[1]?.text ?? '', /due on 09\/29\/2026 \(in 5 days\)/);
 });
 
 test('a failed send stamps nothing, so the next run tries again', async () => {

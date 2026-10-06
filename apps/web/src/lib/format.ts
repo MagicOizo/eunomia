@@ -115,19 +115,6 @@ export function activeLanguage(): string {
 }
 
 /**
- * Counted noun with the matching German form: `plural(1, 'Rechnung',
- * 'Rechnungen')` → "1 Rechnung". The caller passes both forms in the case its
- * sentence needs ("von 1 leistungsfreien Jahr" vs "3 leistungsfreie Jahre"),
- * since German inflects the noun by case as well as by number.
- *
- * German only: it leaves with the texts of its callers, whose catalogue
- * messages count with vue-i18n's plural forms instead.
- */
-export function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
-
-/**
  * Groups an IBAN in fours (`DE89 3704 0044 0532 0130 00`) — the form it is
  * printed in, and the only one a picker list can break. Display only: stored,
  * submitted and QR-encoded, an IBAN stays compact (the API normalises it, and

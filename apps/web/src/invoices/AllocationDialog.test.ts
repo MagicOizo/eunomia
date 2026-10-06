@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
+import { withLocale } from '../test/locale';
 import AllocationDialog from './AllocationDialog.vue';
 import type { InvoiceAllocationDto, InvoiceDto } from './api';
 
@@ -75,5 +76,22 @@ describe('AllocationDialog amount shortcut', () => {
     expect(take.text().replace(/\u00a0/g, ' ')).toBe('400,00 €');
     expect(take.attributes('aria-label')).toContain('in Erstattung übernehmen');
     wrapper.unmount();
+  });
+});
+
+describe('AllocationDialog in English', () => {
+  it('writes the note as one sentence with the amount still clickable', async () => {
+    await withLocale('en', async () => {
+      const wrapper = await openDialog();
+
+      expect(wrapper.find('.eu-dialog__title').text()).toBe('Change reimbursement');
+      expect(wrapper.find('.eu-form__note').text().replace(/\s+/g, ' ')).toBe(
+        'Invoice R-1 for €400.00, reimbursed through billing LA-42 of 01/04/2025.',
+      );
+      expect(wrapper.find('.eu-alloc__take').attributes('aria-label')).toBe(
+        'Use the invoice amount €400.00 as the reimbursement',
+      );
+      wrapper.unmount();
+    });
   });
 });

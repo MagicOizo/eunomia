@@ -13,6 +13,8 @@ export const ERROR_CODES = {
   BAD_REQUEST: 'BAD_REQUEST',
   CONFLICT: 'CONFLICT',
   INTERNAL: 'INTERNAL',
+  /** Too many requests from one address within the limiter's window. */
+  RATE_LIMITED: 'RATE_LIMITED',
   /** Unique constraint hit (MariaDB 1062). */
   DUPLICATE_VALUE: 'DUPLICATE_VALUE',
   /**

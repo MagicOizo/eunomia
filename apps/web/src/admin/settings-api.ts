@@ -10,7 +10,7 @@ import { apiData } from '../lib/api';
 
 export interface PublicSetting {
   key: string;
-  section: 'mail' | 'updateCheck' | 'reminders' | 'retention';
+  section: 'general' | 'mail' | 'updateCheck' | 'reminders' | 'retention';
   isSecret: boolean;
   readonly: boolean;
   /** Always null for a secret — the plaintext never leaves the API. */

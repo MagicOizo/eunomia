@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { FORMAT_REGIONS, formatDate, formatMoney, germanDate, germanMoney } from './format.js';
+import { FORMAT_REGIONS, formatDate, formatMoney } from './format.js';
 
 /** The separator Intl puts between amount and sign is a non-breaking space. */
 const NBSP = '\u00a0';
 
 test('money is written the German way, with the sign behind the amount', () => {
-  assert.equal(germanMoney(45), `45,00${NBSP}€`);
-  assert.equal(germanMoney(0), `0,00${NBSP}€`);
-  assert.equal(germanMoney(-1234.5), `-1.234,50${NBSP}€`);
+  assert.equal(formatMoney(45, 'de-DE'), `45,00${NBSP}€`);
+  assert.equal(formatMoney(0, 'de-DE'), `0,00${NBSP}€`);
+  assert.equal(formatMoney(-1234.5, 'de-DE'), `-1.234,50${NBSP}€`);
   // The API hands amounts out as strings where the driver does (DECIMAL).
-  assert.equal(germanMoney('120.00'), `120,00${NBSP}€`);
+  assert.equal(formatMoney('120.00', 'de-DE'), `120,00${NBSP}€`);
 });
 
 test('English formats put the euro sign in front and swap the separators', () => {
@@ -20,8 +20,8 @@ test('English formats put the euro sign in front and swap the separators', () =>
 });
 
 test('a German date is turned around, not shifted', () => {
-  assert.equal(germanDate('2026-10-01'), '01.10.2026');
-  assert.equal(germanDate('1978-01-09'), '09.01.1978');
+  assert.equal(formatDate('2026-10-01', 'de-DE'), '01.10.2026');
+  assert.equal(formatDate('1978-01-09', 'de-DE'), '09.01.1978');
 });
 
 test('British dates put the day first, American dates the month', () => {

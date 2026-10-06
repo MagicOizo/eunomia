@@ -102,6 +102,20 @@ test('a successful send records a green status and logs one event', async () => 
   assert.match(lines[0] ?? '', /^eunomia event=MAIL_SEND_OK level=info /);
 });
 
+test("the test mail is written in the caller's language, else the instance default", async () => {
+  const { store } = stubStore({ ...configured, 'general.defaultLocale': 'en' });
+  const transport = stubTransport();
+  const mailer = createMailer(store, { createTransport: transport.createTransport, now: clock });
+
+  await captureLog(() => mailer.sendTestMail('max@example.com'));
+  await captureLog(() =>
+    mailer.sendTestMail('max@example.com', { locale: 'de', formatRegion: null }),
+  );
+
+  assert.equal(transport.sent[0]?.subject, 'Eunomia: test message');
+  assert.equal(transport.sent[1]?.subject, 'Eunomia: Testnachricht');
+});
+
 test('the transport gets the configured host, port, TLS mode, credentials and timeouts', async () => {
   const { store } = stubStore({ ...configured, 'mail.port': 465, 'mail.secure': true });
   const transport = stubTransport();

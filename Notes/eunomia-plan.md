@@ -2311,5 +2311,13 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - Die Fallbacks hinter `describeCode` in `not-covered.ts`/`treatment-days.ts` lesen den Fehlercode-Satz jetzt direkt per `t()` (kompilergeprüft).
 - Spaltenkopf „Erstattung“ englisch „Reimbursed“ statt „Reimbursement“: das eine Wort trennt Chromium unter Linux nicht, und die Tabelle lief bei 1440 px um 24 px über.
 
+### Slice 82 — Rechnungen II + Server (umgesetzt 2026-10-06, `1.2.0-slice.6`)
+- **Rechnungen vollständig:** Einreichungskarten, Einreichen-, Zuordnen-, Erstattung-ändern- und Widerspruchsdialog, Abrechnungsseite samt Suche über alle Policen, Abrechnungssuche und -formular aus dem Katalog; `no-raw-text` gilt für `invoices/**/*.vue`. Sätze mit eingebettetem Betrag-Knopf (Erstattung ändern) und fettem Teil (Löschrückfrage) über `<i18n-t>`.
+- **`plural()` gelöscht** (Abweichung vom Paketplan, der es 83 zuordnet): mit dieser Scheibe gingen seine letzten Aufrufer, alle Zählformen kommen jetzt aus dem Katalog. Nebenbei: Die Löschrückfrage einer Abrechnung mit einer Rechnung sagte „verliert … und gehen zurück“ — jetzt „geht“.
+- **`SUPPORTED_LOCALES`, `DEFAULT_FORMAT`, `isLocale`, `isFormatRegion`** wandern nach `@eunomia/shared` (`locale.ts`), damit die API dieselben Listen prüft; `germanMoney`/`germanDate` sind gelöscht.
+- **Speicher:** Migration 020 `Users.locale`/`Users.formatRegion` (`VARCHAR(5)`, `NULL` = folgen; kein `ENUM`, damit eine neue Sprache keine Migration braucht). `PATCH /api/v1/me` setzt beides (`.strict()`, `null` = wieder folgen), kein Recht außer angemeldet — wie das eigene Passwort. Einstellungs-Section `general` mit `general.defaultLocale` (enum, Vorgabe `de`) und `general.defaultFormat` (leer = aus der Sprache). Die Einstellungsseite zeigt die Section erst mit 83.
+- **Mail-Katalog** `apps/api/src/mail/catalog.ts`: typisierte Tabelle je Sprache, `de` ist das Schema, Einträge als Funktionen (Zählformen, Wortstellung). `mailLocale()` löst Profil → Instanz → `de` auf (kein Browser), das Format Profil → Instanz → Sprache; ein unbekannter gespeicherter Wert wird übersprungen statt den Versand scheitern zu lassen. Die Erinnerung schreibt je Empfänger in dessen Sprache (auch in der Vorschau), die Testmail in der des Auslösers.
+- **Rate-Limit:** englischer Satz mit `ERROR_CODES.RATE_LIMITED`, das Web übersetzt.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

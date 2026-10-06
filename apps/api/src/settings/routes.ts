@@ -119,8 +119,8 @@ export function createSettingsRouter(
    * someone's SMTP account must not double as a way to mail third parties.
    */
   router.post('/settings/mail/test', async (_req, res) => {
-    const { email } = getAuthUser(res);
-    sendData(res, { recipient: email, status: await mailer.sendTestMail(email) });
+    const user = getAuthUser(res);
+    sendData(res, { recipient: user.email, status: await mailer.sendTestMail(user.email, user) });
   });
 
   /**

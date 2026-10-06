@@ -199,6 +199,7 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
   BAD_REQUEST: () => t('errors.code.BAD_REQUEST'),
   CONFLICT: () => t('errors.code.CONFLICT'),
   INTERNAL: () => t('errors.code.INTERNAL'),
+  RATE_LIMITED: () => t('errors.code.RATE_LIMITED'),
 
   // Anmeldung und Ersteinrichtung
   INVALID_CREDENTIALS: () => t('errors.code.INVALID_CREDENTIALS'),

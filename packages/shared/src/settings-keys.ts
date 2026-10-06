@@ -8,6 +8,8 @@
  * the other does not know.
  */
 export const SETTING_KEYS = [
+  'general.defaultLocale',
+  'general.defaultFormat',
   'mail.enabled',
   'mail.host',
   'mail.port',

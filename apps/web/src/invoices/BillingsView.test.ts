@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { grant } from '../test/permissions';
+import { withLocale } from '../test/locale';
 import BillingDialog from './BillingDialog.vue';
 import BillingsView from './BillingsView.vue';
 import type { BillingDto, BillingListDto } from './api';
@@ -285,5 +286,35 @@ describe('BillingsView: the row a search led to', () => {
 
     expect(markedRows(wrapper)).toHaveLength(0);
     wrapper.unmount();
+  });
+});
+
+describe('BillingsView in English', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApiData();
+    listResource.mockResolvedValue([]);
+    searchBillings.mockResolvedValue([billing]);
+  });
+
+  it('labels the filters, the columns and the new button', async () => {
+    await withLocale('en', async () => {
+      const wrapper = await mountView();
+
+      const labels = wrapper.findAll('label').map((label) => label.text());
+      expect(labels).toEqual(
+        expect.arrayContaining(['Billing or invoice number', 'Billed from', 'Reimbursement up to']),
+      );
+      expect(wrapper.findAll('th').map((th) => th.text())).toEqual([
+        'Number',
+        'Date',
+        'Reimbursed',
+        'Invoices',
+        'Objection',
+        'Actions',
+      ]);
+      expect(wrapper.findAll('button').some((button) => button.text() === 'New')).toBe(true);
+      wrapper.unmount();
+    });
   });
 });

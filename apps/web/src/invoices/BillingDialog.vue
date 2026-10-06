@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, reactive, ref, useId, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -10,7 +11,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, forfeitsByRule } from '../contracts/api';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
-import { formatDate, formatMoney, plural } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import {
   type BillingDto,
   type BillingListDto,
@@ -75,6 +76,8 @@ const emit = defineEmits<{
   ];
 }>();
 
+const { t } = useI18n();
+
 interface EntryInput {
   reimbursement: number | null;
   receiptNumber: string;
@@ -130,8 +133,8 @@ function submittedHint(contract: string): string | undefined {
   ];
   if (days.length === 0) return undefined;
   return days.length === 1
-    ? `eingereicht am ${formatDate(days[0])}`
-    : 'an mehreren Tagen eingereicht';
+    ? t('invoices.submission.submittedOn', { date: formatDate(days[0]) })
+    : t('invoices.billing.submittedOnSeveralDays');
 }
 
 const policyOptions = computed(() =>
@@ -178,9 +181,11 @@ const addOptions = computed(() =>
     return {
       value: invoice.invoiceUID,
       label: invoice.invoiceNumber,
-      hint:
-        `${formatDate(invoice.invoiceDate)} · offen ${formatMoney(invoice.remainingAmount)}` +
-        (day ? ` · eingereicht am ${formatDate(day)}` : ''),
+      hint: [
+        formatDate(invoice.invoiceDate),
+        t('invoices.billing.openAmount', { amount: formatMoney(invoice.remainingAmount) }),
+        ...(day ? [t('invoices.submission.submittedOn', { date: formatDate(day) })] : []),
+      ].join(' · '),
     };
   }),
 );
@@ -315,15 +320,15 @@ function onBillingFound(billing: BillingListDto): void {
 
 function submit(): void {
   clear();
-  if (!contractUID.value) return fail('Bitte die Police wählen.');
-  if (!selectedBilling.value) {
-    return fail('Bitte eine Leistungsabrechnung wählen, suchen oder anlegen.');
-  }
-  if (rows.value.length === 0) return fail('Bitte mindestens eine Rechnung wählen.');
+  if (!contractUID.value) return fail(t('invoices.exclusion.contractRequired'));
+  if (!selectedBilling.value) return fail(t('invoices.billing.billingRequired'));
+  if (rows.value.length === 0) return fail(t('invoices.billing.invoiceRequired'));
   const missing = rows.value.filter((i) => entries[i.invoiceUID]?.reimbursement === null);
   if (missing.length > 0) {
     return fail(
-      `Bitte den Erstattungsbetrag angeben für: ${missing.map((i) => i.invoiceNumber).join(', ')}.`,
+      t('invoices.billing.amountMissing', {
+        invoices: missing.map((i) => i.invoiceNumber).join(', '),
+      }),
     );
   }
   // Checked here as well as on the server, so a booking is not attempted only
@@ -335,9 +340,16 @@ function submit(): void {
   );
   if (exceeding.length > 0) {
     return fail(
-      `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — zu viel bei: ${exceeding
-        .map((i) => `${i.invoiceNumber} (noch offen: ${formatMoney(i.remainingAmount)})`)
-        .join(', ')}.`,
+      t('invoices.billing.tooMuch', {
+        invoices: exceeding
+          .map((i) =>
+            t('invoices.billing.tooMuchItem', {
+              number: i.invoiceNumber,
+              open: formatMoney(i.remainingAmount),
+            }),
+          )
+          .join(', '),
+      }),
     );
   }
 
@@ -359,27 +371,25 @@ function submit(): void {
 </script>
 
 <template>
-  <EuDialog :open="open" title="Abrechnung zuordnen" wide @close="emit('close')">
+  <EuDialog :open="open" :title="t('invoices.billing.title')" wide @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <p class="eu-form__note">
         <template v-if="rows.length === 0">
-          Noch keine Rechnung gewählt — unten die Rechnungen dieser Leistungsabrechnung hinzufügen.
+          {{ t('invoices.billing.noInvoiceYet') }}
         </template>
         <template v-else>
-          {{ plural(rows.length, 'Rechnung wird', 'Rechnungen werden') }} über diese
-          Leistungsabrechnung erstattet.
+          {{ t('invoices.billing.reimbursedThrough', rows.length) }}
         </template>
       </p>
 
       <p v-if="policyOptions.length === 0" class="eu-form__note" role="status">
-        Diese Rechnungen haben keine gemeinsame Police — sie lassen sich nicht über eine
-        Leistungsabrechnung erstatten.
+        {{ t('invoices.billing.noCommonPolicy') }}
       </p>
 
       <EuEntityPicker
         v-else-if="policyOptions.length > 1"
         :model-value="contractUID || null"
-        label="Police"
+        :label="t('fields.contractUID')"
         required
         :options="policyOptions"
         @update:model-value="selectPolicy"
@@ -387,11 +397,11 @@ function submit(): void {
 
       <EuEntityPicker
         :model-value="selectedBilling || null"
-        label="Leistungsabrechnung"
+        :label="t('invoices.billing.billing')"
         required
         allow-search
         allow-create
-        create-noun="Leistungsabrechnung"
+        :create-noun="t('invoices.billing.billing')"
         :disabled="!contractUID"
         :options="billingOptions"
         @update:model-value="selectedBilling = $event ?? ''"
@@ -405,7 +415,7 @@ function submit(): void {
         "
       />
       <p class="eu-form__readonly">
-        Abrechnungsdatum:
+        {{ t('invoices.billing.billingDate') }}
         <strong>{{ chosenBilling ? formatDate(chosenBilling.billingDate) : '–' }}</strong>
       </p>
 
@@ -418,30 +428,49 @@ function submit(): void {
             <span class="eu-bill__meta">
               {{
                 (invoice.facilityUID && facilityNames[invoice.facilityUID]) ||
-                'ohne Leistungserbringer'
+                t('invoices.billing.noFacility')
               }}
               · {{ formatDate(invoice.invoiceDate) }} ·
               <button
                 type="button"
                 class="eu-bill__take"
-                :aria-label="`Rechnungsbetrag ${formatMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
-                :title="`${formatMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
+                :aria-label="
+                  t('invoices.allocation.takeAmount', {
+                    amount: formatMoney(invoice.invoiceAmount),
+                  })
+                "
+                :title="
+                  t('invoices.allocation.takeAmountHint', {
+                    amount: formatMoney(invoice.invoiceAmount),
+                  })
+                "
                 @click="takeAmount(invoice.invoiceUID, invoice.invoiceAmount)"
               >
                 {{ formatMoney(invoice.invoiceAmount) }}
               </button>
-              · noch offen
+              · {{ t('invoices.billing.stillOpen') }}
               <button
                 type="button"
                 class="eu-bill__take"
-                :aria-label="`Offenen Betrag ${formatMoney(invoice.remainingAmount)} in Erstattung übernehmen`"
-                :title="`${formatMoney(invoice.remainingAmount)} in Erstattung übernehmen`"
+                :aria-label="
+                  t('invoices.billing.takeOpen', { amount: formatMoney(invoice.remainingAmount) })
+                "
+                :title="
+                  t('invoices.allocation.takeAmountHint', {
+                    amount: formatMoney(invoice.remainingAmount),
+                  })
+                "
                 @click="takeAmount(invoice.invoiceUID, invoice.remainingAmount)"
               >
                 {{ formatMoney(invoice.remainingAmount) }}
               </button>
               <template v-if="submittedAt(invoice, contractUID)">
-                · eingereicht am {{ formatDate(submittedAt(invoice, contractUID)!) }}
+                ·
+                {{
+                  t('invoices.submission.submittedOn', {
+                    date: formatDate(submittedAt(invoice, contractUID)!),
+                  })
+                }}
               </template>
             </span>
             <EuButton
@@ -449,8 +478,8 @@ function submit(): void {
               variant="ghost"
               icon-only
               :icon="faTrash"
-              :aria-label="`Rechnung ${invoice.invoiceNumber} nicht mitbuchen`"
-              :title="`Rechnung ${invoice.invoiceNumber} nicht mitbuchen`"
+              :aria-label="t('invoices.billing.dropInvoice', { number: invoice.invoiceNumber })"
+              :title="t('invoices.billing.dropInvoice', { number: invoice.invoiceNumber })"
               @click="removeInvoice(invoice.invoiceUID)"
             />
           </div>
@@ -458,21 +487,23 @@ function submit(): void {
             <div class="eu-bill__fields">
               <EuCurrencyField
                 v-model="entries[invoice.invoiceUID].reimbursement"
-                label="Erstattung"
+                :label="t('fields.reimbursement')"
               />
               <EuTextField
                 v-model="entries[invoice.invoiceUID].receiptNumber"
-                label="Belegnummer"
+                :label="t('fields.receiptNumber')"
               />
             </div>
             <div class="eu-bill__close">
               <EuToggle
                 :model-value="fullyCovered(invoice) || entries[invoice.invoiceUID].close"
                 :disabled="fullyCovered(invoice)"
-                label="Als abgerechnet markieren"
+                :label="t('invoices.billing.markSettled')"
                 @update:model-value="entries[invoice.invoiceUID].close = $event"
               />
-              <span v-if="fullyCovered(invoice)" class="eu-bill__covered">voll erstattet</span>
+              <span v-if="fullyCovered(invoice)" class="eu-bill__covered">{{
+                t('invoices.billing.fullyReimbursed')
+              }}</span>
             </div>
           </div>
         </li>
@@ -481,7 +512,7 @@ function submit(): void {
       <EuEntityPicker
         v-if="addOptions.length > 0"
         :model-value="null"
-        :label="rows.length === 0 ? 'Rechnung dieser Police' : 'Weitere Rechnung dieser Police'"
+        :label="rows.length === 0 ? t('invoices.billing.addFirst') : t('invoices.billing.addMore')"
         :options="addOptions"
         @update:model-value="addInvoice"
       />
@@ -489,21 +520,24 @@ function submit(): void {
       <div>
         <EuToggle
           :model-value="forfeit.value.value"
-          label="Diese Abrechnung verwirkt den Bonus"
+          :label="t('invoices.billingForm.forfeits')"
           @update:model-value="forfeit.set"
         />
         <p v-if="selectedPolicy" class="eu-form__hint">
-          Regel der Police: Bonus verfällt
-          {{ BONUS_FORFEIT_RULE_LABEL[selectedPolicy.bonusForfeitRule] }}.
+          {{
+            t('invoices.billingForm.rule', {
+              rule: BONUS_FORFEIT_RULE_LABEL[selectedPolicy.bonusForfeitRule],
+            })
+          }}
         </p>
       </div>
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting || policyOptions.length === 0" @click="submit">
-        {{ submitting ? 'Speichern…' : 'Speichern' }}
+        {{ submitting ? t('common.saving') : t('common.save') }}
       </EuButton>
     </template>
   </EuDialog>

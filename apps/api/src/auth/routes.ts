@@ -6,8 +6,13 @@ import type { AppConfig } from '../config/env.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './http.js';
 import { createRequireAuth, getAuthUser } from './middleware.js';
 import { getEffectivePermissions } from './permissions.js';
-import type { AuthUser } from './repository.js';
-import { changePasswordSchema, loginSchema, setupSchema } from './schemas.js';
+import { type AuthUser, findUserByUuid, updateLocalePreferences } from './repository.js';
+import {
+  changePasswordSchema,
+  localePreferencesSchema,
+  loginSchema,
+  setupSchema,
+} from './schemas.js';
 import { changeOwnPassword, login, logout, refresh, setupFirstAdmin } from './service.js';
 
 /** The public shape of a user — the enumerable numeric key never leaves here. */
@@ -17,6 +22,8 @@ function publicUser(user: AuthUser): Record<string, unknown> {
     email: user.email,
     firstname: user.firstname,
     surname: user.surname,
+    locale: user.locale,
+    formatRegion: user.formatRegion,
   };
 }
 
@@ -82,6 +89,16 @@ export function createAuthRouter(pool: Pool, config: AppConfig): Router {
     const isAdmin = permissions.global.includes(PERMISSIONS.MANAGE_USERS);
     const setupTokenActive = isAdmin && config.auth.setupToken !== undefined;
     res.json({ user: publicUser(user), permissions, setupTokenActive });
+  });
+
+  // One's own language and format — a personal choice like the password, so no
+  // permission beyond being signed in.
+  router.patch('/me', requireAuth, async (req, res) => {
+    const input = localePreferencesSchema.parse(req.body);
+    const user = getAuthUser(res);
+    await updateLocalePreferences(pool, user.userId, input);
+    const updated = await findUserByUuid(pool, user.uuidText);
+    res.json({ user: publicUser(updated ?? user) });
   });
 
   return router;

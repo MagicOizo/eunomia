@@ -1,4 +1,14 @@
-import { type ReminderStage, daysUntil, germanDate, germanMoney } from '@eunomia/shared';
+import {
+  DEFAULT_FORMAT,
+  type FormatRegion,
+  type Locale,
+  type ReminderStage,
+  daysUntil,
+  formatDate,
+  formatMoney,
+} from '@eunomia/shared';
+
+import { type MailCatalog, mailCatalog } from '../mail/catalog.js';
 
 /**
  * The text of a payment reminder (see Notes/eunomia-plan.md, Slice 31).
@@ -26,31 +36,35 @@ export interface ReminderMailOptions {
   today: string;
   /** Base URL of this instance, when one is configured — otherwise no links. */
   appUrl?: string | null;
+  /** The recipient's language and format (mail/catalog.ts); German when left out. */
+  locale?: Locale;
+  region?: FormatRegion;
 }
 
-/** German plural without a library: the two forms this text needs. */
-function count(n: number, singular: string, plural: string): string {
-  return `${n} ${n === 1 ? singular : plural}`;
+/** Catalogue and formats of one mail, resolved once per render. */
+interface Wording {
+  text: MailCatalog['reminder'];
+  region: FormatRegion;
 }
 
 /** "fällig am 01.10.2026 (in 5 Tagen)" and its overdue and undated variants. */
-function timing(entry: ReminderEntry, today: string): string {
-  if (entry.transferUntilDate === null) return 'ohne Zahlungsziel erfasst';
+function timing(entry: ReminderEntry, today: string, { text, region }: Wording): string {
+  if (entry.transferUntilDate === null) return text.undated;
 
-  const date = germanDate(entry.transferUntilDate);
+  const date = formatDate(entry.transferUntilDate, region);
   const days = daysUntil(entry.transferUntilDate, today);
-  if (days < 0) return `fällig war der ${date} (seit ${count(-days, 'Tag', 'Tagen')} überfällig)`;
-  if (days === 0) return `fällig heute, ${date}`;
-  return `fällig am ${date} (in ${count(days, 'Tag', 'Tagen')})`;
+  if (days < 0) return text.overdueSince(date, -days);
+  if (days === 0) return text.dueToday(date);
+  return text.dueIn(date, days);
 }
 
-function line(entry: ReminderEntry, today: string): string {
+function line(entry: ReminderEntry, today: string, wording: Wording): string {
   const parts = [
-    `Rechnung ${entry.invoiceNumber}`,
+    wording.text.invoice(entry.invoiceNumber),
     entry.accountName,
-    entry.payee ?? 'Empfänger nicht erfasst',
-    germanMoney(entry.amount),
-    timing(entry, today),
+    entry.payee ?? wording.text.noPayee,
+    formatMoney(entry.amount, wording.region),
+    timing(entry, today, wording),
   ];
   return `- ${parts.join(' · ')}`;
 }
@@ -59,13 +73,9 @@ function line(entry: ReminderEntry, today: string): string {
  * The subject names the worse of the two groups first, because that is what a
  * notification list shows: "2 überfällige und 1 fällige Zahlung".
  */
-export function reminderSubject(entries: ReminderEntry[]): string {
+export function reminderSubject(entries: ReminderEntry[], locale: Locale = 'de'): string {
   const overdue = entries.filter((entry) => entry.stage === 'overdue').length;
-  const due = entries.length - overdue;
-  const groups = [];
-  if (overdue > 0) groups.push(count(overdue, 'überfällige Zahlung', 'überfällige Zahlungen'));
-  if (due > 0) groups.push(count(due, 'fällige Zahlung', 'fällige Zahlungen'));
-  return `Eunomia: ${groups.join(' und ')}`;
+  return mailCatalog(locale).reminder.subject(overdue, entries.length - overdue);
 }
 
 /**
@@ -77,31 +87,32 @@ export function renderReminderMail(
   entries: ReminderEntry[],
   options: ReminderMailOptions,
 ): { subject: string; text: string } {
+  const locale = options.locale ?? 'de';
+  const wording: Wording = {
+    text: mailCatalog(locale).reminder,
+    region: options.region ?? DEFAULT_FORMAT[locale],
+  };
+  const { text } = wording;
   const overdue = entries.filter((entry) => entry.stage === 'overdue');
   const due = entries.filter((entry) => entry.stage === 'due');
 
-  const lines = [`Hallo ${recipientName},`, ''];
-  lines.push(
-    entries.length === 1
-      ? 'für eine Rechnung steht eine Zahlung an:'
-      : 'für die folgenden Rechnungen steht eine Zahlung an:',
-  );
+  const lines = [text.greeting(recipientName), '', text.lead(entries.length)];
 
   if (overdue.length > 0) {
-    lines.push('', 'Überfällig:', ...overdue.map((entry) => line(entry, options.today)));
+    lines.push(
+      '',
+      text.overdueHeading,
+      ...overdue.map((entry) => line(entry, options.today, wording)),
+    );
   }
   if (due.length > 0) {
-    lines.push('', 'Fällig:', ...due.map((entry) => line(entry, options.today)));
+    lines.push('', text.dueHeading, ...due.map((entry) => line(entry, options.today, wording)));
   }
 
   const appUrl = options.appUrl?.replace(/\/+$/, '');
-  if (appUrl) lines.push('', `Im Arbeitsbereich öffnen: ${appUrl}/invoices`);
+  if (appUrl) lines.push('', text.openWorkspace(`${appUrl}/invoices`));
 
-  lines.push(
-    '',
-    'Diese Nachricht kommt von Ihrer Eunomia-Instanz. Die Erinnerungen lassen sich',
-    'in den Systemeinstellungen abschalten.',
-  );
+  lines.push('', ...text.footer);
 
-  return { subject: reminderSubject(entries), text: lines.join('\n') };
+  return { subject: reminderSubject(entries, locale), text: lines.join('\n') };
 }

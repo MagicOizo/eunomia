@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer';
 import { ApiError } from '../lib/api-error.js';
 import { logEvent } from '../lib/log.js';
 import type { ResolvedSettings } from '../settings/registry.js';
+import { type LocalePreferences, mailCatalog, mailLocale } from './catalog.js';
 
 /**
  * Sending mail through the SMTP account configured in the system settings
@@ -130,8 +131,11 @@ function readMailConfig(
 export interface Mailer {
   /** Sends a message, records the outcome and logs one greppable event. */
   sendMail(message: MailMessage): Promise<MailSendStatus>;
-  /** The test mail from the settings page; always goes to the admin's own address. */
-  sendTestMail(recipient: string): Promise<MailSendStatus>;
+  /**
+   * The test mail from the settings page; always goes to the admin's own
+   * address, in the admin's language (instance default when they chose none).
+   */
+  sendTestMail(recipient: string, preferences?: LocalePreferences): Promise<MailSendStatus>;
   /** The recorded status of the last attempt, for GET /settings. */
   readStatus(): Promise<MailSendStatus>;
 }
@@ -234,16 +238,17 @@ export function createMailer(store: MailSettingsStore, deps: MailerDeps = {}): M
     }
   }
 
-  async function sendTestMail(recipient: string): Promise<MailSendStatus> {
-    return sendMail({
-      to: recipient,
-      subject: 'Eunomia: Testnachricht',
-      text: [
-        'Diese Nachricht bestätigt, dass Eunomia über den eingetragenen Mailserver versenden kann.',
-        '',
-        'Sie wurde über die Schaltfläche „Testmail senden" in den System-Einstellungen ausgelöst.',
-      ].join('\n'),
+  async function sendTestMail(
+    recipient: string,
+    preferences: LocalePreferences = { locale: null, formatRegion: null },
+  ): Promise<MailSendStatus> {
+    const settings = await store.read();
+    const { locale } = mailLocale(preferences, {
+      defaultLocale: settings['general.defaultLocale'],
+      defaultFormat: settings['general.defaultFormat'],
     });
+    const { testMail } = mailCatalog(locale);
+    return sendMail({ to: recipient, subject: testMail.subject, text: testMail.text.join('\n') });
   }
 
   return { sendMail, sendTestMail, readStatus };

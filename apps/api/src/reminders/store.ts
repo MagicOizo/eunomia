@@ -23,6 +23,9 @@ export interface ReminderSettings {
   timeZone: string;
   repeatDays: number;
   appUrl: string | null;
+  /** The instance's language and format, for recipients who chose none (mail/catalog.ts). */
+  defaultLocale: string;
+  defaultFormat: string | null;
 }
 
 /** What the last run left behind, for the settings page. */
@@ -67,7 +70,15 @@ export interface ReminderStore {
   writeStatus(status: ReminderRunStatus): Promise<void>;
   listPayableInvoices(): Promise<PayableInvoiceRow[]>;
   listRecipients(): Promise<
-    Array<{ userId: number; email: string; name: string; all: boolean; accountUIDs: string[] }>
+    Array<{
+      userId: number;
+      email: string;
+      name: string;
+      locale: string | null;
+      formatRegion: string | null;
+      all: boolean;
+      accountUIDs: string[];
+    }>
   >;
   listReminders(invoiceUIDs: string[]): Promise<ReminderRecord[]>;
   recordReminders(records: ReminderRecord[]): Promise<void>;
@@ -96,6 +107,8 @@ export function createReminderStore(pool: Pool, encryptionKey: EncryptionKey): R
         timeZone: settings['reminders.timeZone'],
         repeatDays: settings['reminders.repeatDays'],
         appUrl: settings['reminders.appUrl'],
+        defaultLocale: settings['general.defaultLocale'],
+        defaultFormat: settings['general.defaultFormat'],
       };
     },
 
@@ -174,6 +187,8 @@ export function createReminderStore(pool: Pool, encryptionKey: EncryptionKey): R
         userId: user.userId,
         email: user.email,
         name: fullName(user.firstname, user.surname),
+        locale: user.locale,
+        formatRegion: user.formatRegion,
         all: user.all,
         accountUIDs: user.accountUIDs,
       }));

@@ -15,14 +15,17 @@ export interface AuthUser {
   firstname: string;
   surname: string | null;
   userStatus: number;
+  /** NULL follows the browser, then the instance default (migration 020). */
+  locale: string | null;
+  formatRegion: string | null;
 }
 
 interface UserWithHash extends AuthUser {
   passwordHash: string;
 }
 
-const USER_COLUMNS = `userID AS userId, uuidText, email, firstname, surname, userStatus`;
-const USER_COLUMNS_PREFIXED = `u.userID AS userId, u.uuidText, u.email, u.firstname, u.surname, u.userStatus`;
+const USER_COLUMNS = `userID AS userId, uuidText, email, firstname, surname, userStatus, locale, formatRegion`;
+const USER_COLUMNS_PREFIXED = `u.userID AS userId, u.uuidText, u.email, u.firstname, u.surname, u.userStatus, u.locale, u.formatRegion`;
 
 /** Total number of user rows — used only to gate the one-time setup endpoint. */
 export async function countUsers(pool: Pool): Promise<number> {
@@ -58,6 +61,27 @@ export async function updatePasswordHash(
   passwordHash: string,
 ): Promise<void> {
   await pool.query('UPDATE Users SET passwordHash = ? WHERE userID = ?', [passwordHash, userId]);
+}
+
+/**
+ * Writes a user's own language and format choices; a field left out stays as
+ * it is, `null` returns it to following the defaults.
+ */
+export async function updateLocalePreferences(
+  pool: Pool,
+  userId: number,
+  preferences: { locale?: string | null; formatRegion?: string | null },
+): Promise<void> {
+  const columns: string[] = [];
+  const values: unknown[] = [];
+  for (const column of ['locale', 'formatRegion'] as const) {
+    if (preferences[column] !== undefined) {
+      columns.push(`${column} = ?`);
+      values.push(preferences[column]);
+    }
+  }
+  if (columns.length === 0) return;
+  await pool.query(`UPDATE Users SET ${columns.join(', ')} WHERE userID = ?`, [...values, userId]);
 }
 
 /** Looks up a user by public UUID, or null if absent. */

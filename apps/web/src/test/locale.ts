@@ -1,6 +1,6 @@
-import type { FormatRegion } from '@eunomia/shared';
+import type { FormatRegion, Locale } from '@eunomia/shared';
 
-import { formatOverride, i18n, type Locale } from '../lib/i18n';
+import { formatOverride, i18n } from '../lib/i18n';
 
 /**
  * Runs a test body in another UI language and returns to German afterwards,

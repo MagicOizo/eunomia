@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BillingListDto, InvoiceDto, InvoiceSubmissionDto } from './api';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
+import { withLocale } from '../test/locale';
 import BillingDialog from './BillingDialog.vue';
 
 const { searchBillings, listAccountInvoices } = vi.hoisted(() => ({
@@ -370,5 +371,20 @@ describe('BillingDialog with several invoices', () => {
     });
     expect(results.violations).toEqual([]);
     wrapper.unmount();
+  });
+});
+
+describe('BillingDialog in English', () => {
+  it('counts the cards and names the amount shortcuts', async () => {
+    await withLocale('en', async () => {
+      const wrapper = await openDialog();
+
+      expect(wrapper.find('.eu-dialog__title').text()).toBe('Allocate billing');
+      expect(wrapper.text()).toContain('2 invoices are reimbursed through this service billing.');
+      const takes = wrapper.findAll('.eu-bill__card')[0].findAll('.eu-bill__take');
+      expect(takes[1].attributes('aria-label')).toContain('Use the open amount');
+      expect(wrapper.text()).toContain('This billing forfeits the bonus');
+      wrapper.unmount();
+    });
   });
 });

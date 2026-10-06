@@ -1,3 +1,4 @@
+import { FORMAT_REGIONS, SUPPORTED_LOCALES } from '@eunomia/shared';
 import { z } from 'zod';
 
 /** Credentials for login — email plus a non-empty password. */
@@ -26,3 +27,15 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, 'Password must be at least 8 characters'),
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+/**
+ * One's own language and format. `null` follows the defaults again (browser,
+ * then instance); a field left out is not touched.
+ */
+export const localePreferencesSchema = z
+  .object({
+    locale: z.enum(SUPPORTED_LOCALES).nullable().optional(),
+    formatRegion: z.enum(FORMAT_REGIONS).nullable().optional(),
+  })
+  .strict();
+export type LocalePreferencesInput = z.infer<typeof localePreferencesSchema>;

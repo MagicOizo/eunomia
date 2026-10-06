@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { ERROR_CODES } from '@eunomia/shared';
 import express, { type Express, type Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -119,7 +120,10 @@ function limiter(windowMs: number, max: number) {
     standardHeaders: true,
     legacyHeaders: false,
     message: {
-      error: { code: 'RATE_LIMITED', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
+      error: {
+        code: ERROR_CODES.RATE_LIMITED,
+        message: 'Too many requests. Please try again later.',
+      },
     },
   });
 }

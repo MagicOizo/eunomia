@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -28,6 +29,8 @@ const emit = defineEmits<{
   close: [];
   submit: [payload: { allocationUID: string; reimbursement: number; receiptNumber: string | null }];
 }>();
+
+const { t } = useI18n();
 
 const reimbursement = ref<number | null>(null);
 const receiptNumber = ref('');
@@ -60,15 +63,11 @@ function submit(): void {
   const allocation = props.allocation;
   if (!allocation) return;
   clear();
-  if (reimbursement.value === null) return fail('Bitte den Erstattungsbetrag angeben.');
+  if (reimbursement.value === null) return fail(t('invoices.allocation.amountRequired'));
   // Checked here as well as on the server, so a correction is not sent only to
   // come back rejected.
   if (Math.round(reimbursement.value * 100) > Math.round(maxReimbursement() * 100)) {
-    return fail(
-      `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — hier sind höchstens ${formatMoney(
-        maxReimbursement(),
-      )} möglich.`,
-    );
+    return fail(t('invoices.allocation.tooMuch', { max: formatMoney(maxReimbursement()) }));
   }
   emit('submit', {
     allocationUID: allocation.allocationUID,
@@ -79,31 +78,46 @@ function submit(): void {
 </script>
 
 <template>
-  <EuDialog :open="open" title="Erstattung ändern" @close="emit('close')">
+  <EuDialog :open="open" :title="t('invoices.allocation.title')" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
-      <p v-if="allocation && invoice" class="eu-form__note">
-        Rechnung {{ invoice.invoiceNumber }} über
-        <button
-          type="button"
-          class="eu-alloc__take"
-          :aria-label="`Rechnungsbetrag ${formatMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
-          :title="`${formatMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
-          @click="takeInvoiceAmount"
-        >
-          {{ formatMoney(invoice.invoiceAmount) }}</button
-        >, erstattet über Abrechnung {{ allocation.billingNumber }} vom
-        {{ formatDate(allocation.billingDate) }}.
-      </p>
+      <i18n-t
+        v-if="allocation && invoice"
+        keypath="invoices.allocation.note"
+        tag="p"
+        class="eu-form__note"
+        scope="global"
+      >
+        <template #invoice>{{ invoice.invoiceNumber }}</template>
+        <template #amount>
+          <button
+            type="button"
+            class="eu-alloc__take"
+            :aria-label="
+              t('invoices.allocation.takeAmount', { amount: formatMoney(invoice.invoiceAmount) })
+            "
+            :title="
+              t('invoices.allocation.takeAmountHint', {
+                amount: formatMoney(invoice.invoiceAmount),
+              })
+            "
+            @click="takeInvoiceAmount"
+          >
+            {{ formatMoney(invoice.invoiceAmount) }}
+          </button>
+        </template>
+        <template #billing>{{ allocation.billingNumber }}</template>
+        <template #date>{{ formatDate(allocation.billingDate) }}</template>
+      </i18n-t>
       <div class="eu-alloc__fields">
-        <EuCurrencyField v-model="reimbursement" label="Erstattung" />
-        <EuTextField v-model="receiptNumber" label="Belegnummer" />
+        <EuCurrencyField v-model="reimbursement" :label="t('fields.reimbursement')" />
+        <EuTextField v-model="receiptNumber" :label="t('fields.receiptNumber')" />
       </div>
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">{{
-        submitting ? 'Speichern…' : 'Speichern'
+        submitting ? t('common.saving') : t('common.save')
       }}</EuButton>
     </template>
   </EuDialog>

@@ -78,3 +78,34 @@ test('the link appears only when a base URL is configured', () => {
   // The trailing slash must not produce a double one.
   assert.match(linked, /https:\/\/eunomia\.example\.com\/invoices$/m);
 });
+
+test('in English the mail counts, dates and words follow the recipient', () => {
+  const entries = [
+    entry(),
+    entry({ invoiceNumber: '2026-0001', stage: 'overdue', transferUntilDate: '2026-09-23' }),
+  ];
+  const { subject, text } = renderReminderMail('Sam', entries, {
+    today: TODAY,
+    locale: 'en',
+    region: 'en-GB',
+  });
+
+  assert.equal(subject, 'Eunomia: 1 overdue payment and 1 payment due');
+  assert.match(text, /^Hello Sam,$/m);
+  assert.match(text, /^payments are due for the following invoices:$/m);
+  assert.match(
+    text,
+    /- Invoice 2026-0042 · Mia Musterfrau · Praxis Dr\. Meier · €128\.40 · due on 29\/09\/2026 \(in 5 days\)$/m,
+  );
+  assert.match(text, /was due on 23\/09\/2026 \(overdue for 1 day\)/);
+  assert.ok(!/fällig|Rechnung/.test(text), text);
+});
+
+test('English text with German formats is a choice of its own', () => {
+  const { text } = renderReminderMail('Sam', [entry()], {
+    today: TODAY,
+    locale: 'en',
+    region: 'de-DE',
+  });
+  assert.match(text, /128,40\s€ · due on 29\.09\.2026/);
+});

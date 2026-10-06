@@ -11,6 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -21,7 +22,7 @@ import EuToggle from '../design-system/components/EuToggle.vue';
 import { type BonusForfeitRule } from '../contracts/api';
 import { apiData } from '../lib/api';
 import { useDebouncedCallback } from '../lib/debounce';
-import { formatDate, formatMoney, plural } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import { todayIso } from '../lib/date-input';
 import { useDialogAction } from '../lib/dialog-action';
 import { noPermission as noPermissionText } from '../lib/error-messages';
@@ -49,6 +50,7 @@ const props = defineProps<{
 }>();
 
 const auth = useAuthStore();
+const { t } = useI18n();
 
 const billings = ref<BillingListDto[]>([]);
 const heading = ref('');
@@ -207,7 +209,7 @@ async function load(): Promise<void> {
     await loadBillings();
   } catch (err) {
     loadError.value =
-      err instanceof HttpError ? describeError(err) : 'Abrechnungen konnten nicht geladen werden.';
+      err instanceof HttpError ? describeError(err) : t('invoices.objection.loadFailed');
   } finally {
     loading.value = false;
   }
@@ -238,7 +240,7 @@ function fileObjection(): void {
   const billing = selected.value;
   if (!billing) return;
   if (!formDate.value) {
-    action.error = 'Bitte ein Datum für den Widerspruch angeben.';
+    action.error = t('invoices.objection.dateRequired');
     return;
   }
   void action.run(
@@ -317,8 +319,8 @@ function confirmDelete(): void {
         <RouterLink
           to="/billings"
           class="eu-billings__back"
-          title="Zurück zur Vertragsauswahl"
-          aria-label="Zurück zur Vertragsauswahl"
+          :title="t('invoices.billings.back')"
+          :aria-label="t('invoices.billings.back')"
         >
           <FontAwesomeIcon :icon="faChevronLeft" aria-hidden="true" />
         </RouterLink>
@@ -330,11 +332,11 @@ function confirmDelete(): void {
         :disabled="!mayManage"
         :title="noPermission"
         @click="newOpen = true"
-        >Neu</EuButton
+        >{{ t('common.new') }}</EuButton
       >
     </div>
 
-    <p v-if="loading" class="eu-billings__hint">Wird geladen…</p>
+    <p v-if="loading" class="eu-billings__hint">{{ t('common.loading') }}</p>
     <p v-else-if="loadError" class="eu-billings__error" role="alert">{{ loadError }}</p>
 
     <template v-else>
@@ -342,25 +344,24 @@ function confirmDelete(): void {
         <EuTextField
           v-model="filters.q"
           class="eu-billings__search"
-          label="Abrechnungs- oder Rechnungsnummer"
+          :label="t('invoices.billingSearch.query')"
         />
-        <EuTextField v-model="filters.from" label="Abrechnung ab" type="date" />
-        <EuTextField v-model="filters.to" label="Abrechnung bis" type="date" />
-        <EuCurrencyField v-model="filters.min" label="Erstattung ab" />
-        <EuCurrencyField v-model="filters.max" label="Erstattung bis" />
+        <EuTextField v-model="filters.from" :label="t('invoices.billingSearch.from')" type="date" />
+        <EuTextField v-model="filters.to" :label="t('invoices.billingSearch.to')" type="date" />
+        <EuCurrencyField v-model="filters.min" :label="t('invoices.billingSearch.min')" />
+        <EuCurrencyField v-model="filters.max" :label="t('invoices.billingSearch.max')" />
         <EuToggle
           v-model="filters.unlinked"
           class="eu-billings__toggle"
-          label="Nur ohne Zuordnung"
+          :label="t('invoices.billingSearch.unlinked')"
         />
       </div>
 
       <p v-if="billings.length === 0 && filtered" class="eu-billings__hint" role="status">
-        Keine Leistungsabrechnung passt zu diesen Filtern.
+        {{ t('invoices.billingSearch.noMatch') }}
       </p>
       <p v-else-if="billings.length === 0" class="eu-billings__hint">
-        Für diesen Vertrag gibt es noch keine Leistungsabrechnungen. Sie entstehen im
-        Rechnungs-Workflow über „Abrechnung zuordnen".
+        {{ t('invoices.billings.empty') }}
       </p>
 
       <div v-else class="eu-billings__table-wrap eu-scroll-focus-safe">
@@ -368,32 +369,32 @@ function confirmDelete(): void {
           <thead>
             <tr>
               <EuSortableTh
-                label="Nummer"
+                :label="t('invoices.columns.number')"
                 :state="sort.stateOf('number')"
                 @sort="sort.toggle('number')"
               />
               <EuSortableTh
-                label="Datum"
+                :label="t('invoices.columns.date')"
                 :state="sort.stateOf('date')"
                 @sort="sort.toggle('date')"
               />
               <EuSortableTh
-                label="Erstattung"
+                :label="t('invoices.billings.reimbursed')"
                 align="center"
                 :state="sort.stateOf('reimbursed')"
                 @sort="sort.toggle('reimbursed')"
               />
               <EuSortableTh
-                label="Rechnungen"
+                :label="t('fields.invoiceUIDs')"
                 :state="sort.stateOf('invoices')"
                 @sort="sort.toggle('invoices')"
               />
               <EuSortableTh
-                label="Widerspruch"
+                :label="t('invoices.objection.title')"
                 :state="sort.stateOf('objection')"
                 @sort="sort.toggle('objection')"
               />
-              <th class="eu-billings__actions-head">Aktionen</th>
+              <th class="eu-billings__actions-head">{{ t('common.actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -414,13 +415,19 @@ function confirmDelete(): void {
                   v-if="isOpenObjection(b)"
                   class="eu-billings__objection"
                   role="img"
-                  :aria-label="`Im Widerspruch offen seit ${formatDate(b.objectionDate)}`"
-                  :title="`Im Widerspruch offen seit ${formatDate(b.objectionDate)}`"
+                  :aria-label="
+                    t('invoices.billings.objectionOpen', { date: formatDate(b.objectionDate) })
+                  "
+                  :title="
+                    t('invoices.billings.objectionOpen', { date: formatDate(b.objectionDate) })
+                  "
                 >
                   <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
                 </span>
                 <span v-else-if="b.objectionDate" class="eu-billings__resolved">
-                  aufgelöst am {{ formatDate(b.objectionResolvedDate) }}
+                  {{
+                    t('invoices.billings.resolvedOn', { date: formatDate(b.objectionResolvedDate) })
+                  }}
                 </span>
                 <span v-else class="eu-billings__muted">–</span>
               </td>
@@ -430,35 +437,35 @@ function confirmDelete(): void {
                   variant="secondary"
                   icon-only
                   :icon="faUpRightFromSquare"
-                  aria-label="Dokument öffnen"
-                  title="Hinterlegtes Dokument öffnen"
+                  :aria-label="t('invoices.paymentInfo.openDocument')"
+                  :title="t('invoices.table.openDocumentTitle')"
                   @click="openDocument(b)"
                 />
                 <EuButton
                   variant="secondary"
                   icon-only
                   :icon="faGavel"
-                  aria-label="Widerspruch"
+                  :aria-label="t('invoices.objection.title')"
                   :disabled="!mayManage"
-                  :title="mayManage ? 'Widerspruch einlegen oder auflösen' : noPermissionText()"
+                  :title="mayManage ? t('invoices.billings.objectionHint') : noPermissionText()"
                   @click="openObjection(b)"
                 />
                 <EuButton
                   variant="secondary"
                   icon-only
                   :icon="faPen"
-                  aria-label="Bearbeiten"
+                  :aria-label="t('invoices.billings.edit')"
                   :disabled="!mayManage"
-                  :title="mayManage ? 'Abrechnung bearbeiten' : noPermissionText()"
+                  :title="mayManage ? t('invoices.billingForm.editTitle') : noPermissionText()"
                   @click="openEdit(b)"
                 />
                 <EuButton
                   variant="secondary"
                   icon-only
                   :icon="faTrash"
-                  aria-label="Löschen"
+                  :aria-label="t('common.delete')"
                   :disabled="!mayManage"
-                  :title="mayManage ? 'Abrechnung löschen' : noPermissionText()"
+                  :title="mayManage ? t('invoices.billings.deleteTitle') : noPermissionText()"
                   @click="openDelete(b)"
                 />
               </td>
@@ -468,45 +475,60 @@ function confirmDelete(): void {
       </div>
     </template>
 
-    <EuDialog :open="objectionOpen" title="Widerspruch" @close="objectionOpen = false">
+    <EuDialog
+      :open="objectionOpen"
+      :title="t('invoices.objection.title')"
+      @close="objectionOpen = false"
+    >
       <div v-if="selected" class="eu-form">
         <p class="eu-form__note">
-          Leistungsabrechnung {{ selected.billingNumber }} ({{ formatDate(selected.billingDate) }})
+          {{
+            t('invoices.billings.billingOf', {
+              number: selected.billingNumber,
+              date: formatDate(selected.billingDate),
+            })
+          }}
         </p>
 
         <template v-if="selectedOpen">
           <p class="eu-billings__state">
-            Widerspruch offen seit {{ formatDate(selected.objectionDate) }}
+            {{ t('invoices.objection.openSince', { date: formatDate(selected.objectionDate) }) }}
           </p>
           <p v-if="selected.objectionNote" class="eu-form__note">{{ selected.objectionNote }}</p>
         </template>
 
         <template v-else-if="selected.objectionDate">
           <p class="eu-billings__resolved">
-            Widerspruch aufgelöst am {{ formatDate(selected.objectionResolvedDate) }}
+            {{
+              t('invoices.objection.resolvedOn', {
+                date: formatDate(selected.objectionResolvedDate),
+              })
+            }}
           </p>
           <p v-if="selected.objectionNote" class="eu-form__note">{{ selected.objectionNote }}</p>
         </template>
 
         <template v-else>
-          <EuTextField v-model="formDate" label="Datum" type="date" />
-          <EuTextField v-model="formNote" label="Notiz (optional)" />
+          <EuTextField v-model="formDate" :label="t('invoices.objection.date')" type="date" />
+          <EuTextField v-model="formNote" :label="t('invoices.objection.note')" />
         </template>
 
         <p v-if="action.error" class="eu-billings__error" role="alert">{{ action.error }}</p>
       </div>
 
       <template #footer>
-        <EuButton variant="secondary" @click="objectionOpen = false">Schließen</EuButton>
+        <EuButton variant="secondary" @click="objectionOpen = false">{{
+          t('common.close')
+        }}</EuButton>
         <EuButton v-if="selectedOpen" :disabled="action.busy" @click="resolveObjection">
-          Als aufgelöst markieren
+          {{ t('invoices.objection.resolve') }}
         </EuButton>
         <EuButton
           v-else-if="selected && !selected.objectionDate"
           :disabled="action.busy"
           @click="fileObjection"
         >
-          Widerspruch einlegen
+          {{ t('invoices.objection.file') }}
         </EuButton>
       </template>
     </EuDialog>
@@ -540,27 +562,28 @@ function confirmDelete(): void {
       @submit="bookAllocations"
     />
 
-    <EuDialog :open="deleteOpen" title="Abrechnung löschen" @close="deleteOpen = false">
+    <EuDialog
+      :open="deleteOpen"
+      :title="t('invoices.billings.deleteTitle')"
+      @close="deleteOpen = false"
+    >
       <div v-if="selected" class="eu-form">
-        <p>
-          Leistungsabrechnung <strong>{{ selected.billingNumber }}</strong> wirklich löschen?
-        </p>
+        <i18n-t keypath="invoices.billings.deleteConfirm" tag="p" scope="global">
+          <template #number>
+            <strong>{{ selected.billingNumber }}</strong>
+          </template>
+        </i18n-t>
         <p v-if="selected.invoiceCount > 0" class="eu-billings__warn">
-          {{
-            plural(
-              selected.invoiceCount,
-              'zugeordnete Rechnung verliert',
-              'zugeordnete Rechnungen verlieren',
-            )
-          }}
-          dadurch ihre Erstattung und gehen zurück auf „eingereicht".
+          {{ t('invoices.billings.deleteWarning', selected.invoiceCount) }}
         </p>
         <p v-if="action.error" class="eu-billings__error" role="alert">{{ action.error }}</p>
       </div>
       <template #footer>
-        <EuButton variant="secondary" @click="deleteOpen = false">Abbrechen</EuButton>
+        <EuButton variant="secondary" @click="deleteOpen = false">{{
+          t('common.cancel')
+        }}</EuButton>
         <EuButton :disabled="action.busy" @click="confirmDelete">{{
-          action.busy ? 'Löschen…' : 'Löschen'
+          action.busy ? t('invoices.billings.deleting') : t('common.delete')
         }}</EuButton>
       </template>
     </EuDialog>

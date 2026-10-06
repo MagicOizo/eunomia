@@ -1,6 +1,7 @@
 import { type ReminderStage, calcPaymentState, daysUntil } from '@eunomia/shared';
 
 import { logEvent } from '../lib/log.js';
+import { mailLocale } from '../mail/catalog.js';
 import type { Mailer } from '../mail/mailer.js';
 import { type ReminderEntry, renderReminderMail } from './message.js';
 import { zonedNow } from './schedule.js';
@@ -157,9 +158,12 @@ export function createReminderRunner(
         }
         if (entries.length === 0) continue;
 
+        // Each recipient reads their own language — the preview on the settings
+        // page shows the same, mail by mail.
         const mail = renderReminderMail(recipient.name, entries, {
           today,
           appUrl: settings.appUrl,
+          ...mailLocale(recipient, settings),
         });
         preview.push({
           email: recipient.email,

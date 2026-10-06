@@ -126,6 +126,9 @@ export interface PermittedUser {
   email: string;
   firstname: string;
   surname: string | null;
+  /** Language and format of the profile, `NULL` = follow (the reminders write in it). */
+  locale: string | null;
+  formatRegion: string | null;
   /** True when a global grant covers every account — `accountUIDs` is then empty. */
   all: boolean;
   accountUIDs: string[];
@@ -154,10 +157,12 @@ export async function listUsersWithAccess(
       email: string;
       firstname: string;
       surname: string | null;
+      locale: string | null;
+      formatRegion: string | null;
       accountUID: string | null;
     }>
   >(
-    `SELECT u.userID, u.email, u.firstname, u.surname, grants.accountUID
+    `SELECT u.userID, u.email, u.firstname, u.surname, u.locale, u.formatRegion, grants.accountUID
        FROM Users u
        JOIN (
               SELECT ur.userID, NULL AS accountUID
@@ -186,6 +191,8 @@ export async function listUsersWithAccess(
       email: row.email,
       firstname: row.firstname,
       surname: row.surname,
+      locale: row.locale,
+      formatRegion: row.formatRegion,
       all: false,
       accountUIDs: [],
     };

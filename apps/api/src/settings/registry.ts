@@ -1,4 +1,12 @@
-import { ERROR_CODES, isHttpUrl, SETTING_KEYS, type SettingKey } from '@eunomia/shared';
+import {
+  ERROR_CODES,
+  FORMAT_REGIONS,
+  isFormatRegion,
+  isHttpUrl,
+  SETTING_KEYS,
+  SUPPORTED_LOCALES,
+  type SettingKey,
+} from '@eunomia/shared';
 
 import { badRequest } from '../lib/api-error.js';
 
@@ -13,7 +21,7 @@ import { badRequest } from '../lib/api-error.js';
  * storage is key-value (migration 009).
  */
 
-export type SettingSection = 'mail' | 'updateCheck' | 'reminders' | 'retention';
+export type SettingSection = 'general' | 'mail' | 'updateCheck' | 'reminders' | 'retention';
 
 export type SettingValue = string | number | boolean | null;
 
@@ -65,6 +73,24 @@ function isTimeZone(value: string): boolean {
  * exists so that slice needs no migration — see the backlog.
  */
 export const SETTINGS = {
+  /**
+   * The instance's language and format, for whoever has chosen neither in
+   * their profile (Slice 82). The web asks the browser first; a mail has no
+   * browser, so for it this is the next answer after the profile. An empty
+   * format follows the language (de → de-DE, en → en-GB).
+   */
+  'general.defaultLocale': {
+    section: 'general',
+    type: 'enum',
+    fallback: 'de',
+    values: SUPPORTED_LOCALES,
+  },
+  'general.defaultFormat': {
+    section: 'general',
+    type: 'string',
+    fallback: null,
+    check: { ok: isFormatRegion, expected: `one of ${FORMAT_REGIONS.join(', ')}` },
+  },
   'mail.enabled': { section: 'mail', type: 'bool', fallback: false },
   'mail.host': { section: 'mail', type: 'string', fallback: null, maxLength: 255 },
   'mail.port': { section: 'mail', type: 'int', fallback: 587, min: 1, max: 65535 },

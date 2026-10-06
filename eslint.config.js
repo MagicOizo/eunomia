@@ -110,19 +110,7 @@ export default tseslint.config(
       'apps/web/src/trash/**/*.vue',
       'apps/web/src/contracts/**/*.vue',
       'apps/web/src/dashboard/**/*.vue',
-      // The invoices go in two slices, so their files one by one until the second.
-      'apps/web/src/invoices/InvoiceWorkspaceView.vue',
-      'apps/web/src/invoices/InvoiceTable.vue',
-      'apps/web/src/invoices/InvoiceFormDialog.vue',
-      'apps/web/src/invoices/InvoiceDetailDialog.vue',
-      'apps/web/src/invoices/InvoiceSummary.vue',
-      'apps/web/src/invoices/RecommendationBadge.vue',
-      'apps/web/src/invoices/PaymentInfoPopover.vue',
-      'apps/web/src/invoices/PaymentQrPopover.vue',
-      'apps/web/src/invoices/InvoiceBriefList.vue',
-      'apps/web/src/invoices/ExclusionDialog.vue',
-      'apps/web/src/invoices/SettleDialog.vue',
-      'apps/web/src/invoices/InvoicePickerView.vue',
+      'apps/web/src/invoices/**/*.vue',
     ],
     rules: {
       '@intlify/vue-i18n/no-raw-text': [

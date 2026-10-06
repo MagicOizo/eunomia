@@ -128,6 +128,7 @@
       "BAD_REQUEST": "Die Anfrage war nicht gültig.",
       "CONFLICT": "Die Aktion ist im aktuellen Zustand nicht möglich.",
       "INTERNAL": "Auf dem Server ist ein Fehler aufgetreten.",
+      "RATE_LIMITED": "Zu viele Anfragen. Bitte später erneut versuchen.",
       "INVALID_CREDENTIALS": "E-Mail oder Passwort ist falsch.",
       "INVALID_CURRENT_PASSWORD": "Das aktuelle Passwort ist falsch.",
       "INVALID_REFRESH_TOKEN": "Die Sitzung ist abgelaufen. Bitte melde dich erneut an.",
@@ -273,6 +274,10 @@
     "documentLink": "vollständige Internetadresse mit http:// oder https://"
   },
   "settingLabels": {
+    "general": {
+      "defaultLocale": "Standardsprache",
+      "defaultFormat": "Standardformat für Zahlen und Daten"
+    },
     "mail": {
       "enabled": "E-Mail-Versand aktiv",
       "host": "Mailserver",
@@ -973,6 +978,125 @@
       "remove": "Entfernen",
       "removeMarkTitle": "Markierung entfernen",
       "removeMarkQuestion": "Die Markierung „nicht erstattungsfähig“ für {policy} entfernen?"
+    },
+    "billingForm": {
+      "createTitle": "Neue Leistungsabrechnung",
+      "editTitle": "Abrechnung bearbeiten",
+      "documentLink": "Dokument-Link (optional)",
+      "forfeits": "Diese Abrechnung verwirkt den Bonus",
+      "rule": "Regel der Police: Bonus verfällt {rule}.",
+      "numberAndDateRequired": "Bitte Abrechnungsnummer und -datum angeben.",
+      "contractMissing": "Zu dieser Leistungsabrechnung fehlt die Police.",
+      "create": "Anlegen",
+      "creating": "Anlegen…"
+    },
+    "submit": {
+      "title": "Rechnungen einreichen",
+      "bundled": "{n} Rechnung wird als eine Einreichung gebündelt. | {n} Rechnungen werden als eine Einreichung gebündelt.",
+      "noContract": "Keine Police verfügbar: Die Rechnungen liegen bereits bei allen Policen oder sind dort als nicht erstattungsfähig markiert.",
+      "noneInPeriod": "Keine Police lief im Behandlungszeitraum ({period}). Mit dem Schalter sind alle Policen wählbar.",
+      "hidden": "{n} Police außerhalb des Behandlungszeitraums ist ausgeblendet. | {n} Policen außerhalb des Behandlungszeitraums sind ausgeblendet.",
+      "showAll": "Auch Policen außerhalb des Behandlungszeitraums",
+      "since": "ab {date}",
+      "required": "Bitte Police und Einreichungsdatum wählen.",
+      "submitting": "Einreichen…"
+    },
+    "submission": {
+      "submittedOn": "eingereicht am {date}",
+      "noBilling": "Noch keine Leistungsabrechnung erfasst.",
+      "receipt": "Beleg {number}",
+      "inObjection": "Im Widerspruch",
+      "editAllocation": "Erstattung aus Abrechnung {number} ändern",
+      "editAllocationHint": "Erstattungsbetrag und Belegnummer ändern ({number})",
+      "removeAllocation": "Erstattung aus Abrechnung {number} entfernen",
+      "reimbursed": "Erstattet",
+      "bill": "Abrechnung für {number} erfassen",
+      "billHint": "Leistungsabrechnung erfassen und Erstattung zuordnen ({number})",
+      "objection": "Widerspruch bei {number}",
+      "objectionHint": "Fehlerhafte Leistungsabrechnung als Widerspruch markieren ({number})",
+      "withdraw": "Einreichung bei {number} zurückziehen"
+    },
+    "objection": {
+      "title": "Widerspruch",
+      "lead": "Leistungsabrechnungen zu Rechnung {number}. Markiere eine fehlerhafte Abrechnung als Widerspruch, um offene Forderungen gegenüber der Versicherung nachzuhalten.",
+      "none": "Zu dieser Rechnung gibt es noch keine Leistungsabrechnung.",
+      "loadFailed": "Abrechnungen konnten nicht geladen werden.",
+      "dateRequired": "Bitte ein Datum für den Widerspruch angeben.",
+      "openSince": "Widerspruch offen seit {date}",
+      "resolve": "Als aufgelöst markieren",
+      "resolvedOn": "Widerspruch aufgelöst am {date}",
+      "date": "Datum",
+      "note": "Notiz (optional)",
+      "file": "Widerspruch einlegen"
+    },
+    "allocation": {
+      "title": "Erstattung ändern",
+      "note": "Rechnung {invoice} über {amount}, erstattet über Abrechnung {billing} vom {date}.",
+      "takeAmount": "Rechnungsbetrag {amount} in Erstattung übernehmen",
+      "takeAmountHint": "{amount} in Erstattung übernehmen",
+      "amountRequired": "Bitte den Erstattungsbetrag angeben.",
+      "tooMuch": "Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — hier sind höchstens {max} möglich."
+    },
+    "billingSearch": {
+      "title": "Leistungsabrechnung auswählen",
+      "policy": "Police: {policy}",
+      "query": "Abrechnungs- oder Rechnungsnummer",
+      "from": "Abrechnung ab",
+      "to": "Abrechnung bis",
+      "min": "Erstattung ab",
+      "max": "Erstattung bis",
+      "unlinked": "Nur ohne Zuordnung",
+      "results": "Suchergebnis",
+      "searching": "Wird gesucht…",
+      "noMatch": "Keine Leistungsabrechnung passt zu diesen Filtern.",
+      "unallocated": "noch keiner Rechnung zugeordnet",
+      "truncated": "Es wird die erste Abrechnung gezeigt — bitte enger filtern. | Es werden die ersten {n} Abrechnungen gezeigt — bitte enger filtern.",
+      "choose": "Auswählen"
+    },
+    "billingPicker": {
+      "query": "Abrechnungs-, Rechnungs-, Policennummer oder Person",
+      "noMatch": "Keine Leistungsabrechnung passt zu dieser Suche.",
+      "meta": "Abrechnung vom {date} · Police {contract}",
+      "truncated": "Es wird die erste Leistungsabrechnung gezeigt. Bitte enger filtern. | Es werden die ersten {n} Leistungsabrechnungen gezeigt. Bitte enger filtern.",
+      "lead": "Für welchen Vertrag möchtest du die Leistungsabrechnungen ansehen?",
+      "noContracts": "Noch keine Verträge erfasst."
+    },
+    "billing": {
+      "title": "Abrechnung zuordnen",
+      "noInvoiceYet": "Noch keine Rechnung gewählt — unten die Rechnungen dieser Leistungsabrechnung hinzufügen.",
+      "reimbursedThrough": "{n} Rechnung wird über diese Leistungsabrechnung erstattet. | {n} Rechnungen werden über diese Leistungsabrechnung erstattet.",
+      "noCommonPolicy": "Diese Rechnungen haben keine gemeinsame Police — sie lassen sich nicht über eine Leistungsabrechnung erstatten.",
+      "billing": "Leistungsabrechnung",
+      "billingDate": "Abrechnungsdatum:",
+      "noFacility": "ohne Leistungserbringer",
+      "stillOpen": "noch offen",
+      "openAmount": "offen {amount}",
+      "takeOpen": "Offenen Betrag {amount} in Erstattung übernehmen",
+      "submittedOnSeveralDays": "an mehreren Tagen eingereicht",
+      "dropInvoice": "Rechnung {number} nicht mitbuchen",
+      "markSettled": "Als abgerechnet markieren",
+      "fullyReimbursed": "voll erstattet",
+      "addFirst": "Rechnung dieser Police",
+      "addMore": "Weitere Rechnung dieser Police",
+      "billingRequired": "Bitte eine Leistungsabrechnung wählen, suchen oder anlegen.",
+      "invoiceRequired": "Bitte mindestens eine Rechnung wählen.",
+      "amountMissing": "Bitte den Erstattungsbetrag angeben für: {invoices}.",
+      "tooMuch": "Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — zu viel bei: {invoices}.",
+      "tooMuchItem": "{number} (noch offen: {open})"
+    },
+    "billings": {
+      "back": "Zurück zur Vertragsauswahl",
+      "empty": "Für diesen Vertrag gibt es noch keine Leistungsabrechnungen. Sie entstehen im Rechnungs-Workflow über „Abrechnung zuordnen“.",
+      "reimbursed": "Erstattung",
+      "objectionOpen": "Im Widerspruch offen seit {date}",
+      "resolvedOn": "aufgelöst am {date}",
+      "objectionHint": "Widerspruch einlegen oder auflösen",
+      "edit": "Bearbeiten",
+      "deleteTitle": "Abrechnung löschen",
+      "billingOf": "Leistungsabrechnung {number} ({date})",
+      "deleteConfirm": "Leistungsabrechnung {number} wirklich löschen?",
+      "deleteWarning": "{n} zugeordnete Rechnung verliert dadurch ihre Erstattung und geht zurück auf „eingereicht“. | {n} zugeordnete Rechnungen verlieren dadurch ihre Erstattung und gehen zurück auf „eingereicht“.",
+      "deleting": "Löschen…"
     }
   }
 }

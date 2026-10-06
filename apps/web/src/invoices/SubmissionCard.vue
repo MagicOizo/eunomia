@@ -9,6 +9,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -42,6 +43,8 @@ const emit = defineEmits<{
   removeAllocation: [allocation: InvoiceAllocationDto];
 }>();
 
+const { t } = useI18n();
+
 const policy = computed(
   () => `${props.submission.contractNumber} · ${props.submission.companyName}`,
 );
@@ -54,7 +57,9 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
     <header class="eu-card__head">
       <h4>
         {{ policy }}
-        <span class="eu-card__sub">eingereicht am {{ formatDate(submission.submittedDate) }}</span>
+        <span class="eu-card__sub">{{
+          t('invoices.submission.submittedOn', { date: formatDate(submission.submittedDate) })
+        }}</span>
       </h4>
       <div class="eu-card__badges">
         <EuBadge :tone="statusDisplay.tone" :icon="statusDisplay.icon">
@@ -67,7 +72,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
     </header>
 
     <p v-if="submission.allocations.length === 0" class="eu-card__hint">
-      Noch keine Leistungsabrechnung erfasst.
+      {{ t('invoices.submission.noBilling') }}
     </p>
     <ul v-else class="eu-card__list">
       <li v-for="allocation in submission.allocations" :key="allocation.allocationUID">
@@ -76,7 +81,8 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           <span class="eu-card__sub">
             {{ formatDate(allocation.billingDate)
             }}<template v-if="allocation.receiptNumber">
-              · Beleg {{ allocation.receiptNumber }}</template
+              ·
+              {{ t('invoices.submission.receipt', { number: allocation.receiptNumber }) }}</template
             >
           </span>
         </span>
@@ -84,8 +90,8 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           v-if="allocation.objectionOpen"
           class="eu-card__objection"
           role="img"
-          aria-label="Im Widerspruch"
-          title="Im Widerspruch"
+          :aria-label="t('invoices.submission.inObjection')"
+          :title="t('invoices.submission.inObjection')"
         >
           <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
         </span>
@@ -94,10 +100,12 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           variant="secondary"
           icon-only
           :icon="faPen"
-          :aria-label="`Erstattung aus Abrechnung ${allocation.billingNumber} ändern`"
+          :aria-label="
+            t('invoices.submission.editAllocation', { number: allocation.billingNumber })
+          "
           :title="
             canManage
-              ? `Erstattungsbetrag und Belegnummer ändern (${allocation.billingNumber})`
+              ? t('invoices.submission.editAllocationHint', { number: allocation.billingNumber })
               : noPermission()
           "
           :disabled="busy || !canManage"
@@ -107,10 +115,12 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           variant="secondary"
           icon-only
           :icon="faTrash"
-          :aria-label="`Erstattung aus Abrechnung ${allocation.billingNumber} entfernen`"
+          :aria-label="
+            t('invoices.submission.removeAllocation', { number: allocation.billingNumber })
+          "
           :title="
             canManage
-              ? `Erstattung aus Abrechnung ${allocation.billingNumber} entfernen`
+              ? t('invoices.submission.removeAllocation', { number: allocation.billingNumber })
               : noPermission()
           "
           :disabled="busy || !canManage"
@@ -121,7 +131,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
 
     <footer class="eu-card__foot">
       <span class="eu-card__total">
-        <span class="eu-card__sub">Erstattet</span>
+        <span class="eu-card__sub">{{ t('invoices.submission.reimbursed') }}</span>
         {{ formatMoney(submission.reimbursed) }}
       </span>
       <div class="eu-card__actions">
@@ -130,10 +140,10 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           variant="secondary"
           icon-only
           :icon="faPlus"
-          :aria-label="`Abrechnung für ${submission.contractNumber} erfassen`"
+          :aria-label="t('invoices.submission.bill', { number: submission.contractNumber })"
           :title="
             canManage
-              ? `Leistungsabrechnung erfassen und Erstattung zuordnen (${submission.contractNumber})`
+              ? t('invoices.submission.billHint', { number: submission.contractNumber })
               : noPermission()
           "
           :disabled="busy || !canManage"
@@ -144,10 +154,10 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           variant="secondary"
           icon-only
           :icon="faGavel"
-          :aria-label="`Widerspruch bei ${submission.contractNumber}`"
+          :aria-label="t('invoices.submission.objection', { number: submission.contractNumber })"
           :title="
             canManage
-              ? `Fehlerhafte Leistungsabrechnung als Widerspruch markieren (${submission.contractNumber})`
+              ? t('invoices.submission.objectionHint', { number: submission.contractNumber })
               : noPermission()
           "
           :disabled="busy || !canManage"
@@ -158,9 +168,11 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           variant="secondary"
           icon-only
           :icon="faArrowRotateLeft"
-          :aria-label="`Einreichung bei ${submission.contractNumber} zurückziehen`"
+          :aria-label="t('invoices.submission.withdraw', { number: submission.contractNumber })"
           :title="
-            canManage ? `Einreichung bei ${submission.contractNumber} zurückziehen` : noPermission()
+            canManage
+              ? t('invoices.submission.withdraw', { number: submission.contractNumber })
+              : noPermission()
           "
           :disabled="busy || !canManage"
           @click="emit('withdraw', submission)"

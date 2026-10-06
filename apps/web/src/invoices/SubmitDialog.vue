@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -8,7 +9,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { todayIso } from '../lib/date-input';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
-import { formatDate, plural } from '../lib/format';
+import { formatDate } from '../lib/format';
 import type { InvoiceDto } from './api';
 import { type ContractOption, contractsCoveringPeriod, treatmentPeriod } from './eligibility';
 import InvoiceBriefList from './InvoiceBriefList.vue';
@@ -28,6 +29,8 @@ const emit = defineEmits<{
   close: [];
   submit: [payload: { contractUID: string; submittedDate: string }];
 }>();
+
+const { t } = useI18n();
 
 const contractUID = ref('');
 const submittedDate = ref('');
@@ -64,7 +67,7 @@ const periodLabel = computed(() => {
 /** "01.01.2020 – 31.12.2023", or "ab 01.01.2020" while the policy still runs. */
 function contractTerm(contract: ContractOption): string {
   return contract.contractEnd === null
-    ? `ab ${formatDate(contract.contractBegin)}`
+    ? t('invoices.submit.since', { date: formatDate(contract.contractBegin) })
     : `${formatDate(contract.contractBegin)} – ${formatDate(contract.contractEnd)}`;
 }
 
@@ -85,7 +88,7 @@ watch(offered, (options) => {
 function submit(): void {
   clear();
   if (!contractUID.value || !submittedDate.value) {
-    return fail('Bitte Police und Einreichungsdatum wählen.');
+    return fail(t('invoices.submit.required'));
   }
   emit('submit', {
     contractUID: contractUID.value,
@@ -95,47 +98,39 @@ function submit(): void {
 </script>
 
 <template>
-  <EuDialog :open="open" title="Rechnungen einreichen" @close="emit('close')">
+  <EuDialog :open="open" :title="t('invoices.submit.title')" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <p class="eu-form__note">
-        {{ plural(invoices.length, 'Rechnung wird', 'Rechnungen werden') }} als eine Einreichung
-        gebündelt.
+        {{ t('invoices.submit.bundled', invoices.length) }}
       </p>
       <InvoiceBriefList :invoices="invoices" :facility-names="facilityNames" />
       <p v-if="contracts.length === 0" class="eu-form__note" role="status">
-        Keine Police verfügbar: Die Rechnungen liegen bereits bei allen Policen oder sind dort als
-        nicht erstattungsfähig markiert.
+        {{ t('invoices.submit.noContract') }}
       </p>
       <template v-else>
         <p v-if="offered.length === 0" class="eu-form__note" role="status">
-          Keine Police lief im Behandlungszeitraum ({{ periodLabel }}). Mit dem Schalter sind alle
-          Policen wählbar.
+          {{ t('invoices.submit.noneInPeriod', { period: periodLabel }) }}
         </p>
         <p v-else-if="!showAll && hiddenCount > 0" class="eu-form__note" role="status">
-          {{ plural(hiddenCount, 'Police', 'Policen') }} außerhalb des Behandlungszeitraums
-          {{ hiddenCount === 1 ? 'ist' : 'sind' }} ausgeblendet.
+          {{ t('invoices.submit.hidden', hiddenCount) }}
         </p>
-        <EuToggle
-          v-if="hiddenCount > 0"
-          v-model="showAll"
-          label="Auch Policen außerhalb des Behandlungszeitraums"
-        />
+        <EuToggle v-if="hiddenCount > 0" v-model="showAll" :label="t('invoices.submit.showAll')" />
         <EuEntityPicker
           :model-value="contractUID || null"
-          label="Police"
+          :label="t('fields.contractUID')"
           required
           :options="offered"
           @update:model-value="contractUID = $event ?? ''"
         />
-        <EuTextField v-model="submittedDate" label="Einreichungsdatum" type="date" />
+        <EuTextField v-model="submittedDate" :label="t('fields.submittedDate')" type="date" />
       </template>
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting || offered.length === 0" @click="submit">
-        {{ submitting ? 'Einreichen…' : 'Einreichen' }}
+        {{ submitting ? t('invoices.submit.submitting') : t('invoices.actions.submit') }}
       </EuButton>
     </template>
   </EuDialog>

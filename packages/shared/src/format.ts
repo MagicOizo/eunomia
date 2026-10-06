@@ -69,13 +69,3 @@ export function formatDate(value: unknown, region: FormatRegion): string {
   if (Number.isNaN(moment.getTime()) || moment.toISOString().slice(0, 10) !== value) return DASH;
   return dateFormat(region).format(moment);
 }
-
-/** `45` → `45,00 €`, for the text the API still writes in German. */
-export function germanMoney(value: unknown): string {
-  return formatMoney(value, 'de-DE');
-}
-
-/** `2026-10-01` → `01.10.2026`, for the text the API still writes in German. */
-export function germanDate(value: unknown): string {
-  return formatDate(value, 'de-DE');
-}

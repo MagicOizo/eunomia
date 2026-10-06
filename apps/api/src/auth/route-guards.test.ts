@@ -62,6 +62,7 @@ const DECLARED: Record<string, Declared> = {
   // Authenticated and nothing more, on purpose.
   'POST /api/v1/auth/password': authenticated('own password, proven with the current one'),
   'GET /api/v1/me': authenticated('reports the caller to themselves'),
+  'PATCH /api/v1/me': authenticated("sets the caller's own language and format"),
   'GET /api/v1/companies': authenticated('global master data; it fills the invoice forms'),
   'GET /api/v1/companies/:uid': authenticated('global master data'),
   'GET /api/v1/facilities': authenticated('global master data'),
