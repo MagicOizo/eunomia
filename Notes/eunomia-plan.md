@@ -2268,7 +2268,10 @@ Geplant 2026-10-06. Eunomia ist bis 1.1.0 durchgehend deutsch (rund 1.300 UI-Tex
 | 80 | `1.2.0-slice.4` | Policen (`contracts/` inkl. Staffel) und Startseite (`dashboard/`) |
 | 81 | `1.2.0-slice.5` | Rechnungen I: Arbeitsfläche, Tabelle, Anlegen-Dialog, Details, Zusammenfassung, Status- und Empfehlungs-Badges, Rechnungssuche |
 | 82 | `1.2.0-slice.6` | Rechnungen II (Einreichung, Abrechnungen, Zuordnung, Picker, Abrechnungssuche) + Server: `Users.locale` und `Users.formatRegion`, Einstellungen `general.defaultLocale`/`general.defaultFormat`, Mail-Katalog in der API (Mail in der Sprache des Empfängers), Locale-Parameter für die Formatierer in `shared`, Rate-Limit-Satz englisch mit Code |
-| 83 | `1.2.0-slice.7` | Sprachwahl scharf (Profil → Browser → Instanz → `de`), Auswahl von Sprache und Format im Profil und in den System-Einstellungen, `plural()` gelöscht, `no-raw-text` als Fehler, Durchgang EN/DE mit Playwright (Textlängen, schmale Tabellen), „Adding a language" in README/DEV.md → Release `1.2.0` |
+| 83 | `1.2.0-slice.7` | Sprachwahl scharf (Profil → Browser → Instanz → `de`), Auswahl von Sprache und Format im Profil und in den System-Einstellungen, `plural()` gelöscht, `no-raw-text` als Fehler, Durchgang EN/DE mit Playwright (Textlängen, schmale Tabellen), „Adding a language" in README/DEV.md |
+| — | `1.2.0` | Release-Commit (Version, CHANGELOG-Abschnitt) — erst, wenn der Autor Slice 83 in der Dev bestätigt hat, wie bei 0.12.0–1.1.0 |
+
+Slice 83 ist die letzte Vorschau, nicht der Release: erst als `1.2.0-slice.7` lässt sich die Sprachwahl im Docker-Image prüfen (der `?lang`-Schalter gilt nur im Dev-Build). Der Sprung auf `1.2.0` folgt in einem eigenen Commit nach der Bestätigung in der Dev (entschieden 2026-10-06).
 
 Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden wird, steht danach hier unter der Scheibe bzw. in `CHANGELOG.md`.
 
