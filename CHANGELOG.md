@@ -7,6 +7,28 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.0 — 2026-10-06
+
+Eunomia speaks German and English, released as the seven previews below.
+
+- **Language and format are chosen per user.** Under _My account_, _Language and format_ picks the
+  language and how dates and numbers are written — German, British or US, independently of the
+  language. Without a choice, the browser decides, then the instance default under System >
+  Settings, then German. The login page already speaks the browser's language.
+- **Every screen is translated**: master data, administration, trash, policies, the start page and
+  the whole invoice area, along with every error message. The English terms follow a glossary in
+  `apps/web/src/locales/README.md` (_billing agency_, _service billing_, _no-claims bonus_,
+  _submission_), which also explains how to add a language.
+- **Amounts and dates are written and typed in the format in effect**, including pasted dates in
+  the slashed form of that format.
+- **Mails go out in the recipient's language and format**: payment reminders and the test mail.
+- **API changes:** `GET`/`PATCH /api/v1/me` carry `locale` and `formatRegion`; the trash describes
+  records as typed parts instead of German phrases (`kind`, `{ kind, count }`, `byKind`); the rate
+  limit answers in English with the code `RATE_LIMITED`; `GET /api/v1/locale-defaults` is new and
+  public.
+- **Dependencies:** vue 3.5.43, proxy-addr 2.0.8 and source-map-js 1.2.2 against
+  GHSA-g2v6-rqmx-r4w6, GHSA-jqcg-44mw-7w3h and GHSA-68fv-2mgg-jv7q.
+
 ## 1.2.0-slice.7 — 2026-10-06
 
 The last preview of 1.2.0: Eunomia now speaks German and English.
