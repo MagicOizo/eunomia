@@ -2,6 +2,7 @@
 import { faArrowRightFromBracket, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 
 import eunomiaLogo from '../../assets/logo/eunomia-white.svg';
@@ -11,6 +12,7 @@ import { useAuthStore } from '../../stores/auth';
 defineProps<{ open: boolean }>();
 const emit = defineEmits<{ navigate: [] }>();
 
+const { t } = useI18n();
 const auth = useAuthStore();
 const router = useRouter();
 
@@ -31,31 +33,31 @@ async function logout(): Promise<void> {
     <RouterLink
       class="eu-sidebar__brand"
       to="/"
-      title="Eunomia Startseite"
+      :title="t('layout.homeLink')"
       @click="emit('navigate')"
     >
       <img :src="eunomiaLogo" alt="" class="eu-sidebar__logo" />
       <span class="eu-sidebar__wordmark">Eunomia</span>
     </RouterLink>
 
-    <nav class="eu-sidebar__nav" aria-label="Hauptnavigation">
+    <nav class="eu-sidebar__nav" :aria-label="t('layout.mainNavigation')">
       <ul>
         <li v-for="item in mainItems" :key="item.to">
           <RouterLink :to="item.to" @click="emit('navigate')">
             <FontAwesomeIcon :icon="item.icon" class="eu-sidebar__icon" aria-hidden="true" />
-            <span>{{ item.title }}</span>
+            <span>{{ t(item.titleKey) }}</span>
           </RouterLink>
         </li>
       </ul>
 
       <template v-if="systemItems.length > 0">
         <hr />
-        <p class="eu-sidebar__section">System</p>
+        <p class="eu-sidebar__section">{{ t('layout.systemSection') }}</p>
         <ul>
           <li v-for="item in systemItems" :key="item.to">
             <RouterLink :to="item.to" @click="emit('navigate')">
               <FontAwesomeIcon :icon="item.icon" class="eu-sidebar__icon" aria-hidden="true" />
-              <span>{{ item.title }}</span>
+              <span>{{ t(item.titleKey) }}</span>
             </RouterLink>
           </li>
         </ul>
@@ -70,7 +72,7 @@ async function logout(): Promise<void> {
       </RouterLink>
       <button type="button" class="eu-sidebar__logout" @click="logout">
         <FontAwesomeIcon :icon="faArrowRightFromBracket" aria-hidden="true" />
-        <span>Abmelden</span>
+        <span>{{ t('layout.logout') }}</span>
       </button>
     </div>
   </aside>

@@ -2,6 +2,7 @@
 import { faArrowRotateLeft, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, inject, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import { pastedIsoDate } from '../../lib/date-input';
 import { germanDate, germanMoney } from '../../lib/format';
@@ -35,7 +36,7 @@ const props = withDefaults(
     step?: string;
     /** For `select`: offers ad-hoc create — the parent answers `create` with a create dialog. */
     allowCreate?: boolean;
-    /** Noun of the created entity, e.g. "Leistungserbringer". */
+    /** Noun of the created entity, e.g. "Leistungserbringer"; "Eintrag" when left out. */
     createNoun?: string;
   }>(),
   {
@@ -47,9 +48,11 @@ const props = withDefaults(
     options: () => [],
     step: undefined,
     allowCreate: false,
-    createNoun: 'Eintrag',
+    createNoun: undefined,
   },
 );
+
+const { t } = useI18n();
 
 const emit = defineEmits<{
   'update:modelValue': [value: DetailValue];
@@ -81,7 +84,7 @@ const readonlyText = computed<string>(() => {
     case 'select':
       return props.options.find((option) => option.value === value)?.label ?? String(value);
     case 'toggle':
-      return value ? 'Ja' : 'Nein';
+      return value ? t('common.yes') : t('common.no');
     case 'date':
       return germanDate(value);
     case 'currency':
@@ -90,6 +93,10 @@ const readonlyText = computed<string>(() => {
       return String(value);
   }
 });
+
+const addLabel = computed(() =>
+  t('common.addNoun', { noun: props.createNoun ?? t('common.entry') }),
+);
 
 // What the picker currently has typed in it: the add action sits outside the
 // field (the mask puts actions in their own column), so it needs to be told.
@@ -220,8 +227,8 @@ function reset(): void {
           type="button"
           class="eu-detail__action"
           :disabled="disabled"
-          :aria-label="`${createNoun} hinzufügen`"
-          :title="`${createNoun} hinzufügen`"
+          :aria-label="addLabel"
+          :title="addLabel"
           @click="emit('create', query.trim())"
         >
           <FontAwesomeIcon :icon="faPlus" aria-hidden="true" />
@@ -231,8 +238,8 @@ function reset(): void {
           type="button"
           class="eu-detail__action"
           :disabled="required || isEmpty || disabled"
-          aria-label="Wert löschen"
-          title="Wert löschen"
+          :aria-label="t('common.clearValue')"
+          :title="t('common.clearValue')"
           @click="clear"
         >
           <FontAwesomeIcon :icon="faXmark" aria-hidden="true" />
@@ -241,8 +248,8 @@ function reset(): void {
           type="button"
           class="eu-detail__action"
           :disabled="!canReset || disabled"
-          aria-label="Zurücksetzen"
-          title="Auf gespeicherten Wert zurücksetzen"
+          :aria-label="t('common.reset')"
+          :title="t('common.resetToSaved')"
           @click="reset"
         >
           <FontAwesomeIcon :icon="faArrowRotateLeft" aria-hidden="true" />

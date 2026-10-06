@@ -2,6 +2,7 @@
 import { faArrowRotateLeft, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, inject } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import { pastedIsoDate } from '../../lib/date-input';
 import { germanDate } from '../../lib/format';
@@ -33,10 +34,13 @@ const props = withDefaults(
     /** A quiet line under the list, e.g. the span the dates cover. */
     hint?: string | null;
   }>(),
-  { savedValue: undefined, addLabel: 'Eintrag hinzufügen', hint: null },
+  { savedValue: undefined, addLabel: undefined, hint: null },
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>();
+const { t } = useI18n();
+
+const addText = computed(() => props.addLabel ?? t('components.detailDays.addEntry'));
 
 /** Read-only throughout when the surrounding mask is (see detail-mask.ts). */
 const maskReadonly = inject(detailMaskReadonly, undefined);
@@ -110,7 +114,7 @@ function reset(): void {
           type="date"
           autocomplete="off"
           :value="day"
-          :aria-label="`${label} ${index + 1}`"
+          :aria-label="t('components.detailDays.entry', { label, index: index + 1 })"
           placeholder="–"
           @input="onInput(index, $event)"
           @paste="onPaste(index, $event)"
@@ -118,8 +122,8 @@ function reset(): void {
         <button
           type="button"
           class="eu-detail-days__action"
-          :aria-label="`${label} ${index + 1} entfernen`"
-          :title="`${label} ${index + 1} entfernen`"
+          :aria-label="t('components.detailDays.removeEntry', { label, index: index + 1 })"
+          :title="t('components.detailDays.removeEntry', { label, index: index + 1 })"
           @click="removeAt(index)"
         >
           <FontAwesomeIcon :icon="faXmark" aria-hidden="true" />
@@ -134,8 +138,8 @@ function reset(): void {
         <button
           type="button"
           class="eu-detail-days__action"
-          :aria-label="addLabel"
-          :title="addLabel"
+          :aria-label="addText"
+          :title="addText"
           @click="add"
         >
           <FontAwesomeIcon :icon="faPlus" aria-hidden="true" />
@@ -144,8 +148,8 @@ function reset(): void {
           type="button"
           class="eu-detail-days__action"
           :disabled="modelValue.length === 0"
-          aria-label="Alle Werte löschen"
-          title="Alle Werte löschen"
+          :aria-label="t('components.detailDays.clearAll')"
+          :title="t('components.detailDays.clearAll')"
           @click="clear"
         >
           <FontAwesomeIcon :icon="faXmark" aria-hidden="true" />
@@ -154,8 +158,8 @@ function reset(): void {
           type="button"
           class="eu-detail-days__action"
           :disabled="!canReset"
-          aria-label="Zurücksetzen"
-          title="Auf gespeicherten Wert zurücksetzen"
+          :aria-label="t('common.reset')"
+          :title="t('common.resetToSaved')"
           @click="reset"
         >
           <FontAwesomeIcon :icon="faArrowRotateLeft" aria-hidden="true" />

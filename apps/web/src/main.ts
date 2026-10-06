@@ -5,6 +5,7 @@ import App from './App.vue';
 import './design-system/fonts.css';
 import './design-system/tokens.css';
 import './design-system/global.css';
+import { i18n } from './lib/i18n';
 import { router } from './router';
 import { useAuthStore } from './stores/auth';
 
@@ -16,6 +17,7 @@ import { useAuthStore } from './stores/auth';
  */
 async function bootstrap(): Promise<void> {
   const app = createApp(App);
+  app.use(i18n);
   app.use(createPinia());
 
   await useAuthStore().initialize();

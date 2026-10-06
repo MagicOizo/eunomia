@@ -7,6 +7,27 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.0-slice.1 — 2026-10-06
+
+The first preview of 1.2.0, which makes Eunomia available in English as well as German. The app
+still starts in German for everyone; the language becomes selectable once every screen is
+translated.
+
+- **UI texts move into catalogues.** The web app now takes its texts from one catalogue per
+  language (`apps/web/src/locales/de.json`, `en.json`) through vue-i18n. The catalogues are
+  compiled at build time, so the Content Security Policy stays as strict as before. German is the
+  source: a key missing from the English catalogue fails the type check, and the linter rejects
+  keys nobody uses, keys missing in one language, and hard-coded text in the areas already moved.
+- **Moved in this slice:** the navigation and page titles, header, sidebar, footer, the setup-token
+  warning, the sign-in page, and the built-in texts of the design-system components (dialogs,
+  pickers, display-mask rows, date suggestions). The rest follows area by area.
+- **A glossary fixes the English terms** of the domain (`apps/web/src/locales/README.md`), together
+  with style rules and how to add a language. Among them: _billing agency_ for Abrechnungsdienstleister
+  (earlier entries here said "collection agency", which in English mostly means a debt collector),
+  _service billing_ for Leistungsabrechnung, _no-claims bonus_ and _submission_.
+- The document language (`<html lang>`) follows the UI language, for screen readers and
+  hyphenation.
+
 ## 1.1.0 — 2026-10-05
 
 The first feature after 1.0.0, released as the preview below: a no-claims bonus can now be

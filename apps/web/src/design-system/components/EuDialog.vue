@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import { nextTick, onMounted, useId, useTemplateRef, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from './EuButton.vue';
 
@@ -13,6 +14,7 @@ import EuButton from './EuButton.vue';
  */
 const props = defineProps<{ open: boolean; title: string; wide?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
+const { t } = useI18n();
 
 const dialogRef = useTemplateRef<HTMLDialogElement>('dialog');
 const titleId = useId();
@@ -73,7 +75,7 @@ onMounted(sync);
         variant="ghost"
         icon-only
         :icon="faXmark"
-        aria-label="Schließen"
+        :aria-label="t('common.close')"
         @click="emit('close')"
       />
     </header>

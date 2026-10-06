@@ -1,6 +1,7 @@
 import type { PermissionKey } from '@eunomia/shared';
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '../lib/i18n';
 import { mainNav, systemNav, visibleNav } from './nav';
 
 /** `canAny` for a user holding exactly these permissions. */
@@ -9,7 +10,8 @@ const holding =
   (permission: PermissionKey): boolean =>
     held.includes(permission);
 
-const titles = (items: typeof mainNav): string[] => items.map((item) => item.title);
+const titles = (items: typeof mainNav): string[] =>
+  items.map((item) => i18n.global.t(item.titleKey));
 
 describe('visibleNav', () => {
   it('keeps what needs nothing but a login', () => {

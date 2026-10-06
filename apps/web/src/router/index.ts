@@ -16,7 +16,7 @@ import DashboardView from '../dashboard/DashboardView.vue';
 import LoginView from '../views/LoginView.vue';
 import PlaceholderView from '../views/PlaceholderView.vue';
 import { routeRejection } from './guard';
-import { mainNav, systemNav } from './nav';
+import { type NavTitleKey, mainNav, systemNav } from './nav';
 
 /** One query value as a plain string; a repeated parameter yields an array. */
 function queryString(value: LocationQueryValue | LocationQueryValue[]): string | undefined {
@@ -26,7 +26,8 @@ function queryString(value: LocationQueryValue | LocationQueryValue[]): string |
 
 declare module 'vue-router' {
   interface RouteMeta {
-    title?: string;
+    /** The page title, as a catalogue key; the header translates it. */
+    titleKey?: NavTitleKey;
     requiresAuth?: boolean;
     /** The permission the page needs — the same one its endpoints require (CR-26). */
     permission?: PermissionKey;
@@ -59,7 +60,7 @@ const navRoutes = [
     component: config ? ResourceView : PlaceholderView,
     props: config ? { config } : undefined,
     meta: {
-      title: item.title,
+      titleKey: item.titleKey,
       requiresAuth: true,
       permission: item.permission,
     },
@@ -73,13 +74,13 @@ export const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
-      meta: { layout: 'blank', title: 'Anmelden' },
+      meta: { layout: 'blank', titleKey: 'nav.login' },
     },
     {
       path: '/',
       name: 'home',
       component: DashboardView,
-      meta: { title: 'Startseite', requiresAuth: true },
+      meta: { titleKey: 'nav.home', requiresAuth: true },
     },
     {
       // The search filter lives in the URL (Slice 45): the filter buttons of
@@ -94,7 +95,7 @@ export const router = createRouter({
         facility: queryString(route.query.facility),
         status: queryString(route.query.status),
       }),
-      meta: { title: 'Rechnungen', requiresAuth: true, permission: PERMISSIONS.VIEW_INVOICES },
+      meta: { titleKey: 'nav.invoices', requiresAuth: true, permission: PERMISSIONS.VIEW_INVOICES },
     },
     {
       // `year` and `invoice` come from the invoice-number search on /invoices:
@@ -109,7 +110,7 @@ export const router = createRouter({
         focusInvoiceUID: queryString(route.query.invoice),
       }),
       meta: {
-        title: 'Rechnungen',
+        titleKey: 'nav.invoices',
         requiresAuth: true,
         permission: PERMISSIONS.VIEW_INVOICES,
         accountParam: 'accountUID',
@@ -119,19 +120,23 @@ export const router = createRouter({
       path: '/system/users',
       name: '/system/users',
       component: UsersView,
-      meta: { title: 'Nutzer & Rechte', requiresAuth: true, permission: PERMISSIONS.MANAGE_USERS },
+      meta: { titleKey: 'nav.users', requiresAuth: true, permission: PERMISSIONS.MANAGE_USERS },
     },
     {
       path: '/system/trash',
       name: '/system/trash',
       component: TrashView,
-      meta: { title: 'Papierkorb', requiresAuth: true, permission: PERMISSIONS.MANAGE_TRASH },
+      meta: { titleKey: 'nav.trash', requiresAuth: true, permission: PERMISSIONS.MANAGE_TRASH },
     },
     {
       path: '/system/settings',
       name: '/system/settings',
       component: SettingsView,
-      meta: { title: 'Einstellungen', requiresAuth: true, permission: PERMISSIONS.MANAGE_SETTINGS },
+      meta: {
+        titleKey: 'nav.settings',
+        requiresAuth: true,
+        permission: PERMISSIONS.MANAGE_SETTINGS,
+      },
     },
     {
       // The user's own account (Slice 7 of the review slices). Deliberately not
@@ -141,7 +146,7 @@ export const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: ProfileView,
-      meta: { title: 'Mein Konto', requiresAuth: true },
+      meta: { titleKey: 'nav.profile', requiresAuth: true },
     },
     {
       // Like /invoices: the search across every policy keeps its filter in the URL.
@@ -153,7 +158,7 @@ export const router = createRouter({
         unlinked: queryString(route.query.unlinked),
       }),
       meta: {
-        title: 'Leistungsabrechnungen',
+        titleKey: 'nav.billings',
         requiresAuth: true,
         permission: PERMISSIONS.VIEW_INVOICES,
       },
@@ -170,7 +175,7 @@ export const router = createRouter({
       // No permission in the meta: the account hangs on the policy, not on the
       // path, so there is nothing here to check it against. Without the right
       // the API answers 403 and the page shows that sentence.
-      meta: { title: 'Leistungsabrechnungen', requiresAuth: true },
+      meta: { titleKey: 'nav.billings', requiresAuth: true },
     },
     ...navRoutes,
     {
@@ -178,7 +183,7 @@ export const router = createRouter({
       name: 'styleguide',
       // The Slice 1 living style guide, kept reachable as a developer reference.
       component: () => import('../design-system/StyleGuideView.vue'),
-      meta: { title: 'Style-Guide' },
+      meta: { titleKey: 'nav.styleguide' },
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],

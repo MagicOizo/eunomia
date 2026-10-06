@@ -2,11 +2,13 @@
 import { faArrowUp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import { loadAppInfo } from '../../lib/app-info';
 import { clearUpdateStatus, loadUpdateStatus, updateStatus } from '../../lib/update-status';
 import { useAuthStore } from '../../stores/auth';
 
+const { t } = useI18n();
 const auth = useAuthStore();
 const year = new Date().getFullYear();
 const version = ref<string | null>(null);
@@ -58,9 +60,9 @@ const availableUpdate = computed(() => {
 
 <template>
   <footer class="eu-footer">
-    <span>&copy; {{ year }} Max Zöller</span>
+    <span>{{ t('layout.copyright', { year }) }}</span>
     <span v-if="version" class="eu-footer__version">
-      Backend v{{ version }}
+      {{ t('layout.backendVersion', { version }) }}
       <template v-if="availableUpdate">
         <span aria-hidden="true">·</span>
         <a
@@ -68,10 +70,10 @@ const availableUpdate = computed(() => {
           :href="availableUpdate.url"
           target="_blank"
           rel="noopener"
-          :aria-label="`Version ${availableUpdate.version} ist verfügbar — Release-Notes öffnen (neuer Tab)`"
+          :aria-label="t('layout.updateAvailableLabel', { version: availableUpdate.version })"
         >
           <FontAwesomeIcon :icon="faArrowUp" aria-hidden="true" />
-          v{{ availableUpdate.version }} verfügbar
+          {{ t('layout.updateAvailable', { version: availableUpdate.version }) }}
         </a>
       </template>
     </span>

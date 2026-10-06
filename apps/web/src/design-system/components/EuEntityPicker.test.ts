@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
+import { withLocale } from '../../test/locale';
 import EuEntityPicker from './EuEntityPicker.vue';
 
 const options = [
@@ -235,5 +236,23 @@ describe('EuEntityPicker searching a label printed in groups', () => {
     await input.setValue('DE89370400440532013000');
 
     expect(wrapper.find('.eu-picker__option--create').exists()).toBe(false);
+  });
+});
+
+describe('EuEntityPicker in English', () => {
+  it('offers to add the typed text and says when nothing matches', async () => {
+    await withLocale('en', async () => {
+      const wrapper = mountPicker({ allowCreate: true, createNoun: 'provider' });
+      const input = wrapper.find('input');
+      await input.trigger('focus');
+      await input.setValue('Praxis West');
+
+      expect(wrapper.find('.eu-picker__option--create').text()).toBe(
+        'Add “Praxis West” as provider',
+      );
+
+      await wrapper.setProps({ allowCreate: false });
+      expect(wrapper.find('.eu-picker__empty').text()).toBe('No matches');
+    });
   });
 });

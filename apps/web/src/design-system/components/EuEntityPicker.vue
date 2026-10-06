@@ -3,6 +3,7 @@ import { autoUpdate, flip, offset, shift, size, useFloating } from '@floating-ui
 import { faMagnifyingGlass, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, ref, useId, useTemplateRef } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 export interface PickerOption {
   value: string;
@@ -38,7 +39,7 @@ const props = withDefaults(
     allowSearch?: boolean;
     /** Display-mask mode: no visible label, border only on hover/focus. */
     bare?: boolean;
-    /** Noun used in the "‹query› hinzufügen" row, e.g. "Leistungserbringer". */
+    /** Noun used in the "‹query› hinzufügen" row, e.g. "Leistungserbringer"; "Eintrag" when left out. */
     createNoun?: string;
   }>(),
   {
@@ -47,9 +48,12 @@ const props = withDefaults(
     allowCreate: false,
     allowSearch: false,
     bare: false,
-    createNoun: 'Eintrag',
+    createNoun: undefined,
   },
 );
+
+const { t } = useI18n();
+const noun = computed(() => props.createNoun ?? t('common.entry'));
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | null];
@@ -271,8 +275,8 @@ function onKeydown(event: KeyboardEvent): void {
         v-if="allowSearch && !disabled && !bare"
         type="button"
         class="eu-picker__action"
-        :aria-label="`${label} suchen`"
-        :title="`${label} suchen`"
+        :aria-label="t('components.picker.search', { label })"
+        :title="t('components.picker.search', { label })"
         @mousedown.prevent
         @click="triggerSearch"
       >
@@ -282,8 +286,8 @@ function onKeydown(event: KeyboardEvent): void {
         v-if="allowCreate && !disabled && !bare"
         type="button"
         class="eu-picker__action"
-        :aria-label="`${createNoun} hinzufügen`"
-        :title="`${createNoun} hinzufügen`"
+        :aria-label="t('common.addNoun', { noun })"
+        :title="t('common.addNoun', { noun })"
         @mousedown.prevent
         @click="triggerCreate"
       >
@@ -293,7 +297,7 @@ function onKeydown(event: KeyboardEvent): void {
         v-if="modelValue && !required && !disabled && !bare"
         type="button"
         class="eu-picker__action"
-        aria-label="Auswahl entfernen"
+        :aria-label="t('components.picker.clear')"
         @mousedown.prevent
         @click="clear"
       >
@@ -320,7 +324,7 @@ function onKeydown(event: KeyboardEvent): void {
         @click="triggerCreate"
       >
         <FontAwesomeIcon :icon="faPlus" aria-hidden="true" />
-        <span>„{{ query.trim() }}" als {{ createNoun }} hinzufügen</span>
+        <span>{{ t('components.picker.createFromQuery', { query: query.trim(), noun }) }}</span>
       </li>
       <li
         v-for="(option, i) in filtered"
@@ -343,7 +347,7 @@ function onKeydown(event: KeyboardEvent): void {
         aria-disabled="true"
         :aria-selected="false"
       >
-        Keine Treffer
+        {{ t('components.picker.noMatches') }}
       </li>
     </ul>
   </div>

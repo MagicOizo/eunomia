@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 
 import AppFooter from '../components/layout/AppFooter.vue';
@@ -8,8 +9,9 @@ import AppSidebar from '../components/layout/AppSidebar.vue';
 import SetupTokenBanner from '../components/layout/SetupTokenBanner.vue';
 import { useAuthStore } from '../stores/auth';
 
+const { t } = useI18n();
 const route = useRoute();
-const title = computed(() => route.meta.title ?? 'Eunomia');
+const title = computed(() => (route.meta.titleKey ? t(route.meta.titleKey) : 'Eunomia'));
 
 const auth = useAuthStore();
 

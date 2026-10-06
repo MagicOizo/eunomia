@@ -2271,5 +2271,13 @@ Geplant 2026-10-06. Eunomia ist bis 1.1.0 durchgehend deutsch (rund 1.300 UI-Tex
 
 Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden wird, steht danach hier unter der Scheibe bzw. in `CHANGELOG.md`.
 
+### Slice 77 — Fundament, Glossar, Rahmen (umgesetzt 2026-10-06, `1.2.0-slice.1`)
+- **Glossar** in `apps/web/src/locales/README.md` (englisch, öffentlich), verbindlich für Kataloge und ab 1.2.0 für README/CHANGELOG. Entscheidungen des Autors: Leistungsabrechnung → *service billing* (wie im Code), Abrechnungsdienstleister → *billing agency* (statt „collection agency" — im Englischen meist ein Inkassobüro), Bonus → *no-claims bonus*, Einreichung → *submission*.
+- **`no-raw-text` als Fehler über eine wachsende Pfadliste** in `eslint.config.js` statt überall als Warnung (abweichend vom Paketplan): Hunderte Warnungen würden echte verdecken. Jede Scheibe verlängert die Liste, Slice 83 setzt die Regel global. `StyleGuideView` bleibt draußen (Beispieltexte sind dort Inhalt).
+- **`no-unused-keys` sieht nur wörtliche `t()`-Aufrufe.** Schlüssel, die als Daten gehalten werden (`titleKey` der Navigation), sind deshalb per Muster ausgenommen; ihr Leser ist gegen das Schema typisiert. Für die datengetriebenen Gruppen der späteren Scheiben (Fehlercodes, Status) gilt dasselbe Muster.
+- **Der Dev-Schalter `?lang=en` merkt sich nichts.** Er gilt für die SPA-Sitzung bis zum Neuladen; ein `sessionStorage` hätte die Invariante I-8 gebrochen (keine Browser-Speicher in der SPA, `stores/auth.spec.ts` hat es sofort gemeldet).
+- `<i18n-t>` braucht `scope="global"`, sonst warnt vue-i18n bei jedem Rendern („Not found parent scope").
+- Bundle: +19 kB gzip (163 → 182 kB); die Warnung über 500 kB gab es schon vorher. Geprüft: das gebaute Bundle rendert unter der CSP der API ohne Message-Compiler.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

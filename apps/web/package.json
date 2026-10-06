@@ -1,7 +1,7 @@
 {
   "name": "@eunomia/web",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0-slice.1",
   "description": "Eunomia frontend SPA.",
   "type": "module",
   "scripts": {
@@ -21,9 +21,11 @@
     "pinia": "^3.0.4",
     "qrcode": "^1.5.4",
     "vue": "^3.5.39",
+    "vue-i18n": "^11.4.13",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@intlify/unplugin-vue-i18n": "^11.2.5",
     "@types/node": "^24.13.2",
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^6.0.7",

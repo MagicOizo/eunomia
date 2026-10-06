@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 
 import logoBlue from '../assets/logo/eunomia-blue.svg';
@@ -9,6 +10,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import { HttpError } from '../lib/http';
 import { useAuthStore } from '../stores/auth';
 
+const { t } = useI18n();
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
@@ -28,8 +30,8 @@ async function submit(): Promise<void> {
   } catch (err) {
     error.value =
       err instanceof HttpError && err.status === 401
-        ? 'E-Mail oder Passwort ist falsch.'
-        : 'Anmeldung fehlgeschlagen. Bitte später erneut versuchen.';
+        ? t('login.wrongCredentials')
+        : t('login.failed');
   } finally {
     busy.value = false;
   }
@@ -43,21 +45,21 @@ async function submit(): Promise<void> {
       <img :src="logoWhite" alt="" class="eu-login__logo eu-login__logo--dark" />
       <span>Eunomia</span>
     </div>
-    <p class="eu-login__subtitle">Verwaltung privater Krankenversicherungs-Abrechnungen</p>
+    <p class="eu-login__subtitle">{{ t('login.subtitle') }}</p>
 
     <form class="eu-login__form" @submit.prevent="submit">
       <!-- The one place the browser's prefill is wanted, so it is asked for by
            name; every other field is left at EuTextField's `off`. -->
-      <EuTextField v-model="email" label="E-Mail" type="email" autocomplete="username" />
+      <EuTextField v-model="email" :label="t('login.email')" type="email" autocomplete="username" />
       <EuTextField
         v-model="password"
-        label="Passwort"
+        :label="t('login.password')"
         type="password"
         autocomplete="current-password"
       />
       <p v-if="error" class="eu-login__error" role="alert">{{ error }}</p>
       <EuButton type="submit" :disabled="busy">
-        {{ busy ? 'Anmelden…' : 'Anmelden' }}
+        {{ busy ? t('login.submitting') : t('login.submit') }}
       </EuButton>
     </form>
   </div>

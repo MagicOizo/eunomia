@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { faBars } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { useI18n } from 'vue-i18n';
 
 defineProps<{ title: string }>();
 const emit = defineEmits<{ toggleSidebar: [] }>();
+const { t } = useI18n();
 </script>
 
 <template>
@@ -11,7 +13,7 @@ const emit = defineEmits<{ toggleSidebar: [] }>();
     <button
       type="button"
       class="eu-header__toggle"
-      aria-label="Navigation ein-/ausblenden"
+      :aria-label="t('layout.toggleNavigation')"
       @click="emit('toggleSidebar')"
     >
       <FontAwesomeIcon :icon="faBars" aria-hidden="true" />

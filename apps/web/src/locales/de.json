@@ -1,0 +1,70 @@
+{
+  "common": {
+    "close": "Schließen",
+    "yes": "Ja",
+    "no": "Nein",
+    "reset": "Zurücksetzen",
+    "resetToSaved": "Auf gespeicherten Wert zurücksetzen",
+    "clearValue": "Wert löschen",
+    "entry": "Eintrag",
+    "addNoun": "{noun} hinzufügen"
+  },
+  "nav": {
+    "home": "Startseite",
+    "invoices": "Rechnungen",
+    "accounts": "Versicherte",
+    "contracts": "Policen",
+    "companies": "Versicherungen",
+    "facilities": "Leistungserbringer",
+    "agencies": "Abrechnungsdienstleister",
+    "billings": "Leistungsabrechnungen",
+    "users": "Nutzer & Rechte",
+    "trash": "Papierkorb",
+    "settings": "Einstellungen",
+    "profile": "Mein Konto",
+    "login": "Anmelden",
+    "styleguide": "Style-Guide"
+  },
+  "layout": {
+    "toggleNavigation": "Navigation ein-/ausblenden",
+    "mainNavigation": "Hauptnavigation",
+    "homeLink": "Eunomia Startseite",
+    "systemSection": "System",
+    "logout": "Abmelden",
+    "backendVersion": "Backend v{version}",
+    "updateAvailable": "v{version} verfügbar",
+    "updateAvailableLabel": "Version {version} ist verfügbar — Release-Notes öffnen (neuer Tab)",
+    "setupToken": {
+      "title": "Sicherheitshinweis: Das SETUP_TOKEN ist noch aktiv.",
+      "body": "Der Ersteinrichtungs-Endpunkt ({endpoint}) ist dadurch weiterhin erreichbar. Entferne {token} aus der {file} und starte die Anwendung neu, um ihn zu deaktivieren."
+    },
+    "placeholder": "Dieser Bereich ist bereits in der Navigation verankert, die eigentliche Seite entsteht in einem der nächsten Slices. Die API dahinter steht schon bereit.",
+    "copyright": "© {year} Max Zöller"
+  },
+  "login": {
+    "subtitle": "Verwaltung privater Krankenversicherungs-Abrechnungen",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "submitting": "Anmelden…",
+    "wrongCredentials": "E-Mail oder Passwort ist falsch.",
+    "failed": "Anmeldung fehlgeschlagen. Bitte später erneut versuchen."
+  },
+  "components": {
+    "detailDays": {
+      "addEntry": "Eintrag hinzufügen",
+      "entry": "{label} {index}",
+      "removeEntry": "{label} {index} entfernen",
+      "clearAll": "Alle Werte löschen"
+    },
+    "picker": {
+      "search": "{label} suchen",
+      "clear": "Auswahl entfernen",
+      "createFromQuery": "„{query}“ als {noun} hinzufügen",
+      "noMatches": "Keine Treffer"
+    },
+    "suggestedDate": {
+      "suggestions": "Vorschläge"
+    }
+  }
+}

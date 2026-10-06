@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { faPersonDigging } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 </script>
 
 <template>
   <div class="eu-placeholder">
     <FontAwesomeIcon :icon="faPersonDigging" class="eu-placeholder__icon" aria-hidden="true" />
-    <p>
-      Dieser Bereich ist bereits in der Navigation verankert, die eigentliche Seite entsteht in
-      einem der nächsten Slices. Die API dahinter steht schon bereit.
-    </p>
+    <p>{{ t('layout.placeholder') }}</p>
   </div>
 </template>
 

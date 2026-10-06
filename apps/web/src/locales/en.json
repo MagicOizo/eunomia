@@ -1,0 +1,70 @@
+{
+  "common": {
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "reset": "Reset",
+    "resetToSaved": "Reset to the saved value",
+    "clearValue": "Clear value",
+    "entry": "entry",
+    "addNoun": "Add {noun}"
+  },
+  "nav": {
+    "home": "Home",
+    "invoices": "Invoices",
+    "accounts": "Insured persons",
+    "contracts": "Policies",
+    "companies": "Insurers",
+    "facilities": "Providers",
+    "agencies": "Billing agencies",
+    "billings": "Service billings",
+    "users": "Users & permissions",
+    "trash": "Trash",
+    "settings": "Settings",
+    "profile": "My account",
+    "login": "Sign in",
+    "styleguide": "Style guide"
+  },
+  "layout": {
+    "toggleNavigation": "Show or hide navigation",
+    "mainNavigation": "Main navigation",
+    "homeLink": "Eunomia home",
+    "systemSection": "System",
+    "logout": "Sign out",
+    "backendVersion": "Backend v{version}",
+    "updateAvailable": "v{version} available",
+    "updateAvailableLabel": "Version {version} is available — open the release notes (new tab)",
+    "setupToken": {
+      "title": "Security notice: SETUP_TOKEN is still active.",
+      "body": "The first-run setup endpoint ({endpoint}) therefore remains reachable. Remove {token} from the {file} and restart the application to disable it."
+    },
+    "placeholder": "This area already has its place in the navigation; the page itself arrives in one of the next slices. The API behind it is already in place.",
+    "copyright": "© {year} Max Zöller"
+  },
+  "login": {
+    "subtitle": "Managing private health insurance claims",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "wrongCredentials": "Email or password is incorrect.",
+    "failed": "Sign-in failed. Please try again later."
+  },
+  "components": {
+    "detailDays": {
+      "addEntry": "Add entry",
+      "entry": "{label} {index}",
+      "removeEntry": "Remove {label} {index}",
+      "clearAll": "Clear all values"
+    },
+    "picker": {
+      "search": "Search {label}",
+      "clear": "Clear selection",
+      "createFromQuery": "Add “{query}” as {noun}",
+      "noMatches": "No matches"
+    },
+    "suggestedDate": {
+      "suggestions": "Suggestions"
+    }
+  }
+}

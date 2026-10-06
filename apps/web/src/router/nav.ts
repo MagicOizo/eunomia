@@ -14,9 +14,14 @@ import {
   faUsersGear,
 } from '@fortawesome/free-solid-svg-icons';
 
+import type { MessageSchema } from '../lib/i18n';
+
+/** A page title: one of the `nav.*` entries of the catalogue. */
+export type NavTitleKey = `nav.${keyof MessageSchema['nav'] & string}`;
+
 export interface NavItem {
   to: string;
-  title: string;
+  titleKey: NavTitleKey;
   icon: IconDefinition;
   /**
    * The permission that opens this area — globally or for any one account
@@ -30,29 +35,34 @@ export interface NavItem {
 /**
  * The fixed main navigation (see Notes/eunomia-plan.md, 2.7): the structure is
  * set once here and later slices only fill in the target pages. Icons and
- * German labels mirror the first attempt's sidebar.
+ * labels mirror the first attempt's sidebar.
  */
 export const mainNav: NavItem[] = [
-  { to: '/', title: 'Startseite', icon: faHouse },
+  { to: '/', titleKey: 'nav.home', icon: faHouse },
   {
     to: '/invoices',
-    title: 'Rechnungen',
+    titleKey: 'nav.invoices',
     icon: faFileInvoiceDollar,
     permission: PERMISSIONS.VIEW_INVOICES,
   },
   {
     to: '/accounts',
-    title: 'Versicherte',
+    titleKey: 'nav.accounts',
     icon: faUserGroup,
     permission: PERMISSIONS.VIEW_ACCOUNTS,
   },
-  { to: '/contracts', title: 'Policen', icon: faAward, permission: PERMISSIONS.VIEW_CONTRACTS },
-  { to: '/companies', title: 'Versicherungen', icon: faBuildingShield },
-  { to: '/facilities', title: 'Leistungserbringer', icon: faHouseMedical },
-  { to: '/agencies', title: 'Abrechnungsdienstleister', icon: faSackDollar },
+  {
+    to: '/contracts',
+    titleKey: 'nav.contracts',
+    icon: faAward,
+    permission: PERMISSIONS.VIEW_CONTRACTS,
+  },
+  { to: '/companies', titleKey: 'nav.companies', icon: faBuildingShield },
+  { to: '/facilities', titleKey: 'nav.facilities', icon: faHouseMedical },
+  { to: '/agencies', titleKey: 'nav.agencies', icon: faSackDollar },
   {
     to: '/billings',
-    title: 'Leistungsabrechnungen',
+    titleKey: 'nav.billings',
     icon: faReceipt,
     permission: PERMISSIONS.VIEW_INVOICES,
   },
@@ -67,19 +77,19 @@ export const mainNav: NavItem[] = [
 export const systemNav: NavItem[] = [
   {
     to: '/system/users',
-    title: 'Nutzer & Rechte',
+    titleKey: 'nav.users',
     icon: faUsersGear,
     permission: PERMISSIONS.MANAGE_USERS,
   },
   {
     to: '/system/trash',
-    title: 'Papierkorb',
+    titleKey: 'nav.trash',
     icon: faTrashCan,
     permission: PERMISSIONS.MANAGE_TRASH,
   },
   {
     to: '/system/settings',
-    title: 'Einstellungen',
+    titleKey: 'nav.settings',
     icon: faGear,
     permission: PERMISSIONS.MANAGE_SETTINGS,
   },

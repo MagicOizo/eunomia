@@ -1,5 +1,15 @@
+import { config } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach } from 'vitest';
+
+import { i18n } from '../lib/i18n';
+
+/**
+ * Every mounted component gets the app's i18n, in German — the language the
+ * assertions are written in. A case about another language switches with
+ * `withLocale` from ./locale, which puts German back afterwards.
+ */
+config.global.plugins.push(i18n);
 
 /**
  * Every test starts signed in as a global admin, on a pinia of its own. That is

@@ -1,6 +1,6 @@
 {
   "name": "@eunomia/shared",
-  "version": "1.1.0",
+  "version": "1.2.0-slice.1",
   "private": true,
   "description": "Rules and contracts shared between apps/api and apps/web.",
   "type": "module",

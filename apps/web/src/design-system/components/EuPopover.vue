@@ -2,6 +2,7 @@
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import { onBeforeUnmount, ref, useId, useTemplateRef, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from './EuButton.vue';
 
@@ -13,6 +14,7 @@ import EuButton from './EuButton.vue';
  * The trigger goes in the `#trigger` slot, the bubble content in the default.
  */
 const props = defineProps<{ title: string }>();
+const { t } = useI18n();
 
 const referenceRef = useTemplateRef<HTMLElement>('reference');
 const floatingRef = useTemplateRef<HTMLElement>('floating');
@@ -84,7 +86,13 @@ onBeforeUnmount(() => {
          landmark next to the application header (axe: landmark-no-duplicate-banner). -->
     <div class="eu-popover__header">
       <h3 class="eu-popover__title">{{ props.title }}</h3>
-      <EuButton variant="ghost" icon-only :icon="faXmark" aria-label="Schließen" @click="close" />
+      <EuButton
+        variant="ghost"
+        icon-only
+        :icon="faXmark"
+        :aria-label="t('common.close')"
+        @click="close"
+      />
     </div>
     <div class="eu-popover__body">
       <slot />

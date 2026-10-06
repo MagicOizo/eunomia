@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { autoUpdate, flip, offset, shift, size, useFloating } from '@floating-ui/vue';
-import { nextTick, ref, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuTextField from './EuTextField.vue';
 
@@ -43,10 +44,14 @@ const props = withDefaults(
     /** The group's accessible name, e.g. "Typische Zahlungsziele". */
     suggestionsLabel?: string;
   }>(),
-  { suggestionsLabel: 'Vorschläge' },
+  { suggestionsLabel: undefined },
 );
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
+const { t } = useI18n();
+const listLabel = computed(
+  () => props.suggestionsLabel ?? t('components.suggestedDate.suggestions'),
+);
 
 const referenceRef = useTemplateRef<HTMLElement>('reference');
 const floatingRef = useTemplateRef<HTMLElement>('floating');
@@ -200,7 +205,7 @@ watch(
       class="eu-date-suggest__list"
       :style="floatingStyles"
       role="group"
-      :aria-label="suggestionsLabel"
+      :aria-label="listLabel"
     >
       <!-- @mousedown.prevent: without it the click first takes the focus out of
            the field, and the list would be gone before the click is handled. -->

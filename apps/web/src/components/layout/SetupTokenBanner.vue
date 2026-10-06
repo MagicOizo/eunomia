@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { useI18n } from 'vue-i18n';
 
 /**
  * Security nudge shown to admins while the one-time setup endpoint is still
  * open (SETUP_TOKEN set). Not dismissible on purpose — it disappears by itself
  * once the token is removed and the next /me reports it inactive.
  */
+const { t } = useI18n();
 </script>
 
 <template>
@@ -17,12 +19,12 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
       aria-hidden="true"
     />
     <div>
-      <strong>Sicherheitshinweis: Das SETUP_TOKEN ist noch aktiv.</strong>
-      <p>
-        Der Ersteinrichtungs-Endpunkt (<code>POST /api/v1/setup</code>) ist dadurch weiterhin
-        erreichbar. Entferne <code>SETUP_TOKEN</code> aus der <code>.env</code> und starte die
-        Anwendung neu, um ihn zu deaktivieren.
-      </p>
+      <strong>{{ t('layout.setupToken.title') }}</strong>
+      <i18n-t keypath="layout.setupToken.body" tag="p" scope="global">
+        <template #endpoint><code>POST /api/v1/setup</code></template>
+        <template #token><code>SETUP_TOKEN</code></template>
+        <template #file><code>.env</code></template>
+      </i18n-t>
     </div>
   </div>
 </template>
