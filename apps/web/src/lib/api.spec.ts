@@ -14,7 +14,14 @@ vi.mock('./http', async (importOriginal) => ({
   request,
 }));
 
-const user = { uuid: 'u1', email: 'a@b.c', firstname: 'A', surname: null };
+const user = {
+  uuid: 'u1',
+  email: 'a@b.c',
+  firstname: 'A',
+  surname: null,
+  locale: null,
+  formatRegion: null,
+};
 
 /** The token in each call, in the order the calls were made. */
 function tokensUsed(): unknown[] {

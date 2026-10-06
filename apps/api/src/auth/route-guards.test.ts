@@ -58,6 +58,9 @@ const DECLARED: Record<string, Declared> = {
   'POST /api/v1/auth/login': anonymous('hands out the first token'),
   'POST /api/v1/auth/refresh': anonymous('authenticated by the refresh cookie, not by a token'),
   'POST /api/v1/auth/logout': anonymous('must work even with an expired access token'),
+  'GET /api/v1/locale-defaults': anonymous(
+    'the login page picks its language before anyone signs in; two instance values, nothing personal',
+  ),
 
   // Authenticated and nothing more, on purpose.
   'POST /api/v1/auth/password': authenticated('own password, proven with the current one'),

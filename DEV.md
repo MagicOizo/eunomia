@@ -81,6 +81,15 @@ files only. `git commit --no-verify` skips it in an emergency. Formatting drift 
 commit, whose hash goes into `.git-blame-ignore-revs`. To have local `git blame` skip those commits:
 `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
+## UI texts and translations
+
+The web app speaks German and English. No text is written into a component: every one lives in the
+catalogues under `apps/web/src/locales/` (`de.json` is the source and the schema), and lint fails on
+raw text in a template. How to write a message, the glossary, how the language is chosen and how to
+add a language are in [apps/web/src/locales/README.md](apps/web/src/locales/README.md). To look at a
+screen in the other language without touching the profile, append `?lang=en` (or `?format=en-US`)
+in the dev build.
+
 ## Seed data & resetting the dev database
 
 The seed fills the database with a dataset built for clicking through the app: every workflow

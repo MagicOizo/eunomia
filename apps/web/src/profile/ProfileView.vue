@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { faCircleCheck, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { isFormatRegion, isLocale } from '@eunomia/shared';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCollapsibleSection from '../design-system/components/EuCollapsibleSection.vue';
+import EuSelectField from '../components/resource/EuSelectField.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { describeError } from '../lib/errors';
+import { formatName, formatOptions, languageName, languageOptions } from '../lib/locale-options';
+import { automaticPreferences } from '../lib/locale-preferences';
 import { useAuthStore } from '../stores/auth';
-import { changePassword } from './api';
+import { changePassword, updateLocalePreferences } from './api';
 
 /**
  * The user's own account (Slice 7 of the review slices, SEC-06). Until now a
@@ -40,6 +44,48 @@ const fullName = computed(() => {
   if (!user) return '';
   return user.surname ? `${user.firstname} ${user.surname}` : user.firstname;
 });
+
+/*
+ * Language and format: saved the moment one is picked, and the interface
+ * switches with the answer (lib/locale-preferences.ts follows the store). The
+ * empty entry says what "automatic" amounts to right now. A stored value the
+ * lists do not know (edited by hand) shows as automatic, which is what it does.
+ */
+const chosenLocale = computed(() => (isLocale(auth.user?.locale) ? auth.user.locale : ''));
+const chosenFormat = computed(() =>
+  isFormatRegion(auth.user?.formatRegion) ? auth.user.formatRegion : '',
+);
+const automaticLocale = computed(() =>
+  t('localeChoice.automatic', { current: languageName(automaticPreferences.value.locale) }),
+);
+const automaticFormat = computed(() =>
+  t('localeChoice.automatic', { current: formatName(automaticPreferences.value.format) }),
+);
+// Computed, so the format names follow a change of language.
+const localeOptions = computed(() => languageOptions());
+const regionOptions = computed(() => formatOptions());
+
+const preferenceBusy = ref(false);
+const preferenceError = ref<string | null>(null);
+const preferenceSaved = ref(false);
+
+async function savePreference(field: 'locale' | 'formatRegion', value: string): Promise<void> {
+  preferenceError.value = null;
+  preferenceSaved.value = false;
+  preferenceBusy.value = true;
+  try {
+    const body =
+      field === 'locale'
+        ? { locale: isLocale(value) ? value : null }
+        : { formatRegion: isFormatRegion(value) ? value : null };
+    auth.user = await updateLocalePreferences(body);
+    preferenceSaved.value = true;
+  } catch (caught) {
+    preferenceError.value = describeError(caught);
+  } finally {
+    preferenceBusy.value = false;
+  }
+}
 
 /** The two checks the browser can make itself, so a typo costs no round trip. */
 function validate(): boolean {
@@ -84,6 +130,33 @@ async function submit(): Promise<void> {
         <dd>{{ auth.user.email }}</dd>
       </dl>
       <p class="eu-profile__hint">{{ t('profile.changeByAdmin') }}</p>
+    </EuCollapsibleSection>
+
+    <EuCollapsibleSection :title="t('localeChoice.title')">
+      <p class="eu-profile__hint">{{ t('localeChoice.lead') }}</p>
+      <div class="eu-profile__form eu-profile__form--wide">
+        <EuSelectField
+          :model-value="chosenLocale"
+          :label="t('localeChoice.language')"
+          :options="localeOptions"
+          :empty-label="automaticLocale"
+          :disabled="preferenceBusy"
+          @update:model-value="savePreference('locale', $event)"
+        />
+        <EuSelectField
+          :model-value="chosenFormat"
+          :label="t('localeChoice.format')"
+          :options="regionOptions"
+          :empty-label="automaticFormat"
+          :disabled="preferenceBusy"
+          @update:model-value="savePreference('formatRegion', $event)"
+        />
+        <p v-if="preferenceSaved" class="eu-profile__ok" role="status">
+          <FontAwesomeIcon :icon="faCircleCheck" aria-hidden="true" />
+          {{ t('localeChoice.saved') }}
+        </p>
+        <p v-if="preferenceError" class="eu-profile__error" role="alert">{{ preferenceError }}</p>
+      </div>
     </EuCollapsibleSection>
 
     <EuCollapsibleSection :title="t('profile.password')">
@@ -145,6 +218,13 @@ async function submit(): Promise<void> {
      is not held to that width, which is why it sits outside it. */
   max-width: 24rem;
   margin-top: 1rem;
+}
+
+.eu-profile__form--wide {
+  /* The format entries carry a sample date and amount ("Automatisch —
+     US-amerikanisch (12/31/2026 · €1,234.56)"); at the password fields' width
+     the select cuts it off. */
+  max-width: 32rem;
 }
 
 .eu-profile__form > * {

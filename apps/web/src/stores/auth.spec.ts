@@ -15,7 +15,14 @@ vi.mock('../lib/http', async (importOriginal) => ({
 
 const session = {
   accessToken: 'fresh',
-  user: { uuid: 'u1', email: 'a@b.c', firstname: 'A', surname: null },
+  user: {
+    uuid: 'u1',
+    email: 'a@b.c',
+    firstname: 'A',
+    surname: null,
+    locale: null,
+    formatRegion: null,
+  },
 };
 
 function refreshCalls(): number {

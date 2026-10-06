@@ -52,6 +52,8 @@ and for English project documentation (README, CHANGELOG) from 1.2.0 on.
 | Versicherte(r)                                                                                 | insured person                                                                 | `Account`              |
 | Hauptversicherte(r)                                                                            | policyholder                                                                   |                        |
 | Police                                                                                         | policy                                                                         | `Contract`             |
+| Vollversicherung / Zusatzversicherung                                                          | comprehensive cover / supplementary cover                                      | `ContractKind`         |
+| Voll / Zusatz (short, in tables)                                                               | Full / Add-on                                                                  |                        |
 | Versicherung (the company)                                                                     | insurer                                                                        | `InsuranceCompany`     |
 | Leistungserbringer                                                                             | provider                                                                       | `Facility`             |
 | Abrechnungsdienstleister                                                                       | billing agency                                                                 | `CollectionAgency`     |
@@ -109,9 +111,32 @@ format next to `?lang=en`.
 The domain stays German whatever the format: the currency is always the euro, a postcode has five
 digits, and IBAN and GiroCode are unchanged.
 
+## Which language a user sees
+
+Each of language and format comes from the first source that names one Eunomia supports
+(`resolvePreferences` in `src/lib/i18n.ts`):
+
+| Step | Language                                               | Format                                           |
+| ---- | ------------------------------------------------------ | ------------------------------------------------ |
+| 1    | the user's profile (`Users.locale`)                    | the user's profile (`Users.formatRegion`)        |
+| 2    | the browser, by primary subtag (`en-AU` reads as `en`) | the browser, exact regions only (`de-AT` is not) |
+| 3    | the instance default (`general.defaultLocale`)         | the instance default (`general.defaultFormat`)   |
+| 4    | German                                                 | the language's own (`DEFAULT_FORMAT`)            |
+
+The login page follows steps 2–4: the instance defaults are public (`GET /api/v1/locale-defaults`).
+Mails skip the browser, which they do not have (`mailLocale` in `apps/api/src/mail/catalog.ts`). In
+the dev build, `?lang=` and `?format=` override everything until the next reload.
+
 ## Adding a language
 
-1. Copy `en.json` to `<code>.json` and translate every value, keeping the keys.
-2. Add the code to `SUPPORTED_LOCALES` and the catalogue to `messages` in `src/lib/i18n.ts`, and
-   give it a default format in `DEFAULT_FORMAT` (a new region also goes into `FORMAT_REGIONS`).
-3. Run `npm run typecheck` and `npm run lint`. Both name every key that is still missing.
+1. Copy `en.json` to `<code>.json` and translate every value, keeping the keys. Extend the glossary
+   above with the new column first, so the catalogue and the mails use the same words.
+2. Add the code to `SUPPORTED_LOCALES` in `packages/shared/src/locale.ts` and give it a default
+   format in `DEFAULT_FORMAT` there. A new region also goes into `FORMAT_REGIONS`
+   (`packages/shared/src/format.ts`) and gets a name in `FORMAT_NAMES` (`src/lib/locale-options.ts`).
+3. Register the catalogue in `messages` in `src/lib/i18n.ts`.
+4. Translate the mails: add the language to the catalogue in `apps/api/src/mail/catalog.ts`.
+5. Run `npm run typecheck` and `npm run lint`. Both name every key and every entry that is still
+   missing. The language then appears in the profile and the system settings by itself, named in
+   its own words by the browser (`Intl.DisplayNames`). No migration is needed: the database stores
+   the code as text.

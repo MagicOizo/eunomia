@@ -131,6 +131,22 @@ export async function getPublicSettings(pool: Pool): Promise<PublicSetting[]> {
 }
 
 /**
+ * The instance's language and format — the two settings anyone may read, even
+ * before signing in: the login page picks its language from them when the
+ * browser's is not one Eunomia speaks. Nothing else is read, so this path
+ * cannot leak another setting by accident.
+ */
+export async function getLocaleDefaults(
+  pool: Pool,
+): Promise<{ locale: SettingValue; format: SettingValue }> {
+  const stored = await readRows(pool);
+  return {
+    locale: parseStoredValue('general.defaultLocale', stored.get('general.defaultLocale') ?? null),
+    format: parseStoredValue('general.defaultFormat', stored.get('general.defaultFormat') ?? null),
+  };
+}
+
+/**
  * Writes a batch of settings in one transaction, so a half-applied mail
  * configuration cannot exist. Values are already validated by the registry.
  *

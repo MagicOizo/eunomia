@@ -65,6 +65,14 @@ The created user gets the `Admin` role globally. Afterwards the endpoint returns
 `SETUP_TOKEN` from `.env` to disable it entirely. From then on, manage users and their access from
 the **System → Nutzer & Rechte** page in the app.
 
+## Language
+
+Eunomia speaks German and English. Each user picks language and format (German, British or US dates
+and numbers) under **My account**; without a choice the browser's language decides, then the
+instance default an admin sets under **System > Settings**, then German. Mails follow the same
+choice without the browser step. Adding a language is described in
+[apps/web/src/locales/README.md](apps/web/src/locales/README.md).
+
 ## Backup & Restore
 
 The backup/restore scripts ship **inside the image** and run via `docker compose exec` — you only
@@ -360,6 +368,10 @@ the container health check). `GET /api/v1/update-check` compares that version ag
 GitHub release and needs `MANAGE_SETTINGS`; it answers
 `{ current, latest, updateAvailable, releaseUrl, checkedAt, status }` with `status` one of `ok`,
 `disabled` or `unavailable` — never an error, so an unreachable GitHub stays invisible in the UI.
+`GET /api/v1/locale-defaults` answers the instance's default language and format
+(`{ locale, format }`, `format` `null` = from the language) without a token, so the login page can
+pick its language. `PATCH /api/v1/me` sets the caller's own `locale` and `formatRegion` (`null` to
+follow the defaults again).
 
 ## License
 

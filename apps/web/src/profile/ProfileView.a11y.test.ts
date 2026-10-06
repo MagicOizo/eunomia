@@ -4,12 +4,16 @@ import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HttpError } from '../lib/http';
-import { useAuthStore } from '../stores/auth';
-import type { ChangePasswordBody } from './api';
+import { withLocale } from '../test/locale';
+import { type AuthUser, useAuthStore } from '../stores/auth';
+import type { ChangePasswordBody, LocalePreferencesBody } from './api';
 
 const changePassword = vi.fn<(body: ChangePasswordBody) => Promise<void>>();
+const updateLocalePreferences = vi.fn<(body: LocalePreferencesBody) => Promise<AuthUser>>();
 vi.mock('./api', () => ({
   changePassword: (body: ChangePasswordBody): Promise<void> => changePassword(body),
+  updateLocalePreferences: (body: LocalePreferencesBody): Promise<AuthUser> =>
+    updateLocalePreferences(body),
 }));
 
 const { default: ProfileView } = await import('./ProfileView.vue');
@@ -23,7 +27,14 @@ async function mountView(attach = false) {
   const pinia = createPinia();
   setActivePinia(pinia);
   const auth = useAuthStore();
-  auth.user = { uuid: 'u-1', email: 'uwe@example.com', firstname: 'Uwe', surname: 'Ulm' };
+  auth.user = {
+    uuid: 'u-1',
+    email: 'uwe@example.com',
+    firstname: 'Uwe',
+    surname: 'Ulm',
+    locale: null,
+    formatRegion: null,
+  };
 
   const wrapper = mount(ProfileView, {
     global: { plugins: [pinia] },
@@ -114,6 +125,44 @@ describe('ProfileView', () => {
     // The typed values stay: the user corrects one field, not all three.
     expect((fields(wrapper)[1]!.element as HTMLInputElement).value).toBe('newpass123');
     wrapper.unmount();
+  });
+
+  it('stores a chosen language and puts the answer into the session', async () => {
+    const wrapper = await mountView();
+    const answered = { ...useAuthStore().user!, locale: 'en' };
+    updateLocalePreferences.mockResolvedValue(answered);
+
+    await wrapper.findAll('select')[0]!.setValue('en');
+    await flushPromises();
+
+    expect(updateLocalePreferences).toHaveBeenCalledWith({ locale: 'en' });
+    expect(useAuthStore().user).toEqual(answered);
+    expect(wrapper.text()).toContain('Gespeichert.');
+    wrapper.unmount();
+  });
+
+  it('sends null for "automatic", so the profile follows again', async () => {
+    const wrapper = await mountView();
+    useAuthStore().user!.formatRegion = 'en-US';
+    updateLocalePreferences.mockResolvedValue({ ...useAuthStore().user!, formatRegion: null });
+
+    await wrapper.findAll('select')[1]!.setValue('');
+    await flushPromises();
+
+    expect(updateLocalePreferences).toHaveBeenCalledWith({ formatRegion: null });
+    wrapper.unmount();
+  });
+
+  it('names the languages in themselves and shows a sample per format', async () => {
+    await withLocale('en', async () => {
+      const wrapper = await mountView();
+      expect(wrapper.text()).toContain('Language and format');
+      const options = wrapper.findAll('option').map((option) => option.text());
+      expect(options).toContain('Deutsch');
+      expect(options).toContain('English');
+      expect(options).toContain('American (12/31/2026 · €1,234.56)');
+      wrapper.unmount();
+    });
   });
 
   it('has no automatically detectable accessibility violations', async () => {

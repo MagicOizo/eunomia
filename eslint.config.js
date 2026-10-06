@@ -92,26 +92,11 @@ export default tseslint.config(
       '@intlify/vue-i18n/no-v-html': 'error',
     },
   },
-  // No text outside the catalogues — enforced area by area, as each one is
-  // moved over; the list grows with every slice of the package until the rule
-  // covers the whole app. The style guide stays out: its sample texts are the
-  // content of a developer page.
+  // No text outside the catalogues, anywhere in the app. The style guide stays
+  // out: its sample texts are the content of a developer page.
   {
-    files: [
-      'apps/web/src/App.vue',
-      'apps/web/src/components/layout/**/*.vue',
-      'apps/web/src/layouts/**/*.vue',
-      'apps/web/src/views/**/*.vue',
-      'apps/web/src/design-system/components/**/*.vue',
-      'apps/web/src/components/resource/**/*.vue',
-      'apps/web/src/agencies/**/*.vue',
-      'apps/web/src/admin/**/*.vue',
-      'apps/web/src/profile/**/*.vue',
-      'apps/web/src/trash/**/*.vue',
-      'apps/web/src/contracts/**/*.vue',
-      'apps/web/src/dashboard/**/*.vue',
-      'apps/web/src/invoices/**/*.vue',
-    ],
+    files: ['apps/web/src/**/*.vue'],
+    ignores: ['apps/web/src/design-system/StyleGuideView.vue'],
     rules: {
       '@intlify/vue-i18n/no-raw-text': [
         'error',

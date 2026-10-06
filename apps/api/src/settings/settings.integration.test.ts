@@ -103,10 +103,18 @@ test('system settings: gating, write cases, encryption at rest, mail status', as
       assert.equal(set.status, 200);
       assert.equal(setting(set.body, 'general.defaultLocale').value, 'en');
       assert.equal(setting(set.body, 'general.defaultFormat').value, 'en-US');
+      // The login page reads the same two values without a token.
+      const anonymous = await request(app).get('/api/v1/locale-defaults');
+      assert.equal(anonymous.status, 200);
+      assert.deepEqual(anonymous.body.data, { locale: 'en', format: 'en-US' });
 
       const cleared = await write({ 'general.defaultLocale': null, 'general.defaultFormat': null });
       assert.equal(setting(cleared.body, 'general.defaultLocale').value, 'de');
       assert.equal(setting(cleared.body, 'general.defaultFormat').value, null);
+      assert.deepEqual((await request(app).get('/api/v1/locale-defaults')).body.data, {
+        locale: 'de',
+        format: null,
+      });
     });
 
     await t.test('writing the mail configuration stores values and hides the secret', async () => {

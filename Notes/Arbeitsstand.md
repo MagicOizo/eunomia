@@ -23,5 +23,5 @@ Deutsch + Englisch über vue-i18n, Sprachwahl am Profil. Geplant als Slices 77�
 | ✓   | 80    | Policen und Startseite                                        | `1.2.0-slice.4` |
 | ✓   | 81    | Rechnungen I: Arbeitsfläche, Maske, Details                   | `1.2.0-slice.5` |
 | ✓   | 82    | Rechnungen II: Einreichung, Abrechnung, Zuordnung + Server    | `1.2.0-slice.6` |
-|     | 83    | Sprachwahl einschalten, Abschluss                             | `1.2.0-slice.7` |
+| ✓   | 83    | Sprachwahl einschalten, Abschluss                             | `1.2.0-slice.7` |
 |     | —     | Release nach Bestätigung in der Dev                           | `1.2.0`         |

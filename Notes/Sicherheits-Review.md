@@ -87,7 +87,8 @@ begründet ändern — sie sind nicht Beschreibung, sondern Vorgabe.
 
 **I-1 Jede Route ist bewacht.** Kein Endpunkt unter `/api/v1` antwortet mit Daten ohne
 `createRequireAuth`. Ausnahmen sind abschließend: `/version`, `/setup`, `/auth/login`,
-`/auth/refresh`, `/auth/logout`.
+`/auth/refresh`, `/auth/logout`, `/locale-defaults` (Slice 83: die zwei Instanz-Vorgaben für Sprache
+und Format, damit die Login-Seite ihre Sprache wählen kann).
 
 **I-2 Jeder Zugriff auf Falldaten ist kontogeprüft.** Wer eine Rechnung, Police, Einreichung,
 Leistungsabrechnung oder Buchung liest oder schreibt, hält die Berechtigung **auf deren Konto** —

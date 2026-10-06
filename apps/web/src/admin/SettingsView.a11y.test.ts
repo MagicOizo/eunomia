@@ -214,8 +214,9 @@ describe('SettingsView', () => {
     const wrapper = await mountView();
 
     // Enter in the empty field submits the form even though the button is
-    // disabled; an empty secret would be read as "clear it".
-    await wrapper.find('form').trigger('submit');
+    // disabled; an empty secret would be read as "clear it". The token form is
+    // the second one, after the language and format.
+    await wrapper.findAll('form')[1]!.trigger('submit');
     await flushPromises();
 
     expect(saveSettings).not.toHaveBeenCalled();
@@ -224,9 +225,9 @@ describe('SettingsView', () => {
 
   it('sends the password only when one was typed', async () => {
     const wrapper = await mountView();
-    // Three forms, in order: update token, mail, reminders.
+    // The forms, in order: language and format, update token, mail, reminders, retention.
     const forms = wrapper.findAll('form');
-    const mailForm = forms[1];
+    const mailForm = forms[2];
     expect(mailForm).toBeDefined();
 
     await mailForm!.trigger('submit');

@@ -27,37 +27,86 @@ declare module 'vue-i18n' {
   export interface DefineLocaleMessage extends MessageSchema {}
 }
 
-/**
- * The language the app starts in. Until the whole UI is translated it is
- * German for everyone: detection from the profile and the browser is switched
- * on only once no screen is left half German. The dev build alone takes
- * `?lang=en` (or `de`) on the page it is loaded with, so a translated area can
- * be looked at while the rest is still being moved. It holds for the SPA
- * session, not beyond a reload — remembering it would need browser storage,
- * which the SPA does not touch (invariant I-8, stores/auth.spec.ts).
- */
-function initialLocale(): Locale {
-  if (!import.meta.env.DEV) return 'de';
-  const requested = new URLSearchParams(window.location.search).get('lang');
-  return isLocale(requested) ? requested : 'de';
-}
-
 export const i18n = createI18n<[MessageSchema], Locale, false>({
   legacy: false,
-  locale: initialLocale(),
+  // German until lib/locale-preferences.ts has resolved the real choice at
+  // startup — and for good in the tests, which never run that resolution
+  // (jsdom would report an English browser).
+  locale: 'de',
   fallbackLocale: 'de',
   messages: { de, en },
 });
 
-/** Like `?lang`, the dev build alone takes `?format=en-US`, held until a reload. */
-function initialFormat(): FormatRegion | null {
-  if (!import.meta.env.DEV) return null;
-  const requested = new URLSearchParams(window.location.search).get('format');
-  return isFormatRegion(requested) ? requested : null;
+/** A user's own choice as the profile stores it (`null` = follow). */
+export interface LocaleChoice {
+  locale: string | null;
+  formatRegion: string | null;
 }
 
+/** The instance's defaults from the system settings (GET /locale-defaults). */
+export interface InstanceLocaleDefaults {
+  locale: string | null;
+  format: string | null;
+}
+
+export interface ResolvedPreferences {
+  locale: Locale;
+  format: FormatRegion;
+}
+
+/**
+ * Language and format, each from the first source that names one Eunomia
+ * supports (Notes/eunomia-plan.md, package Localization):
+ *
+ *  - language: profile → browser (by primary subtag, so `en-AU` reads as `en`)
+ *    → instance default → German;
+ *  - format: profile → browser (only an exact region — `de-AT` is not
+ *    `de-DE`) → instance default → the language's own.
+ *
+ * Stored values are strings, not checked types: a language removed from the
+ * lists or a row edited by hand is skipped like an empty one. Mails resolve
+ * the same chain without the browser (apps/api/src/mail/catalog.ts).
+ */
+export function resolvePreferences(input: {
+  profile: LocaleChoice | null;
+  browser: readonly string[];
+  instance: InstanceLocaleDefaults;
+}): ResolvedPreferences {
+  const { profile, browser, instance } = input;
+  const locale =
+    [
+      profile?.locale,
+      ...browser.map((tag) => tag.split('-')[0]?.toLowerCase()),
+      instance.locale,
+    ].find(isLocale) ?? 'de';
+  const format =
+    [profile?.formatRegion, ...browser, instance.format].find(isFormatRegion) ??
+    DEFAULT_FORMAT[locale];
+  return { locale, format };
+}
+
+/**
+ * The dev build alone takes `?lang=en` and `?format=en-US` on the page it is
+ * loaded with, ahead of every other source, so a screen can be looked at in
+ * another language without changing the profile. Held until a reload — and
+ * not beyond: remembering it would need browser storage, which the SPA does
+ * not touch (invariant I-8, stores/auth.spec.ts).
+ */
+function devOverride(): { locale: Locale | null; format: FormatRegion | null } {
+  if (!import.meta.env.DEV) return { locale: null, format: null };
+  const query = new URLSearchParams(window.location.search);
+  const locale = query.get('lang');
+  const format = query.get('format');
+  return {
+    locale: isLocale(locale) ? locale : null,
+    format: isFormatRegion(format) ? format : null,
+  };
+}
+
+const override = devOverride();
+
 /** The chosen format, or null to follow the language. */
-export const formatOverride = ref<FormatRegion | null>(initialFormat());
+export const formatOverride = ref<FormatRegion | null>(null);
 
 /**
  * The format in effect. Reads both refs, so a template or computed that
@@ -65,6 +114,16 @@ export const formatOverride = ref<FormatRegion | null>(initialFormat());
  */
 export function activeFormat(): FormatRegion {
   return formatOverride.value ?? DEFAULT_FORMAT[i18n.global.locale.value];
+}
+
+/**
+ * Switches the interface to what the chain resolves to. The dev query still
+ * wins, and a `?lang` without `?format` lets the format follow that language,
+ * as it did before detection existed.
+ */
+export function applyPreferences(resolved: ResolvedPreferences): void {
+  i18n.global.locale.value = override.locale ?? resolved.locale;
+  formatOverride.value = override.format ?? (override.locale ? null : resolved.format);
 }
 
 // Screen readers and the browser's hyphenation read the document language.

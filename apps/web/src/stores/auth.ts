@@ -9,6 +9,9 @@ export interface AuthUser {
   email: string;
   firstname: string;
   surname: string | null;
+  /** The profile's language and format; `null` follows browser and instance (lib/i18n.ts). */
+  locale: string | null;
+  formatRegion: string | null;
 }
 
 interface EffectivePermissions {

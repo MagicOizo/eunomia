@@ -392,8 +392,8 @@
       "hotline": "Hotline"
     },
     "contracts": {
-      "currentPremium": "Current premium",
-      "currentDeductible": "Current deductible",
+      "currentPremium": "Premium",
+      "currentDeductible": "Deductible",
       "term": "Term",
       "since": "since {date}",
       "initialMonthlyPremium": "Monthly premium from the start of the policy",
@@ -417,8 +417,8 @@
       "SUPPLEMENTARY": "Supplementary cover"
     },
     "kindsShort": {
-      "FULL": "Comprehensive",
-      "SUPPLEMENTARY": "Supplementary"
+      "FULL": "Full",
+      "SUPPLEMENTARY": "Add-on"
     },
     "forfeitRules": {
       "ON_SUBMISSION": "as soon as it is submitted",
@@ -675,6 +675,11 @@
     "notRunYet": "Not run yet",
     "lastRunFailed": "Last run {at} — failed",
     "lastRunMessage": "Message from the last run: {message}",
+    "general": {
+      "title": "Language and format",
+      "lead": "The default for everyone who has not chosen in their profile: in the interface when the browser reports no supported language, and for the mails they receive.",
+      "fromLanguage": "From the language"
+    },
     "mail": {
       "title": "Email dispatch",
       "lastSendOk": "Last dispatch succeeded ({at})",
@@ -768,6 +773,20 @@
     "mismatch": "The repetition does not match the new password.",
     "change": "Change password",
     "changed": "Password changed. All other sessions have ended."
+  },
+  "localeChoice": {
+    "title": "Language and format",
+    "lead": "Without a choice of your own, Eunomia follows your browser's language and, if that is not supported, this instance's default. The language also applies to the mails you receive.",
+    "language": "Language",
+    "format": "Numbers and dates",
+    "automatic": "Automatic — {current}",
+    "formatOption": "{name} ({date} · {amount})",
+    "formats": {
+      "german": "German",
+      "british": "British",
+      "american": "American"
+    },
+    "saved": "Saved."
   },
   "invoices": {
     "status": {

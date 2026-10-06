@@ -7,6 +7,26 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.0-slice.7 — 2026-10-06
+
+The last preview of 1.2.0: Eunomia now speaks German and English.
+
+- **Language and format are chosen per user.** Under _My account_, a new section _Language and
+  format_ picks the language and how dates and numbers are written (German, British or US — English
+  text with German dates is fine). The choice switches the interface at once and holds on every
+  device; _Automatic_ says what it currently amounts to.
+- **Without a choice, the browser decides**, then the instance default, then German. The format
+  follows the browser's region when it is one Eunomia knows (`en-US` gets US dates). The login page
+  already speaks the browser's language.
+- **The instance default is set under System > Settings**, in a new first section _Language and
+  format_. It applies to everyone without a choice of their own whose browser speaks no supported
+  language, and to their mails. The login page reads it from the new public endpoint
+  `GET /api/v1/locale-defaults`, the one addition to the list of routes that answer without a token.
+- English tables stay as wide as the German ones: the policy list says _Premium_, _Deductible_ and
+  _Full_/_Add-on_ in its columns.
+- For developers: lint now rejects raw text in every template of the app (the style guide excepted),
+  and the README of `apps/web/src/locales/` explains how the language is chosen and how to add one.
+
 ## 1.2.0-slice.6 — 2026-10-06
 
 The sixth preview of 1.2.0. The UI still starts in German for everyone.

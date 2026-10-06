@@ -675,6 +675,11 @@
     "notRunYet": "Noch nicht gelaufen",
     "lastRunFailed": "Letzter Lauf {at} — fehlgeschlagen",
     "lastRunMessage": "Meldung beim letzten Lauf: {message}",
+    "general": {
+      "title": "Sprache und Format",
+      "lead": "Die Vorgabe für alle, die im Profil nichts gewählt haben: auf der Oberfläche, wenn der Browser keine unterstützte Sprache meldet, und für die Mails an sie.",
+      "fromLanguage": "Nach der Sprache"
+    },
     "mail": {
       "title": "E-Mail-Versand",
       "lastSendOk": "Letzter Versand erfolgreich ({at})",
@@ -768,6 +773,20 @@
     "mismatch": "Die Wiederholung stimmt nicht mit dem neuen Passwort überein.",
     "change": "Passwort ändern",
     "changed": "Passwort geändert. Alle anderen Sitzungen sind beendet."
+  },
+  "localeChoice": {
+    "title": "Sprache und Format",
+    "lead": "Ohne eigene Wahl folgt Eunomia der Sprache deines Browsers und, wenn die nicht unterstützt wird, der Vorgabe dieser Instanz. Die Sprache gilt auch für die Mails, die du bekommst.",
+    "language": "Sprache",
+    "format": "Zahlen und Daten",
+    "automatic": "Automatisch — {current}",
+    "formatOption": "{name} ({date} · {amount})",
+    "formats": {
+      "german": "Deutsch",
+      "british": "Britisch",
+      "american": "US-amerikanisch"
+    },
+    "saved": "Gespeichert."
   },
   "invoices": {
     "status": {

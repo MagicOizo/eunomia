@@ -31,6 +31,7 @@ import { createTrashRouter } from './domain/trash.js';
 import { errorHandler } from './lib/error-handler.js';
 import { createUpdateCheckRouter } from './routes/update-check.js';
 import { versionRouter } from './routes/version.js';
+import { createLocaleDefaultsRouter } from './settings/locale-defaults.js';
 import { createSettingsRouter } from './settings/routes.js';
 
 /** Optional dependencies for the routes that need a database and config. */
@@ -52,9 +53,9 @@ export interface AppDependencies {
  * matcher closes over the pattern), so the prefix is not recoverable from the
  * built app. It has to be readable here or nowhere.
  *
- * `versionRouter` is deliberately not in the list: it needs no pool, doubles as
- * the container health check, and is the one route that answers before anyone
- * has logged in — see the exception list of I-1.
+ * `versionRouter` is deliberately not in the list: it needs no pool and doubles
+ * as the container health check. Like `/locale-defaults` (which is in it) it
+ * answers before anyone has logged in — see the exception list of I-1.
  */
 export const API_MOUNTS: ReadonlyArray<{
   path: string;
@@ -64,6 +65,7 @@ export const API_MOUNTS: ReadonlyArray<{
   { path: '/api/v1', create: createUserAdminRouter },
   { path: '/api/v1', create: createUpdateCheckRouter },
   { path: '/api/v1', create: createSettingsRouter },
+  { path: '/api/v1', create: createLocaleDefaultsRouter },
   { path: '/api/v1/accounts', create: createAccountsRouter },
   { path: '/api/v1/accounts', create: createReimbursementPlanRouter },
   { path: '/api/v1/companies', create: createInsuranceCompaniesRouter },
