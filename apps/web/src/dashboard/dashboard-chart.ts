@@ -1,3 +1,4 @@
+import { formatWholeMoney } from '../lib/format';
 import type { DashboardYearDto } from './api';
 
 /**
@@ -145,13 +146,7 @@ export function layoutChart(years: readonly DashboardYearDto[]): ChartLayout {
   };
 }
 
-const tickFormat = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-});
-
 /** An axis label: whole euros, "2.500 €". */
 export function tickLabel(value: number): string {
-  return tickFormat.format(value);
+  return formatWholeMoney(value);
 }

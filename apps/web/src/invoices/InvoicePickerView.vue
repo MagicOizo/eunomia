@@ -10,7 +10,7 @@ import EuBadge from '../design-system/components/EuBadge.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { useDebouncedCallback } from '../lib/debounce';
 import { describeError } from '../lib/errors';
-import { germanDate, germanMoney } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import { listResource } from '../lib/resource';
 import { type InvoiceDto, searchInvoices } from './api';
 import {
@@ -305,9 +305,9 @@ onMounted(async () => {
               {{ STATUS_DISPLAY[invoice.workflowStatus].label }}
             </EuBadge>
             <span class="eu-picker__meta">
-              Rechnung vom {{ germanDate(invoice.invoiceDate) }} · Behandlung
+              Rechnung vom {{ formatDate(invoice.invoiceDate) }} · Behandlung
               {{ treatmentDaysLabel(invoice.treatmentDates) }} ·
-              {{ germanMoney(invoice.invoiceAmount) }}
+              {{ formatMoney(invoice.invoiceAmount) }}
             </span>
             <span v-if="referenceLine(invoice)" class="eu-picker__refs">{{
               referenceLine(invoice)
@@ -332,7 +332,7 @@ onMounted(async () => {
         <li v-for="person in accounts" :key="person.accountUID">
           <RouterLink class="eu-picker__tile" :to="`/invoices/${person.accountUID}`">
             <span class="eu-picker__name">{{ person.firstname }} {{ person.surname }}</span>
-            <span class="eu-picker__birth">{{ germanDate(person.birthDate) }}</span>
+            <span class="eu-picker__birth">{{ formatDate(person.birthDate) }}</span>
           </RouterLink>
         </li>
       </ul>

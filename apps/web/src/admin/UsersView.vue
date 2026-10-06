@@ -10,7 +10,7 @@ import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { describeError } from '../lib/errors';
-import { germanDateTime } from '../lib/format';
+import { formatDateTime } from '../lib/format';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/table-sort';
 import {
@@ -269,7 +269,7 @@ async function confirmPurge(): Promise<void> {
             <tr v-for="user in deleted" :key="user.uuid">
               <td>{{ user.email }}</td>
               <td>{{ [user.firstname, user.surname].filter(Boolean).join(' ') }}</td>
-              <td>{{ user.deletedAt === null ? 'unbekannt' : germanDateTime(user.deletedAt) }}</td>
+              <td>{{ user.deletedAt === null ? 'unbekannt' : formatDateTime(user.deletedAt) }}</td>
               <td class="eu-users__actions">
                 <EuButton
                   variant="secondary"

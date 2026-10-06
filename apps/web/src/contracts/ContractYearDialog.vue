@@ -7,7 +7,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
-import { germanMoney, plural } from '../lib/format';
+import { formatMoney, plural } from '../lib/format';
 import type { BonusYearDto, ContractYearInput } from './api';
 import { forecastBasis } from './bonus-labels';
 
@@ -63,7 +63,7 @@ function submit(): void {
             ? 'offen, der bonusrelevante Beitrag ist nicht für jeden Monat erfasst'
             : year.expectedBonus === null
               ? 'keine Konditionen erfasst'
-              : germanMoney(year.expectedBonus)
+              : formatMoney(year.expectedBonus)
         }}
         <template v-if="!year.forfeited && forecastBasis(year)"
           >({{ forecastBasis(year) }})</template

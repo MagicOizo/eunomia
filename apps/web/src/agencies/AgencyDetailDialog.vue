@@ -9,7 +9,7 @@ import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { useDialogAction } from '../lib/dialog-action';
-import { NO_PERMISSION } from '../lib/error-messages';
+import { noPermission as noPermissionText } from '../lib/error-messages';
 import { describeError } from '../lib/errors';
 import { paymentDetailLabel } from './payment-details';
 import {
@@ -51,7 +51,7 @@ const auth = useAuthStore();
  */
 const mayManage = computed(() => auth.can('MANAGE_AGENCIES'));
 /** Why the actions are disabled, or nothing when they are not. */
-const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
+const noPermission = computed(() => (mayManage.value ? undefined : noPermissionText()));
 
 const agency = ref<AgencyDto | null>(null);
 const loadError = ref<string | null>(null);

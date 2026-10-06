@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch } from 'vue';
 
+import { activeFormat } from '../../lib/i18n';
+
 /**
- * Currency input with German formatting. Displays "1.234,56 €" when idle and a
- * plain, comma-decimal value while editing; emits a numeric `modelValue`
- * (null when empty). Formatting happens on blur, not per keystroke, so the
- * caret never jumps.
+ * Currency input in the format in effect. Displays "1.234,56 €" (or
+ * "€1,234.56") when idle and a plain value with the format's decimal mark
+ * while editing; emits a numeric `modelValue` (null when empty). Formatting
+ * happens on blur, not per keystroke, so the caret never jumps.
  */
 const props = withDefaults(
   defineProps<{ modelValue: number | null; label: string; error?: string; bare?: boolean }>(),
@@ -34,33 +36,61 @@ const bareWidth = computed(() => {
   return `${Math.max(4, chars + 0.2)}ch`;
 });
 
-const formatter = new Intl.NumberFormat('de-DE', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+const formatter = computed(
+  () =>
+    new Intl.NumberFormat(activeFormat(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+);
+
+/** The format's decimal mark, `,` or `.`. */
+const decimalMark = computed(
+  () => formatter.value.formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? ',',
+);
+
+/** Whether the format writes the € in front of the amount ("€12.00") or behind it. */
+const symbolFirst = computed(() => {
+  const parts = new Intl.NumberFormat(activeFormat(), {
+    style: 'currency',
+    currency: 'EUR',
+  }).formatToParts(1);
+  return (
+    parts.findIndex((part) => part.type === 'currency') <
+    parts.findIndex((part) => part.type === 'integer')
+  );
 });
 
 function formatValue(value: number | null): string {
-  return value === null ? '' : formatter.format(value);
+  return value === null ? '' : formatter.value.format(value);
 }
 
-/** Plain, editable form: comma decimal, no thousands separators. */
+/** Plain, editable form: the format's decimal mark, no thousands separators. */
 function editableValue(value: number | null): string {
-  return value === null ? '' : String(value).replace('.', ',');
+  return value === null ? '' : String(value).replace('.', decimalMark.value);
 }
 
-/** Parses German (or plain) input to a number rounded to cents, or null. */
+/**
+ * Parses typed input to a number rounded to cents, or null. With a decimal
+ * comma, dots are thousands — unless no comma was typed, then a dot is taken
+ * as the decimal mark, since "12.5" is far more likely a plain number than
+ * twelve thousand five hundred. With a decimal point, commas are thousands
+ * only: "1,234" is one thousand two hundred and thirty-four.
+ */
 function parse(input: string): number | null {
   let s = input.replace(/[^\d,.-]/g, '');
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); // comma = decimal, dots = thousands
+  if (decimalMark.value === ',') {
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    s = s.replace(/,/g, '');
+  }
   if (s === '' || s === '-') return null;
   const n = Number.parseFloat(s);
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
 }
 
-// Reflect external value changes while the field is not being edited.
+// Reflect external value changes — and a change of format — while the field is
+// not being edited.
 watch(
-  () => props.modelValue,
-  (value) => {
+  [() => props.modelValue, formatter],
+  ([value]) => {
     if (!focused.value) text.value = formatValue(value);
   },
   { immediate: true },
@@ -88,6 +118,7 @@ function onBlur(): void {
   <div class="eu-currency-field">
     <label v-if="!bare" :for="inputId" class="eu-currency-field__label">{{ label }}</label>
     <div class="eu-currency-field__control" :class="{ 'is-error': hasError, 'is-bare': bare }">
+      <span v-if="symbolFirst" class="eu-currency-field__symbol" aria-hidden="true">€</span>
       <input
         :id="inputId"
         class="eu-currency-field__input"
@@ -102,7 +133,7 @@ function onBlur(): void {
         @input="onInput"
         @blur="onBlur"
       />
-      <span class="eu-currency-field__suffix" aria-hidden="true">€</span>
+      <span v-if="!symbolFirst" class="eu-currency-field__symbol" aria-hidden="true">€</span>
     </div>
     <p v-if="hasError" :id="errorId" class="eu-currency-field__error">{{ error }}</p>
   </div>
@@ -183,7 +214,7 @@ function onBlur(): void {
   outline: none;
 }
 
-.eu-currency-field__suffix {
+.eu-currency-field__symbol {
   color: var(--eu-color-text-muted);
 }
 

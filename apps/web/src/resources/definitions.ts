@@ -11,7 +11,7 @@ import {
 import ContractDetailDialog from '../contracts/ContractDetailDialog.vue';
 import { apiData } from '../lib/api';
 import { downloadJson, isoToday } from '../lib/download';
-import { bic, germanDate, germanMoney, iban } from '../lib/format';
+import { bic, formatDate, formatMoney, iban } from '../lib/format';
 import type { ResourceRow } from '../lib/resource';
 import type { ResourceConfig } from './config';
 
@@ -37,7 +37,7 @@ const accounts: ResourceConfig = {
   columns: [
     { key: 'firstname', label: 'Vorname' },
     { key: 'surname', label: 'Nachname' },
-    { key: 'birthDate', label: 'Geburtsdatum', format: germanDate },
+    { key: 'birthDate', label: 'Geburtsdatum', format: formatDate },
   ],
   fields: [
     { key: 'firstname', label: 'Vorname', type: 'text', required: true },
@@ -116,15 +116,15 @@ const contracts: ResourceConfig = {
       label: 'Art',
       format: (value) => CONTRACT_KIND_SHORT_LABEL[value as ContractKind] ?? '–',
     },
-    { key: 'currentMonthlyPremium', label: 'Beitrag aktuell', format: germanMoney, align: 'right' },
-    { key: 'currentDeductible', label: 'SB aktuell', format: germanMoney, align: 'right' },
+    { key: 'currentMonthlyPremium', label: 'Beitrag aktuell', format: formatMoney, align: 'right' },
+    { key: 'currentDeductible', label: 'SB aktuell', format: formatMoney, align: 'right' },
     {
       key: 'contractBegin',
       label: 'Laufzeit',
       format: (value, row) =>
         row.contractEnd
-          ? `${germanDate(value)} – ${germanDate(row.contractEnd)}`
-          : `seit ${germanDate(value)}`,
+          ? `${formatDate(value)} – ${formatDate(row.contractEnd)}`
+          : `seit ${formatDate(value)}`,
     },
   ],
   // Create form only (editing opens ContractDetailDialog). The initial* fields

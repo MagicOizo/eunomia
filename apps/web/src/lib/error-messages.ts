@@ -1,18 +1,23 @@
 import type { ErrorCode } from '@eunomia/shared';
 
-import { FIELD_FORMATS, fieldLabel, settingLabel } from './field-labels';
+import { fieldFormat, fieldLabel, settingLabel } from './field-labels';
+import { activeLanguage } from './format';
+import { i18n } from './i18n';
 
 /**
- * German sentences for what the API reports. The API answers in English (its
- * messages are for API clients and logs); the UI never shows those. Two
- * sources are translated here:
+ * Sentences for what the API reports, in the UI language. The API answers in
+ * English (its messages are for API clients and logs); the UI never shows
+ * those. Two sources are translated here:
  *
  * - `VALIDATION_ERROR` carries zod issues, which are turned into a sentence
- *   from the issue's `code` and the field's German label.
+ *   from the issue's `code` and the field's label.
  * - Every other failure carries a specific error code (@eunomia/shared) plus the
  *   data its sentence needs in `details`. The table below is keyed by that list,
- *   so a new code without a German sentence does not compile.
+ *   so a new code without a sentence does not compile — and every sentence is
+ *   a catalogue key, so one missing from a language does not compile either.
  */
+
+const { t } = i18n.global;
 
 /** The parts of a zod issue this translation uses (zod 3 shapes). */
 interface ZodIssueLike {
@@ -27,14 +32,14 @@ interface ZodIssueLike {
 
 type Details = Record<string, unknown>;
 
-const quoted = (label: string): string => `„${label}“`;
-
 /**
  * Why a button is disabled — the same sentence the API answers a `FORBIDDEN`
  * with, said before the click instead of after it (CR-26). It stands here so
  * the two never drift apart.
  */
-export const NO_PERMISSION = 'Dazu fehlt dir die Berechtigung.';
+export function noPermission(): string {
+  return t('errors.noPermission');
+}
 
 /** The field a zod issue belongs to: the last named segment of its path. */
 function keyOf(issue: ZodIssueLike): string {
@@ -46,43 +51,41 @@ function tooSmall(issue: ZodIssueLike, label: string): string {
   const min = issue.minimum ?? 0;
   if (issue.type === 'string') {
     return min <= 1
-      ? `Bitte ${quoted(label)} ausfüllen.`
-      : `${quoted(label)} muss mindestens ${min} Zeichen haben.`;
+      ? t('errors.issue.required', { label })
+      : t('errors.issue.minLength', { label, min });
   }
-  if (issue.type === 'array') return `Bitte mindestens einen Eintrag bei ${quoted(label)} angeben.`;
-  return `${quoted(label)} darf nicht kleiner als ${min} sein.`;
+  if (issue.type === 'array') return t('errors.issue.minEntries', { label });
+  return t('errors.issue.minValue', { label, min });
 }
 
 function tooBig(issue: ZodIssueLike, label: string): string {
   const max = issue.maximum ?? 0;
-  if (issue.type === 'string') return `${quoted(label)} darf höchstens ${max} Zeichen haben.`;
-  if (issue.type === 'array') return `${quoted(label)} darf höchstens ${max} Einträge haben.`;
-  return `${quoted(label)} darf höchstens ${max} sein.`;
+  if (issue.type === 'string') return t('errors.issue.maxLength', { label, max });
+  if (issue.type === 'array') return t('errors.issue.maxEntries', { label, max });
+  return t('errors.issue.maxValue', { label, max });
 }
 
 /** The sentence that spells out a field's own format, where one is written down. */
 function formatSentence(key: string, label: string): string | null {
-  const format = FIELD_FORMATS[key];
-  return format === undefined
-    ? null
-    : `Bitte ${quoted(label)} im richtigen Format angeben (${format}).`;
+  const format = fieldFormat(key);
+  return format === null ? null : t('errors.issue.format', { label, format });
 }
 
 function invalidString(issue: ZodIssueLike, key: string, label: string): string {
   switch (issue.validation) {
     case 'email':
-      return `${quoted(label)} ist keine gültige E-Mail-Adresse.`;
+      return t('errors.issue.email', { label });
     case 'url':
-      return `${quoted(label)} muss eine vollständige Internetadresse sein (mit https://).`;
+      return t('errors.issue.url', { label });
     case 'date':
     case 'datetime':
-      return `${quoted(label)} ist kein gültiges Datum.`;
+      return t('errors.issue.date', { label });
     default:
-      return formatSentence(key, label) ?? `${quoted(label)} hat nicht das erwartete Format.`;
+      return formatSentence(key, label) ?? t('errors.issue.unexpectedString', { label });
   }
 }
 
-/** One validation issue as a German sentence. */
+/** One validation issue as a sentence. */
 export function describeIssue(issue: ZodIssueLike): string {
   const key = keyOf(issue);
   const label = fieldLabel(key);
@@ -90,8 +93,8 @@ export function describeIssue(issue: ZodIssueLike): string {
   switch (issue.code) {
     case 'invalid_type':
       return issue.received === 'undefined' || issue.received === 'null'
-        ? `Bitte ${quoted(label)} ausfüllen.`
-        : `${quoted(label)} hat ein unerwartetes Format.`;
+        ? t('errors.issue.required', { label })
+        : t('errors.issue.unexpectedType', { label });
     case 'too_small':
       return tooSmall(issue, label);
     case 'too_big':
@@ -99,16 +102,16 @@ export function describeIssue(issue: ZodIssueLike): string {
     case 'invalid_string':
       return invalidString(issue, key, label);
     case 'invalid_date':
-      return `${quoted(label)} ist kein gültiges Datum.`;
+      return t('errors.issue.date', { label });
     // A refinement (`.refine`) carries no `validation` to translate. Where the
     // field writes down a format, that is the sentence — it is how the document
     // link's refused scheme gets explained instead of being called merely
     // inadmissible (SEC-01). A refinement that is not about a format at all
     // (two entries for the same invoice) keeps the general sentence.
     case 'custom':
-      return formatSentence(key, label) ?? `Die Angabe bei ${quoted(label)} ist nicht zulässig.`;
+      return formatSentence(key, label) ?? t('errors.issue.notAllowed', { label });
     default:
-      return `Die Angabe bei ${quoted(label)} ist nicht zulässig.`;
+      return t('errors.issue.notAllowed', { label });
   }
 }
 
@@ -117,33 +120,41 @@ function list(value: unknown): string {
   return Array.isArray(value) ? value.map(String).join(', ') : '';
 }
 
-/** The German noun for a resource the API reports as missing. */
-const RESOURCE_NAMES: Record<string, string> = {
-  Account: 'Der Versicherte',
-  Allocation: 'Die Erstattung',
-  'Bank account': 'Die Kontoverbindung',
-  'Collection agency': 'Der Abrechnungsdienstleister',
-  Contract: 'Die Police',
-  'Contract terms': 'Die Konditionen',
-  'Deleted record': 'Der gelöschte Eintrag',
-  Exclusion: 'Die Markierung',
-  Facility: 'Der Leistungserbringer',
-  'Insurance company': 'Die Versicherung',
-  Invoice: 'Die Rechnung',
-  'Invoice in submission': 'Die Rechnung in dieser Einreichung',
-  Premium: 'Der Beitragsstand',
-  Resource: 'Der Eintrag',
-  'Service billing': 'Die Leistungsabrechnung',
-  Submission: 'Die Einreichung',
-  User: 'Der Nutzer',
+/**
+ * The sentence for a resource the API reports as missing, keyed by the API's
+ * English name for it. Whole sentences rather than a noun dropped into one:
+ * the article and the verb agree with the noun, differently in each language.
+ */
+const NOT_FOUND: Record<string, () => string> = {
+  Account: () => t('errors.notFound.account'),
+  Allocation: () => t('errors.notFound.allocation'),
+  'Bank account': () => t('errors.notFound.bankAccount'),
+  'Collection agency': () => t('errors.notFound.agency'),
+  Contract: () => t('errors.notFound.contract'),
+  'Contract terms': () => t('errors.notFound.terms'),
+  'Deleted record': () => t('errors.notFound.deletedRecord'),
+  Exclusion: () => t('errors.notFound.exclusion'),
+  Facility: () => t('errors.notFound.facility'),
+  'Insurance company': () => t('errors.notFound.company'),
+  Invoice: () => t('errors.notFound.invoice'),
+  'Invoice in submission': () => t('errors.notFound.invoiceInSubmission'),
+  Premium: () => t('errors.notFound.premium'),
+  Resource: () => t('errors.notFound.entry'),
+  'Service billing': () => t('errors.notFound.billing'),
+  Submission: () => t('errors.notFound.submission'),
+  User: () => t('errors.notFound.user'),
 };
 
 /**
  * Premium and terms share the history rules but not their grammar
- * ("Konditionen können …" vs "Ein Beitragsstand kann …").
+ * ("Konditionen können …" vs "Ein Beitragsstand kann …"), so each has its own
+ * sentence.
  */
-const historyClause = (details: Details): string =>
-  details.kind === 'terms' ? 'Konditionen können' : 'Ein Beitragsstand kann';
+const isTerms = (details: Details): boolean => details.kind === 'terms';
+
+/** A record as the trash names it: `Rechnung „R-1“`. */
+const namedEntry = (singular: string, label: string): string =>
+  t('errors.namedEntry', { singular, label });
 
 /**
  * The record a failure hung on, when the API named one (`details.entry`). The
@@ -153,157 +164,148 @@ const historyClause = (details: Details): string =>
 function entryPrefix(details: Details): string {
   const entry = details.entry as { singular?: unknown; label?: unknown } | undefined;
   if (typeof entry?.singular !== 'string' || typeof entry.label !== 'string') return '';
-  return `${entry.singular} ${quoted(entry.label)}: `;
+  return `${namedEntry(entry.singular, entry.label)}: `;
 }
 
-/** Upper-cases the first letter again after a prefix was left out. */
+/** Lower-cases the sentence's first letter after a prefix ("Rechnung „R-1“: die …"). */
 const sentence = (prefix: string, rest: string): string =>
-  prefix === '' ? rest : prefix + rest.charAt(0).toLocaleLowerCase('de') + rest.slice(1);
+  prefix === ''
+    ? rest
+    : prefix + rest.charAt(0).toLocaleLowerCase(activeLanguage()) + rest.slice(1);
 
-/** Everything the trash refuses ends on this, because a restore is all or nothing. */
-const UNCHANGED = ' Es wurde nichts wiederhergestellt.';
+/**
+ * A sentence about one record of a restore: prefixed with the record when the
+ * API named one, and closed by the reminder that a restore is all or nothing.
+ */
+function restoreSentence(details: Details, text: string): string {
+  const prefix = entryPrefix(details);
+  return prefix === '' ? text : `${sentence(prefix, text)} ${t('errors.nothingRestored')}`;
+}
 
 /** Every code but the one that carries zod issues, which is read field by field. */
 type SentenceCode = Exclude<ErrorCode, 'VALIDATION_ERROR'>;
 
 const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
-  NOT_FOUND: (d) =>
-    `${RESOURCE_NAMES[String(d.resource)] ?? 'Der Eintrag'} wurde nicht gefunden. Vielleicht ist der Eintrag inzwischen gelöscht.`,
-  DUPLICATE_VALUE: () => 'Es gibt bereits einen Eintrag mit diesem Wert.',
+  NOT_FOUND: (d) => (NOT_FOUND[String(d.resource)] ?? NOT_FOUND.Resource)(),
+  DUPLICATE_VALUE: () => t('errors.code.DUPLICATE_VALUE'),
   STILL_REFERENCED: (d) => {
     const blockers = Array.isArray(d.blockers)
       ? (d.blockers as Array<{ label?: unknown; count?: unknown }>)
           .filter((one) => typeof one.label === 'string')
           .map((one) => `${String(one.count ?? '')} ${String(one.label)}`.trim())
       : [];
-    if (blockers.length === 0) {
-      return 'Der Eintrag wird noch verwendet und kann deshalb nicht gelöscht werden.';
-    }
-    return `Der Eintrag wird noch verwendet und kann deshalb nicht endgültig gelöscht werden. Daran hängt noch: ${blockers.join(', ')}.`;
+    return blockers.length === 0
+      ? t('errors.code.STILL_REFERENCED')
+      : t('errors.code.STILL_REFERENCED_BY', { blockers: blockers.join(', ') });
   },
-  MISSING_REFERENCE: () => 'Ein verknüpfter Eintrag existiert nicht mehr.',
-  BAD_REQUEST: () => 'Die Anfrage war nicht gültig.',
-  CONFLICT: () => 'Die Aktion ist im aktuellen Zustand nicht möglich.',
-  INTERNAL: () => 'Auf dem Server ist ein Fehler aufgetreten.',
+  MISSING_REFERENCE: () => t('errors.code.MISSING_REFERENCE'),
+  BAD_REQUEST: () => t('errors.code.BAD_REQUEST'),
+  CONFLICT: () => t('errors.code.CONFLICT'),
+  INTERNAL: () => t('errors.code.INTERNAL'),
 
   // Anmeldung und Ersteinrichtung
-  INVALID_CREDENTIALS: () => 'E-Mail oder Passwort ist falsch.',
-  INVALID_CURRENT_PASSWORD: () => 'Das aktuelle Passwort ist falsch.',
-  INVALID_REFRESH_TOKEN: () => 'Die Sitzung ist abgelaufen. Bitte melde dich erneut an.',
-  UNAUTHENTICATED: () => 'Bitte melde dich erneut an.',
-  FORBIDDEN: () => NO_PERMISSION,
-  SETUP_DISABLED: () => 'Die Ersteinrichtung ist deaktiviert.',
-  INVALID_SETUP_TOKEN: () => 'Das Setup-Token ist ungültig.',
-  SETUP_ALREADY_DONE: () => 'Die Ersteinrichtung ist bereits abgeschlossen.',
+  INVALID_CREDENTIALS: () => t('errors.code.INVALID_CREDENTIALS'),
+  INVALID_CURRENT_PASSWORD: () => t('errors.code.INVALID_CURRENT_PASSWORD'),
+  INVALID_REFRESH_TOKEN: () => t('errors.code.INVALID_REFRESH_TOKEN'),
+  UNAUTHENTICATED: () => t('errors.code.UNAUTHENTICATED'),
+  FORBIDDEN: () => noPermission(),
+  SETUP_DISABLED: () => t('errors.code.SETUP_DISABLED'),
+  INVALID_SETUP_TOKEN: () => t('errors.code.INVALID_SETUP_TOKEN'),
+  SETUP_ALREADY_DONE: () => t('errors.code.SETUP_ALREADY_DONE'),
 
   // Rechnungen, Einreichungen, Abrechnungen
-  INVOICES_UNKNOWN: (d) => `Diese Rechnungen gibt es nicht mehr: ${list(d.invoices)}.`,
+  INVOICES_UNKNOWN: (d) => t('errors.code.INVOICES_UNKNOWN', { invoices: list(d.invoices) }),
   INVOICES_WRONG_ACCOUNT: (d) =>
-    `Diese Rechnungen gehören nicht zum Versicherten der Police: ${list(d.invoices)}.`,
+    t('errors.code.INVOICES_WRONG_ACCOUNT', { invoices: list(d.invoices) }),
   INVOICES_ALREADY_SUBMITTED: (d) =>
-    `Diese Rechnungen liegen bei dieser Police bereits: ${list(d.invoices)}.`,
-  INVOICES_EXCLUDED: (d) =>
-    `Diese Rechnungen sind bei dieser Police als nicht erstattungsfähig markiert: ${list(d.invoices)}.`,
+    t('errors.code.INVOICES_ALREADY_SUBMITTED', { invoices: list(d.invoices) }),
+  INVOICES_EXCLUDED: (d) => t('errors.code.INVOICES_EXCLUDED', { invoices: list(d.invoices) }),
   INVOICES_ALREADY_BILLED: (d) =>
-    `Diese Rechnungen sind bereits als abgerechnet markiert: ${list(d.invoices)}.`,
+    t('errors.code.INVOICES_ALREADY_BILLED', { invoices: list(d.invoices) }),
   INVOICES_NOT_COVERED: (d) =>
-    `Diese Rechnungen sind als nicht gedeckt markiert und werden nicht eingereicht: ${list(d.invoices)}.`,
+    t('errors.code.INVOICES_NOT_COVERED', { invoices: list(d.invoices) }),
   INVOICES_NOT_SUBMITTED_HERE: (d) =>
-    `Diese Rechnungen sind bei der Police dieser Leistungsabrechnung nicht eingereicht: ${list(d.invoices)}.`,
-  REIMBURSEMENT_EXCEEDS_INVOICE: (d) => {
-    const prefix = entryPrefix(d);
-    const text = `Die Erstattungen würden den Rechnungsbetrag übersteigen: ${list(d.invoices)}.`;
-    return prefix === '' ? text : sentence(prefix, text) + UNCHANGED;
-  },
-  INVOICE_AMOUNT_BELOW_REIMBURSED: () =>
-    'Der Rechnungsbetrag kann nicht unter die bereits erstatteten Beträge sinken.',
-  INVOICE_NOT_SUBMITTED: () =>
-    'Nur eine eingereichte Rechnung kann als abgerechnet markiert werden.',
-  INVOICE_ALREADY_SUBMITTED: () => 'Die Rechnung ist bei dieser Police bereits eingereicht.',
-  INVOICE_ALREADY_EXCLUDED: () =>
-    'Die Rechnung ist bei dieser Police bereits als nicht erstattungsfähig markiert.',
-  CONTRACT_ACCOUNT_MISMATCH: () =>
-    'Die Police gehört zu einem anderen Versicherten als die Rechnung.',
-  TREATMENT_DAYS_DIFFERENT_YEARS: () =>
-    'Alle Behandlungstage einer Rechnung müssen im selben Kalenderjahr liegen. ' +
-    'Für das andere Jahr bitte eine zweite Rechnung anlegen — dieselbe Rechnungsnummer ' +
-    'darf dabei zweimal vorkommen.',
-  INVOICE_NOT_COVERED_REASON_REQUIRED: () =>
-    'Bitte eine kurze Begründung angeben, warum die Rechnung nicht gedeckt ist — sie ist der Zweck der Markierung.',
-  INVOICE_NOT_COVERED_SUBMITTED: () =>
-    'Eine schon eingereichte Rechnung kann nicht als nicht gedeckt markiert werden. ' +
-    'Bitte zuerst die Einreichung zurückziehen oder die Markierung bei der einzelnen Police setzen.',
-  INVOICE_ACCOUNT_NOT_OF_AGENCY: () =>
-    'Die gewählte Kontoverbindung gehört nicht zu diesem Abrechnungsdienstleister. ' +
-    'Bitte eine seiner Kontoverbindungen wählen.',
-  INVOICE_HAS_REIMBURSEMENT: () =>
-    'Für diese Rechnung wurde bei dieser Police bereits eine Erstattung gebucht, sie kann nicht mehr zurückgezogen werden.',
-  BILLING_NUMBER_TAKEN: (d) => {
-    const text = `Die Leistungsabrechnung ${d.billingNumber} gibt es bei dieser Police schon.`;
-    const prefix = entryPrefix(d);
-    return prefix === '' ? text : sentence(prefix, text) + UNCHANGED;
-  },
+    t('errors.code.INVOICES_NOT_SUBMITTED_HERE', { invoices: list(d.invoices) }),
+  REIMBURSEMENT_EXCEEDS_INVOICE: (d) =>
+    restoreSentence(
+      d,
+      t('errors.code.REIMBURSEMENT_EXCEEDS_INVOICE', { invoices: list(d.invoices) }),
+    ),
+  INVOICE_AMOUNT_BELOW_REIMBURSED: () => t('errors.code.INVOICE_AMOUNT_BELOW_REIMBURSED'),
+  INVOICE_NOT_SUBMITTED: () => t('errors.code.INVOICE_NOT_SUBMITTED'),
+  INVOICE_ALREADY_SUBMITTED: () => t('errors.code.INVOICE_ALREADY_SUBMITTED'),
+  INVOICE_ALREADY_EXCLUDED: () => t('errors.code.INVOICE_ALREADY_EXCLUDED'),
+  CONTRACT_ACCOUNT_MISMATCH: () => t('errors.code.CONTRACT_ACCOUNT_MISMATCH'),
+  TREATMENT_DAYS_DIFFERENT_YEARS: () => t('errors.code.TREATMENT_DAYS_DIFFERENT_YEARS'),
+  INVOICE_NOT_COVERED_REASON_REQUIRED: () => t('errors.code.INVOICE_NOT_COVERED_REASON_REQUIRED'),
+  INVOICE_NOT_COVERED_SUBMITTED: () => t('errors.code.INVOICE_NOT_COVERED_SUBMITTED'),
+  INVOICE_ACCOUNT_NOT_OF_AGENCY: () => t('errors.code.INVOICE_ACCOUNT_NOT_OF_AGENCY'),
+  INVOICE_HAS_REIMBURSEMENT: () => t('errors.code.INVOICE_HAS_REIMBURSEMENT'),
+  BILLING_NUMBER_TAKEN: (d) =>
+    restoreSentence(
+      d,
+      t('errors.code.BILLING_NUMBER_TAKEN', { billingNumber: String(d.billingNumber) }),
+    ),
 
   // Policen
-  HISTORY_BEFORE_CONTRACT: (d) => `${historyClause(d)} nicht vor dem Vertragsbeginn starten.`,
-  HISTORY_AFTER_CONTRACT: (d) => `${historyClause(d)} nicht nach dem Vertragsende starten.`,
-  HISTORY_START_EXISTS: (d) => {
-    const prefix = entryPrefix(d);
-    const suffix = prefix === '' ? '' : UNCHANGED;
-    if (d.kind === 'terms')
-      return sentence(prefix, 'Für dieses Jahr gibt es bereits Konditionen.') + suffix;
-    return sentence(prefix, 'Für dieses Datum gibt es bereits einen Beitragsstand.') + suffix;
-  },
-  YEAR_OUTSIDE_CONTRACT: () => 'Das Jahr liegt außerhalb der Vertragslaufzeit.',
+  HISTORY_BEFORE_CONTRACT: (d) =>
+    isTerms(d)
+      ? t('errors.code.HISTORY_BEFORE_CONTRACT.terms')
+      : t('errors.code.HISTORY_BEFORE_CONTRACT.premium'),
+  HISTORY_AFTER_CONTRACT: (d) =>
+    isTerms(d)
+      ? t('errors.code.HISTORY_AFTER_CONTRACT.terms')
+      : t('errors.code.HISTORY_AFTER_CONTRACT.premium'),
+  HISTORY_START_EXISTS: (d) =>
+    restoreSentence(
+      d,
+      isTerms(d)
+        ? t('errors.code.HISTORY_START_EXISTS.terms')
+        : t('errors.code.HISTORY_START_EXISTS.premium'),
+    ),
+  YEAR_OUTSIDE_CONTRACT: () => t('errors.code.YEAR_OUTSIDE_CONTRACT'),
 
   // Papierkorb
   PARENT_IN_TRASH: (d) => {
     const parent = d.parent as { singular?: unknown; label?: unknown } | undefined;
     const named =
       typeof parent?.singular === 'string' && typeof parent.label === 'string'
-        ? `${parent.singular} ${quoted(parent.label)}`
-        : 'Der übergeordnete Eintrag';
-    return `${entryPrefix(d)}${named} liegt ebenfalls im Papierkorb. Bitte diesen Eintrag zuerst wiederherstellen.${UNCHANGED}`;
+        ? namedEntry(parent.singular, parent.label)
+        : t('errors.code.PARENT_UNNAMED');
+    // Not lower-cased after the prefix: it starts with a noun.
+    const text = t('errors.code.PARENT_IN_TRASH', { parent: named });
+    return `${entryPrefix(d)}${text} ${t('errors.nothingRestored')}`;
   },
   NOT_RESTORABLE: (d) =>
-    typeof d.reason === 'string'
-      ? `${entryPrefix(d)}${d.reason}`
-      : 'Dieser Eintrag kann nicht wiederhergestellt werden.',
+    typeof d.reason === 'string' ? `${entryPrefix(d)}${d.reason}` : t('errors.code.NOT_RESTORABLE'),
   RESTORE_CONFLICT: (d) =>
-    `${entryPrefix(d)}es gibt inzwischen einen Eintrag mit demselben Wert.${UNCHANGED}`,
+    `${sentence(entryPrefix(d), t('errors.code.RESTORE_CONFLICT'))} ${t('errors.nothingRestored')}`,
 
   // Nutzerverwaltung
-  SELF_ACCOUNT_ACTION: () => 'Diese Aktion ist für das eigene Konto nicht möglich.',
-  LAST_ADMIN: () => 'Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.',
-  USER_NOT_DELETED: () =>
-    'Dieser Nutzer ist nicht gelöscht. Bitte die Seite neu laden — die Liste ist nicht mehr aktuell.',
+  SELF_ACCOUNT_ACTION: () => t('errors.code.SELF_ACCOUNT_ACTION'),
+  LAST_ADMIN: () => t('errors.code.LAST_ADMIN'),
+  USER_NOT_DELETED: () => t('errors.code.USER_NOT_DELETED'),
 
   // System-Einstellungen und E-Mail-Versand
-  SETTING_UNKNOWN: () =>
-    'Diese Einstellung kennt die Anwendung nicht. Bitte die Seite neu laden und es erneut versuchen.',
-  SETTING_READONLY: () =>
-    'Diese Angabe schreibt die Anwendung selbst, sie kann nicht gesetzt werden.',
+  SETTING_UNKNOWN: () => t('errors.code.SETTING_UNKNOWN'),
+  SETTING_READONLY: () => t('errors.code.SETTING_READONLY'),
   SETTING_INVALID_VALUE: (d) =>
     typeof d.key === 'string'
-      ? `Der Wert für ${quoted(settingLabel(d.key))} passt nicht.`
-      : 'Der Wert passt nicht zu dieser Einstellung.',
-  SETTINGS_ENCRYPTION_UNAVAILABLE: () =>
-    'Ohne den Schlüssel CONFIG_ENCRYPTION_KEY in der Server-Umgebung können Passwörter und Token nicht gespeichert werden.',
-  MAIL_NOT_CONFIGURED: () =>
-    'Der E-Mail-Versand ist nicht vollständig eingerichtet. Bitte Aktivierung, Mailserver und Absenderadresse prüfen.',
+      ? t('errors.code.SETTING_INVALID_VALUE', { label: settingLabel(d.key) })
+      : t('errors.code.SETTING_INVALID_VALUE_UNNAMED'),
+  SETTINGS_ENCRYPTION_UNAVAILABLE: () => t('errors.code.SETTINGS_ENCRYPTION_UNAVAILABLE'),
+  MAIL_NOT_CONFIGURED: () => t('errors.code.MAIL_NOT_CONFIGURED'),
   MAIL_SEND_FAILED: (d) =>
     typeof d.reason === 'string'
-      ? `Der Mailserver hat den Versand abgelehnt: ${d.reason}`
-      : 'Der Versand über den eingetragenen Mailserver ist fehlgeschlagen.',
-  REMINDERS_DISABLED: () =>
-    'Die Zahlungserinnerungen sind ausgeschaltet. Ohne sie verschickt ein Lauf nichts.',
-  RETENTION_DISABLED: () =>
-    'Die Aufbewahrungsfrist ist ausgeschaltet. Der Probelauf zeigt trotzdem, was sie entfernen würde.',
+      ? t('errors.code.MAIL_SEND_FAILED', { reason: d.reason })
+      : t('errors.code.MAIL_SEND_FAILED_UNNAMED'),
+  REMINDERS_DISABLED: () => t('errors.code.REMINDERS_DISABLED'),
+  RETENTION_DISABLED: () => t('errors.code.RETENTION_DISABLED'),
 };
 
 /**
- * The German sentence for an error code, or null if the code is unknown here —
- * which an older client can still see from a newer server.
+ * The sentence for an error code, or null if the code is unknown here — which
+ * an older client can still see from a newer server.
  */
 export function describeCode(code: string, details: unknown): string | null {
   const build = (CODE_MESSAGES as Record<string, ((details: Details) => string) | undefined>)[code];

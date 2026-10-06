@@ -8,7 +8,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { todayIso } from '../lib/date-input';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
-import { germanDate, plural } from '../lib/format';
+import { formatDate, plural } from '../lib/format';
 import type { InvoiceDto } from './api';
 import { type ContractOption, contractsCoveringPeriod, treatmentPeriod } from './eligibility';
 import InvoiceBriefList from './InvoiceBriefList.vue';
@@ -57,15 +57,15 @@ const periodLabel = computed(() => {
   const span = period.value;
   if (!span) return '';
   return span.from === span.to
-    ? germanDate(span.from)
-    : `${germanDate(span.from)} – ${germanDate(span.to)}`;
+    ? formatDate(span.from)
+    : `${formatDate(span.from)} – ${formatDate(span.to)}`;
 });
 
 /** "01.01.2020 – 31.12.2023", or "ab 01.01.2020" while the policy still runs. */
 function contractTerm(contract: ContractOption): string {
   return contract.contractEnd === null
-    ? `ab ${germanDate(contract.contractBegin)}`
-    : `${germanDate(contract.contractBegin)} – ${germanDate(contract.contractEnd)}`;
+    ? `ab ${formatDate(contract.contractBegin)}`
+    : `${formatDate(contract.contractBegin)} – ${formatDate(contract.contractEnd)}`;
 }
 
 const { shownError, fail, clear } = useFormDialog(props, () => {

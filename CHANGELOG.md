@@ -7,6 +7,28 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.0-slice.2 — 2026-10-06
+
+The second preview of 1.2.0. The UI still starts in German for everyone.
+
+- **Error messages speak the UI language.** Every sentence the app shows for a failed request —
+  validation errors field by field, and one per error code — now comes from the catalogues, as do
+  the field and setting labels those sentences name. The check per error code stays: a new code
+  without a sentence does not compile, and neither does a sentence missing in one language. A
+  missing record is reported in a whole sentence per kind of record instead of a noun dropped into
+  a German frame.
+- **Number and date formats are a choice of their own.** Amounts, dates, timestamps, factors,
+  percentages and chart axes are written in the format in effect: German (`01.10.2026`,
+  `1.234,50 €`), British (`01/10/2026`, `€1,234.50`) or American (`10/01/2026`). Without a choice,
+  the language decides — German for German, British for English. Choosing the format in the
+  profile comes with the language selection later in 1.2.0.
+- **Amounts are typed in the format in effect.** The amount field shows and reads the format's
+  decimal mark and puts the € where the format does; in English, `1,234` is one thousand two
+  hundred and thirty-four.
+- **Pasting a date** still accepts `24.09.2026` everywhere, and now also the slashed form of the
+  format in effect — day first for British, month first for American dates.
+- Sorting and filtering compare text by the rules of the UI language.
+
 ## 1.2.0-slice.1 — 2026-10-06
 
 The first preview of 1.2.0, which makes Eunomia available in English as well as German. The app

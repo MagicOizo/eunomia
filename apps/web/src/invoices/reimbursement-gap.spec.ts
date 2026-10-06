@@ -8,7 +8,7 @@ const invoice = (
   remainingAmount: number,
 ): Pick<InvoiceDto, 'workflowStatus' | 'remainingAmount'> => ({ workflowStatus, remainingAmount });
 
-// `germanMoney()` separates the amount from the sign with a non-breaking space; the
+// `formatMoney()` separates the amount from the sign with a non-breaking space; the
 // sentences below pin it, because they are read out exactly as they stand.
 describe('reimbursementGap', () => {
   it('marks a closed case that fell short as the insured person’s own share', () => {

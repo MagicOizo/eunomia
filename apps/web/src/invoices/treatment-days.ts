@@ -9,7 +9,7 @@
  */
 
 import { describeCode } from '../lib/error-messages';
-import { germanDate } from '../lib/format';
+import { formatDate } from '../lib/format';
 import type { InvoiceDto } from './api';
 
 /**
@@ -61,7 +61,7 @@ export function treatmentDaysLabel(days: string[]): string {
   const from = sorted[0];
   const to = sorted[sorted.length - 1];
   if (from === undefined) return '–';
-  if (from === to) return germanDate(from);
-  if (!sameCalendarYear(sorted)) return `${germanDate(from)} – ${germanDate(to)}`;
-  return `${germanDate(from).slice(0, 6)}–${germanDate(to)}`;
+  if (from === to) return formatDate(from);
+  if (!sameCalendarYear(sorted)) return `${formatDate(from)} – ${formatDate(to)}`;
+  return `${formatDate(from).slice(0, 6)}–${formatDate(to)}`;
 }

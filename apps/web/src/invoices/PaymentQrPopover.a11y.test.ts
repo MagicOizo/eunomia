@@ -31,7 +31,7 @@ describe('PaymentQrPopover', () => {
 
     const image = wrapper.find('img');
     expect(image.attributes('src')).toMatch(/^data:image\/svg\+xml/);
-    // germanMoney() separates with a non-breaking space.
+    // formatMoney() separates with a non-breaking space.
     expect(image.attributes('alt')?.replace(/\u00a0/g, ' ')).toBe(
       'GiroCode für eine Überweisung von 320,00 € an Beispiel Inkasso GmbH',
     );

@@ -3,7 +3,7 @@ import { faFilter } from '@fortawesome/free-solid-svg-icons';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NO_PERMISSION } from '../../lib/error-messages';
+import { noPermission } from '../../lib/error-messages';
 import type { ResourceConfig } from '../../resources/config';
 import { grant } from '../../test/permissions';
 import type { SelectOption } from './EuSelectField.vue';
@@ -162,7 +162,7 @@ describe('ResourceView search', () => {
       .find((one) => one.attributes('aria-label') === 'Daten von Praxis Nord exportieren');
     expect(button).toBeDefined();
     expect(button!.attributes('disabled')).toBeDefined();
-    expect(button!.attributes('title')).toBe(NO_PERMISSION);
+    expect(button!.attributes('title')).toBe(noPermission());
 
     grant({ global: [PERMISSIONS.VIEW_ACCOUNTS, PERMISSIONS.VIEW_INVOICES] });
     await flushPromises();

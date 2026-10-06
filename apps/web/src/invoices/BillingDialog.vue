@@ -10,7 +10,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { BONUS_FORFEIT_RULE_LABEL, forfeitsByRule } from '../contracts/api';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
-import { germanDate, germanMoney, plural } from '../lib/format';
+import { formatDate, formatMoney, plural } from '../lib/format';
 import {
   type BillingDto,
   type BillingListDto,
@@ -130,7 +130,7 @@ function submittedHint(contract: string): string | undefined {
   ];
   if (days.length === 0) return undefined;
   return days.length === 1
-    ? `eingereicht am ${germanDate(days[0])}`
+    ? `eingereicht am ${formatDate(days[0])}`
     : 'an mehreren Tagen eingereicht';
 }
 
@@ -150,7 +150,7 @@ const billingOptions = computed(() =>
   billings.value.map((b) => ({
     value: b.billingUID,
     label: b.billingNumber,
-    hint: germanDate(b.billingDate),
+    hint: formatDate(b.billingDate),
   })),
 );
 
@@ -179,8 +179,8 @@ const addOptions = computed(() =>
       value: invoice.invoiceUID,
       label: invoice.invoiceNumber,
       hint:
-        `${germanDate(invoice.invoiceDate)} · offen ${germanMoney(invoice.remainingAmount)}` +
-        (day ? ` · eingereicht am ${germanDate(day)}` : ''),
+        `${formatDate(invoice.invoiceDate)} · offen ${formatMoney(invoice.remainingAmount)}` +
+        (day ? ` · eingereicht am ${formatDate(day)}` : ''),
     };
   }),
 );
@@ -336,7 +336,7 @@ function submit(): void {
   if (exceeding.length > 0) {
     return fail(
       `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen — zu viel bei: ${exceeding
-        .map((i) => `${i.invoiceNumber} (noch offen: ${germanMoney(i.remainingAmount)})`)
+        .map((i) => `${i.invoiceNumber} (noch offen: ${formatMoney(i.remainingAmount)})`)
         .join(', ')}.`,
     );
   }
@@ -406,7 +406,7 @@ function submit(): void {
       />
       <p class="eu-form__readonly">
         Abrechnungsdatum:
-        <strong>{{ chosenBilling ? germanDate(chosenBilling.billingDate) : '–' }}</strong>
+        <strong>{{ chosenBilling ? formatDate(chosenBilling.billingDate) : '–' }}</strong>
       </p>
 
       <ul class="eu-bill__cards">
@@ -420,28 +420,28 @@ function submit(): void {
                 (invoice.facilityUID && facilityNames[invoice.facilityUID]) ||
                 'ohne Leistungserbringer'
               }}
-              · {{ germanDate(invoice.invoiceDate) }} ·
+              · {{ formatDate(invoice.invoiceDate) }} ·
               <button
                 type="button"
                 class="eu-bill__take"
-                :aria-label="`Rechnungsbetrag ${germanMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
-                :title="`${germanMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
+                :aria-label="`Rechnungsbetrag ${formatMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
+                :title="`${formatMoney(invoice.invoiceAmount)} in Erstattung übernehmen`"
                 @click="takeAmount(invoice.invoiceUID, invoice.invoiceAmount)"
               >
-                {{ germanMoney(invoice.invoiceAmount) }}
+                {{ formatMoney(invoice.invoiceAmount) }}
               </button>
               · noch offen
               <button
                 type="button"
                 class="eu-bill__take"
-                :aria-label="`Offenen Betrag ${germanMoney(invoice.remainingAmount)} in Erstattung übernehmen`"
-                :title="`${germanMoney(invoice.remainingAmount)} in Erstattung übernehmen`"
+                :aria-label="`Offenen Betrag ${formatMoney(invoice.remainingAmount)} in Erstattung übernehmen`"
+                :title="`${formatMoney(invoice.remainingAmount)} in Erstattung übernehmen`"
                 @click="takeAmount(invoice.invoiceUID, invoice.remainingAmount)"
               >
-                {{ germanMoney(invoice.remainingAmount) }}
+                {{ formatMoney(invoice.remainingAmount) }}
               </button>
               <template v-if="submittedAt(invoice, contractUID)">
-                · eingereicht am {{ germanDate(submittedAt(invoice, contractUID)!) }}
+                · eingereicht am {{ formatDate(submittedAt(invoice, contractUID)!) }}
               </template>
             </span>
             <EuButton

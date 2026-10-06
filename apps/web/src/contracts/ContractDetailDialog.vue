@@ -21,9 +21,9 @@ import EuDetailMask from '../design-system/components/EuDetailMask.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { useDialogAction } from '../lib/dialog-action';
-import { NO_PERMISSION } from '../lib/error-messages';
+import { noPermission as noPermissionText } from '../lib/error-messages';
 import { describeError } from '../lib/errors';
-import { germanDate, germanMoney, plural } from '../lib/format';
+import { formatDate, formatMoney, formatPercent, plural } from '../lib/format';
 import {
   BONUS_FORFEIT_RULE_LABEL,
   type BonusYearDto,
@@ -73,7 +73,7 @@ const auth = useAuthStore();
  */
 const mayManage = computed(() => auth.can('MANAGE_CONTRACTS', contract.value?.accountUID));
 /** Why the actions are disabled, or nothing when they are not. */
-const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
+const noPermission = computed(() => (mayManage.value ? undefined : noPermissionText()));
 const loadError = ref<string | null>(null);
 const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
@@ -261,15 +261,14 @@ const olderLabel = (count: number, one = 'älteren Eintrag', many = 'ältere Ein
 
 const premiumPeriod = (p: PremiumDto): string =>
   p.validTo
-    ? `${germanDate(p.validFrom)} – ${germanDate(p.validTo)}`
-    : `ab ${germanDate(p.validFrom)}`;
+    ? `${formatDate(p.validFrom)} – ${formatDate(p.validTo)}`
+    : `ab ${formatDate(p.validFrom)}`;
 const termsPeriod = (t: TermsDto): string =>
   t.validToYear === null
     ? `ab ${t.validFromYear}`
     : t.validToYear === t.validFromYear
       ? String(t.validFromYear)
       : `${t.validFromYear} – ${t.validToYear}`;
-const percent = (value: number): string => `${new Intl.NumberFormat('de-DE').format(value)} %`;
 
 // --- Year history (claim-free years & bonus) ---------------------------------
 
@@ -306,7 +305,7 @@ function expectedLabel(y: BonusYearDto): string {
   if (y.premiumMissing) return 'Beitrag fehlt';
   if (y.expectedBonus === null) return 'keine Konditionen';
   if (!y.hasBonusScale) return 'kein Bonus';
-  return germanMoney(y.expectedBonus);
+  return formatMoney(y.expectedBonus);
 }
 
 const yearDialog = reactive({ open: false, year: null as BonusYearDto | null });
@@ -430,16 +429,16 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     <EuIconLabel :icon="faCommentDots" :label="premium.note" />
                   </span>
                 </td>
-                <td class="eu-contract__num">{{ germanMoney(premium.monthlyPremium) }}</td>
+                <td class="eu-contract__num">{{ formatMoney(premium.monthlyPremium) }}</td>
                 <td class="eu-contract__num">
-                  {{ germanMoney(premium.bonusRelevantPremium) }}
+                  {{ formatMoney(premium.bonusRelevantPremium) }}
                 </td>
                 <td class="eu-contract__actions">
                   <EuButton
                     variant="secondary"
                     icon-only
                     :icon="faPen"
-                    :aria-label="`Beitragsstand ab ${germanDate(premium.validFrom)} bearbeiten`"
+                    :aria-label="`Beitragsstand ab ${formatDate(premium.validFrom)} bearbeiten`"
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="openPremium(premium)"
@@ -448,14 +447,14 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     variant="secondary"
                     icon-only
                     :icon="faTrash"
-                    :aria-label="`Beitragsstand ab ${germanDate(premium.validFrom)} löschen`"
+                    :aria-label="`Beitragsstand ab ${formatDate(premium.validFrom)} löschen`"
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="
                       pendingDelete = {
                         segment: 'premiums',
                         uid: premium.premiumUID,
-                        label: `den Beitragsstand ab ${germanDate(premium.validFrom)}`,
+                        label: `den Beitragsstand ab ${formatDate(premium.validFrom)}`,
                       }
                     "
                   />
@@ -516,13 +515,13 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                 :key="terms.termsUID"
               >
                 <td class="eu-contract__period">{{ termsPeriod(terms) }}</td>
-                <td class="eu-contract__num">{{ germanMoney(terms.deductible) }}</td>
+                <td class="eu-contract__num">{{ formatMoney(terms.deductible) }}</td>
                 <td class="eu-contract__num">
                   {{
-                    terms.reimbursementCap === null ? 'keine' : germanMoney(terms.reimbursementCap)
+                    terms.reimbursementCap === null ? 'keine' : formatMoney(terms.reimbursementCap)
                   }}
                 </td>
-                <td class="eu-contract__num">{{ percent(terms.reimbursementRate) }}</td>
+                <td class="eu-contract__num">{{ formatPercent(terms.reimbursementRate) }}</td>
                 <td>
                   <ul v-if="terms.bonusTiers.length > 0" class="eu-contract__tiers">
                     <li v-for="tier in terms.bonusTiers" :key="tier.claimFreeYears">
@@ -532,7 +531,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                         :title="factorLabel(tier.bonusFactor)"
                         >{{ factorShort(tier.bonusFactor) }}</abbr
                       >
-                      <template v-else>{{ germanMoney(tier.bonusAmount) }}</template>
+                      <template v-else>{{ formatMoney(tier.bonusAmount) }}</template>
                     </li>
                   </ul>
                   <template v-else>kein Bonus</template>
@@ -636,7 +635,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                   </span>
                 </td>
                 <td class="eu-contract__num">
-                  {{ y.actualBonus === null ? '–' : germanMoney(y.actualBonus) }}
+                  {{ y.actualBonus === null ? '–' : formatMoney(y.actualBonus) }}
                 </td>
                 <td class="eu-contract__actions">
                   <EuButton

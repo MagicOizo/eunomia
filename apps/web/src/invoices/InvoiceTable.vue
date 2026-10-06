@@ -19,8 +19,8 @@ import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
-import { NO_PERMISSION } from '../lib/error-messages';
-import { germanDate, germanMoney } from '../lib/format';
+import { noPermission } from '../lib/error-messages';
+import { formatDate, formatMoney } from '../lib/format';
 import { useTableSort } from '../lib/table-sort';
 import type { InvoiceDto } from './api';
 import PaymentInfoPopover from './PaymentInfoPopover.vue';
@@ -245,7 +245,7 @@ defineExpose({ revealFound });
               <RecommendationBadge v-if="row.badge" :badge="row.badge" />
             </div>
           </td>
-          <td>{{ germanDate(row.invoice.invoiceDate) }}</td>
+          <td>{{ formatDate(row.invoice.invoiceDate) }}</td>
           <td :title="row.treatmentTitle">{{ row.treatmentLabel }}</td>
           <td>{{ row.invoice.invoiceNumber }}</td>
           <td class="eu-ws__facility" :title="row.facilityName ?? undefined">
@@ -253,7 +253,7 @@ defineExpose({ revealFound });
           </td>
           <td>
             <div class="eu-ws__amount">
-              <span>{{ germanMoney(row.invoice.invoiceAmount) }}</span>
+              <span>{{ formatMoney(row.invoice.invoiceAmount) }}</span>
               <PaymentInfoPopover
                 :invoice="row.invoice"
                 :facility-name="row.facilityName"
@@ -286,7 +286,7 @@ defineExpose({ revealFound });
             :title="row.gap?.label"
           >
             <span v-if="row.gap" class="eu-visually-hidden">{{ row.gap.label }}:</span>
-            {{ germanMoney(row.invoice.reimbursedTotal) }}
+            {{ formatMoney(row.invoice.reimbursedTotal) }}
           </td>
           <td class="eu-ws__actions">
             <EuButton
@@ -305,7 +305,7 @@ defineExpose({ revealFound });
               :icon="faPaperPlane"
               aria-label="Einreichen"
               :disabled="!canManage"
-              :title="canManage ? 'Rechnung bei der Versicherung einreichen' : NO_PERMISSION"
+              :title="canManage ? 'Rechnung bei der Versicherung einreichen' : noPermission()"
               @click="emit('submit', [row.invoice])"
             />
             <EuButton
@@ -315,7 +315,7 @@ defineExpose({ revealFound });
               :icon="faCircleCheck"
               aria-label="Als bezahlt markieren"
               :disabled="!canManage"
-              :title="canManage ? 'Rechnung als bezahlt markieren' : NO_PERMISSION"
+              :title="canManage ? 'Rechnung als bezahlt markieren' : noPermission()"
               @click="emit('settle', row.invoice)"
             />
             <EuButton
@@ -336,7 +336,7 @@ defineExpose({ revealFound });
               :icon="faTrash"
               aria-label="Löschen"
               :disabled="!canManage"
-              :title="canManage ? 'Rechnung löschen' : NO_PERMISSION"
+              :title="canManage ? 'Rechnung löschen' : noPermission()"
               @click="emit('remove', [row.invoice.invoiceUID])"
             />
           </td>

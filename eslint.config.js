@@ -75,10 +75,11 @@ export default tseslint.config(
         {
           src: 'apps/web/src',
           extensions: ['.ts', '.vue'],
-          // Keys held as data (a nav entry's `titleKey`) are invisible to this
+          // Keys held as data (a nav entry's `titleKey`, a field or setting
+          // label looked up by the name the API uses) are invisible to this
           // rule, which only sees literal `t()` calls; whatever reads them is
           // typed against the catalogue instead.
-          ignores: ['/^nav\\./'],
+          ignores: ['/^nav\\./', '/^fields\\./', '/^fieldFormats\\./', '/^settingLabels\\./'],
         },
       ],
     },

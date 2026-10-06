@@ -8,8 +8,9 @@ import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuSortableTh from '../../design-system/components/EuSortableTh.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
 import { useDialogAction } from '../../lib/dialog-action';
-import { NO_PERMISSION } from '../../lib/error-messages';
+import { noPermission } from '../../lib/error-messages';
 import { describeError } from '../../lib/errors';
+import { activeLanguage } from '../../lib/format';
 import { useTableSort } from '../../lib/table-sort';
 import {
   type ResourceRow,
@@ -214,11 +215,11 @@ function sortValue(row: ResourceRow, key: string): string | number | null | unde
  * as they stand in the table, not as the raw UID or ISO value behind them.
  */
 const visibleRows = computed<ResourceRow[]>(() => {
-  const needle = filter.value.trim().toLocaleLowerCase('de');
+  const needle = filter.value.trim().toLocaleLowerCase(activeLanguage());
   if (needle === '') return rows.value;
   return rows.value.filter((row) =>
     props.config.columns.some((column) =>
-      cell(row, column).toLocaleLowerCase('de').includes(needle),
+      cell(row, column).toLocaleLowerCase(activeLanguage()).includes(needle),
     ),
   );
 });
@@ -279,7 +280,7 @@ async function confirmDelete(): Promise<void> {
       <EuButton
         :icon="faPlus"
         :disabled="!mayCreate"
-        :title="mayCreate ? undefined : NO_PERMISSION"
+        :title="mayCreate ? undefined : noPermission()"
         @click="openCreate"
         >Neu</EuButton
       >
@@ -332,7 +333,7 @@ async function confirmDelete(): Promise<void> {
                 :aria-label="action.label(row)"
                 :to="mayRunAction(action, row) ? action.to?.(row) : undefined"
                 :disabled="busyAction === action.label(row) || !mayRunAction(action, row)"
-                :title="mayRunAction(action, row) ? action.label(row) : NO_PERMISSION"
+                :title="mayRunAction(action, row) ? action.label(row) : noPermission()"
                 @click="action.run ? runRowAction(action, row) : undefined"
               />
               <EuButton
@@ -348,7 +349,7 @@ async function confirmDelete(): Promise<void> {
                 :icon="faTrash"
                 :aria-label="`${config.singular} löschen`"
                 :disabled="!mayManage(row)"
-                :title="mayManage(row) ? undefined : NO_PERMISSION"
+                :title="mayManage(row) ? undefined : noPermission()"
                 @click="confirmTarget = row"
               />
             </td>

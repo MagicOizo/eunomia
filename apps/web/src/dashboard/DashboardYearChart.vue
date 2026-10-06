@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 
-import { germanMoney } from '../lib/format';
+import { formatMoney } from '../lib/format';
 import type { DashboardYearDto } from './api';
 import { CHART, layoutChart, tickLabel } from './dashboard-chart';
 
@@ -129,10 +129,10 @@ onMounted(() => {
         aria-hidden="true"
       >
         <strong>{{ hoveredYear.year }}</strong>
-        <span>Rechnungen {{ germanMoney(hoveredYear.invoiceAmount) }}</span>
+        <span>Rechnungen {{ formatMoney(hoveredYear.invoiceAmount) }}</span>
         <span v-for="series in SERIES" :key="series.key">
           <span class="eu-yearchart__swatch" :style="{ background: series.color }" />
-          {{ series.label }} {{ germanMoney(hoveredYear[series.key]) }}
+          {{ series.label }} {{ formatMoney(hoveredYear[series.key]) }}
         </span>
       </div>
     </div>
@@ -155,10 +155,10 @@ onMounted(() => {
             <tr v-for="year in years" :key="year.year">
               <th scope="row">{{ year.year }}</th>
               <td class="num">{{ year.invoiceCount }}</td>
-              <td class="num">{{ germanMoney(year.invoiceAmount) }}</td>
-              <td class="num">{{ germanMoney(year.reimbursed) }}</td>
-              <td class="num">{{ germanMoney(year.selfBorne) }}</td>
-              <td class="num">{{ germanMoney(year.bonusPaid) }}</td>
+              <td class="num">{{ formatMoney(year.invoiceAmount) }}</td>
+              <td class="num">{{ formatMoney(year.reimbursed) }}</td>
+              <td class="num">{{ formatMoney(year.selfBorne) }}</td>
+              <td class="num">{{ formatMoney(year.bonusPaid) }}</td>
             </tr>
           </tbody>
         </table>

@@ -5,7 +5,7 @@ import { ref, watch } from 'vue';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
-import { germanMoney } from '../lib/format';
+import { formatMoney } from '../lib/format';
 import { buildGirocode } from './girocode';
 
 /**
@@ -103,7 +103,7 @@ watch(
         <img
           class="eu-girocode__image"
           :src="imageUrl"
-          :alt="`GiroCode für eine Überweisung von ${germanMoney(amount)} an ${recipient}`"
+          :alt="`GiroCode für eine Überweisung von ${formatMoney(amount)} an ${recipient}`"
         />
         <p class="eu-girocode__hint">Mit der Banking-App scannen.</p>
       </template>

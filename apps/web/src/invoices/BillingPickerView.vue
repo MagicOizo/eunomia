@@ -6,7 +6,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { useDebouncedCallback } from '../lib/debounce';
 import { describeError } from '../lib/errors';
-import { germanDate, germanMoney } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import { listResource } from '../lib/resource';
 import { type BillingListDto, searchBillings } from './api';
 import {
@@ -144,9 +144,9 @@ onMounted(async () => {
           <RouterLink class="eu-picker__result" :to="hitTarget(billing)">
             <span class="eu-picker__number">{{ billing.billingNumber }}</span>
             <span class="eu-picker__person">{{ billing.personName }}</span>
-            <span class="eu-picker__amount">{{ germanMoney(billing.reimbursedTotal) }}</span>
+            <span class="eu-picker__amount">{{ formatMoney(billing.reimbursedTotal) }}</span>
             <span class="eu-picker__meta">
-              Abrechnung vom {{ germanDate(billing.billingDate) }} · Police
+              Abrechnung vom {{ formatDate(billing.billingDate) }} · Police
               {{ billing.contractNumber }}
             </span>
             <span class="eu-picker__refs">{{

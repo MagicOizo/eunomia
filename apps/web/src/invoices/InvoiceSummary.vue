@@ -4,7 +4,7 @@ import { faStar } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
-import { germanMoney, plural } from '../lib/format';
+import { formatMoney, plural } from '../lib/format';
 import type { InvoiceDto, PlanPolicyDto, ReimbursementPlanDto } from './api';
 import {
   POLICY_STATUS_BADGE,
@@ -81,14 +81,14 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
       >
         {{ entry.display.label }}: {{ entry.count }}
       </EuBadge>
-      <span class="eu-summary__spend">Gesamtausgaben: {{ germanMoney(totalSpend) }}</span>
+      <span class="eu-summary__spend">Gesamtausgaben: {{ formatMoney(totalSpend) }}</span>
     </div>
 
     <p v-if="recommendation" class="eu-summary__recommendation">
       <strong>Empfehlung:</strong> {{ recommendation.text }} – Erstattungen und Boni zusammen
-      {{ germanMoney(recommendation.total)
+      {{ formatMoney(recommendation.total)
       }}<template v-if="recommendation.advantage !== null && recommendation.advantage > 0"
-        >, {{ germanMoney(recommendation.advantage) }} mehr als die nächstbeste Variante</template
+        >, {{ formatMoney(recommendation.advantage) }} mehr als die nächstbeste Variante</template
       >.
     </p>
 
@@ -118,8 +118,8 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
             <span v-if="!policy.hasTerms">keine Konditionen</span>
             <span v-else-if="policy.deductible === 0">keine</span>
             <span v-else
-              >{{ germanMoney(policy.deductibleUsed) }} von
-              {{ germanMoney(policy.deductible) }}</span
+              >{{ formatMoney(policy.deductibleUsed) }} von
+              {{ formatMoney(policy.deductible) }}</span
             >
           </div>
           <div v-if="policy.hasTerms && policy.deductible > 0" class="eu-bar" aria-hidden="true">
@@ -134,8 +134,8 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
           <div class="eu-summary__metric-head">
             <span class="eu-summary__label">Obergrenze</span>
             <span>
-              {{ germanMoney(policy.expectedReimbursement) }} von
-              {{ germanMoney(policy.reimbursementCap) }}
+              {{ formatMoney(policy.expectedReimbursement) }} von
+              {{ formatMoney(policy.reimbursementCap) }}
             </span>
           </div>
           <div class="eu-bar" aria-hidden="true">
@@ -168,11 +168,11 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
         <dl class="eu-summary__grid">
           <div>
             <dt>Bereits erstattet</dt>
-            <dd>{{ germanMoney(policy.actualReimbursement) }}</dd>
+            <dd>{{ formatMoney(policy.actualReimbursement) }}</dd>
           </div>
           <div>
             <dt>Erstattung laut Empfehlung</dt>
-            <dd>{{ germanMoney(policy.expectedReimbursement) }}</dd>
+            <dd>{{ formatMoney(policy.expectedReimbursement) }}</dd>
           </div>
           <div v-if="policy.reimbursementRate !== 100">
             <dt>Erstattungssatz</dt>
@@ -211,10 +211,10 @@ function capShares(policy: PlanPolicyDto): { actual: number; expected: number } 
                   Empfohlen
                 </EuBadge>
               </th>
-              <td class="num">{{ germanMoney(row.reimbursements) }}</td>
-              <td class="num">{{ germanMoney(row.bonuses) }}</td>
-              <td class="num">{{ germanMoney(row.total) }}</td>
-              <td class="num">{{ row.recommended ? '–' : germanMoney(row.gap) }}</td>
+              <td class="num">{{ formatMoney(row.reimbursements) }}</td>
+              <td class="num">{{ formatMoney(row.bonuses) }}</td>
+              <td class="num">{{ formatMoney(row.total) }}</td>
+              <td class="num">{{ row.recommended ? '–' : formatMoney(row.gap) }}</td>
             </tr>
           </tbody>
         </table>

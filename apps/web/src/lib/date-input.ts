@@ -1,10 +1,14 @@
+import type { FormatRegion } from '@eunomia/shared';
+
+import { activeFormat } from './i18n';
+
 /**
  * The ISO date text a date field speaks.
  *
  * Every date field in the app is a native `<input type="date">`, and those take
  * only ISO text. A `24.09.2026` copied out of Excel is dropped silently: the
  * browser fires the paste event, refuses the German notation and leaves the
- * field empty (measured in Chromium). So the fields catch the paste themselves
+ * field empty (measured in Chromium); the same goes for `01/10/2026`. So the fields catch the paste themselves
  * and hand the browser the ISO form instead — and where a form offers today as
  * its default, it takes that day from here too.
  */
@@ -23,19 +27,28 @@ function isRealDate(year: number, month: number, day: number): boolean {
 }
 
 /**
- * Reads `DD.MM.YYYY` (and `D.M.YYYY`) as an ISO date, passing ISO text through
- * unchanged. Anything else — including a two-digit year — is `null` and left to
- * the browser: `15.03.57` would need the app to guess a century, and a birth
- * date is exactly where guessing goes wrong.
+ * Reads a typed or pasted date as ISO text, passing ISO text through
+ * unchanged. Understood are the dotted `DD.MM.YYYY` (and `D.M.YYYY`), which is
+ * day first wherever it is written, and the slashed form of the format in
+ * effect: `DD/MM/YYYY` for British, `MM/DD/YYYY` for American dates. A German
+ * format takes no slashes, since nobody there writes them and `01/10/2026`
+ * would have to guess which of the two is meant. Anything else — including a
+ * two-digit year — is `null` and left to the browser: `15.03.57` would need the
+ * app to guess a century, and a birth date is exactly where guessing goes wrong.
  */
-export function isoFromGerman(text: string): string | null {
+export function isoFromDateText(text: string, region: FormatRegion = 'de-DE'): string | null {
   const trimmed = text.trim();
 
-  const german = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(trimmed);
-  if (german) {
-    const [, day, month, year] = german;
-    if (!isRealDate(Number(year), Number(month), Number(day))) return null;
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  const dotted = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(trimmed);
+  if (dotted) {
+    const [, day, month, year] = dotted;
+    return isoOf(year, month, day);
+  }
+
+  const slashed = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
+  if (slashed && region !== 'de-DE') {
+    const [, first, second, year] = slashed;
+    return region === 'en-US' ? isoOf(year, first, second) : isoOf(year, second, first);
   }
 
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
@@ -47,10 +60,15 @@ export function isoFromGerman(text: string): string | null {
   return null;
 }
 
+function isoOf(year: string, month: string, day: string): string | null {
+  if (!isRealDate(Number(year), Number(month), Number(day))) return null;
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
 /** The ISO date on the clipboard, or `null` to let the paste run as it would. */
 export function pastedIsoDate(event: ClipboardEvent): string | null {
   const text = event.clipboardData?.getData('text');
-  return text ? isoFromGerman(text) : null;
+  return text ? isoFromDateText(text, activeFormat()) : null;
 }
 
 /**
@@ -63,7 +81,7 @@ export function pastedIsoDate(event: ClipboardEvent): string | null {
  * short because that night is 25 hours long.
  */
 export function isoPlusDays(value: string, days: number): string | null {
-  const iso = isoFromGerman(value);
+  const iso = isoFromDateText(value);
   if (iso === null) return null;
   const [year, month, day] = iso.split('-').map(Number);
   const shifted = new Date(Date.UTC(year, month - 1, day + days));

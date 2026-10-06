@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { germanDate, germanMoney } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import type { InvoiceDto } from './api';
 
 /**
@@ -28,8 +28,8 @@ defineProps<{
       <tr v-for="invoice in invoices" :key="invoice.invoiceUID">
         <td class="eu-brief__number">{{ invoice.invoiceNumber }}</td>
         <td>{{ (invoice.facilityUID && facilityNames[invoice.facilityUID]) || '–' }}</td>
-        <td>{{ germanDate(invoice.invoiceDate) }}</td>
-        <td class="eu-brief__num">{{ germanMoney(invoice.invoiceAmount) }}</td>
+        <td>{{ formatDate(invoice.invoiceDate) }}</td>
+        <td class="eu-brief__num">{{ formatMoney(invoice.invoiceAmount) }}</td>
       </tr>
     </tbody>
   </table>

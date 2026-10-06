@@ -21,10 +21,10 @@ import EuToggle from '../design-system/components/EuToggle.vue';
 import { type BonusForfeitRule } from '../contracts/api';
 import { apiData } from '../lib/api';
 import { useDebouncedCallback } from '../lib/debounce';
-import { germanDate, germanMoney, plural } from '../lib/format';
+import { formatDate, formatMoney, plural } from '../lib/format';
 import { todayIso } from '../lib/date-input';
 import { useDialogAction } from '../lib/dialog-action';
-import { NO_PERMISSION } from '../lib/error-messages';
+import { noPermission as noPermissionText } from '../lib/error-messages';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
 import { listResource } from '../lib/resource';
@@ -62,7 +62,7 @@ const policy = ref<(CommonPolicy & { accountUID: string }) | null>(null);
  */
 const mayManage = computed(() => auth.can('MANAGE_INVOICES', policy.value?.accountUID));
 /** Why the actions are disabled, or nothing when they are not. */
-const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
+const noPermission = computed(() => (mayManage.value ? undefined : noPermissionText()));
 
 const facilityNames = ref<Record<string, string>>({});
 const newOpen = ref(false);
@@ -406,21 +406,21 @@ function confirmDelete(): void {
               :tabindex="b.billingUID === foundUID ? -1 : undefined"
             >
               <td>{{ b.billingNumber }}</td>
-              <td>{{ germanDate(b.billingDate) }}</td>
-              <td class="eu-billings__num">{{ germanMoney(b.reimbursedTotal) }}</td>
+              <td>{{ formatDate(b.billingDate) }}</td>
+              <td class="eu-billings__num">{{ formatMoney(b.reimbursedTotal) }}</td>
               <td>{{ b.invoiceNumbers ?? '–' }}</td>
               <td>
                 <span
                   v-if="isOpenObjection(b)"
                   class="eu-billings__objection"
                   role="img"
-                  :aria-label="`Im Widerspruch offen seit ${germanDate(b.objectionDate)}`"
-                  :title="`Im Widerspruch offen seit ${germanDate(b.objectionDate)}`"
+                  :aria-label="`Im Widerspruch offen seit ${formatDate(b.objectionDate)}`"
+                  :title="`Im Widerspruch offen seit ${formatDate(b.objectionDate)}`"
                 >
                   <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
                 </span>
                 <span v-else-if="b.objectionDate" class="eu-billings__resolved">
-                  aufgelöst am {{ germanDate(b.objectionResolvedDate) }}
+                  aufgelöst am {{ formatDate(b.objectionResolvedDate) }}
                 </span>
                 <span v-else class="eu-billings__muted">–</span>
               </td>
@@ -440,7 +440,7 @@ function confirmDelete(): void {
                   :icon="faGavel"
                   aria-label="Widerspruch"
                   :disabled="!mayManage"
-                  :title="mayManage ? 'Widerspruch einlegen oder auflösen' : NO_PERMISSION"
+                  :title="mayManage ? 'Widerspruch einlegen oder auflösen' : noPermissionText()"
                   @click="openObjection(b)"
                 />
                 <EuButton
@@ -449,7 +449,7 @@ function confirmDelete(): void {
                   :icon="faPen"
                   aria-label="Bearbeiten"
                   :disabled="!mayManage"
-                  :title="mayManage ? 'Abrechnung bearbeiten' : NO_PERMISSION"
+                  :title="mayManage ? 'Abrechnung bearbeiten' : noPermissionText()"
                   @click="openEdit(b)"
                 />
                 <EuButton
@@ -458,7 +458,7 @@ function confirmDelete(): void {
                   :icon="faTrash"
                   aria-label="Löschen"
                   :disabled="!mayManage"
-                  :title="mayManage ? 'Abrechnung löschen' : NO_PERMISSION"
+                  :title="mayManage ? 'Abrechnung löschen' : noPermissionText()"
                   @click="openDelete(b)"
                 />
               </td>
@@ -471,19 +471,19 @@ function confirmDelete(): void {
     <EuDialog :open="objectionOpen" title="Widerspruch" @close="objectionOpen = false">
       <div v-if="selected" class="eu-form">
         <p class="eu-form__note">
-          Leistungsabrechnung {{ selected.billingNumber }} ({{ germanDate(selected.billingDate) }})
+          Leistungsabrechnung {{ selected.billingNumber }} ({{ formatDate(selected.billingDate) }})
         </p>
 
         <template v-if="selectedOpen">
           <p class="eu-billings__state">
-            Widerspruch offen seit {{ germanDate(selected.objectionDate) }}
+            Widerspruch offen seit {{ formatDate(selected.objectionDate) }}
           </p>
           <p v-if="selected.objectionNote" class="eu-form__note">{{ selected.objectionNote }}</p>
         </template>
 
         <template v-else-if="selected.objectionDate">
           <p class="eu-billings__resolved">
-            Widerspruch aufgelöst am {{ germanDate(selected.objectionResolvedDate) }}
+            Widerspruch aufgelöst am {{ formatDate(selected.objectionResolvedDate) }}
           </p>
           <p v-if="selected.objectionNote" class="eu-form__note">{{ selected.objectionNote }}</p>
         </template>

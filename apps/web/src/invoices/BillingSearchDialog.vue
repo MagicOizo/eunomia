@@ -8,7 +8,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { useDebouncedCallback } from '../lib/debounce';
 import { describeError } from '../lib/errors';
-import { germanDate, germanMoney, plural } from '../lib/format';
+import { formatDate, formatMoney, plural } from '../lib/format';
 import { type BillingListDto, searchBillings } from './api';
 
 /**
@@ -127,8 +127,8 @@ function confirm(): void {
             @dblclick="confirm"
           >
             <span class="eu-bsearch__number">{{ billing.billingNumber }}</span>
-            <span class="eu-bsearch__date">{{ germanDate(billing.billingDate) }}</span>
-            <span class="eu-bsearch__amount">{{ germanMoney(billing.reimbursedTotal) }}</span>
+            <span class="eu-bsearch__date">{{ formatDate(billing.billingDate) }}</span>
+            <span class="eu-bsearch__amount">{{ formatMoney(billing.reimbursedTotal) }}</span>
             <span class="eu-bsearch__invoices">
               {{ billing.invoiceNumbers ?? 'noch keiner Rechnung zugeordnet' }}
             </span>

@@ -1,11 +1,9 @@
-import { germanMoney } from '../lib/format';
+import { formatMoney, formatNumber } from '../lib/format';
 import type { BonusYearDto } from './api';
-
-const factorFormat = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
 
 /** A bonus factor in the insurer's words: "1 Monatsbeitrag", "1,5 Monatsbeiträge". */
 export function factorLabel(factor: number): string {
-  return `${factorFormat.format(factor)} ${factor === 1 ? 'Monatsbeitrag' : 'Monatsbeiträge'}`;
+  return `${formatNumber(factor)} ${factor === 1 ? 'Monatsbeitrag' : 'Monatsbeiträge'}`;
 }
 
 /**
@@ -13,7 +11,7 @@ export function factorLabel(factor: number): string {
  * table has the width of an amount per step, not of "1,5 Monatsbeiträge".
  */
 export function factorShort(factor: number): string {
-  return `${factorFormat.format(factor)}-fach`;
+  return `${formatNumber(factor)}-fach`;
 }
 
 /**
@@ -24,5 +22,5 @@ export function forecastBasis(
   year: Pick<BonusYearDto, 'bonusFactor' | 'relevantPremiumAverage'>,
 ): string | null {
   if (year.bonusFactor === null || year.relevantPremiumAverage === null) return null;
-  return `${factorFormat.format(year.bonusFactor)} × Ø ${germanMoney(year.relevantPremiumAverage)}`;
+  return `${formatNumber(year.bonusFactor)} × Ø ${formatMoney(year.relevantPremiumAverage)}`;
 }

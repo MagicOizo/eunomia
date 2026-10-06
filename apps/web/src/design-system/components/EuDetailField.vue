@@ -5,7 +5,7 @@ import { computed, inject, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import { pastedIsoDate } from '../../lib/date-input';
-import { germanDate, germanMoney } from '../../lib/format';
+import { formatDate, formatMoney } from '../../lib/format';
 import { detailMaskReadonly } from './detail-mask';
 import EuCurrencyField from './EuCurrencyField.vue';
 import EuEntityPicker, { type PickerOption } from './EuEntityPicker.vue';
@@ -86,9 +86,9 @@ const readonlyText = computed<string>(() => {
     case 'toggle':
       return value ? t('common.yes') : t('common.no');
     case 'date':
-      return germanDate(value);
+      return formatDate(value);
     case 'currency':
-      return germanMoney(value);
+      return formatMoney(value);
     default:
       return String(value);
   }

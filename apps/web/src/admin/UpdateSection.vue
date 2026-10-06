@@ -10,7 +10,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { describeError } from '../lib/errors';
 import { settingLabel } from '../lib/field-labels';
-import { germanDateTime } from '../lib/format';
+import { formatDateTime } from '../lib/format';
 import { loadUpdateStatus, refreshUpdateStatus, updateStatus } from '../lib/update-status';
 import { isStored } from './settings-values';
 import { type SettingsSnapshot, saveSettings } from './settings-api';
@@ -123,7 +123,7 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
       <dt>Neueste veröffentlichte Version</dt>
       <dd>{{ update?.latest ?? '–' }}</dd>
       <dt>Zuletzt geprüft</dt>
-      <dd>{{ update?.checkedAt ? germanDateTime(update.checkedAt) : 'noch nicht' }}</dd>
+      <dd>{{ update?.checkedAt ? formatDateTime(update.checkedAt) : 'noch nicht' }}</dd>
     </dl>
 
     <p class="eu-settings__sentence">

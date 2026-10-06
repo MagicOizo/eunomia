@@ -4,7 +4,7 @@ import { reactive, ref, watch } from 'vue';
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
-import { germanDate } from '../lib/format';
+import { formatDate } from '../lib/format';
 import { todayIso } from '../lib/date-input';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
@@ -128,14 +128,14 @@ function resolve(billing: BillingDto): void {
       <li v-for="billing in billings" :key="billing.billingUID" class="eu-obj__item">
         <div class="eu-obj__head">
           <strong>{{ billing.billingNumber }}</strong>
-          <span class="eu-obj__date">{{ germanDate(billing.billingDate) }}</span>
+          <span class="eu-obj__date">{{ formatDate(billing.billingDate) }}</span>
         </div>
         <span class="eu-obj__date">{{ policyOf(billing) }}</span>
 
         <!-- Open objection: show it and offer to resolve. -->
         <template v-if="isOpen(billing)">
           <p class="eu-obj__state eu-obj__state--open">
-            Widerspruch offen seit {{ germanDate(billing.objectionDate) }}
+            Widerspruch offen seit {{ formatDate(billing.objectionDate) }}
           </p>
           <p v-if="billing.objectionNote" class="eu-obj__note">{{ billing.objectionNote }}</p>
           <EuButton
@@ -150,7 +150,7 @@ function resolve(billing: BillingDto): void {
         <!-- Resolved objection: history only. -->
         <template v-else-if="billing.objectionDate">
           <p class="eu-obj__state eu-obj__state--resolved">
-            Widerspruch aufgelöst am {{ germanDate(billing.objectionResolvedDate) }}
+            Widerspruch aufgelöst am {{ formatDate(billing.objectionResolvedDate) }}
           </p>
           <p v-if="billing.objectionNote" class="eu-obj__note">{{ billing.objectionNote }}</p>
         </template>

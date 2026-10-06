@@ -2249,6 +2249,7 @@ Geplant 2026-10-06. Eunomia ist bis 1.1.0 durchgehend deutsch (rund 1.300 UI-Tex
 - **Sprachen:** Deutsch + Englisch; die Infrastruktur nimmt weitere auf.
 - **Sprachwahl:** am Profil (`Users.locale`, `NULL` = folgen) → Browsersprache → Instanz-Vorgabe in den System-Einstellungen → `de`. Die Profilsprache bestimmt auch die Sprache der Mails.
 - **Technik: vue-i18n** (Composition-Modus), Texte als **JSON je Sprache** (`apps/web/src/locales/de.json`, `en.json`). Mein erster Vorschlag war ein eigener typisierter Katalog; auf Nachfrage des Autors korrigiert: Typsicherheit gibt vue-i18n genauso (`de.json` als Schema, ein fehlender Schlüssel in `en` kompiliert nicht), dazu kommen, was ein Eigenbau nachbauen müsste — das ESLint-Plugin (`no-raw-text`, `no-missing-keys`, `no-unused-keys`), `<i18n-t>` für Sätze mit eingebetteten Elementen, benannte Zahlen-/Datumsformate und ein Format, das Werkzeuge und Übersetzer kennen. `@intlify/unplugin-vue-i18n` kompiliert die Texte beim Build vor: kein `eval`, CSP `script-src 'self'` bleibt. Die API bekommt nur für die Mails einen kleinen typisierten Katalog.
+- **Format getrennt von der Sprache** (entschieden 2026-10-06, Slice 78): Deutsch (`de-DE`), Britisch (`en-GB`) oder US (`en-US`) wählbar, also auch englische Texte mit deutschen Daten; ohne Wahl entscheidet die Sprache (de → `de-DE`, en → `en-GB`). Gespeichert und gewählt wie die Sprache: Profil + Instanz-Vorgabe in 82, Auswahl in 83.
 - **Umfang:** nur Sprache und Formate. Fachlich bleibt es eine deutsche PKV-App — Euro, 5-stellige PLZ, IBAN/GiroCode unverändert.
 - Weiter gilt Slice 24: die API antwortet englisch mit Fehlercode, das Web übersetzt.
 
@@ -2266,8 +2267,8 @@ Geplant 2026-10-06. Eunomia ist bis 1.1.0 durchgehend deutsch (rund 1.300 UI-Tex
 | 79 | `1.2.0-slice.3` | Stammdaten (`resources/`, `ResourceView`, `agencies/`), Verwaltung (`admin/`, `profile/`), Papierkorb — die API liefert dessen Beschriftungen künftig strukturiert, die Sätze bildet das Web |
 | 80 | `1.2.0-slice.4` | Policen (`contracts/` inkl. Staffel) und Startseite (`dashboard/`) |
 | 81 | `1.2.0-slice.5` | Rechnungen I: Arbeitsfläche, Tabelle, Anlegen-Dialog, Details, Zusammenfassung, Status- und Empfehlungs-Badges, Rechnungssuche |
-| 82 | `1.2.0-slice.6` | Rechnungen II (Einreichung, Abrechnungen, Zuordnung, Picker, Abrechnungssuche) + Server: `Users.locale`, Einstellung `general.defaultLocale`, Mail-Katalog in der API (Mail in der Sprache des Empfängers), Locale-Parameter für die Formatierer in `shared`, Rate-Limit-Satz englisch mit Code |
-| 83 | `1.2.0-slice.7` | Sprachwahl scharf (Profil → Browser → Instanz → `de`), Auswahl im Profil und in den System-Einstellungen, `no-raw-text` als Fehler, Durchgang EN/DE mit Playwright (Textlängen, schmale Tabellen), „Adding a language" in README/DEV.md → Release `1.2.0` |
+| 82 | `1.2.0-slice.6` | Rechnungen II (Einreichung, Abrechnungen, Zuordnung, Picker, Abrechnungssuche) + Server: `Users.locale` und `Users.formatRegion`, Einstellungen `general.defaultLocale`/`general.defaultFormat`, Mail-Katalog in der API (Mail in der Sprache des Empfängers), Locale-Parameter für die Formatierer in `shared`, Rate-Limit-Satz englisch mit Code |
+| 83 | `1.2.0-slice.7` | Sprachwahl scharf (Profil → Browser → Instanz → `de`), Auswahl von Sprache und Format im Profil und in den System-Einstellungen, `plural()` gelöscht, `no-raw-text` als Fehler, Durchgang EN/DE mit Playwright (Textlängen, schmale Tabellen), „Adding a language" in README/DEV.md → Release `1.2.0` |
 
 Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden wird, steht danach hier unter der Scheibe bzw. in `CHANGELOG.md`.
 
@@ -2278,6 +2279,15 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - **Der Dev-Schalter `?lang=en` merkt sich nichts.** Er gilt für die SPA-Sitzung bis zum Neuladen; ein `sessionStorage` hätte die Invariante I-8 gebrochen (keine Browser-Speicher in der SPA, `stores/auth.spec.ts` hat es sofort gemeldet).
 - `<i18n-t>` braucht `scope="global"`, sonst warnt vue-i18n bei jedem Rendern („Not found parent scope").
 - Bundle: +19 kB gzip (163 → 182 kB); die Warnung über 500 kB gab es schon vorher. Geprüft: das gebaute Bundle rendert unter der CSP der API ohne Message-Compiler.
+
+### Slice 78 — Fehlermeldungen, Feldnamen, Formate (umgesetzt 2026-10-06, `1.2.0-slice.2`)
+- **Format als eigene Größe** (Entscheidung des Autors, s. oben): `FORMAT_REGIONS` und `formatMoney`/`formatDate` mit Region-Parameter in `@eunomia/shared` (`german.ts` → `format.ts`; `germanMoney`/`germanDate` bleiben als Hüllen für die API bis Slice 82). Im Web liest `lib/format.ts` die Region beim Aufruf über `activeFormat()` (`lib/i18n.ts`), Templates folgen so einem Wechsel. Dev-Schalter `?format=en-US`.
+- **Fehlermeldungen im Katalog** (`errors.*`): `CODE_MESSAGES` bleibt ein `Record` je `ErrorCode` und ruft `t()` wörtlich. `NOT_FOUND` und die Historien-Sätze als ganze Sätze je Ressource bzw. Art (Artikel und Verb hängen am Nomen). `NO_PERMISSION` ist jetzt die Funktion `noPermission()`.
+- **Feld- und Einstellungsnamen** unter `fields`, `fieldFormats`, `settingLabels` — datenhaltig, deshalb per Muster aus `no-unused-keys` ausgenommen; `fieldLabel`/`settingLabel` fallen über `te()` auf den Schlüssel zurück.
+- **`plural()` bleibt** (Abweichung vom Paketplan): Seine Aufrufer reichen deutsche Wortformen herein, es geht mit den Texten seiner Bereiche und wird in 83 gelöscht.
+- **Betragsfeld:** Dezimalzeichen und €-Position aus `Intl…formatToParts`; mit Dezimalkomma bleibt die alte Nachsicht („12.5" ohne Komma = 12,5), mit Dezimalpunkt sind Kommas immer Tausender.
+- **Datums-Einfügen:** Punkt-Form immer (Tag zuerst), Schrägstrich-Form nur nach Region (`en-GB` Tag zuerst, `en-US` Monat zuerst, `de-DE` gar nicht). Das native `<input type="date">` zeigt weiter im Browser-Format.
+- Die Papierkorb-Nomen in Fehlersätzen kommen noch deutsch von der API (Slice 79).
 
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

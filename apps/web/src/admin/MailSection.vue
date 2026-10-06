@@ -14,7 +14,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { settingLabel } from '../lib/field-labels';
-import { germanDateTime } from '../lib/format';
+import { formatDateTime } from '../lib/format';
 import { boolOf, isStored, stringOf } from './settings-values';
 import {
   type SettingWrite,
@@ -140,8 +140,8 @@ async function runTest(): Promise<void> {
       >
         {{
           mailStatus.lastSendResult === 'ok'
-            ? `Letzter Versand erfolgreich (${germanDateTime(mailStatus.lastSendAt)})`
-            : `Letzter Versand fehlgeschlagen (${germanDateTime(mailStatus.lastSendAt)})`
+            ? `Letzter Versand erfolgreich (${formatDateTime(mailStatus.lastSendAt)})`
+            : `Letzter Versand fehlgeschlagen (${formatDateTime(mailStatus.lastSendAt)})`
         }}
       </EuBadge>
       <EuBadge v-else tone="neutral">Noch nichts versendet</EuBadge>

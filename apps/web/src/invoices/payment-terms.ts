@@ -1,5 +1,5 @@
 import { isoPlusDays } from '../lib/date-input';
-import { germanDate } from '../lib/format';
+import { formatDate } from '../lib/format';
 
 /**
  * The payment terms a bill usually names (issues.md 0.15.0-2).
@@ -49,7 +49,7 @@ export function paymentTermSuggestions(invoiceDate: string): PaymentTermSuggesti
   for (const days of PAYMENT_TERM_DAYS) {
     const due = isoPlusDays(invoiceDate, days);
     if (due === null) return [];
-    suggestions.push({ value: due, label: termLabel(days), hint: germanDate(due) });
+    suggestions.push({ value: due, label: termLabel(days), hint: formatDate(due) });
   }
   return suggestions;
 }

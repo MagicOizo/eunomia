@@ -5,7 +5,7 @@ import { computed, inject } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import { pastedIsoDate } from '../../lib/date-input';
-import { germanDate } from '../../lib/format';
+import { formatDate } from '../../lib/format';
 import { detailMaskReadonly } from './detail-mask';
 
 /**
@@ -47,7 +47,7 @@ const maskReadonly = inject(detailMaskReadonly, undefined);
 const readonly = computed(() => maskReadonly?.value ?? false);
 /** The dates as one line of text, for the read-only row. */
 const readonlyText = computed(() => {
-  const days = props.modelValue.filter(Boolean).map(germanDate);
+  const days = props.modelValue.filter(Boolean).map(formatDate);
   return days.length === 0 ? '–' : days.join(', ');
 });
 

@@ -14,7 +14,7 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { settingLabel } from '../lib/field-labels';
-import { germanDateTime, plural } from '../lib/format';
+import { formatDateTime, plural } from '../lib/format';
 import { boolOf, statusOf, stringOf } from './settings-values';
 import {
   type RetentionRunResult,
@@ -155,7 +155,7 @@ const runDetail = computed(() =>
         :icon="status.lastRunResult === 'ok' ? faCircleCheck : faCircleExclamation"
       >
         {{
-          `Letzter Lauf ${germanDateTime(status.lastRunAt)}` +
+          `Letzter Lauf ${formatDateTime(status.lastRunAt)}` +
           (status.lastRunResult === 'ok'
             ? ` — ${status.lastRunPurged ?? 0} entfernt`
             : ' — fehlgeschlagen')

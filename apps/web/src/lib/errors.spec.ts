@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { describeError } from './errors';
-import { FIELD_LABELS } from './field-labels';
-import { HttpError } from './http';
+import de from '../locales/de.json';
 import { resourceConfigs } from '../resources/definitions';
+import { withLocale } from '../test/locale';
+import { noPermission } from './error-messages';
+import { describeError } from './errors';
+import { fieldLabel, settingLabel } from './field-labels';
+import { HttpError } from './http';
 
 /** A validation response as the API sends it (zod issues in `details`). */
 function validation(...issues: Array<Record<string, unknown>>): HttpError {
@@ -167,7 +170,62 @@ describe('field labels', () => {
   it('covers every field of the master-data resources', () => {
     const missing = Object.values(resourceConfigs)
       .flatMap((config) => config.fields.map((field) => field.key))
-      .filter((key) => !(key in FIELD_LABELS));
+      .filter((key) => !(key in de.fields));
     expect(missing).toEqual([]);
+  });
+
+  it('falls back to the key itself for a field or setting without a label', () => {
+    expect(fieldLabel('somethingNew')).toBe('somethingNew');
+    expect(settingLabel('mail.lastSendAt')).toBe('mail.lastSendAt');
+    // A group of settings is not a label of its own.
+    expect(settingLabel('mail')).toBe('mail');
+  });
+});
+
+describe('describeError — in English', () => {
+  it('names a field by its English label, in English quotation marks', async () => {
+    await withLocale('en', () => {
+      const error = validation({
+        code: 'too_small',
+        type: 'string',
+        minimum: 1,
+        path: ['addressCity'],
+      });
+      expect(describeError(error)).toBe('Please fill in “City”.');
+    });
+  });
+
+  it('spells out a field format in English', async () => {
+    await withLocale('en', () => {
+      const error = validation({
+        code: 'invalid_string',
+        validation: 'regex',
+        path: ['addressPostalCode'],
+      });
+      expect(describeError(error)).toBe(
+        'Please enter “Postcode” in the right format (five digits, e.g. 12345).',
+      );
+    });
+  });
+
+  it('says what was not found and fills in what the server named', async () => {
+    await withLocale('en', () => {
+      expect(describeError(new HttpError(404, 'NOT_FOUND', 'x', { resource: 'Invoice' }))).toBe(
+        'The invoice was not found. It may have been deleted in the meantime.',
+      );
+      expect(
+        describeError(new HttpError(409, 'INVOICES_UNKNOWN', 'x', { invoices: ['R-1', 'R-2'] })),
+      ).toBe('These invoices no longer exist: R-1, R-2.');
+      expect(
+        describeError(new HttpError(400, 'SETTING_INVALID_VALUE', 'x', { key: 'mail.port' })),
+      ).toBe('The value for “Port” does not fit.');
+    });
+  });
+
+  it('explains a missing permission and an unknown failure in English', async () => {
+    await withLocale('en', () => {
+      expect(noPermission()).toBe('You do not have permission to do this.');
+      expect(describeError(new Error('boom'))).toBe('Unexpected error.');
+    });
   });
 });

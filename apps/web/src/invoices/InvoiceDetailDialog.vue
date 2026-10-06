@@ -16,10 +16,10 @@ import type { PickerOption } from '../design-system/components/EuEntityPicker.vu
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { describeError } from '../lib/errors';
-import { NO_PERMISSION } from '../lib/error-messages';
+import { noPermission as noPermissionText } from '../lib/error-messages';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { useAuthStore } from '../stores/auth';
-import { germanMoney } from '../lib/format';
+import { formatMoney } from '../lib/format';
 import {
   type InvoiceAllocationDto,
   type InvoiceDto,
@@ -100,7 +100,7 @@ const auth = useAuthStore();
  */
 const mayManage = computed(() => auth.can('MANAGE_INVOICES', props.invoice?.accountUID));
 /** Why the actions are disabled, or nothing when they are not. */
-const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
+const noPermission = computed(() => (mayManage.value ? undefined : noPermissionText()));
 
 const values = reactive<Record<string, DetailValue>>({});
 const saved = reactive<Record<string, DetailValue>>({});
@@ -427,7 +427,7 @@ async function saveBilling(payload: BillingAllocationPayload): Promise<void> {
   const ok = await runBlock(
     () => saveBillingAllocations(payload),
     (m) => (billingError.value = m),
-    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${germanMoney(inv.remainingAmount)}).`,
+    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${formatMoney(inv.remainingAmount)}).`,
   );
   if (ok) billingOpen.value = false;
 }
@@ -452,7 +452,7 @@ async function saveAllocation(payload: {
         receiptNumber: payload.receiptNumber,
       }),
     (m) => (allocationError.value = m),
-    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (Rechnungsbetrag: ${germanMoney(inv.invoiceAmount)}).`,
+    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (Rechnungsbetrag: ${formatMoney(inv.invoiceAmount)}).`,
   );
   if (ok) editingAllocation.value = null;
 }
@@ -690,13 +690,13 @@ function submit(): void {
       <EuDetailField
         label="Erstattung"
         type="readonly"
-        :model-value="germanMoney(invoice.reimbursedTotal)"
+        :model-value="formatMoney(invoice.reimbursedTotal)"
       />
       <template v-if="isSubmitted">
         <EuDetailField
           label="Noch nicht erstattet"
           type="readonly"
-          :model-value="germanMoney(invoice.remainingAmount)"
+          :model-value="formatMoney(invoice.remainingAmount)"
         />
         <EuDetailField
           v-model="values.reimbursementClosed"
@@ -776,7 +776,9 @@ function submit(): void {
               :icon="faTrash"
               :aria-label="`Markierung für ${exclusion.contractNumber} entfernen`"
               :title="
-                mayManage ? `Markierung für ${exclusion.contractNumber} entfernen` : NO_PERMISSION
+                mayManage
+                  ? `Markierung für ${exclusion.contractNumber} entfernen`
+                  : noPermissionText()
               "
               :disabled="!mayManage || blockBusy"
               @click="pendingRemove = exclusion"
@@ -880,7 +882,7 @@ function submit(): void {
     @close="pendingAllocation = null"
   >
     <p v-if="pendingAllocation">
-      Die Erstattung von {{ germanMoney(pendingAllocation.reimbursement) }} aus Abrechnung
+      Die Erstattung von {{ formatMoney(pendingAllocation.reimbursement) }} aus Abrechnung
       {{ pendingAllocation.billingNumber }} wirklich entfernen? Die Leistungsabrechnung selbst
       bleibt bestehen.
     </p>

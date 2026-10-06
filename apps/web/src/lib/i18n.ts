@@ -1,4 +1,5 @@
-import { watch } from 'vue';
+import { FORMAT_REGIONS, type FormatRegion } from '@eunomia/shared';
+import { ref, watch } from 'vue';
 import { createI18n } from 'vue-i18n';
 
 import de from '../locales/de.json';
@@ -48,6 +49,36 @@ export const i18n = createI18n<[MessageSchema], Locale, false>({
   fallbackLocale: 'de',
   messages: { de, en },
 });
+
+/**
+ * How numbers and dates are written is a choice of its own, next to the
+ * language: English text with German dates is a legitimate wish, and British
+ * and American English disagree on the order of day and month. Without a
+ * choice, the language decides.
+ */
+export const DEFAULT_FORMAT: Record<Locale, FormatRegion> = { de: 'de-DE', en: 'en-GB' };
+
+function isFormatRegion(value: unknown): value is FormatRegion {
+  return typeof value === 'string' && (FORMAT_REGIONS as readonly string[]).includes(value);
+}
+
+/** Like `?lang`, the dev build alone takes `?format=en-US`, held until a reload. */
+function initialFormat(): FormatRegion | null {
+  if (!import.meta.env.DEV) return null;
+  const requested = new URLSearchParams(window.location.search).get('format');
+  return isFormatRegion(requested) ? requested : null;
+}
+
+/** The chosen format, or null to follow the language. */
+export const formatOverride = ref<FormatRegion | null>(initialFormat());
+
+/**
+ * The format in effect. Reads both refs, so a template or computed that
+ * formats through it follows a change of either.
+ */
+export function activeFormat(): FormatRegion {
+  return formatOverride.value ?? DEFAULT_FORMAT[i18n.global.locale.value];
+}
 
 // Screen readers and the browser's hyphenation read the document language.
 watch(

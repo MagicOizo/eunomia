@@ -86,8 +86,29 @@ and for English project documentation (README, CHANGELOG) from 1.2.0 on.
 "Billing agency" replaces "collection agency", which earlier changelog entries use: in English,
 the latter mostly means a debt collector.
 
+## Formats
+
+How numbers and dates are written is chosen apart from the language, so English text with German
+dates is possible. The formats are named by region (`FORMAT_REGIONS` in `@eunomia/shared`):
+
+| Format  | Date         | Amount       | Default for |
+| ------- | ------------ | ------------ | ----------- |
+| `de-DE` | `01.10.2026` | `1.234,50 €` | `de`        |
+| `en-GB` | `01/10/2026` | `€1,234.50`  | `en`        |
+| `en-US` | `10/01/2026` | `€1,234.50`  |             |
+
+Never format with a fixed locale. Use the formatters in `src/lib/format.ts` (`formatMoney`,
+`formatDate`, `formatDateTime`, `formatNumber`, `formatPercent`, `formatWholeMoney`): they read the
+format in effect when they are called, so a template follows a change. Sorting and case folding are
+a matter of language, not format (`activeLanguage()`). In the dev build, `?format=en-US` picks a
+format next to `?lang=en`.
+
+The domain stays German whatever the format: the currency is always the euro, a postcode has five
+digits, and IBAN and GiroCode are unchanged.
+
 ## Adding a language
 
 1. Copy `en.json` to `<code>.json` and translate every value, keeping the keys.
-2. Add the code to `SUPPORTED_LOCALES` and the catalogue to `messages` in `src/lib/i18n.ts`.
+2. Add the code to `SUPPORTED_LOCALES` and the catalogue to `messages` in `src/lib/i18n.ts`, and
+   give it a default format in `DEFAULT_FORMAT` (a new region also goes into `FORMAT_REGIONS`).
 3. Run `npm run typecheck` and `npm run lint`. Both name every key that is still missing.

@@ -18,7 +18,7 @@ Deutsch + Englisch über vue-i18n, Sprachwahl am Profil. Geplant als Slices 77�
 | ✓   | Slice | Inhalt                                                        | Version         |
 | --- | ----- | ------------------------------------------------------------- | --------------- |
 | ✓   | 77    | Fundament + Glossar + Rahmen                                  | `1.2.0-slice.1` |
-|     | 78    | Fehlermeldungen, Feldnamen, Formate                           | `1.2.0-slice.2` |
+| ✓   | 78    | Fehlermeldungen, Feldnamen, Formate                           | `1.2.0-slice.2` |
 |     | 79    | Stammdaten, Verwaltung, Papierkorb                            | `1.2.0-slice.3` |
 |     | 80    | Policen und Startseite                                        | `1.2.0-slice.4` |
 |     | 81    | Rechnungen I: Arbeitsfläche, Maske, Details                   | `1.2.0-slice.5` |

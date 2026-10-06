@@ -8,7 +8,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { describeError } from '../lib/errors';
-import { germanDateTime, plural } from '../lib/format';
+import { activeLanguage, formatDateTime, plural } from '../lib/format';
 import { useTableSort } from '../lib/table-sort';
 import { type TrashEntryDto, type TrashGroupDto, loadTrash, purgeEntry, restoreEntry } from './api';
 
@@ -39,14 +39,14 @@ const total = computed(() => groups.value.reduce((sum, group) => sum + group.ent
 
 /** The groups left by the search, each narrowed to its matching entries. */
 const visibleGroups = computed<TrashGroupDto[]>(() => {
-  const needle = filter.value.trim().toLocaleLowerCase('de');
+  const needle = filter.value.trim().toLocaleLowerCase(activeLanguage());
   if (needle === '') return groups.value;
   return groups.value
     .map((group) => ({
       ...group,
       entries: group.entries.filter((entry) =>
         `${entry.label} ${entry.context} ${group.singular}`
-          .toLocaleLowerCase('de')
+          .toLocaleLowerCase(activeLanguage())
           .includes(needle),
       ),
     }))
@@ -224,7 +224,7 @@ const entriesOf = (group: TrashGroupDto): TrashEntryDto[] =>
                     {{ entry.restoreNote }}
                   </span>
                 </td>
-                <td>{{ entry.deletedAt ? germanDateTime(entry.deletedAt) : 'unbekannt' }}</td>
+                <td>{{ entry.deletedAt ? formatDateTime(entry.deletedAt) : 'unbekannt' }}</td>
                 <td class="eu-trash__actions">
                   <EuButton
                     v-if="entry.restorable"

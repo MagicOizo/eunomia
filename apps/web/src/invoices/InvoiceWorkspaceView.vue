@@ -16,8 +16,8 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { apiData } from '../lib/api';
 import { useDialogAction } from '../lib/dialog-action';
-import { NO_PERMISSION } from '../lib/error-messages';
-import { germanDate, plural } from '../lib/format';
+import { noPermission as noPermissionText } from '../lib/error-messages';
+import { formatDate, plural } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
 import { useAuthStore } from '../stores/auth';
@@ -84,7 +84,7 @@ const auth = useAuthStore();
  */
 const mayManage = computed(() => auth.can('MANAGE_INVOICES', props.accountUID));
 /** Why the actions are disabled, or nothing when they are not. */
-const noPermission = computed(() => (mayManage.value ? undefined : NO_PERMISSION));
+const noPermission = computed(() => (mayManage.value ? undefined : noPermissionText()));
 
 const accountName = ref('');
 const years = ref<number[]>([]);
@@ -119,7 +119,7 @@ const facilityName = (invoice: InvoiceDto): string | null =>
  * wherever it is shown, the full list belongs within reach.
  */
 const treatmentTitle = (invoice: InvoiceDto): string | undefined =>
-  invoice.treatmentDates.length < 2 ? undefined : invoice.treatmentDates.map(germanDate).join(', ');
+  invoice.treatmentDates.length < 2 ? undefined : invoice.treatmentDates.map(formatDate).join(', ');
 const plan = ref<ReimbursementPlanDto | null>(null);
 /** The optimizer's advice per invoice; invoices with nothing to do have no entry. */
 const recommendationBadges = computed(() => {

@@ -1,17 +1,22 @@
 import { computed, reactive, type Ref, ref } from 'vue';
 
+import { activeLanguage } from './format';
+
 export type SortDirection = 'default' | 'asc' | 'desc';
 export type SortState = 'asc' | 'desc' | 'none';
 
 type Comparable = string | number | boolean | null | undefined;
 
-/** Locale-aware comparator: numbers numerically, everything else as German text. */
+/** Locale-aware comparator: numbers numerically, everything else as text of the UI language. */
 function compareValues(a: Comparable, b: Comparable): number {
   if (a == null && b == null) return 0;
   if (a == null) return 1; // nulls / empty values sort last
   if (b == null) return -1;
   if (typeof a === 'number' && typeof b === 'number') return a - b;
-  return String(a).localeCompare(String(b), 'de', { numeric: true, sensitivity: 'base' });
+  return String(a).localeCompare(String(b), activeLanguage(), {
+    numeric: true,
+    sensitivity: 'base',
+  });
 }
 
 /**

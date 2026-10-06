@@ -7,6 +7,7 @@ import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import { formatNumber } from '../lib/format';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import type { TermsDto, TermsInput } from './api';
 
@@ -51,12 +52,7 @@ const kindOptions = [
   { value: 'amount', label: 'Betrag in €' },
 ];
 
-const factorFormat = new Intl.NumberFormat('de-DE', {
-  maximumFractionDigits: 2,
-  useGrouping: false,
-});
-
-/** A factor as typed in German, "1,5"; NaN unless it is positive with at most two decimals. */
+/** A factor as typed, "1,5" or "1.5"; NaN unless it is positive with at most two decimals. */
 function parseFactor(text: string): number {
   const trimmed = text.trim().replace(',', '.');
   if (!/^\d{1,2}(\.\d{1,2})?$/.test(trimmed)) return NaN;
@@ -78,7 +74,7 @@ const { shownError, fail, clear } = useFormDialog(
     tiers.value = (source?.bonusTiers ?? []).map((tier) => ({
       years: String(tier.claimFreeYears),
       kind: tier.bonusFactor !== null ? 'factor' : 'amount',
-      factor: tier.bonusFactor !== null ? factorFormat.format(tier.bonusFactor) : '',
+      factor: tier.bonusFactor !== null ? formatNumber(tier.bonusFactor) : '',
       amount: tier.bonusAmount,
     }));
   },

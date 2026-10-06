@@ -8,7 +8,7 @@ import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY } from '../invoices/payment';
 import { POLICY_STATUS_BADGE, bonusView, percentOf } from '../invoices/recommendation';
 import { STATUS_DISPLAY } from '../invoices/status';
 import { describeError } from '../lib/errors';
-import { germanDate, germanMoney, plural } from '../lib/format';
+import { formatDate, formatMoney, plural } from '../lib/format';
 import { useAuthStore } from '../stores/auth';
 import DashboardYearChart from './DashboardYearChart.vue';
 import {
@@ -75,20 +75,20 @@ const tiles = computed<Tile[]>(() => {
         key: 'invoices',
         label: 'Rechnungen',
         value: String(totals.invoiceCount),
-        note: data.since ? `seit ${germanDate(data.since)}` : undefined,
+        note: data.since ? `seit ${formatDate(data.since)}` : undefined,
       },
-      { key: 'amount', label: 'Rechnungsbetrag', value: germanMoney(totals.invoiceAmount) },
-      { key: 'reimbursed', label: 'Erstattet', value: germanMoney(totals.reimbursed) },
+      { key: 'amount', label: 'Rechnungsbetrag', value: formatMoney(totals.invoiceAmount) },
+      { key: 'reimbursed', label: 'Erstattet', value: formatMoney(totals.reimbursed) },
       {
         key: 'selfBorne',
         label: 'Eigenanteil',
-        value: germanMoney(totals.selfBorne),
+        value: formatMoney(totals.selfBorne),
         note: 'alles nicht Erstattete',
       },
     );
   }
   if (seesContracts.value) {
-    result.push({ key: 'bonus', label: 'Bonus erhalten', value: germanMoney(totals.bonusPaid) });
+    result.push({ key: 'bonus', label: 'Bonus erhalten', value: formatMoney(totals.bonusPaid) });
   }
   if (seesAccounts.value) {
     result.push({ key: 'accounts', label: 'Versicherte', value: String(totals.accountCount) });
@@ -188,7 +188,7 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
                 <span v-if="account.payment.unpaidCount === 0">nichts</span>
                 <span v-else>
                   {{ plural(account.payment.unpaidCount, 'Rechnung', 'Rechnungen') }} ·
-                  {{ germanMoney(account.payment.unpaidAmount) }}
+                  {{ formatMoney(account.payment.unpaidAmount) }}
                 </span>
               </div>
               <ul
@@ -257,7 +257,7 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
                   <span v-if="!policy.hasTerms">keine Konditionen</span>
                   <span v-else-if="policy.deductible === 0">keine</span>
                   <span v-else-if="policy.deductibleLeft === 0">erreicht</span>
-                  <span v-else>noch {{ germanMoney(policy.deductibleLeft) }} offen</span>
+                  <span v-else>noch {{ formatMoney(policy.deductibleLeft) }} offen</span>
                 </div>
                 <div
                   v-if="policy.hasTerms && policy.deductible > 0"
@@ -272,7 +272,7 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
                   v-if="policy.hasTerms && policy.deductible > 0"
                   class="eu-dashboard__sub eu-dashboard__bar-note"
                 >
-                  {{ germanMoney(policy.deductibleUsed) }} von {{ germanMoney(policy.deductible) }}
+                  {{ formatMoney(policy.deductibleUsed) }} von {{ formatMoney(policy.deductible) }}
                 </p>
 
                 <div class="eu-dashboard__fact">

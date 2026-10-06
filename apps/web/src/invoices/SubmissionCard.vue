@@ -12,8 +12,8 @@ import { computed } from 'vue';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
-import { NO_PERMISSION } from '../lib/error-messages';
-import { germanDate, germanMoney } from '../lib/format';
+import { noPermission } from '../lib/error-messages';
+import { formatDate, formatMoney } from '../lib/format';
 import type { InvoiceAllocationDto, InvoiceSubmissionDto, PlanInvoicePolicyAction } from './api';
 import { policyActionBadge } from './recommendation';
 import { SUBMISSION_STATUS_DISPLAY } from './status';
@@ -54,7 +54,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
     <header class="eu-card__head">
       <h4>
         {{ policy }}
-        <span class="eu-card__sub">eingereicht am {{ germanDate(submission.submittedDate) }}</span>
+        <span class="eu-card__sub">eingereicht am {{ formatDate(submission.submittedDate) }}</span>
       </h4>
       <div class="eu-card__badges">
         <EuBadge :tone="statusDisplay.tone" :icon="statusDisplay.icon">
@@ -74,7 +74,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
         <span class="eu-card__billing">
           {{ allocation.billingNumber }}
           <span class="eu-card__sub">
-            {{ germanDate(allocation.billingDate)
+            {{ formatDate(allocation.billingDate)
             }}<template v-if="allocation.receiptNumber">
               · Beleg {{ allocation.receiptNumber }}</template
             >
@@ -89,7 +89,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
         >
           <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
         </span>
-        <span class="eu-card__amount">{{ germanMoney(allocation.reimbursement) }}</span>
+        <span class="eu-card__amount">{{ formatMoney(allocation.reimbursement) }}</span>
         <EuButton
           variant="secondary"
           icon-only
@@ -98,7 +98,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           :title="
             canManage
               ? `Erstattungsbetrag und Belegnummer ändern (${allocation.billingNumber})`
-              : NO_PERMISSION
+              : noPermission()
           "
           :disabled="busy || !canManage"
           @click="emit('editAllocation', allocation)"
@@ -111,7 +111,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           :title="
             canManage
               ? `Erstattung aus Abrechnung ${allocation.billingNumber} entfernen`
-              : NO_PERMISSION
+              : noPermission()
           "
           :disabled="busy || !canManage"
           @click="emit('removeAllocation', allocation)"
@@ -122,7 +122,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
     <footer class="eu-card__foot">
       <span class="eu-card__total">
         <span class="eu-card__sub">Erstattet</span>
-        {{ germanMoney(submission.reimbursed) }}
+        {{ formatMoney(submission.reimbursed) }}
       </span>
       <div class="eu-card__actions">
         <EuButton
@@ -134,7 +134,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           :title="
             canManage
               ? `Leistungsabrechnung erfassen und Erstattung zuordnen (${submission.contractNumber})`
-              : NO_PERMISSION
+              : noPermission()
           "
           :disabled="busy || !canManage"
           @click="emit('bill', submission)"
@@ -148,7 +148,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           :title="
             canManage
               ? `Fehlerhafte Leistungsabrechnung als Widerspruch markieren (${submission.contractNumber})`
-              : NO_PERMISSION
+              : noPermission()
           "
           :disabled="busy || !canManage"
           @click="emit('objection', submission)"
@@ -160,7 +160,7 @@ const advice = computed(() => (props.planAction ? policyActionBadge(props.planAc
           :icon="faArrowRotateLeft"
           :aria-label="`Einreichung bei ${submission.contractNumber} zurückziehen`"
           :title="
-            canManage ? `Einreichung bei ${submission.contractNumber} zurückziehen` : NO_PERMISSION
+            canManage ? `Einreichung bei ${submission.contractNumber} zurückziehen` : noPermission()
           "
           :disabled="busy || !canManage"
           @click="emit('withdraw', submission)"

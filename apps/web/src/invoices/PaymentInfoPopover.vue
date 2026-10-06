@@ -18,7 +18,7 @@ import { invoicePaymentDetail, paymentDetailLabel } from '../agencies/payment-de
 import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
-import { germanDate, germanMoney } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import type { InvoiceDto } from './api';
 import { PAYMENT_COLOR_VAR, paymentState } from './payment';
 import PaymentQrPopover from './PaymentQrPopover.vue';
@@ -74,16 +74,16 @@ const showQr = computed(
 
       <template v-if="invoice.transferUntilDate">
         <dt><EuIconLabel :icon="faCalendarDay" label="Zahlungsziel" :color="dueColor" /></dt>
-        <dd>{{ germanDate(invoice.transferUntilDate) }}</dd>
+        <dd>{{ formatDate(invoice.transferUntilDate) }}</dd>
       </template>
 
       <template v-if="invoice.transferDate">
         <dt><EuIconLabel :icon="faCalendarCheck" label="Überweisungsdatum" /></dt>
-        <dd>{{ germanDate(invoice.transferDate) }}</dd>
+        <dd>{{ formatDate(invoice.transferDate) }}</dd>
       </template>
 
       <dt><EuIconLabel :icon="faEuroSign" label="Rechnungssumme" /></dt>
-      <dd>{{ germanMoney(invoice.invoiceAmount) }}</dd>
+      <dd>{{ formatMoney(invoice.invoiceAmount) }}</dd>
 
       <template v-if="isHttpUrl(invoice.documentLink)">
         <dt><EuIconLabel :icon="faReceipt" label="Dokument" /></dt>
