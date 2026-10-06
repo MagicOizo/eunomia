@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HttpError } from '../lib/http';
+import { withLocale } from '../test/locale';
 import { grant } from '../test/permissions';
 import type { DashboardDto } from './api';
 import { dashboardFixture } from './dashboard-fixture';
@@ -87,6 +88,29 @@ describe('DashboardView', () => {
     expect(plain(policy)).toContain('noch 300,00 € offen');
     expect(plain(policy)).toContain('200,00 € von 500,00 €');
     expect(plain(policy)).toContain('Sicher');
+  });
+
+  it('speaks English in its own texts', async () => {
+    await withLocale('en', async () => {
+      const wrapper = await render();
+
+      expect(wrapper.find('h2').text()).toMatch(/^Welcome/);
+      expect(tileLabels(wrapper)).toEqual([
+        'Invoices',
+        'Invoice amount',
+        'Reimbursed',
+        'Own share',
+        'Bonus received',
+        'Insured persons',
+        'Active policies',
+      ]);
+      expect(wrapper.text()).toContain('since 01/02/2024');
+      const [anna] = wrapper.findAll('.eu-dashboard__person');
+      expect(plain(anna)).toContain('2 invoices · €320.50');
+      expect(plain(anna)).toContain('1 overdue');
+      expect(plain(wrapper.find('.eu-dashboard__policy'))).toContain('€300.00 still open');
+      expect(wrapper.find('.eu-yearchart__details summary').text()).toBe('Figures per year');
+    });
   });
 
   it('does not call a bonus safe while a submission there is still unanswered', async () => {

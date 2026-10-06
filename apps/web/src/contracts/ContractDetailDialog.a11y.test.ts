@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import axe from 'axe-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withLocale } from '../test/locale';
 import type { BonusYearDto, ContractDetailDto, PremiumDto, TermsDto } from './api';
 import ContractDetailDialog from './ContractDetailDialog.vue';
 
@@ -80,6 +81,35 @@ beforeEach(() => {
   getContract.mockReset();
   getContract.mockImplementation(async () => structuredClone(contract));
 });
+
+/** A policy with a factor scale and a forecast computed from it (Slice 76). */
+function factorContract(): ContractDetailDto {
+  return {
+    ...structuredClone(contract),
+    premiums: [premium('2020-01-01', null, null, 400)],
+    terms: [
+      {
+        ...terms(2020),
+        bonusTiers: [
+          { claimFreeYears: 1, bonusAmount: null, bonusFactor: 1 },
+          { claimFreeYears: 3, bonusAmount: null, bonusFactor: 1.5 },
+          { claimFreeYears: 5, bonusAmount: 900, bonusFactor: null },
+        ],
+      },
+    ],
+    years: [
+      { ...year(2020), premiumMissing: true, expectedBonus: null, hasBonusScale: true },
+      {
+        ...year(2021),
+        claimFreeStreak: 3,
+        expectedBonus: 615,
+        hasBonusScale: true,
+        bonusFactor: 1.5,
+        relevantPremiumAverage: 410,
+      },
+    ],
+  };
+}
 
 async function openDialog() {
   const wrapper = mount(ContractDetailDialog, {
@@ -162,31 +192,7 @@ describe('ContractDetailDialog', () => {
   });
 
   it('shows a factor scale with the forecast it was computed from (Slice 76)', async () => {
-    getContract.mockResolvedValueOnce({
-      ...structuredClone(contract),
-      premiums: [premium('2020-01-01', null, null, 400)],
-      terms: [
-        {
-          ...terms(2020),
-          bonusTiers: [
-            { claimFreeYears: 1, bonusAmount: null, bonusFactor: 1 },
-            { claimFreeYears: 3, bonusAmount: null, bonusFactor: 1.5 },
-            { claimFreeYears: 5, bonusAmount: 900, bonusFactor: null },
-          ],
-        },
-      ],
-      years: [
-        { ...year(2020), premiumMissing: true, expectedBonus: null, hasBonusScale: true },
-        {
-          ...year(2021),
-          claimFreeStreak: 3,
-          expectedBonus: 615,
-          hasBonusScale: true,
-          bonusFactor: 1.5,
-          relevantPremiumAverage: 410,
-        },
-      ],
-    });
+    getContract.mockResolvedValueOnce(factorContract());
     const wrapper = await openDialog();
 
     expect(rowsUnder(wrapper, 'Beitragsverlauf')[0]).toMatch(/–\s*400,00\s€/);
@@ -205,6 +211,31 @@ describe('ContractDetailDialog', () => {
     expect(results.violations).toEqual([]);
 
     wrapper.unmount();
+  });
+
+  it('speaks English: headings, scale, forecast and the delete question', async () => {
+    await withLocale('en', async () => {
+      getContract.mockResolvedValueOnce(factorContract());
+      const wrapper = await openDialog();
+
+      expect(wrapper.findAll('h3').map((h) => h.text())).toEqual([
+        'Premium history',
+        'Terms per year',
+        'Year history',
+      ]);
+      const scale = rowsUnder(wrapper, 'Terms per year')[0];
+      expect(scale).toMatch(/from 3 yrs:\s*1\.5×/);
+      const factors = wrapper.findAll('.eu-contract__tiers abbr').map((a) => a.attributes('title'));
+      expect(factors).toEqual(['1 monthly premium', '1.5 monthly premiums']);
+      expect(rowsUnder(wrapper, 'Year history')[0]).toMatch(/€615\.00\s*1\.5 × avg\. €410\.00/);
+      await toggleIn(wrapper, 'Year history').trigger('click');
+      expect(rowsUnder(wrapper, 'Year history')[1]).toContain('premium missing');
+
+      await wrapper.find('[aria-label="Delete the terms from 2020"]').trigger('click');
+      expect(document.body.textContent).toContain('Delete the terms from 2020?');
+
+      wrapper.unmount();
+    });
   });
 
   it('has no automatically detectable accessibility violations', async () => {

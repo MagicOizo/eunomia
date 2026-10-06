@@ -1,9 +1,15 @@
 import { formatMoney, formatNumber } from '../lib/format';
+import { i18n } from '../lib/i18n';
 import type { BonusYearDto } from './api';
 
-/** A bonus factor in the insurer's words: "1 Monatsbeitrag", "1,5 Monatsbeiträge". */
+const { t } = i18n.global;
+
+/**
+ * A bonus factor in the insurer's words: "1 Monatsbeitrag", "1,5 Monatsbeiträge".
+ * The count picks the form, the shown number is the formatted one ("1,5").
+ */
 export function factorLabel(factor: number): string {
-  return `${formatNumber(factor)} ${factor === 1 ? 'Monatsbeitrag' : 'Monatsbeiträge'}`;
+  return t('contracts.bonus.factor', { n: formatNumber(factor) }, factor);
 }
 
 /**
@@ -11,7 +17,7 @@ export function factorLabel(factor: number): string {
  * table has the width of an amount per step, not of "1,5 Monatsbeiträge".
  */
 export function factorShort(factor: number): string {
-  return `${formatNumber(factor)}-fach`;
+  return t('contracts.bonus.factorShort', { n: formatNumber(factor) });
 }
 
 /**
@@ -22,5 +28,8 @@ export function forecastBasis(
   year: Pick<BonusYearDto, 'bonusFactor' | 'relevantPremiumAverage'>,
 ): string | null {
   if (year.bonusFactor === null || year.relevantPremiumAverage === null) return null;
-  return `${formatNumber(year.bonusFactor)} × Ø ${formatMoney(year.relevantPremiumAverage)}`;
+  return t('contracts.bonus.basis', {
+    factor: formatNumber(year.bonusFactor),
+    amount: formatMoney(year.relevantPremiumAverage),
+  });
 }

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
+import { withLocale } from '../test/locale';
 import TermsFormDialog from './TermsFormDialog.vue';
 import type { TermsDto, TermsInput } from './api';
 
@@ -144,6 +145,20 @@ describe('TermsFormDialog: taking the previous year over', () => {
 
     expect(submitted(wrapper)).toBeUndefined();
     expect(wrapper.text()).toContain('Bitte ein Jahr ab 2020 (Vertragsbeginn) angeben.');
+  });
+
+  it('refuses it in English when the UI speaks English', async () => {
+    await withLocale('en', async () => {
+      const wrapper = mountDialog();
+      await flushPromises();
+      expect(wrapper.text()).toContain('Values taken over from the terms from 2025');
+      await textField(wrapper, 'Valid from year').find('input').setValue('2019');
+
+      await submit(wrapper);
+
+      expect(submitted(wrapper)).toBeUndefined();
+      expect(wrapper.text()).toContain('Enter a year from 2020 (policy start) on.');
+    });
   });
 
   it('refuses the same number of claim-free years twice', async () => {

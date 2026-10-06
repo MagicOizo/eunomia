@@ -11,6 +11,7 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import EuBadge from '../design-system/components/EuBadge.vue';
@@ -23,7 +24,7 @@ import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { noPermission as noPermissionText } from '../lib/error-messages';
 import { describeError } from '../lib/errors';
-import { formatDate, formatMoney, formatPercent, plural } from '../lib/format';
+import { formatDate, formatMoney, formatPercent } from '../lib/format';
 import {
   BONUS_FORFEIT_RULE_LABEL,
   type BonusYearDto,
@@ -63,6 +64,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: []; changed: [] }>();
 
+const { t } = useI18n();
+
 const contract = ref<ContractDetailDto | null>(null);
 
 const auth = useAuthStore();
@@ -91,11 +94,13 @@ async function afterChange(): Promise<void> {
 /** Which history blocks show their older entries (see the history section). */
 const showOlder = reactive({ premiums: false, terms: false, years: false });
 
-const kindOptions = Object.entries(CONTRACT_KIND_LABEL).map(([value, label]) => ({ value, label }));
-const forfeitOptions = Object.entries(BONUS_FORFEIT_RULE_LABEL).map(([value, label]) => ({
-  value,
-  label,
-}));
+// Computed, so the getter labels are read again after a change of language.
+const kindOptions = computed(() =>
+  Object.entries(CONTRACT_KIND_LABEL).map(([value, label]) => ({ value, label })),
+);
+const forfeitOptions = computed(() =>
+  Object.entries(BONUS_FORFEIT_RULE_LABEL).map(([value, label]) => ({ value, label })),
+);
 
 function seedMask(dto: ContractDetailDto): void {
   const seed: Record<string, DetailValue> = {
@@ -142,7 +147,9 @@ const accountName = computed(
   () => props.options.accounts?.find((o) => o.value === contract.value?.accountUID)?.label ?? '–',
 );
 const title = computed(() =>
-  contract.value ? `Police ${contract.value.contractNumber}` : 'Police',
+  contract.value
+    ? t('contracts.detail.title', { number: contract.value.contractNumber })
+    : t('contracts.detail.titleEmpty'),
 );
 const str = (value: DetailValue): string => (typeof value === 'string' ? value.trim() : '');
 
@@ -153,12 +160,11 @@ async function saveMask(): Promise<void> {
   const claimFreeYears = str(values.claimFreeYearsAtStart);
   const fromYear = str(values.claimFreeCountingFromYear);
   if (!str(values.contractNumber) || !values.companyUID || !values.contractBegin) {
-    mask.error = 'Bitte Vertragsnummer, Versicherung und Vertragsbeginn ausfüllen.';
+    mask.error = t('contracts.detail.requiredMissing');
     return;
   }
   if (!/^\d{1,2}$/.test(claimFreeYears) || (fromYear !== '' && !/^\d{4}$/.test(fromYear))) {
-    mask.error =
-      'Leistungsfreie Jahre als ganze Zahl, Zählbeginn als Jahreszahl (z. B. 2024) angeben.';
+    mask.error = t('contracts.detail.claimFreeInvalid');
     return;
   }
   await mask.run(() =>
@@ -186,7 +192,16 @@ const termsDialog = reactive({
   /** Year a new entry should start in, when opened from the year history. */
   year: null as number | null,
 });
-const pendingDelete = ref<{ segment: Segment; uid: string; label: string } | null>(null);
+/** The entry to delete; `from` is its start, a date (premiums) or a year (terms). */
+const pendingDelete = ref<{ segment: Segment; uid: string; from: string } | null>(null);
+
+const deleteQuestion = computed(() => {
+  const pending = pendingDelete.value;
+  if (!pending) return '';
+  return pending.segment === 'premiums'
+    ? t('contracts.history.confirmDeletePremium', { date: formatDate(pending.from) })
+    : t('contracts.history.confirmDeleteTerms', { year: pending.from });
+});
 
 const beginYear = computed(() =>
   Number(contract.value?.contractBegin.slice(0, 4) ?? new Date().getFullYear()),
@@ -256,19 +271,16 @@ function visibleRows<T>(rows: T[], expanded: boolean): T[] {
   return expanded ? rows : rows.slice(0, 1);
 }
 
-const olderLabel = (count: number, one = 'älteren Eintrag', many = 'ältere Einträge'): string =>
-  `${plural(count, one, many)} anzeigen`;
-
 const premiumPeriod = (p: PremiumDto): string =>
   p.validTo
     ? `${formatDate(p.validFrom)} – ${formatDate(p.validTo)}`
-    : `ab ${formatDate(p.validFrom)}`;
-const termsPeriod = (t: TermsDto): string =>
-  t.validToYear === null
-    ? `ab ${t.validFromYear}`
-    : t.validToYear === t.validFromYear
-      ? String(t.validFromYear)
-      : `${t.validFromYear} – ${t.validToYear}`;
+    : t('contracts.premiums.since', { date: formatDate(p.validFrom) });
+const termsPeriod = (terms: TermsDto): string =>
+  terms.validToYear === null
+    ? t('contracts.terms.since', { year: terms.validFromYear })
+    : terms.validToYear === terms.validFromYear
+      ? String(terms.validFromYear)
+      : `${terms.validFromYear} – ${terms.validToYear}`;
 
 // --- Year history (claim-free years & bonus) ---------------------------------
 
@@ -280,17 +292,22 @@ function yearStatus(y: BonusYearDto): {
   label: string;
   icon: IconDefinition;
 } {
-  const manual = y.bonusForfeitedOverride !== null ? ' (manuell)' : '';
-  if (y.forfeited) return { tone: 'open', label: `verwirkt${manual}`, icon: faCircleXmark };
+  const marked = (status: string): string =>
+    y.bonusForfeitedOverride !== null ? t('contracts.years.manual', { status }) : status;
+  if (y.forfeited) {
+    return { tone: 'open', label: marked(t('contracts.years.forfeited')), icon: faCircleXmark };
+  }
   if (y.pendingClaims > 0) {
     return {
       tone: 'submitted',
-      label: `in Gefahr (${y.pendingClaims} offen)`,
+      label: t('contracts.years.atRisk', { n: y.pendingClaims }),
       icon: faTriangleExclamation,
     };
   }
-  if (y.inProgress) return { tone: 'neutral', label: 'laufend', icon: faHourglassHalf };
-  return { tone: 'done', label: `leistungsfrei${manual}`, icon: faCircleCheck };
+  if (y.inProgress) {
+    return { tone: 'neutral', label: t('contracts.years.running'), icon: faHourglassHalf };
+  }
+  return { tone: 'done', label: marked(t('contracts.years.claimFree')), icon: faCircleCheck };
 }
 
 /**
@@ -302,9 +319,9 @@ const scaleOutdated = (y: BonusYearDto): boolean =>
   y.tiersInherited && y.hasBonusScale && !y.forfeited && y.actualBonus === null;
 
 function expectedLabel(y: BonusYearDto): string {
-  if (y.premiumMissing) return 'Beitrag fehlt';
-  if (y.expectedBonus === null) return 'keine Konditionen';
-  if (!y.hasBonusScale) return 'kein Bonus';
+  if (y.premiumMissing) return t('contracts.years.premiumMissing');
+  if (y.expectedBonus === null) return t('contracts.years.noTerms');
+  if (!y.hasBonusScale) return t('contracts.terms.noBonus');
   return formatMoney(y.expectedBonus);
 }
 
@@ -335,15 +352,15 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
         <EuDetailField
           v-model="values.contractNumber"
           :saved-value="saved.contractNumber"
-          label="Vertragsnummer"
+          :label="t('fields.contractNumber')"
           type="text"
           required
         />
-        <EuDetailField label="Versicherter" type="readonly" :model-value="accountName" />
+        <EuDetailField :label="t('fields.accountUID')" type="readonly" :model-value="accountName" />
         <EuDetailField
           v-model="values.companyUID"
           :saved-value="saved.companyUID"
-          label="Versicherung"
+          :label="t('fields.companyUID')"
           type="select"
           :options="options.companies ?? []"
           required
@@ -351,7 +368,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
         <EuDetailField
           v-model="values.contractKind"
           :saved-value="saved.contractKind"
-          label="Art"
+          :label="t('fields.contractKind')"
           type="select"
           :options="kindOptions"
           required
@@ -359,20 +376,20 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
         <EuDetailField
           v-model="values.contractBegin"
           :saved-value="saved.contractBegin"
-          label="Vertragsbeginn"
+          :label="t('fields.contractBegin')"
           type="date"
           required
         />
         <EuDetailField
           v-model="values.contractEnd"
           :saved-value="saved.contractEnd"
-          label="Vertragsende"
+          :label="t('fields.contractEnd')"
           type="date"
         />
         <EuDetailField
           v-model="values.bonusForfeitRule"
           :saved-value="saved.bonusForfeitRule"
-          label="Bonus verfällt"
+          :label="t('fields.bonusForfeitRule')"
           type="select"
           :options="forfeitOptions"
           required
@@ -380,14 +397,14 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
         <EuDetailField
           v-model="values.claimFreeYearsAtStart"
           :saved-value="saved.claimFreeYearsAtStart"
-          label="Leistungsfreie Jahre vorab"
+          :label="t('contracts.detail.claimFreeYearsAtStart')"
           type="text"
           required
         />
         <EuDetailField
           v-model="values.claimFreeCountingFromYear"
           :saved-value="saved.claimFreeCountingFromYear"
-          label="Zählbeginn (Jahr)"
+          :label="t('contracts.detail.claimFreeCountingFromYear')"
           type="text"
         />
       </EuDetailMask>
@@ -395,27 +412,29 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
 
       <section class="eu-contract__block" aria-labelledby="eu-contract-premiums">
         <div class="eu-contract__block-head">
-          <h3 id="eu-contract-premiums">Beitragsverlauf</h3>
+          <h3 id="eu-contract-premiums">{{ t('contracts.premiums.heading') }}</h3>
           <EuButton
             variant="secondary"
             :icon="faPlus"
             :disabled="!mayManage"
             :title="noPermission"
             @click="openPremium(null)"
-            >Beitragsanpassung erfassen</EuButton
+            >{{ t('contracts.premiums.add') }}</EuButton
           >
         </div>
         <p v-if="contract.premiums.length === 0" class="eu-contract__hint">
-          Noch kein Beitrag erfasst.
+          {{ t('contracts.premiums.empty') }}
         </p>
         <div v-else class="eu-contract__scroll eu-scroll-focus-safe">
           <table class="eu-contract__table">
             <thead>
               <tr>
-                <th scope="col">Gültig</th>
-                <th scope="col" class="eu-contract__num">Monatsbeitrag</th>
-                <th scope="col" class="eu-contract__num">bonusrelevant</th>
-                <th scope="col" class="eu-contract__actions">Aktionen</th>
+                <th scope="col">{{ t('contracts.premiums.colValid') }}</th>
+                <th scope="col" class="eu-contract__num">{{ t('fields.monthlyPremium') }}</th>
+                <th scope="col" class="eu-contract__num">
+                  {{ t('contracts.premiums.colRelevant') }}
+                </th>
+                <th scope="col" class="eu-contract__actions">{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -438,7 +457,9 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     variant="secondary"
                     icon-only
                     :icon="faPen"
-                    :aria-label="`Beitragsstand ab ${formatDate(premium.validFrom)} bearbeiten`"
+                    :aria-label="
+                      t('contracts.premiums.editAria', { date: formatDate(premium.validFrom) })
+                    "
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="openPremium(premium)"
@@ -447,14 +468,16 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     variant="secondary"
                     icon-only
                     :icon="faTrash"
-                    :aria-label="`Beitragsstand ab ${formatDate(premium.validFrom)} löschen`"
+                    :aria-label="
+                      t('contracts.premiums.deleteAria', { date: formatDate(premium.validFrom) })
+                    "
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="
                       pendingDelete = {
                         segment: 'premiums',
                         uid: premium.premiumUID,
-                        label: `den Beitragsstand ab ${formatDate(premium.validFrom)}`,
+                        from: premium.validFrom,
                       }
                     "
                   />
@@ -469,8 +492,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                   >
                     {{
                       showOlder.premiums
-                        ? 'Ältere Einträge ausblenden'
-                        : olderLabel(contract.premiums.length - 1)
+                        ? t('contracts.history.hideOlderEntries')
+                        : t('contracts.history.showOlderEntries', contract.premiums.length - 1)
                     }}
                   </button>
                 </td>
@@ -482,31 +505,33 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
 
       <section class="eu-contract__block" aria-labelledby="eu-contract-terms">
         <div class="eu-contract__block-head">
-          <h3 id="eu-contract-terms">Konditionen je Jahr</h3>
+          <h3 id="eu-contract-terms">{{ t('contracts.terms.heading') }}</h3>
           <EuButton
             variant="secondary"
             :icon="faPlus"
             :disabled="!mayManage"
             :title="noPermission"
             @click="openTerms(null)"
-            >Konditionen ab Jahr erfassen</EuButton
+            >{{ t('contracts.terms.add') }}</EuButton
           >
         </div>
         <p v-if="contract.terms.length === 0" class="eu-contract__hint">
-          Noch keine Konditionen erfasst.
+          {{ t('contracts.terms.empty') }}
         </p>
         <div v-else class="eu-contract__scroll eu-scroll-focus-safe">
           <table class="eu-contract__table">
             <thead>
               <tr>
-                <th scope="col">Jahre</th>
-                <th scope="col" class="eu-contract__num">Selbstbeteiligung</th>
-                <th scope="col" class="eu-contract__num">Obergrenze</th>
+                <th scope="col">{{ t('contracts.terms.colYears') }}</th>
+                <th scope="col" class="eu-contract__num">{{ t('fields.deductible') }}</th>
+                <th scope="col" class="eu-contract__num">{{ t('contracts.terms.colCap') }}</th>
                 <th scope="col" class="eu-contract__num">
-                  <abbr title="Erstattungssatz">Satz</abbr>
+                  <abbr :title="t('fields.reimbursementRate')">{{
+                    t('contracts.terms.colRate')
+                  }}</abbr>
                 </th>
-                <th scope="col">Bonus-Staffel</th>
-                <th scope="col" class="eu-contract__actions">Aktionen</th>
+                <th scope="col">{{ t('fields.bonusTiers') }}</th>
+                <th scope="col" class="eu-contract__actions">{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -518,14 +543,16 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                 <td class="eu-contract__num">{{ formatMoney(terms.deductible) }}</td>
                 <td class="eu-contract__num">
                   {{
-                    terms.reimbursementCap === null ? 'keine' : formatMoney(terms.reimbursementCap)
+                    terms.reimbursementCap === null
+                      ? t('contracts.terms.noCap')
+                      : formatMoney(terms.reimbursementCap)
                   }}
                 </td>
                 <td class="eu-contract__num">{{ formatPercent(terms.reimbursementRate) }}</td>
                 <td>
                   <ul v-if="terms.bonusTiers.length > 0" class="eu-contract__tiers">
                     <li v-for="tier in terms.bonusTiers" :key="tier.claimFreeYears">
-                      ab {{ tier.claimFreeYears }} J.:
+                      {{ t('contracts.terms.tierFrom', tier.claimFreeYears) }}
                       <abbr
                         v-if="tier.bonusFactor !== null"
                         :title="factorLabel(tier.bonusFactor)"
@@ -534,14 +561,14 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                       <template v-else>{{ formatMoney(tier.bonusAmount) }}</template>
                     </li>
                   </ul>
-                  <template v-else>kein Bonus</template>
+                  <template v-else>{{ t('contracts.terms.noBonus') }}</template>
                 </td>
                 <td class="eu-contract__actions">
                   <EuButton
                     variant="secondary"
                     icon-only
                     :icon="faPen"
-                    :aria-label="`Konditionen ab ${terms.validFromYear} bearbeiten`"
+                    :aria-label="t('contracts.terms.editAria', { year: terms.validFromYear })"
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="openTerms(terms)"
@@ -550,14 +577,14 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     variant="secondary"
                     icon-only
                     :icon="faTrash"
-                    :aria-label="`Konditionen ab ${terms.validFromYear} löschen`"
+                    :aria-label="t('contracts.terms.deleteAria', { year: terms.validFromYear })"
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="
                       pendingDelete = {
                         segment: 'terms',
                         uid: terms.termsUID,
-                        label: `die Konditionen ab ${terms.validFromYear}`,
+                        from: String(terms.validFromYear),
                       }
                     "
                   />
@@ -572,8 +599,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                   >
                     {{
                       showOlder.terms
-                        ? 'Ältere Einträge ausblenden'
-                        : olderLabel(contract.terms.length - 1)
+                        ? t('contracts.history.hideOlderEntries')
+                        : t('contracts.history.showOlderEntries', contract.terms.length - 1)
                     }}
                   </button>
                 </td>
@@ -585,27 +612,32 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
 
       <section class="eu-contract__block" aria-labelledby="eu-contract-years">
         <div class="eu-contract__block-head">
-          <h3 id="eu-contract-years">Jahresverlauf</h3>
+          <h3 id="eu-contract-years">{{ t('contracts.years.heading') }}</h3>
         </div>
         <p class="eu-contract__hint eu-contract__hint--intro">
-          Leistungsfreie Jahre werden aus Einreichungen und Erstattungen gezählt (Bonus verfällt
-          {{ BONUS_FORFEIT_RULE_LABEL[contract.bonusForfeitRule] }}).
+          {{
+            t('contracts.years.intro', {
+              rule: BONUS_FORFEIT_RULE_LABEL[contract.bonusForfeitRule],
+            })
+          }}
         </p>
         <p v-if="contract.years.length === 0" class="eu-contract__hint">
-          Noch kein Jahr zu zählen – der Zählbeginn liegt in der Zukunft.
+          {{ t('contracts.years.empty') }}
         </p>
         <div v-else class="eu-contract__scroll eu-scroll-focus-safe">
           <table class="eu-contract__table">
             <thead>
               <tr>
-                <th scope="col">Jahr</th>
-                <th scope="col">Status</th>
+                <th scope="col">{{ t('contracts.years.colYear') }}</th>
+                <th scope="col">{{ t('fields.status') }}</th>
                 <th scope="col" class="eu-contract__num">
-                  <abbr title="Leistungsfreie Jahre in Folge">In Folge</abbr>
+                  <abbr :title="t('contracts.years.streakTitle')">{{
+                    t('contracts.years.colStreak')
+                  }}</abbr>
                 </th>
-                <th scope="col" class="eu-contract__num">Bonus erwartet</th>
-                <th scope="col" class="eu-contract__num">Erhalten</th>
-                <th scope="col" class="eu-contract__actions">Aktionen</th>
+                <th scope="col" class="eu-contract__num">{{ t('contracts.years.colExpected') }}</th>
+                <th scope="col" class="eu-contract__num">{{ t('contracts.years.colReceived') }}</th>
+                <th scope="col" class="eu-contract__actions">{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -628,10 +660,10 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     {{ forecastBasis(y) }}
                   </span>
                   <span v-if="y.premiumMissing" class="eu-contract__stale">
-                    bonusrelevanter Beitrag nicht für jeden Monat erfasst
+                    {{ t('contracts.years.premiumGap') }}
                   </span>
                   <span v-if="scaleOutdated(y)" class="eu-contract__stale">
-                    nicht aktualisiert (Staffel {{ y.termsFromYear }})
+                    {{ t('contracts.years.scaleOutdated', { year: y.termsFromYear }) }}
                   </span>
                 </td>
                 <td class="eu-contract__num">
@@ -643,7 +675,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     variant="secondary"
                     icon-only
                     :icon="faPlus"
-                    :aria-label="`Konditionen und Staffel für ${y.year} erfassen`"
+                    :aria-label="t('contracts.years.addTermsAria', { year: y.year })"
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="openTerms(null, y.year)"
@@ -652,7 +684,7 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                     variant="secondary"
                     icon-only
                     :icon="faPen"
-                    :aria-label="`Jahr ${y.year} erfassen (Rückerstattung, Verwirkung)`"
+                    :aria-label="t('contracts.years.editAria', { year: y.year })"
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="openYear(y)"
@@ -668,8 +700,8 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
                   >
                     {{
                       showOlder.years
-                        ? 'Ältere Jahre ausblenden'
-                        : olderLabel(contract.years.length - 1, 'älteres Jahr', 'ältere Jahre')
+                        ? t('contracts.history.hideOlderYears')
+                        : t('contracts.history.showOlderYears', contract.years.length - 1)
                     }}
                   </button>
                 </td>
@@ -681,9 +713,9 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
     </template>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.close') }}</EuButton>
       <EuButton v-if="mayManage" :disabled="mask.busy || !contract" @click="saveMask">{{
-        mask.busy ? 'Speichern…' : 'Speichern'
+        mask.busy ? t('common.saving') : t('common.save')
       }}</EuButton>
     </template>
   </EuDialog>
@@ -716,12 +748,18 @@ async function saveYear(payload: ContractYearInput): Promise<void> {
     @close="yearDialog.open = false"
     @submit="saveYear"
   />
-  <EuDialog :open="pendingDelete !== null" title="Eintrag löschen" @close="pendingDelete = null">
-    <p>Soll {{ pendingDelete?.label }} wirklich gelöscht werden?</p>
+  <EuDialog
+    :open="pendingDelete !== null"
+    :title="t('contracts.history.deleteTitle')"
+    @close="pendingDelete = null"
+  >
+    <p>{{ deleteQuestion }}</p>
     <p v-if="removal.error" class="eu-contract__error" role="alert">{{ removal.error }}</p>
     <template #footer>
-      <EuButton variant="secondary" @click="pendingDelete = null">Abbrechen</EuButton>
-      <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
+      <EuButton variant="secondary" @click="pendingDelete = null">{{
+        t('common.cancel')
+      }}</EuButton>
+      <EuButton :disabled="removal.busy" @click="confirmDelete">{{ t('common.delete') }}</EuButton>
     </template>
   </EuDialog>
 </template>

@@ -2296,5 +2296,12 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - **Rollen und Rechte (Entscheidung des Autors):** System-Rollen werden über ihren gesäten Namen (`Admin`, `Nutzer`) aus `roles.system.*` benannt, eigene Rollen zeigen den DB-Wert; Rechte über `permissions.<KEY>` (`Record` über `PermissionKey`), der Schlüssel bleibt als Tooltip (`admin/role-names.ts`).
 - `no-raw-text` gilt jetzt zusätzlich für `components/resource/`, `agencies/`, `admin/`, `profile/`, `trash/`. Die Vorschau der Erinnerungsmails (Betreff/Text) kommt weiter deutsch von der API — Mail-Katalog in Slice 82.
 
+### Slice 80 — Policen und Startseite (umgesetzt 2026-10-06, `1.2.0-slice.4`)
+- **Badges der Rechnungen bleiben bei 81 (Entscheidung des Autors):** Die Startseite zeigt `STATUS_DISPLAY`, `PAYMENT_DISPLAY`, `POLICY_STATUS_BADGE` und `bonusView` aus `invoices/`; sie wandern mit ihren Bereichen in Slice 81. Bis dahin ist die Startseite auf `?lang=en` gemischt.
+- **Zählformen aus dem Katalog statt `plural()`:** „ältere Einträge/Jahre anzeigen“, die Prognose im Jahres-Dialog und die offenen Rechnungen der Startseite zählen mit den Pluralformen von vue-i18n. Der Faktor einer Bonus-Stufe wählt die Form nach der Zahl (1,5 zählt als Mehrzahl) und zeigt sie formatiert.
+- **Lösch-Rückfrage als ganzer Satz je Art:** Die Police merkt sich für den Löschdialog Art und Beginn des Eintrags statt einer deutschen Nominalphrase; der Satz entsteht beim Anzeigen.
+- Auswahllisten (Art, Bonus-Verfall, Stufen-Art, Verwirkung) sind `computed`, damit sie einem Sprachwechsel folgen. Feldnamen kommen, wo vorhanden, aus `fields.*`.
+- `no-raw-text` gilt jetzt zusätzlich für `contracts/` und `dashboard/`.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

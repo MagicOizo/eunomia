@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -7,7 +8,7 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
-import { formatMoney, plural } from '../lib/format';
+import { formatMoney } from '../lib/format';
 import type { BonusYearDto, ContractYearInput } from './api';
 import { forecastBasis } from './bonus-labels';
 
@@ -21,15 +22,28 @@ const props = defineProps<FormDialogProps & { year: BonusYearDto | null }>();
 
 const emit = defineEmits<{ close: []; submit: [payload: ContractYearInput] }>();
 
+const { t } = useI18n();
+
 const actualBonus = ref<number | null>(null);
 const forfeitChoice = ref<'auto' | 'yes' | 'no'>('auto');
 const note = ref('');
 
-const forfeitOptions = [
-  { value: 'auto', label: 'Automatisch aus den Einreichungen' },
-  { value: 'yes', label: 'Ja, Bonus verwirkt' },
-  { value: 'no', label: 'Nein, Jahr ist leistungsfrei' },
-];
+const forfeitOptions = computed(() => [
+  { value: 'auto', label: t('contracts.yearDialog.forfeitAuto') },
+  { value: 'yes', label: t('contracts.yearDialog.forfeitYes') },
+  { value: 'no', label: t('contracts.yearDialog.forfeitNo') },
+]);
+
+/** The forecast for the year, with how a factor tier arrived at it. */
+const forecast = computed(() => {
+  const year = props.year;
+  if (!year) return '';
+  if (year.premiumMissing) return t('contracts.yearDialog.forecastPremiumMissing');
+  if (year.expectedBonus === null) return t('contracts.yearDialog.forecastNoTerms');
+  const amount = formatMoney(year.expectedBonus);
+  const basis = year.forfeited ? null : forecastBasis(year);
+  return basis ? t('contracts.yearDialog.forecastWithBasis', { amount, basis }) : amount;
+});
 
 const { shownError } = useFormDialog(
   props,
@@ -54,41 +68,30 @@ function submit(): void {
 </script>
 
 <template>
-  <EuDialog :open="open" :title="`Jahr ${year?.year ?? ''} erfassen`" @close="emit('close')">
+  <EuDialog
+    :open="open"
+    :title="t('contracts.yearDialog.title', { year: year?.year ?? '' })"
+    @close="emit('close')"
+  >
     <form class="eu-form" @submit.prevent="submit">
       <p v-if="year" class="eu-form__note">
-        Prognose:
-        {{
-          year.premiumMissing
-            ? 'offen, der bonusrelevante Beitrag ist nicht für jeden Monat erfasst'
-            : year.expectedBonus === null
-              ? 'keine Konditionen erfasst'
-              : formatMoney(year.expectedBonus)
-        }}
-        <template v-if="!year.forfeited && forecastBasis(year)"
-          >({{ forecastBasis(year) }})</template
-        >
-        bei {{ plural(year.claimFreeStreak, 'leistungsfreien Jahr', 'leistungsfreien Jahren') }} in
-        Folge.
+        {{ t('contracts.yearDialog.forecast', { forecast }, year.claimFreeStreak) }}
       </p>
-      <EuCurrencyField
-        v-model="actualBonus"
-        label="Tatsächlich erhaltene Beitragsrückerstattung (laut Schreiben)"
-      />
+      <EuCurrencyField v-model="actualBonus" :label="t('contracts.yearDialog.actualBonus')" />
       <EuEntityPicker
         :model-value="forfeitChoice"
-        label="Bonus verwirkt"
+        :label="t('fields.bonusForfeited')"
         required
         :options="forfeitOptions"
         @update:model-value="forfeitChoice = ($event as 'auto' | 'yes' | 'no' | null) ?? 'auto'"
       />
-      <EuTextField v-model="note" label="Notiz (optional)" />
+      <EuTextField v-model="note" :label="t('contracts.yearDialog.noteOptional')" />
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">{{
-        submitting ? 'Speichern…' : 'Speichern'
+        submitting ? t('common.saving') : t('common.save')
       }}</EuButton>
     </template>
   </EuDialog>

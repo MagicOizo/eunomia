@@ -108,6 +108,8 @@ export default tseslint.config(
       'apps/web/src/admin/**/*.vue',
       'apps/web/src/profile/**/*.vue',
       'apps/web/src/trash/**/*.vue',
+      'apps/web/src/contracts/**/*.vue',
+      'apps/web/src/dashboard/**/*.vue',
     ],
     rules: {
       '@intlify/vue-i18n/no-raw-text': [

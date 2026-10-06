@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -36,6 +37,8 @@ const props = defineProps<
 
 const emit = defineEmits<{ close: []; submit: [payload: TermsInput] }>();
 
+const { t } = useI18n();
+
 const validFromYear = ref('');
 const deductible = ref<number | null>(null);
 const reimbursementCap = ref<number | null>(null);
@@ -47,10 +50,10 @@ const tiers = ref<Array<{ years: string; kind: TierKind; factor: string; amount:
   [],
 );
 
-const kindOptions = [
-  { value: 'factor', label: 'Monatsbeiträge' },
-  { value: 'amount', label: 'Betrag in €' },
-];
+const kindOptions = computed(() => [
+  { value: 'factor', label: t('contracts.terms.kindFactor') },
+  { value: 'amount', label: t('contracts.terms.kindAmount') },
+]);
 
 /** A factor as typed, "1,5" or "1.5"; NaN unless it is positive with at most two decimals. */
 function parseFactor(text: string): number {
@@ -96,10 +99,10 @@ function submit(): void {
   const year = Number(validFromYear.value);
   const rate = Number(reimbursementRate.value.replace(',', '.'));
   if (!Number.isInteger(year) || year < props.minYear) {
-    return fail(`Bitte ein Jahr ab ${props.minYear} (Vertragsbeginn) angeben.`);
+    return fail(t('contracts.terms.yearTooEarly', { year: props.minYear }));
   }
   if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
-    return fail('Der Erstattungssatz muss zwischen 0 und 100 % liegen.');
+    return fail(t('contracts.terms.rateRange'));
   }
   const bonusTiers = tiers.value.map((tier) => ({
     claimFreeYears: Number(tier.years),
@@ -116,12 +119,10 @@ function submit(): void {
         Number.isNaN(tier.bonusFactor),
     )
   ) {
-    return fail(
-      'Jede Bonus-Stufe braucht leistungsfreie Jahre (1–99) und einen Betrag oder einen Faktor (z. B. 1,5).',
-    );
+    return fail(t('contracts.terms.tierInvalid'));
   }
   if (new Set(bonusTiers.map((tier) => tier.claimFreeYears)).size !== bonusTiers.length) {
-    return fail('Jede Anzahl leistungsfreier Jahre darf nur einmal vorkommen.');
+    return fail(t('contracts.terms.tierDuplicate'));
   }
   bonusTiers.sort((a, b) => a.claimFreeYears - b.claimFreeYears);
   emit('submit', {
@@ -137,56 +138,59 @@ function submit(): void {
 <template>
   <EuDialog
     :open="open"
-    :title="entry ? 'Konditionen bearbeiten' : 'Konditionen ab Jahr erfassen'"
+    :title="entry ? t('contracts.terms.editTitle') : t('contracts.terms.add')"
     @close="emit('close')"
   >
     <form class="eu-form" @submit.prevent="submit">
       <p v-if="copiedFrom !== null" class="eu-form__note">
-        Werte aus den Konditionen ab {{ copiedFrom }} übernommen – bitte prüfen und anpassen.
+        {{ t('contracts.terms.copiedFrom', { year: copiedFrom }) }}
       </p>
-      <EuTextField v-model="validFromYear" label="Gültig ab Jahr" type="number" />
-      <EuCurrencyField v-model="deductible" label="Selbstbeteiligung pro Jahr" />
-      <EuCurrencyField
-        v-model="reimbursementCap"
-        label="Erstattungsobergrenze pro Jahr (leer = keine)"
+      <EuTextField v-model="validFromYear" :label="t('fields.validFromYear')" type="number" />
+      <EuCurrencyField v-model="deductible" :label="t('contracts.terms.deductiblePerYear')" />
+      <EuCurrencyField v-model="reimbursementCap" :label="t('contracts.terms.capPerYear')" />
+      <EuTextField
+        v-model="reimbursementRate"
+        :label="t('contracts.terms.ratePercent')"
+        type="number"
       />
-      <EuTextField v-model="reimbursementRate" label="Erstattungssatz (%)" type="number" />
       <fieldset class="eu-tiers">
-        <legend>Bonus-Staffel (Beitragsrückerstattung)</legend>
-        <p class="eu-form__note">
-          Je Stufe ein Faktor in Monatsbeiträgen – gerechnet mit dem Jahresdurchschnitt des
-          bonusrelevanten Beitrags – oder ein fester Betrag für die Jahre dieser Konditionen. Ohne
-          Stufen hat die Police keinen Bonus.
-        </p>
+        <legend>{{ t('contracts.terms.scaleLegend') }}</legend>
+        <p class="eu-form__note">{{ t('contracts.terms.scaleNote') }}</p>
         <div v-for="(tier, index) in tiers" :key="index" class="eu-tiers__row">
-          <EuTextField v-model="tier.years" label="Leistungsfreie Jahre" type="number" />
+          <EuTextField v-model="tier.years" :label="t('fields.claimFreeYears')" type="number" />
           <EuEntityPicker
             :model-value="tier.kind"
-            label="Bonus als"
+            :label="t('contracts.terms.tierKind')"
             required
             :options="kindOptions"
             @update:model-value="tier.kind = ($event as TierKind | null) ?? tier.kind"
           />
-          <EuTextField v-if="tier.kind === 'factor'" v-model="tier.factor" label="Monatsbeiträge" />
-          <EuCurrencyField v-else v-model="tier.amount" label="Bonus" />
+          <EuTextField
+            v-if="tier.kind === 'factor'"
+            v-model="tier.factor"
+            :label="t('contracts.terms.kindFactor')"
+          />
+          <EuCurrencyField v-else v-model="tier.amount" :label="t('fields.bonusAmount')" />
           <EuButton
             variant="secondary"
             icon-only
             :icon="faTrash"
-            :aria-label="`Bonus-Stufe ${index + 1} entfernen`"
+            :aria-label="t('contracts.terms.removeTier', { n: index + 1 })"
             @click="tiers.splice(index, 1)"
           />
         </div>
         <div>
-          <EuButton variant="secondary" :icon="faPlus" @click="addTier">Stufe hinzufügen</EuButton>
+          <EuButton variant="secondary" :icon="faPlus" @click="addTier">{{
+            t('contracts.terms.addTier')
+          }}</EuButton>
         </div>
       </fieldset>
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">{{
-        submitting ? 'Speichern…' : 'Speichern'
+        submitting ? t('common.saving') : t('common.save')
       }}</EuButton>
     </template>
   </EuDialog>

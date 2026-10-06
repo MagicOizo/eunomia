@@ -2,21 +2,18 @@
 import { PERMISSIONS } from '@eunomia/shared';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
+import { CONTRACT_KIND_LABEL } from '../contracts/api';
 import EuBadge from '../design-system/components/EuBadge.vue';
 import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY } from '../invoices/payment';
 import { POLICY_STATUS_BADGE, bonusView, percentOf } from '../invoices/recommendation';
 import { STATUS_DISPLAY } from '../invoices/status';
 import { describeError } from '../lib/errors';
-import { formatDate, formatMoney, plural } from '../lib/format';
+import { formatDate, formatMoney } from '../lib/format';
 import { useAuthStore } from '../stores/auth';
 import DashboardYearChart from './DashboardYearChart.vue';
-import {
-  type DashboardAccountDto,
-  type DashboardDto,
-  type DashboardPolicyDto,
-  loadDashboard,
-} from './api';
+import { type DashboardAccountDto, type DashboardDto, loadDashboard } from './api';
 
 /**
  * The start page (issues.md 0.15.0-3): the household's figures instead of
@@ -30,6 +27,7 @@ import {
  * zero, and a zero would claim something it does not know.
  */
 
+const { t } = useI18n();
 const auth = useAuthStore();
 
 const dashboard = ref<DashboardDto | null>(null);
@@ -73,30 +71,46 @@ const tiles = computed<Tile[]>(() => {
     result.push(
       {
         key: 'invoices',
-        label: 'Rechnungen',
+        label: t('dashboard.tiles.invoices'),
         value: String(totals.invoiceCount),
-        note: data.since ? `seit ${formatDate(data.since)}` : undefined,
+        note: data.since ? t('dashboard.tiles.since', { date: formatDate(data.since) }) : undefined,
       },
-      { key: 'amount', label: 'Rechnungsbetrag', value: formatMoney(totals.invoiceAmount) },
-      { key: 'reimbursed', label: 'Erstattet', value: formatMoney(totals.reimbursed) },
+      {
+        key: 'amount',
+        label: t('dashboard.tiles.amount'),
+        value: formatMoney(totals.invoiceAmount),
+      },
+      {
+        key: 'reimbursed',
+        label: t('dashboard.tiles.reimbursed'),
+        value: formatMoney(totals.reimbursed),
+      },
       {
         key: 'selfBorne',
-        label: 'Eigenanteil',
+        label: t('dashboard.tiles.selfBorne'),
         value: formatMoney(totals.selfBorne),
-        note: 'alles nicht Erstattete',
+        note: t('dashboard.tiles.selfBorneNote'),
       },
     );
   }
   if (seesContracts.value) {
-    result.push({ key: 'bonus', label: 'Bonus erhalten', value: formatMoney(totals.bonusPaid) });
+    result.push({
+      key: 'bonus',
+      label: t('dashboard.tiles.bonus'),
+      value: formatMoney(totals.bonusPaid),
+    });
   }
   if (seesAccounts.value) {
-    result.push({ key: 'accounts', label: 'Versicherte', value: String(totals.accountCount) });
+    result.push({
+      key: 'accounts',
+      label: t('dashboard.tiles.accounts'),
+      value: String(totals.accountCount),
+    });
   }
   if (seesContracts.value) {
     result.push({
       key: 'contracts',
-      label: 'Laufende Policen',
+      label: t('dashboard.tiles.contracts'),
       value: String(totals.contractCount),
     });
   }
@@ -120,31 +134,28 @@ function underWay(account: DashboardAccountDto): number {
 function nothingOpen(account: DashboardAccountDto): boolean {
   return account.payment.unpaidCount === 0 && underWay(account) === 0;
 }
-
-const kindLabel = (policy: DashboardPolicyDto): string =>
-  policy.contractKind === 'FULL' ? 'Vollversicherung' : 'Zusatzversicherung';
 </script>
 
 <template>
   <section class="eu-dashboard">
     <h2 class="eu-dashboard__greeting">
-      Willkommen{{ auth.user ? `, ${auth.user.firstname}` : '' }}.
+      {{
+        auth.user
+          ? t('dashboard.greetingName', { name: auth.user.firstname })
+          : t('dashboard.greeting')
+      }}
     </h2>
-    <p class="eu-dashboard__lead">
-      Eunomia begleitet den Weg einer Rechnung von der Erfassung über die Einreichung bei der
-      Versicherung bis zur Erstattung.
-    </p>
+    <p class="eu-dashboard__lead">{{ t('dashboard.lead') }}</p>
 
-    <p v-if="!seesAnything" class="eu-dashboard__hint">
-      Für die Zahlen auf der Startseite fehlen dir noch die Rechte. Wende dich an die Person, die
-      Eunomia verwaltet.
+    <p v-if="!seesAnything" class="eu-dashboard__hint">{{ t('dashboard.noRights') }}</p>
+    <p v-else-if="loading" class="eu-dashboard__hint" role="status">
+      {{ t('common.loading') }}
     </p>
-    <p v-else-if="loading" class="eu-dashboard__hint" role="status">Wird geladen…</p>
     <p v-else-if="loadError" class="eu-dashboard__error" role="alert">{{ loadError }}</p>
 
     <template v-else-if="dashboard">
       <section class="eu-dashboard__block" aria-labelledby="eu-dashboard-totals">
-        <h3 id="eu-dashboard-totals">Überblick</h3>
+        <h3 id="eu-dashboard-totals">{{ t('dashboard.overview') }}</h3>
         <dl class="eu-dashboard__tiles">
           <div v-for="tile in tiles" :key="tile.key" class="eu-dashboard__tile">
             <dt>{{ tile.label }}</dt>
@@ -152,14 +163,21 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
             <dd v-if="tile.note" class="eu-dashboard__note">{{ tile.note }}</dd>
           </div>
         </dl>
-        <p v-if="noInvoices" class="eu-dashboard__hint">
-          Noch keine Rechnung erfasst — das beginnt unter
-          <RouterLink to="/invoices">Rechnungen</RouterLink>.
-        </p>
+        <i18n-t
+          v-if="noInvoices"
+          keypath="dashboard.noInvoices"
+          tag="p"
+          scope="global"
+          class="eu-dashboard__hint"
+        >
+          <template #link>
+            <RouterLink to="/invoices">{{ t('dashboard.invoicesLink') }}</RouterLink>
+          </template>
+        </i18n-t>
       </section>
 
       <section v-if="showYears" class="eu-dashboard__block" aria-labelledby="eu-dashboard-years">
-        <h3 id="eu-dashboard-years">Je Behandlungsjahr</h3>
+        <h3 id="eu-dashboard-years">{{ t('dashboard.perYear') }}</h3>
         <DashboardYearChart :years="dashboard.years" />
       </section>
 
@@ -168,7 +186,7 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
         class="eu-dashboard__block"
         aria-labelledby="eu-dashboard-accounts"
       >
-        <h3 id="eu-dashboard-accounts">Je versicherte Person</h3>
+        <h3 id="eu-dashboard-accounts">{{ t('dashboard.perAccount') }}</h3>
         <ul class="eu-dashboard__people">
           <li
             v-for="account in dashboard.accounts"
@@ -181,13 +199,15 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
               }}</RouterLink>
             </h4>
 
-            <p v-if="nothingOpen(account)" class="eu-dashboard__quiet">Nichts offen.</p>
+            <p v-if="nothingOpen(account)" class="eu-dashboard__quiet">
+              {{ t('dashboard.nothingOpen') }}
+            </p>
             <template v-else>
               <div class="eu-dashboard__fact">
-                <span class="eu-dashboard__label">Zu bezahlen</span>
-                <span v-if="account.payment.unpaidCount === 0">nichts</span>
+                <span class="eu-dashboard__label">{{ t('dashboard.toPay') }}</span>
+                <span v-if="account.payment.unpaidCount === 0">{{ t('dashboard.nothing') }}</span>
                 <span v-else>
-                  {{ plural(account.payment.unpaidCount, 'Rechnung', 'Rechnungen') }} ·
+                  {{ t('dashboard.invoiceCount', account.payment.unpaidCount) }} ·
                   {{ formatMoney(account.payment.unpaidAmount) }}
                 </span>
               </div>
@@ -200,20 +220,20 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
                   :style="{ color: `var(${PAYMENT_COLOR_VAR.overdue})` }"
                 >
                   <FontAwesomeIcon :icon="PAYMENT_DISPLAY.overdue.icon" aria-hidden="true" />
-                  {{ account.payment.overdueCount }} überfällig
+                  {{ t('dashboard.overdue', { n: account.payment.overdueCount }) }}
                 </li>
                 <li
                   v-if="account.payment.dueCount > 0"
                   :style="{ color: `var(${PAYMENT_COLOR_VAR.due})` }"
                 >
                   <FontAwesomeIcon :icon="PAYMENT_DISPLAY.due.icon" aria-hidden="true" />
-                  {{ account.payment.dueCount }} fällig
+                  {{ t('dashboard.due', { n: account.payment.dueCount }) }}
                 </li>
               </ul>
 
               <div class="eu-dashboard__fact">
-                <span class="eu-dashboard__label">Erstattung unterwegs</span>
-                <span v-if="underWay(account) === 0">nichts</span>
+                <span class="eu-dashboard__label">{{ t('dashboard.underWay') }}</span>
+                <span v-if="underWay(account) === 0">{{ t('dashboard.nothing') }}</span>
               </div>
               <div v-if="underWay(account) > 0" class="eu-dashboard__badges">
                 <template v-for="status in WORKFLOW_OPEN" :key="status">
@@ -230,7 +250,7 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
             </template>
 
             <div v-if="account.policies.length > 0" class="eu-dashboard__policies">
-              <h5>Policen {{ account.year }}</h5>
+              <h5>{{ t('dashboard.policies', { year: account.year }) }}</h5>
               <article
                 v-for="policy in account.policies"
                 :key="policy.contractUID"
@@ -240,7 +260,7 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
                   <span>
                     <strong>{{ policy.contractNumber }}</strong>
                     <span class="eu-dashboard__sub">
-                      {{ policy.companyName }} · {{ kindLabel(policy) }}
+                      {{ policy.companyName }} · {{ CONTRACT_KIND_LABEL[policy.contractKind] }}
                     </span>
                   </span>
                   <EuBadge
@@ -253,11 +273,17 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
                 </header>
 
                 <div class="eu-dashboard__fact">
-                  <span class="eu-dashboard__label">Selbstbeteiligung</span>
-                  <span v-if="!policy.hasTerms">keine Konditionen</span>
-                  <span v-else-if="policy.deductible === 0">keine</span>
-                  <span v-else-if="policy.deductibleLeft === 0">erreicht</span>
-                  <span v-else>noch {{ formatMoney(policy.deductibleLeft) }} offen</span>
+                  <span class="eu-dashboard__label">{{ t('fields.deductible') }}</span>
+                  <span v-if="!policy.hasTerms">{{ t('contracts.years.noTerms') }}</span>
+                  <span v-else-if="policy.deductible === 0">{{
+                    t('dashboard.deductibleNone')
+                  }}</span>
+                  <span v-else-if="policy.deductibleLeft === 0">{{
+                    t('dashboard.deductibleReached')
+                  }}</span>
+                  <span v-else>{{
+                    t('dashboard.deductibleLeft', { amount: formatMoney(policy.deductibleLeft) })
+                  }}</span>
                 </div>
                 <div
                   v-if="policy.hasTerms && policy.deductible > 0"
@@ -272,11 +298,16 @@ const kindLabel = (policy: DashboardPolicyDto): string =>
                   v-if="policy.hasTerms && policy.deductible > 0"
                   class="eu-dashboard__sub eu-dashboard__bar-note"
                 >
-                  {{ formatMoney(policy.deductibleUsed) }} von {{ formatMoney(policy.deductible) }}
+                  {{
+                    t('dashboard.deductibleOf', {
+                      used: formatMoney(policy.deductibleUsed),
+                      total: formatMoney(policy.deductible),
+                    })
+                  }}
                 </p>
 
                 <div class="eu-dashboard__fact">
-                  <span class="eu-dashboard__label">Bonus</span>
+                  <span class="eu-dashboard__label">{{ t('dashboard.bonus') }}</span>
                   <EuBadge compact :tone="bonusView(policy).tone" :icon="bonusView(policy).icon">
                     {{ bonusView(policy).label }}
                   </EuBadge>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import { formatMoney } from '../lib/format';
 import type { DashboardYearDto } from './api';
@@ -16,14 +17,23 @@ import { CHART, layoutChart, tickLabel } from './dashboard-chart';
  */
 const props = defineProps<{ years: DashboardYearDto[] }>();
 
+const { t } = useI18n();
+
 const layout = computed(() => layoutChart(props.years));
 const hovered = ref<number | null>(null);
 
-const SERIES = [
-  { key: 'reimbursed', label: 'Erstattet', color: 'var(--eu-color-chart-1)' },
-  { key: 'selfBorne', label: 'Eigenanteil', color: 'var(--eu-color-chart-2)' },
-  { key: 'bonusPaid', label: 'Bonus', color: 'var(--eu-color-chart-3)' },
-] as const;
+const SERIES = computed(
+  () =>
+    [
+      {
+        key: 'reimbursed',
+        label: t('dashboard.chart.reimbursed'),
+        color: 'var(--eu-color-chart-1)',
+      },
+      { key: 'selfBorne', label: t('dashboard.chart.selfBorne'), color: 'var(--eu-color-chart-2)' },
+      { key: 'bonusPaid', label: t('dashboard.chart.bonus'), color: 'var(--eu-color-chart-3)' },
+    ] as const,
+);
 
 const hoveredYear = computed(() => props.years.find((y) => y.year === hovered.value) ?? null);
 /**
@@ -129,7 +139,9 @@ onMounted(() => {
         aria-hidden="true"
       >
         <strong>{{ hoveredYear.year }}</strong>
-        <span>Rechnungen {{ formatMoney(hoveredYear.invoiceAmount) }}</span>
+        <span>{{
+          t('dashboard.chart.invoices', { amount: formatMoney(hoveredYear.invoiceAmount) })
+        }}</span>
         <span v-for="series in SERIES" :key="series.key">
           <span class="eu-yearchart__swatch" :style="{ background: series.color }" />
           {{ series.label }} {{ formatMoney(hoveredYear[series.key]) }}
@@ -138,17 +150,17 @@ onMounted(() => {
     </div>
 
     <details class="eu-yearchart__details">
-      <summary>Zahlen je Jahr</summary>
+      <summary>{{ t('dashboard.chart.details') }}</summary>
       <div class="eu-yearchart__table-wrap">
         <table class="eu-yearchart__table">
           <thead>
             <tr>
-              <th scope="col">Behandlungsjahr</th>
-              <th scope="col" class="num">Rechnungen</th>
-              <th scope="col" class="num">Betrag</th>
-              <th scope="col" class="num">Erstattet</th>
-              <th scope="col" class="num">Eigenanteil</th>
-              <th scope="col" class="num">Bonus</th>
+              <th scope="col">{{ t('dashboard.chart.colYear') }}</th>
+              <th scope="col" class="num">{{ t('dashboard.chart.colInvoices') }}</th>
+              <th scope="col" class="num">{{ t('dashboard.chart.colAmount') }}</th>
+              <th scope="col" class="num">{{ t('dashboard.chart.reimbursed') }}</th>
+              <th scope="col" class="num">{{ t('dashboard.chart.selfBorne') }}</th>
+              <th scope="col" class="num">{{ t('dashboard.chart.bonus') }}</th>
             </tr>
           </thead>
           <tbody>

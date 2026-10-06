@@ -7,6 +7,17 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.0-slice.4 — 2026-10-06
+
+The fourth preview of 1.2.0. The UI still starts in German for everyone.
+
+- **Policies and the start page speak the UI language.** The policy dialog with its premium,
+  terms and year histories, the forms for premiums, terms with their bonus scale and a single
+  year, the start page and its year chart take their texts from the catalogues. A bonus factor
+  reads "1.5 monthly premiums" in English, "1,5 Monatsbeiträge" in German.
+- The badges for the invoice status, the payment light and the policy and bonus advice on the
+  start page follow with the invoices in the next preview.
+
 ## 1.2.0-slice.3 — 2026-10-06
 
 The third preview of 1.2.0. The UI still starts in German for everyone.

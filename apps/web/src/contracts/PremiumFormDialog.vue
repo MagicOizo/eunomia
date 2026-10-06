@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCurrencyField from '../design-system/components/EuCurrencyField.vue';
@@ -25,6 +26,8 @@ const props = defineProps<
 
 const emit = defineEmits<{ close: []; submit: [payload: PremiumInput] }>();
 
+const { t } = useI18n();
+
 const validFrom = ref('');
 const monthlyPremium = ref<number | null>(null);
 const bonusRelevantPremium = ref<number | null>(null);
@@ -44,12 +47,12 @@ const { shownError, fail, clear } = useFormDialog(
 
 function submit(): void {
   clear();
-  if (!validFrom.value) return fail('Bitte „Gültig ab" ausfüllen.');
+  if (!validFrom.value) return fail(t('contracts.premiums.validFromRequired'));
   if (monthlyPremium.value === null && bonusRelevantPremium.value === null) {
-    return fail('Bitte den Monatsbeitrag, den bonusrelevanten Beitrag oder beide angeben.');
+    return fail(t('contracts.premiums.amountRequired'));
   }
   if (validFrom.value < props.minDate) {
-    return fail('Ein Beitrag kann nicht vor Vertragsbeginn gelten.');
+    return fail(t('contracts.premiums.beforeBegin'));
   }
   emit('submit', {
     validFrom: validFrom.value,
@@ -63,25 +66,21 @@ function submit(): void {
 <template>
   <EuDialog
     :open="open"
-    :title="entry ? 'Beitragsstand bearbeiten' : 'Beitragsanpassung erfassen'"
+    :title="entry ? t('contracts.premiums.editTitle') : t('contracts.premiums.add')"
     @close="emit('close')"
   >
     <form class="eu-form" @submit.prevent="submit">
-      <EuTextField v-model="validFrom" label="Gültig ab" type="date" />
-      <EuCurrencyField v-model="monthlyPremium" label="Monatsbeitrag gesamt (optional)" />
-      <EuCurrencyField v-model="bonusRelevantPremium" label="Bonusrelevanter Monatsbeitrag" />
-      <p class="eu-form__note">
-        Der bonusrelevante Beitrag ist der Teil, auf den die Versicherung die Beitragsrückerstattung
-        rechnet – meist nur der Haupttarif. Bonus-Stufen in Monatsbeiträgen rechnen mit seinem
-        Jahresdurchschnitt.
-      </p>
-      <EuTextField v-model="note" label="Notiz (z. B. Anlass der Anpassung)" />
+      <EuTextField v-model="validFrom" :label="t('fields.validFrom')" type="date" />
+      <EuCurrencyField v-model="monthlyPremium" :label="t('contracts.premiums.monthlyOptional')" />
+      <EuCurrencyField v-model="bonusRelevantPremium" :label="t('fields.bonusRelevantPremium')" />
+      <p class="eu-form__note">{{ t('contracts.premiums.relevantNote') }}</p>
+      <EuTextField v-model="note" :label="t('contracts.premiums.noteLabel')" />
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">{{
-        submitting ? 'Speichern…' : 'Speichern'
+        submitting ? t('common.saving') : t('common.save')
       }}</EuButton>
     </template>
   </EuDialog>
