@@ -13,6 +13,7 @@ import {
   faSackDollar,
 } from '@fortawesome/free-solid-svg-icons';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import { invoicePaymentDetail, paymentDetailLabel } from '../agencies/payment-details';
 import type { AgencyPaymentDetailDto } from '../agencies/api';
@@ -33,6 +34,8 @@ const props = defineProps<{
    */
   paymentDetails?: AgencyPaymentDetailDto[];
 }>();
+
+const { t } = useI18n();
 
 const dueColor = computed(() => `var(${PAYMENT_COLOR_VAR[paymentState(props.invoice)]})`);
 
@@ -56,7 +59,7 @@ const showQr = computed(
 </script>
 
 <template>
-  <EuPopover title="Zahlungsinformationen">
+  <EuPopover :title="t('invoices.paymentInfo.title')">
     <!-- Forwarded so the caller's own trigger button can carry the popover's
          open state (EuPopover hands it to the slot). -->
     <template #trigger="triggerProps">
@@ -68,30 +71,42 @@ const showQr = computed(
          bubble compact. -->
     <dl class="eu-pay-grid">
       <template v-if="facilityName">
-        <dt><EuIconLabel :icon="faHouseMedical" label="Leistungserbringer" /></dt>
+        <dt><EuIconLabel :icon="faHouseMedical" :label="t('fields.facilityUID')" /></dt>
         <dd>{{ facilityName }}</dd>
       </template>
 
       <template v-if="invoice.transferUntilDate">
-        <dt><EuIconLabel :icon="faCalendarDay" label="Zahlungsziel" :color="dueColor" /></dt>
+        <dt>
+          <EuIconLabel
+            :icon="faCalendarDay"
+            :label="t('fields.transferUntilDate')"
+            :color="dueColor"
+          />
+        </dt>
         <dd>{{ formatDate(invoice.transferUntilDate) }}</dd>
       </template>
 
       <template v-if="invoice.transferDate">
-        <dt><EuIconLabel :icon="faCalendarCheck" label="Überweisungsdatum" /></dt>
+        <dt>
+          <EuIconLabel :icon="faCalendarCheck" :label="t('invoices.paymentInfo.transferDate')" />
+        </dt>
         <dd>{{ formatDate(invoice.transferDate) }}</dd>
       </template>
 
-      <dt><EuIconLabel :icon="faEuroSign" label="Rechnungssumme" /></dt>
+      <dt><EuIconLabel :icon="faEuroSign" :label="t('invoices.paymentInfo.amount')" /></dt>
       <dd>{{ formatMoney(invoice.invoiceAmount) }}</dd>
 
       <template v-if="isHttpUrl(invoice.documentLink)">
-        <dt><EuIconLabel :icon="faReceipt" label="Dokument" /></dt>
-        <dd><a :href="invoice.documentLink" target="_blank" rel="noopener">Dokument öffnen</a></dd>
+        <dt><EuIconLabel :icon="faReceipt" :label="t('invoices.paymentInfo.document')" /></dt>
+        <dd>
+          <a :href="invoice.documentLink" target="_blank" rel="noopener">{{
+            t('invoices.paymentInfo.openDocument')
+          }}</a>
+        </dd>
       </template>
 
       <template v-if="payee">
-        <dt><EuIconLabel :icon="faSackDollar" label="Abrechnungsdienstleister / Empfänger" /></dt>
+        <dt><EuIconLabel :icon="faSackDollar" :label="t('invoices.paymentInfo.payee')" /></dt>
         <dd>{{ payee }}</dd>
       </template>
 
@@ -121,12 +136,12 @@ const showQr = computed(
       </template>
 
       <template v-if="invoice.transferSubject">
-        <dt><EuIconLabel :icon="faHashtag" label="Verwendungszweck" /></dt>
+        <dt><EuIconLabel :icon="faHashtag" :label="t('fields.transferSubject')" /></dt>
         <dd>{{ invoice.transferSubject }}</dd>
       </template>
 
-      <dt><EuIconLabel :icon="faCoins" label="Barzahlung" /></dt>
-      <dd>{{ invoice.directPayment ? 'Ja' : 'Nein' }}</dd>
+      <dt><EuIconLabel :icon="faCoins" :label="t('invoices.paymentInfo.cash')" /></dt>
+      <dd>{{ invoice.directPayment ? t('common.yes') : t('common.no') }}</dd>
     </dl>
   </EuPopover>
 </template>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { withLocale } from '../test/locale';
 import { PAYMENT_COLOR_VAR, PAYMENT_DISPLAY, paymentState } from './payment';
 
 /**
@@ -58,5 +59,12 @@ describe('the display tables', () => {
       expect(PAYMENT_DISPLAY[state].label).not.toBe('');
       expect(PAYMENT_COLOR_VAR[state]).toMatch(/^--eu-color-/);
     }
+  });
+
+  it('name the state in the UI language when read', async () => {
+    expect(PAYMENT_DISPLAY.overdue.label).toBe('Zahlung überfällig');
+    await withLocale('en', () => {
+      expect(PAYMENT_DISPLAY.overdue.label).toBe('Payment overdue');
+    });
   });
 });

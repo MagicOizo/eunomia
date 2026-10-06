@@ -8,7 +8,10 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import { todayIso } from '../lib/date-input';
+import { i18n } from '../lib/i18n';
 import type { InvoiceDto } from './api';
+
+const { t } = i18n.global;
 
 /**
  * The payment-status "traffic light" for an invoice — driven by the money side
@@ -38,10 +41,30 @@ export interface PaymentDisplay {
 }
 
 export const PAYMENT_DISPLAY: Record<PaymentState, PaymentDisplay> = {
-  paid: { icon: faCircleCheck, label: 'Bereits bezahlt' },
-  uncritical: { icon: faCircleInfo, label: 'Noch nicht fällig' },
-  due: { icon: faClock, label: 'Zahlung fällig' },
-  overdue: { icon: faTriangleExclamation, label: 'Zahlung überfällig' },
+  paid: {
+    icon: faCircleCheck,
+    get label() {
+      return t('invoices.payment.paid');
+    },
+  },
+  uncritical: {
+    icon: faCircleInfo,
+    get label() {
+      return t('invoices.payment.uncritical');
+    },
+  },
+  due: {
+    icon: faClock,
+    get label() {
+      return t('invoices.payment.due');
+    },
+  },
+  overdue: {
+    icon: faTriangleExclamation,
+    get label() {
+      return t('invoices.payment.overdue');
+    },
+  },
 };
 
 /**

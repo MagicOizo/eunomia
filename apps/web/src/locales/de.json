@@ -763,5 +763,216 @@
     "mismatch": "Die Wiederholung stimmt nicht mit dem neuen Passwort überein.",
     "change": "Passwort ändern",
     "changed": "Passwort geändert. Alle anderen Sitzungen sind beendet."
+  },
+  "invoices": {
+    "status": {
+      "offen": "Offen",
+      "eingereicht": "Eingereicht",
+      "teilabgerechnet": "Teilabgerechnet",
+      "abgerechnet": "Abgerechnet",
+      "erledigt": "Erledigt"
+    },
+    "payment": {
+      "paid": "Bereits bezahlt",
+      "uncritical": "Noch nicht fällig",
+      "due": "Zahlung fällig",
+      "overdue": "Zahlung überfällig"
+    },
+    "qr": {
+      "noIban": "Für diese Rechnung ist keine IBAN hinterlegt.",
+      "noRecipient": "Für diese Rechnung ist kein Empfänger hinterlegt.",
+      "amountOutOfRange": "Der Rechnungsbetrag lässt sich nicht als GiroCode darstellen.",
+      "tooLong": "Die Zahlungsdaten sind für einen GiroCode zu lang.",
+      "failed": "Der GiroCode konnte nicht erzeugt werden.",
+      "show": "GiroCode anzeigen",
+      "showTitle": "GiroCode für die Überweisung anzeigen",
+      "alt": "GiroCode für eine Überweisung von {amount} an {recipient}",
+      "hint": "Mit der Banking-App scannen."
+    },
+    "gap": {
+      "short": "Nicht vollständig erstattet – Eigenanteil {amount}",
+      "pending": "Noch nicht vollständig erstattet – offen {amount}"
+    },
+    "createFailed": "Anlegen fehlgeschlagen.",
+    "notCovered": {
+      "title": "Von der Versicherung nicht gedeckt."
+    },
+    "actions": {
+      "submit": "Einreichen",
+      "rest": "Rest",
+      "wait": "Abwarten",
+      "withdraw": "Zurückziehen",
+      "hold": "Zurückhalten",
+      "notReimbursable": "Nicht erstattbar",
+      "spare": "Schonen",
+      "exhausted": "Erschöpft"
+    },
+    "advice": {
+      "at": "bei {number} ({amount})",
+      "atDeductible": "bei {number} (zählt auf die Selbstbeteiligung)",
+      "restAt": "Rest {target}",
+      "submit": "Einreichen {targets}.",
+      "rest": "Rest {targets}.",
+      "waitHint": "Bei {numbers} erst einreichen, wenn das Jahr absehbar ist.",
+      "withdraw": "Bei {numbers} zurückziehen – dort ist der Bonus mehr wert.",
+      "instead": "Stattdessen {targets} einreichen.",
+      "wait": "Bei {numbers} erst einreichen, wenn das Jahr absehbar ist (möglich: {amount}).",
+      "holdSpare": "Nicht einreichen – den Bonus bei {numbers} schonen.",
+      "holdNothing": "Nicht einreichen – bei keiner Police ist dafür noch eine Erstattung zu erwarten.",
+      "notReimbursable": "Bei keiner Police erstattungsfähig.",
+      "badge": "Empfehlung: {advice}"
+    },
+    "bonus": {
+      "expected": "{amount} erwartet",
+      "expectedInherited": "{amount} erwartet (Staffel nicht aktualisiert)",
+      "lostBySubmitting": "{expected} – geht mit der Einreichung verloren",
+      "pending": "{expected} – {n} Einreichung noch ohne Abrechnung | {expected} – {n} Einreichungen noch ohne Abrechnung",
+      "atRisk": "In Gefahr",
+      "safe": "Sicher",
+      "received": "Erhalten",
+      "receivedDetail": "{amount} laut Versicherung",
+      "forfeited": "Verwirkt",
+      "forfeitedDetail": "in diesem Jahr kein Bonus mehr",
+      "none": "Kein Bonus",
+      "noneDetail": "keine Staffel"
+    },
+    "strategy": {
+      "use": "{number} nutzen",
+      "spare": "{number} schonen"
+    },
+    "verdict": {
+      "sparePaid": "Bonus bereits erhalten – hier nicht mehr einreichen.",
+      "spare": "Der Bonus ist mehr wert als die mögliche Erstattung.",
+      "spareAlways": "Das bleibt auch bei höheren Kosten so, weil die Obergrenze unter dem Bonus liegt.",
+      "spareAbove": "Einreichen lohnt sich erst, wenn mehr als {amount} weitere Kosten dazukommen.",
+      "wait": "Hier ließen sich {amount} erstatten. Kommen aber noch Kosten dazu, lohnt sich {numbers} – dann erstattet diese Police nur den Rest. Deshalb erst einreichen, wenn das Jahr absehbar ist.",
+      "exhausted": "Die Obergrenze von {amount} ist erreicht – keine weiteren Rechnungen hier einreichen.",
+      "supplementary": "Rechnungen hier einreichen, soweit die Vollversicherung sie nicht erstattet.",
+      "atStake": "Die Erstattung übersteigt den Bonus – alle Rechnungen hier einreichen.",
+      "streakEnds": "Dafür endet die Serie von {n} leistungsfreien Jahr. | Dafür endet die Serie von {n} leistungsfreien Jahren.",
+      "forfeited": "Der Bonus ist in diesem Jahr bereits verwirkt – alle Rechnungen hier einreichen.",
+      "noBonus": "Hier ist kein Bonus im Spiel – alle Rechnungen hier einreichen."
+    },
+    "recommendation": {
+      "submit": "{numbers} einreichen",
+      "wait": "{numbers} abwarten",
+      "spare": "{numbers} schonen",
+      "exhausted": "{numbers} ist erschöpft | {numbers} sind erschöpft"
+    },
+    "columns": {
+      "number": "Nummer",
+      "date": "Datum",
+      "amount": "Betrag"
+    },
+    "exclusion": {
+      "title": "Nicht erstattungsfähig markieren",
+      "contractRequired": "Bitte die Police wählen.",
+      "note": "Notiz (z. B. stationäre Leistung)",
+      "submit": "Markieren"
+    },
+    "settle": {
+      "title": "Als bezahlt markieren",
+      "dateRequired": "Bitte ein Zahlungsdatum wählen.",
+      "note": "Rechnung {number} als erstattet/bezahlt markieren.",
+      "confirm": "Bestätigen"
+    },
+    "paymentInfo": {
+      "title": "Zahlungsinformationen",
+      "transferDate": "Überweisungsdatum",
+      "amount": "Rechnungssumme",
+      "document": "Dokument",
+      "openDocument": "Dokument öffnen",
+      "payee": "Abrechnungsdienstleister / Empfänger",
+      "cash": "Barzahlung"
+    },
+    "table": {
+      "selectAll": "Alle auswählen",
+      "treatment": "Behandlung",
+      "select": "Rechnung {number} auswählen",
+      "inObjection": "Im Widerspruch",
+      "showPayment": "{state} – Zahlungsinformationen anzeigen",
+      "openDocumentTitle": "Hinterlegtes Dokument öffnen",
+      "submitTitle": "Rechnung bei der Versicherung einreichen",
+      "settleTitle": "Rechnung als bezahlt markieren",
+      "details": "Details",
+      "detailsTitle": "Rechnungsdetails öffnen – bearbeiten, einreichen, abrechnen",
+      "detailsView": "Rechnungsdetails ansehen",
+      "deleteTitle": "Rechnung löschen",
+      "reimbursed": "Erstattung"
+    },
+    "workspace": {
+      "back": "Zurück zur Konten-Auswahl",
+      "create": "Neue Rechnung",
+      "submit": "Einreichen ({n})",
+      "billing": "Abrechnung zuordnen ({n})",
+      "delete": "Löschen ({n})",
+      "empty": "Keine Rechnungen für {year}.",
+      "deleteQuestion": "{n} Rechnung wirklich löschen? | {n} Rechnungen wirklich löschen?"
+    },
+    "summary": {
+      "title": "Zusammenfassung",
+      "totalSpend": "Gesamtausgaben: {amount}",
+      "recommendationLabel": "Empfehlung:",
+      "recommendation": "{label} {advice} – Erstattungen und Boni zusammen {total}.",
+      "recommendationAhead": "{label} {advice} – Erstattungen und Boni zusammen {total}, {advantage} mehr als die nächstbeste Variante.",
+      "noTerms": "keine Konditionen",
+      "none": "keine",
+      "of": "{used} von {total}",
+      "cap": "Obergrenze",
+      "streak": "Serie: {n} leistungsfreies Jahr | Serie: {n} leistungsfreie Jahre",
+      "reimbursed": "Bereits erstattet",
+      "expected": "Erstattung laut Empfehlung",
+      "compare": "Vergleich der Alternativen",
+      "strategy": "Variante",
+      "bonuses": "Boni",
+      "total": "Gesamt",
+      "gap": "Differenz",
+      "recommended": "Empfohlen"
+    },
+    "form": {
+      "required": "Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.",
+      "editTitle": "Rechnung bearbeiten",
+      "createTitle": "Rechnung anlegen",
+      "day": "Behandlungstag {n}",
+      "removeDay": "Behandlungstag {n} entfernen",
+      "sameYear": "Alle Behandlungstage müssen im selben Kalenderjahr liegen.",
+      "addDay": "Behandlungstag hinzufügen",
+      "paymentTerms": "Typische Zahlungsziele",
+      "termNow": "sofort",
+      "termDays": "{n} Tage"
+    },
+    "picker": {
+      "notDone": "Nicht erledigt",
+      "search": "Rechnungsnummer suchen",
+      "all": "– alle –",
+      "searching": "Wird gesucht…",
+      "noMatch": "Keine Rechnung passt zu dieser Suche.",
+      "unknown": "Unbekannt",
+      "meta": "Rechnung vom {date} · Behandlung {treatment} · {amount}",
+      "truncated": "Es werden die ersten {n} Rechnungen gezeigt. Bitte enger filtern.",
+      "lead": "Für welchen Versicherten möchtest du die Rechnungen ansehen?",
+      "noAccounts": "Noch keine Versicherten erfasst."
+    },
+    "detail": {
+      "title": "Rechnungsdetails",
+      "span": "Zeitraum {span}",
+      "overReimbursedOpen": "Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: {amount}).",
+      "overReimbursedTotal": "Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (Rechnungsbetrag: {amount}).",
+      "furtherDays": "Weitere Behandlungstage",
+      "documentLink": "Rechnungslink",
+      "remaining": "Noch nicht erstattet",
+      "assignment": "Zuordnung",
+      "notReimbursable": "Nicht erstattungsfähig",
+      "nothingYet": "Noch bei keiner Police eingereicht oder markiert.",
+      "excludedHere": "Nicht erstattungsfähig bei dieser Police.",
+      "removeMark": "Markierung für {number} entfernen",
+      "withdrawTitle": "Einreichung zurückziehen",
+      "withdrawQuestion": "Die Einreichung bei {policy} wirklich zurückziehen? Die Rechnung kann danach erneut bei dieser Police eingereicht werden.",
+      "removeAllocationTitle": "Erstattung entfernen",
+      "removeAllocationQuestion": "Die Erstattung von {amount} aus Abrechnung {number} wirklich entfernen? Die Leistungsabrechnung selbst bleibt bestehen.",
+      "remove": "Entfernen",
+      "removeMarkTitle": "Markierung entfernen",
+      "removeMarkQuestion": "Die Markierung „nicht erstattungsfähig“ für {policy} entfernen?"
+    }
   }
 }

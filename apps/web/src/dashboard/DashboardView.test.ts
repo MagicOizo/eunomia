@@ -108,7 +108,13 @@ describe('DashboardView', () => {
       const [anna] = wrapper.findAll('.eu-dashboard__person');
       expect(plain(anna)).toContain('2 invoices · €320.50');
       expect(plain(anna)).toContain('1 overdue');
-      expect(plain(wrapper.find('.eu-dashboard__policy'))).toContain('€300.00 still open');
+      // The invoice badges come from invoices/ and follow since Slice 81.
+      expect(plain(anna)).toContain('Open: 1');
+      expect(plain(anna)).toContain('Submitted: 1');
+      const policy = wrapper.find('.eu-dashboard__policy');
+      expect(plain(policy)).toContain('€300.00 still open');
+      expect(plain(policy)).toContain('Spare');
+      expect(plain(policy)).toContain('Safe');
       expect(wrapper.find('.eu-yearchart__details summary').text()).toBe('Figures per year');
     });
   });

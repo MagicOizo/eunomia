@@ -9,6 +9,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import type { AgencyPaymentDetailDto } from '../agencies/api';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -17,7 +18,7 @@ import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { apiData } from '../lib/api';
 import { useDialogAction } from '../lib/dialog-action';
 import { noPermission as noPermissionText } from '../lib/error-messages';
-import { formatDate, plural } from '../lib/format';
+import { formatDate } from '../lib/format';
 import { describeError } from '../lib/errors';
 import { listResource } from '../lib/resource';
 import { useAuthStore } from '../stores/auth';
@@ -75,6 +76,7 @@ interface ContractRef extends ContractPeriod {
 /** "Nummer · Versicherung" — tells a person's full and supplementary policy apart. */
 const contractLabel = (c: ContractRef): string => `${c.contractNumber} · ${c.companyName}`;
 
+const { t } = useI18n();
 const auth = useAuthStore();
 
 /**
@@ -440,8 +442,8 @@ function confirmDelete(): void {
       <RouterLink
         to="/invoices"
         class="eu-ws__back"
-        title="Zurück zur Konten-Auswahl"
-        aria-label="Zurück zur Konten-Auswahl"
+        :title="t('invoices.workspace.back')"
+        :aria-label="t('invoices.workspace.back')"
       >
         <FontAwesomeIcon :icon="faChevronLeft" aria-hidden="true" />
       </RouterLink>
@@ -454,7 +456,7 @@ function confirmDelete(): void {
         :disabled="!mayManage"
         :title="noPermission"
         @click="dialogs.openCreate"
-        >Neue Rechnung</EuButton
+        >{{ t('invoices.workspace.create') }}</EuButton
       >
       <EuButton
         :icon="faPaperPlane"
@@ -463,7 +465,7 @@ function confirmDelete(): void {
         :title="noPermission"
         @click="dialogs.openSubmit(selectedSubmittable)"
       >
-        Einreichen ({{ selectedSubmittable.length }})
+        {{ t('invoices.workspace.submit', { n: selectedSubmittable.length }) }}
       </EuButton>
       <EuButton
         :icon="faFileInvoiceDollar"
@@ -472,7 +474,7 @@ function confirmDelete(): void {
         :title="noPermission"
         @click="dialogs.openBilling(selectedBookable)"
       >
-        Abrechnung zuordnen ({{ selectedBookable.length }})
+        {{ t('invoices.workspace.billing', { n: selectedBookable.length }) }}
       </EuButton>
       <EuButton
         :icon="faTrash"
@@ -481,11 +483,16 @@ function confirmDelete(): void {
         :title="noPermission"
         @click="dialogs.openDelete(Array.from(selected))"
       >
-        Löschen ({{ selected.size }})
+        {{ t('invoices.workspace.delete', { n: selected.size }) }}
       </EuButton>
     </div>
 
-    <div v-if="years.length > 1" class="eu-ws__years" role="tablist" aria-label="Behandlungsjahr">
+    <div
+      v-if="years.length > 1"
+      class="eu-ws__years"
+      role="tablist"
+      :aria-label="t('dashboard.chart.colYear')"
+    >
       <button
         v-for="year in years"
         :key="year"
@@ -500,10 +507,10 @@ function confirmDelete(): void {
       </button>
     </div>
 
-    <p v-if="loading" class="eu-ws__hint">Wird geladen…</p>
+    <p v-if="loading" class="eu-ws__hint">{{ t('common.loading') }}</p>
     <p v-else-if="loadError" class="eu-ws__error" role="alert">{{ loadError }}</p>
     <p v-else-if="invoices.length === 0" class="eu-ws__hint">
-      Keine Rechnungen für {{ activeYear }}.
+      {{ t('invoices.workspace.empty', { year: activeYear }) }}
     </p>
 
     <InvoiceTable
@@ -586,15 +593,17 @@ function confirmDelete(): void {
     />
     <EuDialog
       :open="dialogs.deleteTargets.length > 0"
-      title="Rechnung löschen"
+      :title="t('invoices.table.deleteTitle')"
       @close="dialogs.deleteTargets = []"
     >
-      <p>{{ plural(dialogs.deleteTargets.length, 'Rechnung', 'Rechnungen') }} wirklich löschen?</p>
+      <p>{{ t('invoices.workspace.deleteQuestion', dialogs.deleteTargets.length) }}</p>
       <InvoiceBriefList :invoices="deleteInvoices" :facility-names="facilityNameMap" />
       <p v-if="action.error" class="eu-ws__error" role="alert">{{ action.error }}</p>
       <template #footer>
-        <EuButton variant="secondary" @click="dialogs.deleteTargets = []">Abbrechen</EuButton>
-        <EuButton :disabled="action.busy" @click="confirmDelete">Löschen</EuButton>
+        <EuButton variant="secondary" @click="dialogs.deleteTargets = []">{{
+          t('common.cancel')
+        }}</EuButton>
+        <EuButton :disabled="action.busy" @click="confirmDelete">{{ t('common.delete') }}</EuButton>
       </template>
     </EuDialog>
   </section>

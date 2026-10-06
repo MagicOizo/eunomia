@@ -763,5 +763,216 @@
     "mismatch": "The repetition does not match the new password.",
     "change": "Change password",
     "changed": "Password changed. All other sessions have ended."
+  },
+  "invoices": {
+    "status": {
+      "offen": "Open",
+      "eingereicht": "Submitted",
+      "teilabgerechnet": "Partially settled",
+      "abgerechnet": "Settled",
+      "erledigt": "Done"
+    },
+    "payment": {
+      "paid": "Already paid",
+      "uncritical": "Not due yet",
+      "due": "Payment due",
+      "overdue": "Payment overdue"
+    },
+    "qr": {
+      "noIban": "This invoice has no IBAN on file.",
+      "noRecipient": "This invoice has no recipient on file.",
+      "amountOutOfRange": "The invoice amount cannot be shown as a GiroCode.",
+      "tooLong": "The payment details are too long for a GiroCode.",
+      "failed": "The GiroCode could not be created.",
+      "show": "Show GiroCode",
+      "showTitle": "Show the GiroCode for the transfer",
+      "alt": "GiroCode for a transfer of {amount} to {recipient}",
+      "hint": "Scan it with your banking app."
+    },
+    "gap": {
+      "short": "Not fully reimbursed – own share {amount}",
+      "pending": "Not fully reimbursed yet – {amount} open"
+    },
+    "createFailed": "Could not create the entry.",
+    "notCovered": {
+      "title": "Not covered by the insurer."
+    },
+    "actions": {
+      "submit": "Submit",
+      "rest": "Remainder",
+      "wait": "Wait",
+      "withdraw": "Withdraw",
+      "hold": "Hold back",
+      "notReimbursable": "Not reimbursable",
+      "spare": "Spare",
+      "exhausted": "Exhausted"
+    },
+    "advice": {
+      "at": "at {number} ({amount})",
+      "atDeductible": "at {number} (counts towards the deductible)",
+      "restAt": "remainder {target}",
+      "submit": "Submit {targets}.",
+      "rest": "Remainder {targets}.",
+      "waitHint": "Submit at {numbers} only once the year's costs are clear.",
+      "withdraw": "Withdraw at {numbers} – the bonus is worth more there.",
+      "instead": "Submit {targets} instead.",
+      "wait": "Submit at {numbers} only once the year's costs are clear (possible: {amount}).",
+      "holdSpare": "Do not submit – spare the bonus at {numbers}.",
+      "holdNothing": "Do not submit – no policy is still expected to reimburse it.",
+      "notReimbursable": "Not reimbursable at any policy.",
+      "badge": "Recommendation: {advice}"
+    },
+    "bonus": {
+      "expected": "{amount} expected",
+      "expectedInherited": "{amount} expected (bonus scale not updated)",
+      "lostBySubmitting": "{expected} – lost by submitting",
+      "pending": "{expected} – {n} submission not settled yet | {expected} – {n} submissions not settled yet",
+      "atRisk": "At risk",
+      "safe": "Safe",
+      "received": "Received",
+      "receivedDetail": "{amount} according to the insurer",
+      "forfeited": "Forfeited",
+      "forfeitedDetail": "no bonus left this year",
+      "none": "No bonus",
+      "noneDetail": "no bonus scale"
+    },
+    "strategy": {
+      "use": "use {number}",
+      "spare": "spare {number}"
+    },
+    "verdict": {
+      "sparePaid": "Bonus already received – do not submit here any more.",
+      "spare": "The bonus is worth more than the possible reimbursement.",
+      "spareAlways": "That stays so even with higher costs, because the reimbursement cap is below the bonus.",
+      "spareAbove": "Submitting only pays off once more than {amount} in further costs come in.",
+      "wait": "{amount} could be reimbursed here. But if further costs come in, {numbers} pays off – and this policy then only reimburses the remainder. So submit only once the year's costs are clear.",
+      "exhausted": "The reimbursement cap of {amount} is reached – do not submit any further invoices here.",
+      "supplementary": "Submit invoices here as far as the comprehensive cover does not reimburse them.",
+      "atStake": "The reimbursement exceeds the bonus – submit all invoices here.",
+      "streakEnds": "This ends the streak of {n} claim-free year. | This ends the streak of {n} claim-free years.",
+      "forfeited": "The bonus is already forfeited this year – submit all invoices here.",
+      "noBonus": "No bonus is at stake here – submit all invoices here."
+    },
+    "recommendation": {
+      "submit": "submit {numbers}",
+      "wait": "wait with {numbers}",
+      "spare": "spare {numbers}",
+      "exhausted": "{numbers} is exhausted | {numbers} are exhausted"
+    },
+    "columns": {
+      "number": "Number",
+      "date": "Date",
+      "amount": "Amount"
+    },
+    "exclusion": {
+      "title": "Mark as not reimbursable",
+      "contractRequired": "Please choose the policy.",
+      "note": "Note (e.g. inpatient treatment)",
+      "submit": "Mark"
+    },
+    "settle": {
+      "title": "Mark as paid",
+      "dateRequired": "Please choose a payment date.",
+      "note": "Mark invoice {number} as reimbursed/paid.",
+      "confirm": "Confirm"
+    },
+    "paymentInfo": {
+      "title": "Payment information",
+      "transferDate": "Transfer date",
+      "amount": "Invoice amount",
+      "document": "Document",
+      "openDocument": "Open document",
+      "payee": "Billing agency / recipient",
+      "cash": "Paid on the spot"
+    },
+    "table": {
+      "selectAll": "Select all",
+      "treatment": "Treatment",
+      "select": "Select invoice {number}",
+      "inObjection": "Objection open",
+      "showPayment": "{state} – show payment information",
+      "openDocumentTitle": "Open the stored document",
+      "submitTitle": "Submit the invoice to the insurer",
+      "settleTitle": "Mark the invoice as paid",
+      "details": "Details",
+      "detailsTitle": "Open invoice details – edit, submit, settle",
+      "detailsView": "View invoice details",
+      "deleteTitle": "Delete invoice",
+      "reimbursed": "Reimbursed"
+    },
+    "workspace": {
+      "back": "Back to the choice of insured person",
+      "create": "New invoice",
+      "submit": "Submit ({n})",
+      "billing": "Allocate service billing ({n})",
+      "delete": "Delete ({n})",
+      "empty": "No invoices for {year}.",
+      "deleteQuestion": "Really delete {n} invoice? | Really delete {n} invoices?"
+    },
+    "summary": {
+      "title": "Summary",
+      "totalSpend": "Total spend: {amount}",
+      "recommendationLabel": "Recommendation:",
+      "recommendation": "{label} {advice} – reimbursements and bonuses together {total}.",
+      "recommendationAhead": "{label} {advice} – reimbursements and bonuses together {total}, {advantage} more than the next best option.",
+      "noTerms": "no terms",
+      "none": "none",
+      "of": "{used} of {total}",
+      "cap": "Reimbursement cap",
+      "streak": "streak: {n} claim-free year | streak: {n} claim-free years",
+      "reimbursed": "Already reimbursed",
+      "expected": "Reimbursement as recommended",
+      "compare": "Comparison of the options",
+      "strategy": "Option",
+      "bonuses": "Bonuses",
+      "total": "Total",
+      "gap": "Difference",
+      "recommended": "Recommended"
+    },
+    "form": {
+      "required": "Please fill in invoice number, invoice date, treatment date and amount.",
+      "editTitle": "Edit invoice",
+      "createTitle": "Create invoice",
+      "day": "Treatment day {n}",
+      "removeDay": "Remove treatment day {n}",
+      "sameYear": "All treatment days must fall in the same calendar year.",
+      "addDay": "Add treatment day",
+      "paymentTerms": "Typical due dates",
+      "termNow": "immediately",
+      "termDays": "{n} days"
+    },
+    "picker": {
+      "notDone": "Not done",
+      "search": "Search invoice number",
+      "all": "– all –",
+      "searching": "Searching…",
+      "noMatch": "No invoice matches this search.",
+      "unknown": "Unknown",
+      "meta": "Invoice of {date} · treatment {treatment} · {amount}",
+      "truncated": "Showing the first {n} invoices. Please narrow the filter.",
+      "lead": "Whose invoices do you want to see?",
+      "noAccounts": "No insured persons recorded yet."
+    },
+    "detail": {
+      "title": "Invoice details",
+      "span": "Period {span}",
+      "overReimbursedOpen": "The reimbursements of all policies together must not exceed the invoice amount (still open: {amount}).",
+      "overReimbursedTotal": "The reimbursements of all policies together must not exceed the invoice amount (invoice amount: {amount}).",
+      "furtherDays": "Further treatment days",
+      "documentLink": "Invoice link",
+      "remaining": "Not yet reimbursed",
+      "assignment": "Allocation",
+      "notReimbursable": "Not reimbursable",
+      "nothingYet": "Not submitted to or marked at any policy yet.",
+      "excludedHere": "Not reimbursable under this policy.",
+      "removeMark": "Remove the mark for {number}",
+      "withdrawTitle": "Withdraw submission",
+      "withdrawQuestion": "Really withdraw the submission to {policy}? The invoice can then be submitted to this policy again.",
+      "removeAllocationTitle": "Remove reimbursement",
+      "removeAllocationQuestion": "Really remove the reimbursement of {amount} from service billing {number}? The service billing itself stays.",
+      "remove": "Remove",
+      "removeMarkTitle": "Remove mark",
+      "removeMarkQuestion": "Remove the “not reimbursable” mark for {policy}?"
+    }
   }
 }

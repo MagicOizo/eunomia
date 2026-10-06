@@ -12,7 +12,8 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { formatMoney, plural } from '../lib/format';
+import { formatMoney } from '../lib/format';
+import { i18n } from '../lib/i18n';
 import type {
   PlanInvoiceDto,
   PlanInvoicePolicyAction,
@@ -25,7 +26,14 @@ import type {
  * Display texts for the reimbursement optimizer's plan (see the API's
  * reimbursement-optimizer.ts): the recommendation badge per invoice, the
  * policy cards and the comparison of strategies in the invoice summary.
+ *
+ * Every advice is a whole sentence of the catalogue with the policies and
+ * amounts as parameters; an optional second sentence is a message of its own,
+ * appended with a space. Contract numbers are joined with a comma in every
+ * language: they are identifiers, not running text.
  */
+
+const { t } = i18n.global;
 
 export type BadgeTone = 'open' | 'submitted' | 'partial' | 'billed' | 'done' | 'neutral';
 
@@ -48,11 +56,15 @@ const numberOf = (policies: Map<string, PlanPolicyDto>, uid: string): string =>
 const joinNumbers = (policies: Map<string, PlanPolicyDto>, entries: PlanEntry[]): string =>
   entries.map((entry) => numberOf(policies, entry.contractUID)).join(', ');
 
+const sentences = (...parts: Array<string | null>): string =>
+  parts.filter((part): part is string => part !== null).join(' ');
+
 /** "bei X-1 (800,00 €)", or a hint when the invoice only fills the deductible there. */
 function submitPhrase(policies: Map<string, PlanPolicyDto>, entry: PlanEntry): string {
-  const amount =
-    entry.reimbursement > 0 ? formatMoney(entry.reimbursement) : 'zählt auf die Selbstbeteiligung';
-  return `bei ${numberOf(policies, entry.contractUID)} (${amount})`;
+  const number = numberOf(policies, entry.contractUID);
+  return entry.reimbursement > 0
+    ? t('invoices.advice.at', { number, amount: formatMoney(entry.reimbursement) })
+    : t('invoices.advice.atDeductible', { number });
 }
 
 /**
@@ -69,20 +81,25 @@ export function invoiceBadge(
   const toWait = withAction('wait');
   const waitHint =
     toWait.length > 0
-      ? ` Bei ${joinNumbers(policies, toWait)} erst einreichen, wenn das Jahr absehbar ist.`
-      : '';
+      ? t('invoices.advice.waitHint', { numbers: joinNumbers(policies, toWait) })
+      : null;
 
   switch (plan.action) {
     case 'withdraw': {
       const instead =
         toSubmit.length > 0
-          ? ` Stattdessen ${toSubmit.map((entry) => submitPhrase(policies, entry)).join(', ')} einreichen.`
-          : '';
+          ? t('invoices.advice.instead', {
+              targets: toSubmit.map((entry) => submitPhrase(policies, entry)).join(', '),
+            })
+          : null;
       return {
         tone: 'open',
         icon: faRotateLeft,
-        label: 'Zurückziehen',
-        tooltip: `Bei ${joinNumbers(policies, withAction('withdraw'))} zurückziehen – dort ist der Bonus mehr wert.${instead}`,
+        label: t('invoices.actions.withdraw'),
+        tooltip: sentences(
+          t('invoices.advice.withdraw', { numbers: joinNumbers(policies, withAction('withdraw')) }),
+          instead,
+        ),
       };
     }
     case 'submit': {
@@ -91,12 +108,20 @@ export function invoiceBadge(
         .slice(0, firstSubmit)
         .some((entry) => entry.action === 'answered' || entry.action === 'submitted');
       const [first, ...rest] = toSubmit.map((entry) => submitPhrase(policies, entry));
-      const restText = rest.length > 0 ? `, Rest ${rest.join(', Rest ')}` : '';
+      const targets = [
+        first,
+        ...rest.map((target) => t('invoices.advice.restAt', { target })),
+      ].join(', ');
       return {
         tone: 'billed',
         icon: faPaperPlane,
-        label: isRest ? 'Rest' : 'Einreichen',
-        tooltip: `${isRest ? 'Rest' : 'Einreichen'} ${first}${restText}.${waitHint}`,
+        label: isRest ? t('invoices.actions.rest') : t('invoices.actions.submit'),
+        tooltip: sentences(
+          isRest
+            ? t('invoices.advice.rest', { targets })
+            : t('invoices.advice.submit', { targets }),
+          waitHint,
+        ),
       };
     }
     case 'wait': {
@@ -104,8 +129,11 @@ export function invoiceBadge(
       return {
         tone: 'partial',
         icon: faHourglassHalf,
-        label: 'Abwarten',
-        tooltip: `Bei ${joinNumbers(policies, toWait)} erst einreichen, wenn das Jahr absehbar ist (möglich: ${formatMoney(possible)}).`,
+        label: t('invoices.actions.wait'),
+        tooltip: t('invoices.advice.wait', {
+          numbers: joinNumbers(policies, toWait),
+          amount: formatMoney(possible),
+        }),
       };
     }
     case 'hold': {
@@ -115,19 +143,21 @@ export function invoiceBadge(
       return {
         tone: 'done',
         icon: faPiggyBank,
-        label: 'Zurückhalten',
+        label: t('invoices.actions.hold'),
         tooltip:
           spared.length > 0
-            ? `Nicht einreichen – den Bonus bei ${spared.map((p) => p.contractNumber).join(', ')} schonen.`
-            : 'Nicht einreichen – bei keiner Police ist dafür noch eine Erstattung zu erwarten.',
+            ? t('invoices.advice.holdSpare', {
+                numbers: spared.map((p) => p.contractNumber).join(', '),
+              })
+            : t('invoices.advice.holdNothing'),
       };
     }
     case 'not-reimbursable':
       return {
         tone: 'neutral',
         icon: faBan,
-        label: 'Nicht erstattbar',
-        tooltip: 'Bei keiner Police erstattungsfähig.',
+        label: t('invoices.actions.notReimbursable'),
+        tooltip: t('invoices.advice.notReimbursable'),
       };
     default:
       return null;
@@ -142,22 +172,46 @@ export function invoiceBadge(
 export function policyActionBadge(action: PlanInvoicePolicyAction): BadgeView | null {
   switch (action) {
     case 'submit':
-      return { tone: 'billed', icon: faPaperPlane, label: 'Einreichen' };
+      return { tone: 'billed', icon: faPaperPlane, label: t('invoices.actions.submit') };
     case 'wait':
-      return { tone: 'partial', icon: faHourglassHalf, label: 'Abwarten' };
+      return { tone: 'partial', icon: faHourglassHalf, label: t('invoices.actions.wait') };
     case 'withdraw':
-      return { tone: 'open', icon: faRotateLeft, label: 'Zurückziehen' };
+      return { tone: 'open', icon: faRotateLeft, label: t('invoices.actions.withdraw') };
     default:
       return null;
   }
 }
 
-/** What to do with a policy now (the optimizer's `status`). */
+/** What to do with a policy now (the optimizer's `status`); labels are getters over the catalogue. */
 export const POLICY_STATUS_BADGE: Record<PlanPolicyDto['status'], BadgeView> = {
-  spare: { label: 'Schonen', icon: faPiggyBank, tone: 'done' },
-  submit: { label: 'Einreichen', icon: faPaperPlane, tone: 'billed' },
-  wait: { label: 'Abwarten', icon: faHourglassHalf, tone: 'partial' },
-  exhausted: { label: 'Erschöpft', icon: faBan, tone: 'neutral' },
+  spare: {
+    icon: faPiggyBank,
+    tone: 'done',
+    get label() {
+      return t('invoices.actions.spare');
+    },
+  },
+  submit: {
+    icon: faPaperPlane,
+    tone: 'billed',
+    get label() {
+      return t('invoices.actions.submit');
+    },
+  },
+  wait: {
+    icon: faHourglassHalf,
+    tone: 'partial',
+    get label() {
+      return t('invoices.actions.wait');
+    },
+  },
+  exhausted: {
+    icon: faBan,
+    tone: 'neutral',
+    get label() {
+      return t('invoices.actions.exhausted');
+    },
+  },
 };
 
 export interface BonusView extends BadgeView {
@@ -175,59 +229,70 @@ export function bonusView(
     'bonusStatus' | 'bonusAmount' | 'recommendation' | 'pendingClaims' | 'tiersInherited'
   >,
 ): BonusView {
-  const inherited = policy.tiersInherited ? ' (Staffel nicht aktualisiert)' : '';
   switch (policy.bonusStatus) {
     case 'at-stake': {
+      const amount = formatMoney(policy.bonusAmount);
+      const expected = policy.tiersInherited
+        ? t('invoices.bonus.expectedInherited', { amount })
+        : t('invoices.bonus.expected', { amount });
       if (policy.recommendation === 'use') {
         return {
           tone: 'submitted',
           icon: faTriangleExclamation,
-          label: 'In Gefahr',
-          detail: `${formatMoney(policy.bonusAmount)} erwartet${inherited} – geht mit der Einreichung verloren`,
+          label: t('invoices.bonus.atRisk'),
+          detail: t('invoices.bonus.lostBySubmitting', { expected }),
         };
       }
       if (policy.pendingClaims > 0) {
         return {
           tone: 'submitted',
           icon: faTriangleExclamation,
-          label: 'In Gefahr',
-          detail: `${formatMoney(policy.bonusAmount)} erwartet${inherited} – ${plural(policy.pendingClaims, 'Einreichung', 'Einreichungen')} noch ohne Abrechnung`,
+          label: t('invoices.bonus.atRisk'),
+          detail: t(
+            'invoices.bonus.pending',
+            { expected, n: policy.pendingClaims },
+            policy.pendingClaims,
+          ),
         };
       }
       return {
         tone: 'done',
         icon: faShieldHalved,
-        label: 'Sicher',
-        detail: `${formatMoney(policy.bonusAmount)} erwartet${inherited}`,
+        label: t('invoices.bonus.safe'),
+        detail: expected,
       };
     }
     case 'paid':
       return {
         tone: 'done',
         icon: faCircleCheck,
-        label: 'Erhalten',
-        detail: `${formatMoney(policy.bonusAmount)} laut Versicherung`,
+        label: t('invoices.bonus.received'),
+        detail: t('invoices.bonus.receivedDetail', { amount: formatMoney(policy.bonusAmount) }),
       };
     case 'forfeited':
       return {
         tone: 'open',
         icon: faCircleXmark,
-        label: 'Verwirkt',
-        detail: 'in diesem Jahr kein Bonus mehr',
+        label: t('invoices.bonus.forfeited'),
+        detail: t('invoices.bonus.forfeitedDetail'),
       };
     default:
-      return { tone: 'neutral', icon: faMinus, label: 'Kein Bonus', detail: 'keine Staffel' };
+      return {
+        tone: 'neutral',
+        icon: faMinus,
+        label: t('invoices.bonus.none'),
+        detail: t('invoices.bonus.noneDetail'),
+      };
   }
 }
 
 /** "X-1 schonen, Y-1 nutzen", in the plan's policy order. */
 export function strategyLabel(strategy: PlanStrategyDto, policies: PlanPolicyDto[]): string {
   return policies
-    .map(
-      (policy) =>
-        `${policy.contractNumber} ${
-          strategy.usedContractUIDs.includes(policy.contractUID) ? 'nutzen' : 'schonen'
-        }`,
+    .map((policy) =>
+      strategy.usedContractUIDs.includes(policy.contractUID)
+        ? t('invoices.strategy.use', { number: policy.contractNumber })
+        : t('invoices.strategy.spare', { number: policy.contractNumber }),
     )
     .join(', ');
 }
@@ -244,53 +309,58 @@ function mayTip(plan: ReimbursementPlanDto): string {
 export function policyVerdict(policy: PlanPolicyDto, plan: ReimbursementPlanDto): string {
   switch (policy.status) {
     case 'spare': {
-      if (policy.bonusStatus === 'paid')
-        return 'Bonus bereits erhalten – hier nicht mehr einreichen.';
-      const above =
+      if (policy.bonusStatus === 'paid') return t('invoices.verdict.sparePaid');
+      return sentences(
+        t('invoices.verdict.spare'),
         policy.worthUsingAbove === null
-          ? 'Das bleibt auch bei höheren Kosten so, weil die Obergrenze unter dem Bonus liegt.'
-          : `Einreichen lohnt sich erst, wenn mehr als ${formatMoney(policy.worthUsingAbove)} weitere Kosten dazukommen.`;
-      return `Der Bonus ist mehr wert als die mögliche Erstattung. ${above}`;
+          ? t('invoices.verdict.spareAlways')
+          : t('invoices.verdict.spareAbove', { amount: formatMoney(policy.worthUsingAbove) }),
+      );
     }
     case 'wait':
-      return `Hier ließen sich ${formatMoney(policy.expectedReimbursement)} erstatten. Kommen aber noch Kosten dazu, lohnt sich ${mayTip(plan)} – dann erstattet diese Police nur den Rest. Deshalb erst einreichen, wenn das Jahr absehbar ist.`;
+      return t('invoices.verdict.wait', {
+        amount: formatMoney(policy.expectedReimbursement),
+        numbers: mayTip(plan),
+      });
     case 'exhausted':
-      return `Die Obergrenze von ${formatMoney(policy.reimbursementCap)} ist erreicht – keine weiteren Rechnungen hier einreichen.`;
+      return t('invoices.verdict.exhausted', { amount: formatMoney(policy.reimbursementCap) });
     default:
       break;
   }
   if (policy.contractKind === 'SUPPLEMENTARY') {
-    return 'Rechnungen hier einreichen, soweit die Vollversicherung sie nicht erstattet.';
+    return t('invoices.verdict.supplementary');
   }
   if (policy.bonusStatus === 'at-stake') {
-    const streak =
+    return sentences(
+      t('invoices.verdict.atStake'),
       policy.claimFreeStreak === null
-        ? ''
-        : ` Dafür endet die Serie von ${plural(policy.claimFreeStreak, 'leistungsfreien Jahr', 'leistungsfreien Jahren')}.`;
-    return `Die Erstattung übersteigt den Bonus – alle Rechnungen hier einreichen.${streak}`;
+        ? null
+        : t('invoices.verdict.streakEnds', policy.claimFreeStreak),
+    );
   }
   if (policy.bonusStatus === 'forfeited') {
-    return 'Der Bonus ist in diesem Jahr bereits verwirkt – alle Rechnungen hier einreichen.';
+    return t('invoices.verdict.forfeited');
   }
-  return 'Hier ist kein Bonus im Spiel – alle Rechnungen hier einreichen.';
+  return t('invoices.verdict.noBonus');
 }
+
+/** One phrase per kind of advice; a policy count picks the form ("ist"/"sind erschöpft"). */
+const RECOMMENDATION_PHRASES: Array<
+  [PlanPolicyDto['status'], (numbers: string, count: number) => string]
+> = [
+  ['submit', (numbers) => t('invoices.recommendation.submit', { numbers })],
+  ['wait', (numbers) => t('invoices.recommendation.wait', { numbers })],
+  ['spare', (numbers) => t('invoices.recommendation.spare', { numbers })],
+  ['exhausted', (numbers, count) => t('invoices.recommendation.exhausted', { numbers }, count)],
+];
 
 /** "X-1 schonen, Y-1 einreichen", grouped by what to do with each policy. */
 export function recommendationText(plan: ReimbursementPlanDto): string {
-  const phrases: Array<[PlanPolicyDto['status'], string]> = [
-    ['submit', 'einreichen'],
-    ['wait', 'abwarten'],
-    ['spare', 'schonen'],
-    ['exhausted', 'ist erschöpft'],
-  ];
-  return phrases
-    .map(([status, verb]) => {
-      const numbers = plan.policies
-        .filter((p) => p.status === status)
-        .map((p) => p.contractNumber)
-        .join(', ');
-      return numbers ? `${numbers} ${verb}` : '';
-    })
+  return RECOMMENDATION_PHRASES.map(([status, phrase]) => {
+    const policies = plan.policies.filter((p) => p.status === status);
+    if (policies.length === 0) return '';
+    return phrase(policies.map((p) => p.contractNumber).join(', '), policies.length);
+  })
     .filter(Boolean)
     .join(', ');
 }

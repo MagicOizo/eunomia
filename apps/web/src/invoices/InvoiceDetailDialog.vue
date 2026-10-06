@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faBan, faPaperPlane, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, nextTick, reactive, ref, toRef, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import PaymentDetailFormDialog from '../agencies/PaymentDetailFormDialog.vue';
 import { invoicePaymentDetail } from '../agencies/payment-details';
@@ -17,6 +18,7 @@ import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { describeError } from '../lib/errors';
 import { noPermission as noPermissionText } from '../lib/error-messages';
+import { kindName } from '../lib/kind-names';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { useAuthStore } from '../stores/auth';
 import { formatMoney } from '../lib/format';
@@ -92,6 +94,7 @@ const emit = defineEmits<{
   entityCreated: [];
 }>();
 
+const { t } = useI18n();
 const auth = useAuthStore();
 
 /**
@@ -274,7 +277,7 @@ const treatmentSpan = computed(() => {
     typeof values.treatmentDate === 'string' ? values.treatmentDate : '',
     ...extraDays.value,
   ]);
-  return days.length > 1 ? `Zeitraum ${treatmentDaysLabel(days)}` : null;
+  return days.length > 1 ? t('invoices.detail.span', { span: treatmentDaysLabel(days) }) : null;
 });
 
 const statusDisplay = computed(() =>
@@ -428,7 +431,7 @@ async function saveBilling(payload: BillingAllocationPayload): Promise<void> {
   const ok = await runBlock(
     () => saveBillingAllocations(payload),
     (m) => (billingError.value = m),
-    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (noch offen: ${formatMoney(inv.remainingAmount)}).`,
+    t('invoices.detail.overReimbursedOpen', { amount: formatMoney(inv.remainingAmount) }),
   );
   if (ok) billingOpen.value = false;
 }
@@ -453,7 +456,7 @@ async function saveAllocation(payload: {
         receiptNumber: payload.receiptNumber,
       }),
     (m) => (allocationError.value = m),
-    `Die Erstattungen aller Policen dürfen zusammen den Rechnungsbetrag nicht übersteigen (Rechnungsbetrag: ${formatMoney(inv.invoiceAmount)}).`,
+    t('invoices.detail.overReimbursedTotal', { amount: formatMoney(inv.invoiceAmount) }),
   );
   if (ok) editingAllocation.value = null;
 }
@@ -501,7 +504,7 @@ function submit(): void {
     !values.treatmentDate ||
     values.invoiceAmount === null
   ) {
-    return fail('Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.');
+    return fail(t('invoices.form.required'));
   }
   // The complete list, leading day included: the API takes its earliest entry
   // as `treatmentDate` (Slice 41).
@@ -534,16 +537,16 @@ function submit(): void {
 </script>
 
 <template>
-  <EuDialog :open="open" title="Rechnungsdetails" wide @close="emit('close')">
+  <EuDialog :open="open" :title="t('invoices.detail.title')" wide @close="emit('close')">
     <EuDetailMask v-if="invoice" :readonly="!mayManage">
       <EuDetailField
         v-model="values.invoiceNumber"
         :saved-value="saved.invoiceNumber"
-        label="Rechnungsnummer"
+        :label="t('fields.invoiceNumber')"
         type="text"
         required
       />
-      <EuDetailField label="Status" type="readonly">
+      <EuDetailField :label="t('fields.status')" type="readonly">
         <template #value>
           <EuBadge v-if="statusDisplay" :tone="statusDisplay.tone" :icon="statusDisplay.icon">
             {{ statusDisplay.label }}
@@ -553,14 +556,14 @@ function submit(): void {
       <EuDetailField
         v-model="values.invoiceDate"
         :saved-value="saved.invoiceDate"
-        label="Rechnungsdatum"
+        :label="t('fields.invoiceDate')"
         type="date"
         required
       />
       <EuDetailField
         v-model="values.treatmentDate"
         :saved-value="saved.treatmentDate"
-        label="Behandlungsdatum"
+        :label="t('fields.treatmentDate')"
         type="date"
         required
       />
@@ -569,40 +572,40 @@ function submit(): void {
       <EuDetailDays
         v-model="extraDays"
         :saved-value="savedExtraDays"
-        label="Weitere Behandlungstage"
-        add-label="Behandlungstag hinzufügen"
+        :label="t('invoices.detail.furtherDays')"
+        :add-label="t('invoices.form.addDay')"
         :hint="treatmentSpan"
       />
       <EuDetailField
         v-model="values.facilityUID"
         :saved-value="saved.facilityUID"
-        label="Leistungserbringer"
+        :label="t('fields.facilityUID')"
         type="select"
         :options="localFacilities"
         allow-create
-        create-noun="Leistungserbringer"
+        :create-noun="kindName('facility')"
         @create="openCreate('facility', $event)"
       />
-      <EuDetailField label="Versicherter" type="readonly" :model-value="accountName" />
+      <EuDetailField :label="t('fields.accountUID')" type="readonly" :model-value="accountName" />
 
       <EuDetailField
         v-model="values.transferUntilDate"
         :saved-value="saved.transferUntilDate"
-        label="Zahlungsziel"
+        :label="t('fields.transferUntilDate')"
         type="date"
         :disabled="directPayment"
       />
       <EuDetailField
         v-model="values.transferDate"
         :saved-value="saved.transferDate"
-        label="Zahlungsdatum"
+        :label="t('fields.transferDate')"
         type="date"
         :disabled="directPayment"
       />
       <EuDetailField
         v-model="values.invoiceAmount"
         :saved-value="saved.invoiceAmount"
-        label="Rechnungsbetrag"
+        :label="t('fields.invoiceAmount')"
         type="currency"
         required
       />
@@ -610,18 +613,18 @@ function submit(): void {
       <EuDetailField
         v-model="values.directPayment"
         :saved-value="saved.directPayment"
-        label="Direkt-/Barzahlung"
+        :label="t('fields.directPayment')"
         type="toggle"
       />
       <EuDetailField
         v-model="values.agencyUID"
         :saved-value="saved.agencyUID"
-        label="Abrechnungsdienstleister"
+        :label="t('fields.agencyUID')"
         type="select"
         :options="localAgencies"
         :disabled="directPayment"
         allow-create
-        create-noun="Abrechnungsdienstleister"
+        :create-noun="kindName('agency')"
         @create="openCreate('agency', $event)"
       />
       <!-- An agency holds several sets at once, and the invoice names the
@@ -630,12 +633,12 @@ function submit(): void {
       <EuDetailField
         v-model="values.agencyAccountUID"
         :saved-value="saved.agencyAccountUID"
-        label="Kontoverbindung"
+        :label="t('fields.agencyAccountUID')"
         type="select"
         :options="paymentDetailOptions"
         :disabled="directPayment || !values.agencyUID"
         allow-create
-        create-noun="Kontoverbindung"
+        :create-noun="kindName('agencyAccount')"
         @create="paymentDetailPicker.start(String(values.agencyUID ?? ''))"
       >
         <template #after>
@@ -658,7 +661,7 @@ function submit(): void {
       <EuDetailField
         v-model="values.transferSubject"
         :saved-value="saved.transferSubject"
-        label="Verwendungszweck"
+        :label="t('fields.transferSubject')"
         type="text"
         :disabled="directPayment"
       />
@@ -666,7 +669,7 @@ function submit(): void {
       <EuDetailField
         v-model="values.documentLink"
         :saved-value="saved.documentLink"
-        label="Rechnungslink"
+        :label="t('invoices.detail.documentLink')"
         type="text"
       />
 
@@ -675,13 +678,13 @@ function submit(): void {
       <EuDetailField
         v-model="values.notCovered"
         :saved-value="saved.notCovered"
-        label="Nicht gedeckt"
+        :label="t('fields.notCovered')"
         type="toggle"
       />
       <EuDetailField
         v-model="values.notCoveredReason"
         :saved-value="saved.notCoveredReason"
-        label="Begründung"
+        :label="t('fields.notCoveredReason')"
         type="text"
         :disabled="!notCovered"
       />
@@ -689,20 +692,20 @@ function submit(): void {
       <!-- Zuordnungsblock (Karten je Leistungsabrechnung): Slice 21. -->
 
       <EuDetailField
-        label="Erstattung"
+        :label="t('fields.reimbursement')"
         type="readonly"
         :model-value="formatMoney(invoice.reimbursedTotal)"
       />
       <template v-if="isSubmitted">
         <EuDetailField
-          label="Noch nicht erstattet"
+          :label="t('invoices.detail.remaining')"
           type="readonly"
           :model-value="formatMoney(invoice.remainingAmount)"
         />
         <EuDetailField
           v-model="values.reimbursementClosed"
           :saved-value="saved.reimbursementClosed"
-          label="Als abgerechnet markiert"
+          :label="t('fields.reimbursementClosed')"
           type="toggle"
         />
       </template>
@@ -713,7 +716,7 @@ function submit(): void {
     <template v-if="invoice">
       <section class="eu-detail-block" aria-labelledby="eu-invoice-assignment">
         <div class="eu-detail-block__head">
-          <h3 id="eu-invoice-assignment">Zuordnung</h3>
+          <h3 id="eu-invoice-assignment">{{ t('invoices.detail.assignment') }}</h3>
           <div class="eu-detail-block__head-actions">
             <EuButton
               variant="secondary"
@@ -724,7 +727,7 @@ function submit(): void {
                 submitError = null;
                 submitOpen = true;
               "
-              >Einreichen</EuButton
+              >{{ t('invoices.actions.submit') }}</EuButton
             >
             <EuButton
               variant="secondary"
@@ -735,7 +738,7 @@ function submit(): void {
                 exclusionError = null;
                 exclusionOpen = true;
               "
-              >Nicht erstattungsfähig</EuButton
+              >{{ t('invoices.detail.notReimbursable') }}</EuButton
             >
           </div>
         </div>
@@ -744,7 +747,7 @@ function submit(): void {
           v-if="invoice.submissions.length === 0 && invoice.exclusions.length === 0"
           class="eu-detail-block__hint"
         >
-          Noch bei keiner Police eingereicht oder markiert.
+          {{ t('invoices.detail.nothingYet') }}
         </p>
         <div v-else class="eu-detail-block__cards">
           <SubmissionCard
@@ -768,17 +771,19 @@ function submit(): void {
           >
             <div>
               <h4>{{ policyLabel(exclusion) }}</h4>
-              <p>{{ exclusion.note ?? 'Nicht erstattungsfähig bei dieser Police.' }}</p>
+              <p>{{ exclusion.note ?? t('invoices.detail.excludedHere') }}</p>
             </div>
-            <EuBadge tone="neutral" :icon="faBan">Nicht erstattungsfähig</EuBadge>
+            <EuBadge tone="neutral" :icon="faBan">{{
+              t('invoices.detail.notReimbursable')
+            }}</EuBadge>
             <EuButton
               variant="secondary"
               icon-only
               :icon="faTrash"
-              :aria-label="`Markierung für ${exclusion.contractNumber} entfernen`"
+              :aria-label="t('invoices.detail.removeMark', { number: exclusion.contractNumber })"
               :title="
                 mayManage
-                  ? `Markierung für ${exclusion.contractNumber} entfernen`
+                  ? t('invoices.detail.removeMark', { number: exclusion.contractNumber })
                   : noPermissionText()
               "
               :disabled="!mayManage || blockBusy"
@@ -791,9 +796,9 @@ function submit(): void {
     </template>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.close') }}</EuButton>
       <EuButton v-if="mayManage" :disabled="submitting" @click="submit">
-        {{ submitting ? 'Speichern…' : 'Speichern' }}
+        {{ submitting ? t('common.saving') : t('common.save') }}
       </EuButton>
     </template>
   </EuDialog>
@@ -865,45 +870,66 @@ function submit(): void {
   />
   <EuDialog
     :open="pendingWithdraw !== null"
-    title="Einreichung zurückziehen"
+    :title="t('invoices.detail.withdrawTitle')"
     @close="pendingWithdraw = null"
   >
     <p>
-      Die Einreichung bei {{ pendingWithdraw ? policyLabel(pendingWithdraw) : '' }} wirklich
-      zurückziehen? Die Rechnung kann danach erneut bei dieser Police eingereicht werden.
+      {{
+        t('invoices.detail.withdrawQuestion', {
+          policy: pendingWithdraw ? policyLabel(pendingWithdraw) : '',
+        })
+      }}
     </p>
     <template #footer>
-      <EuButton variant="secondary" @click="pendingWithdraw = null">Abbrechen</EuButton>
-      <EuButton :disabled="blockBusy" @click="confirmWithdraw">Zurückziehen</EuButton>
+      <EuButton variant="secondary" @click="pendingWithdraw = null">{{
+        t('common.cancel')
+      }}</EuButton>
+      <EuButton :disabled="blockBusy" @click="confirmWithdraw">{{
+        t('invoices.actions.withdraw')
+      }}</EuButton>
     </template>
   </EuDialog>
   <EuDialog
     :open="pendingAllocation !== null"
-    title="Erstattung entfernen"
+    :title="t('invoices.detail.removeAllocationTitle')"
     @close="pendingAllocation = null"
   >
     <p v-if="pendingAllocation">
-      Die Erstattung von {{ formatMoney(pendingAllocation.reimbursement) }} aus Abrechnung
-      {{ pendingAllocation.billingNumber }} wirklich entfernen? Die Leistungsabrechnung selbst
-      bleibt bestehen.
+      {{
+        t('invoices.detail.removeAllocationQuestion', {
+          amount: formatMoney(pendingAllocation.reimbursement),
+          number: pendingAllocation.billingNumber,
+        })
+      }}
     </p>
     <template #footer>
-      <EuButton variant="secondary" @click="pendingAllocation = null">Abbrechen</EuButton>
-      <EuButton :disabled="blockBusy" @click="confirmRemoveAllocation">Entfernen</EuButton>
+      <EuButton variant="secondary" @click="pendingAllocation = null">{{
+        t('common.cancel')
+      }}</EuButton>
+      <EuButton :disabled="blockBusy" @click="confirmRemoveAllocation">{{
+        t('invoices.detail.remove')
+      }}</EuButton>
     </template>
   </EuDialog>
   <EuDialog
     :open="pendingRemove !== null"
-    title="Markierung entfernen"
+    :title="t('invoices.detail.removeMarkTitle')"
     @close="pendingRemove = null"
   >
     <p>
-      Die Markierung „nicht erstattungsfähig“ für
-      {{ pendingRemove ? policyLabel(pendingRemove) : '' }} entfernen?
+      {{
+        t('invoices.detail.removeMarkQuestion', {
+          policy: pendingRemove ? policyLabel(pendingRemove) : '',
+        })
+      }}
     </p>
     <template #footer>
-      <EuButton variant="secondary" @click="pendingRemove = null">Abbrechen</EuButton>
-      <EuButton :disabled="blockBusy" @click="confirmRemove">Entfernen</EuButton>
+      <EuButton variant="secondary" @click="pendingRemove = null">{{
+        t('common.cancel')
+      }}</EuButton>
+      <EuButton :disabled="blockBusy" @click="confirmRemove">{{
+        t('invoices.detail.remove')
+      }}</EuButton>
     </template>
   </EuDialog>
 </template>

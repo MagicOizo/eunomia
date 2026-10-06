@@ -88,6 +88,25 @@ export function formatDateTime(value: unknown): string {
 }
 
 /**
+ * An ISO date without its year, `01.10.`, `01/10` or `10/01` — the first day
+ * of a span whose last day carries the year. Each format has its own short form
+ * (the German one keeps its trailing dot), so it is not cut from `formatDate`.
+ */
+export function formatDayMonth(value: unknown): string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return DASH;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return DASH;
+  const region = activeFormat();
+  const key = `dm|${region}`;
+  let format = cache.get(key) as Intl.DateTimeFormat | undefined;
+  if (!format) {
+    format = new Intl.DateTimeFormat(region, { month: '2-digit', day: '2-digit', timeZone: 'UTC' });
+    cache.set(key, format);
+  }
+  return format.format(parsed);
+}
+
+/**
  * The UI language, for what is a matter of language rather than format:
  * sorting and case folding.
  */

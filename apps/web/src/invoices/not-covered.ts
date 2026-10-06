@@ -9,24 +9,23 @@
  * before the round trip (see apps/api/src/domain/invoices.ts).
  */
 
-import { describeCode } from '../lib/error-messages';
+import { i18n } from '../lib/i18n';
 import type { InvoiceDto } from './api';
 
+const { t } = i18n.global;
+
 /**
- * What the API answers when the mark comes without a reason, looked up by its
- * error code (lib/error-messages.ts) so the dialog and the round trip word it
- * the same way. The fallback is unreachable while the code is mapped there.
+ * What the API answers when the mark comes without a reason: the message of
+ * its error code (lib/error-messages.ts), so the dialog and the round trip word
+ * it the same way.
  */
 export function reasonRequiredMessage(): string {
-  return (
-    describeCode('INVOICE_NOT_COVERED_REASON_REQUIRED', {}) ??
-    'Bitte eine Begründung angeben, warum die Rechnung nicht gedeckt ist.'
-  );
+  return t('errors.code.INVOICE_NOT_COVERED_REASON_REQUIRED');
 }
 
 /** The mark's tooltip in a list: the reason, which the API guarantees is there. */
 export function notCoveredTitle(
   invoice: Pick<InvoiceDto, 'notCovered' | 'notCoveredReason'>,
 ): string {
-  return invoice.notCoveredReason ?? 'Von der Versicherung nicht gedeckt.';
+  return invoice.notCoveredReason ?? t('invoices.notCovered.title');
 }

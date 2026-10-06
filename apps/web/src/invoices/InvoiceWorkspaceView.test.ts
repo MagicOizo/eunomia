@@ -1,9 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withLocale } from '../test/locale';
 import { grant } from '../test/permissions';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
 import InvoiceFormDialog from './InvoiceFormDialog.vue';
+import InvoiceTable from './InvoiceTable.vue';
 import InvoiceWorkspaceView from './InvoiceWorkspaceView.vue';
 import PaymentInfoPopover from './PaymentInfoPopover.vue';
 
@@ -290,6 +292,46 @@ describe('InvoiceWorkspaceView reimbursement column', () => {
     expect(short.find('.eu-visually-hidden').text()).toContain('Eigenanteil');
     expect(full.find('.eu-visually-hidden').exists()).toBe(false);
     wrapper.unmount();
+  });
+
+  it('speaks English in the table and the delete question', async () => {
+    await withLocale('en', async () => {
+      listInvoices.mockResolvedValue([
+        {
+          ...invoice('inv-short', 'R-2026-3', '2026-03-01'),
+          workflowStatus: 'abgerechnet',
+          reimbursementClosed: true,
+          allocationCount: 1,
+          reimbursedTotal: 60,
+          remainingAmount: 40,
+        },
+        invoice('inv-open', 'R-2026-1', '2026-01-01'),
+      ]);
+      const wrapper = mount(InvoiceWorkspaceView, {
+        props: { accountUID: 'a-1' },
+        global: { stubs: { RouterLink: true } },
+      });
+      await flushPromises();
+
+      expect(wrapper.findAll('.eu-ws__table thead th').map((th) => th.text())).toEqual([
+        '',
+        'Status',
+        'Invoice date',
+        'Treatment',
+        'Number',
+        'Provider',
+        'Amount',
+        'Reimbursed',
+        'Actions',
+      ]);
+      expect(wrapper.find('tbody .eu-ws__badges').text()).toContain('Settled');
+      expect(cells(wrapper)[0].attributes('title')).toBe('Not fully reimbursed – own share €40.00');
+
+      wrapper.findComponent(InvoiceTable).vm.$emit('remove', ['inv-short', 'inv-open']);
+      await flushPromises();
+      expect(wrapper.text()).toContain('Really delete 2 invoices?');
+      wrapper.unmount();
+    });
   });
 
   it('says nothing about an invoice nobody has answered yet', async () => {

@@ -7,6 +7,26 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.0-slice.5 — 2026-10-06
+
+The fifth preview of 1.2.0. The UI still starts in German for everyone.
+
+- **The invoice workspace speaks the UI language.** The invoice search, the table with its status,
+  payment and recommendation badges, the form for a new invoice, the invoice details with their own
+  dialogs (mark as paid, not reimbursable), the summary with the policy cards and the comparison of
+  options, and the GiroCode take their texts from the catalogues. The submission cards and the
+  dialogs for submitting, billing, allocating and objecting follow in the next preview.
+- **The start page is now translated throughout:** its invoice status, payment and policy badges
+  came from the invoices and follow with them.
+- **The optimizer's advice is a whole sentence per case**, with the policies and amounts as
+  parameters, instead of German phrases put together. "X-1, Y-1 is exhausted" now reads "are
+  exhausted" (German: "sind erschöpft") when it is about more than one policy.
+- A span of treatment days drops the year of its first day in the form of each date format
+  (`03.02.–17.02.2020`, `03/02–17/02/2020`, `02/03–02/17/2020`); it used to cut the German form
+  even in the others.
+- **Dependencies:** vue 3.5.43, proxy-addr 2.0.8 and source-map-js 1.2.2 against
+  GHSA-g2v6-rqmx-r4w6, GHSA-jqcg-44mw-7w3h and GHSA-68fv-2mgg-jv7q.
+
 ## 1.2.0-slice.4 — 2026-10-06
 
 The fourth preview of 1.2.0. The UI still starts in German for everyone.

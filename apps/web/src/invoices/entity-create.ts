@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import type { PickerOption } from '../design-system/components/EuEntityPicker.vue';
 import { describeError } from '../lib/errors';
 import { HttpError } from '../lib/http';
+import { i18n } from '../lib/i18n';
 import { type ResourceRow, createResource } from '../lib/resource';
 import type { ResourceConfig } from '../resources/config';
 import { resourceConfigs } from '../resources/definitions';
@@ -61,7 +62,8 @@ export function useEntityCreate(
       );
       open.value = false;
     } catch (err) {
-      error.value = err instanceof HttpError ? describeError(err) : 'Anlegen fehlgeschlagen.';
+      error.value =
+        err instanceof HttpError ? describeError(err) : i18n.global.t('invoices.createFailed');
     } finally {
       busy.value = false;
     }

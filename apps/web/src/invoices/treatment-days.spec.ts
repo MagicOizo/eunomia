@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { withFormat } from '../test/locale';
 import { furtherDays, normalizeDays, sameCalendarYear, treatmentDaysLabel } from './treatment-days';
 
 describe('normalizeDays', () => {
@@ -54,6 +55,12 @@ describe('treatmentDaysLabel', () => {
     expect(treatmentDaysLabel(['2020-02-10', '2020-02-17', '2020-02-03'])).toBe(
       '03.02.–17.02.2020',
     );
+  });
+
+  it('drops the year in the short form of each format', async () => {
+    const days = ['2020-02-03', '2020-02-17'];
+    await withFormat('en-GB', () => expect(treatmentDaysLabel(days)).toBe('03/02–17/02/2020'));
+    await withFormat('en-US', () => expect(treatmentDaysLabel(days)).toBe('02/03–02/17/2020'));
   });
 
   it('spells out both years where they differ', () => {

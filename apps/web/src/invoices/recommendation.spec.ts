@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { withLocale } from '../test/locale';
 import type { PlanInvoiceDto, PlanPolicyDto, PlanStrategyDto, ReimbursementPlanDto } from './api';
 import {
   bonusView,
@@ -219,9 +220,95 @@ describe('strategies and texts', () => {
     expect(plain(policyVerdict(x, plan))).toContain('mehr als 350,00 € weitere Kosten');
   });
 
+  it('says "is" for one exhausted policy and "are" for several, German and English', async () => {
+    const exhausted = (...numbers: string[]): ReimbursementPlanDto => ({
+      ...plan,
+      policies: numbers.map((contractNumber) =>
+        zusatz({ contractUID: contractNumber, contractNumber, status: 'exhausted' }),
+      ),
+    });
+    expect(recommendationText(exhausted('Y-1'))).toBe('Y-1 ist erschöpft');
+    expect(recommendationText(exhausted('Y-1', 'Z-1'))).toBe('Y-1, Z-1 sind erschöpft');
+    await withLocale('en', () => {
+      expect(recommendationText(exhausted('Y-1'))).toBe('Y-1 is exhausted');
+      expect(recommendationText(exhausted('Y-1', 'Z-1'))).toBe('Y-1, Z-1 are exhausted');
+    });
+  });
+
   it('clamps progress shares', () => {
     expect(percentOf(150, 200)).toBe(75);
     expect(percentOf(300, 200)).toBe(100);
     expect(percentOf(10, 0)).toBe(0);
+  });
+});
+
+describe('in English', () => {
+  const used = byUID(
+    policy({ recommendation: 'use', status: 'submit', worthUsingAbove: null }),
+    zusatz(),
+  );
+  const spared = byUID(policy({}), zusatz());
+
+  it('words every advice as a whole sentence', async () => {
+    await withLocale('en', () => {
+      const split = invoiceBadge(invoicePlan('submit', ['submit', 800], ['submit', 50]), used);
+      expect(split?.label).toBe('Submit');
+      expect(split?.tooltip).toBe('Submit at X-1 (€800.00), remainder at Y-1 (€50.00).');
+
+      const deductible = invoiceBadge(invoicePlan('submit', ['submit', 0], ['submit', 150]), used);
+      expect(deductible?.tooltip).toBe(
+        'Submit at X-1 (counts towards the deductible), remainder at Y-1 (€150.00).',
+      );
+
+      const withdraw = invoiceBadge(
+        invoicePlan('withdraw', ['withdraw', 0], ['submit', 150]),
+        spared,
+      );
+      expect(withdraw?.label).toBe('Withdraw');
+      expect(withdraw?.tooltip).toBe(
+        'Withdraw at X-1 – the bonus is worth more there. Submit at Y-1 (€150.00) instead.',
+      );
+
+      const hold = invoiceBadge(invoicePlan('hold', ['none', 0], ['none', 0]), spared);
+      expect(hold?.label).toBe('Hold back');
+      expect(hold?.tooltip).toBe('Do not submit – spare the bonus at X-1.');
+    });
+  });
+
+  it('names the bonus state and counts pending submissions', async () => {
+    await withLocale('en', () => {
+      expect(bonusView(policy({})).label).toBe('Safe');
+      expect(bonusView(policy({})).detail).toBe('€300.00 expected');
+      expect(bonusView(policy({ pendingClaims: 1 })).detail).toBe(
+        '€300.00 expected – 1 submission not settled yet',
+      );
+      expect(bonusView(policy({ pendingClaims: 2, tiersInherited: true })).detail).toBe(
+        '€300.00 expected (bonus scale not updated) – 2 submissions not settled yet',
+      );
+      expect(policyActionBadge('wait')?.label).toBe('Wait');
+    });
+  });
+
+  it('explains a policy card and labels the strategies', async () => {
+    const x = policy({});
+    const plan: ReimbursementPlanDto = {
+      accountUID: 'a',
+      year: 2025,
+      invoiceTotal: 150,
+      advantage: 300,
+      strategies: [],
+      policies: [x, zusatz()],
+      invoices: [],
+    };
+    await withLocale('en', () => {
+      expect(policyVerdict(x, plan)).toBe(
+        'The bonus is worth more than the possible reimbursement. Submitting only pays off once more than €350.00 in further costs come in.',
+      );
+      const atStake = policy({ status: 'submit', claimFreeStreak: 3 });
+      expect(policyVerdict(atStake, plan)).toBe(
+        'The reimbursement exceeds the bonus – submit all invoices here. This ends the streak of 3 claim-free years.',
+      );
+      expect(recommendationText(plan)).toBe('submit Y-1, spare X-1');
+    });
   });
 });

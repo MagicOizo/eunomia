@@ -8,8 +8,8 @@
  * apps/api/src/domain/invoices.ts).
  */
 
-import { describeCode } from '../lib/error-messages';
-import { formatDate } from '../lib/format';
+import { formatDate, formatDayMonth } from '../lib/format';
+import { i18n } from '../lib/i18n';
 import type { InvoiceDto } from './api';
 
 /**
@@ -32,15 +32,12 @@ export function sameCalendarYear(days: string[]): boolean {
 }
 
 /**
- * What the API answers when the days span two calendar years, looked up by its
- * error code (lib/error-messages.ts) so the dialog and the round trip word it
- * the same way. The fallback is unreachable while the code is mapped there.
+ * What the API answers when the days span two calendar years: the message of
+ * its error code (lib/error-messages.ts), so the dialog and the round trip word
+ * it the same way.
  */
 export function differentYearsMessage(): string {
-  return (
-    describeCode('TREATMENT_DAYS_DIFFERENT_YEARS', {}) ??
-    'Die Behandlungstage der Rechnung passen nicht zusammen.'
-  );
+  return i18n.global.t('errors.code.TREATMENT_DAYS_DIFFERENT_YEARS');
 }
 
 /** The days besides the leading one — what the masks edit below "Behandlungsdatum". */
@@ -63,5 +60,5 @@ export function treatmentDaysLabel(days: string[]): string {
   if (from === undefined) return '–';
   if (from === to) return formatDate(from);
   if (!sameCalendarYear(sorted)) return `${formatDate(from)} – ${formatDate(to)}`;
-  return `${formatDate(from).slice(0, 6)}–${formatDate(to)}`;
+  return `${formatDayMonth(from)}–${formatDate(to)}`;
 }

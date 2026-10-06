@@ -19,7 +19,10 @@
  */
 
 import { formatMoney } from '../lib/format';
+import { i18n } from '../lib/i18n';
 import type { InvoiceDto } from './api';
+
+const { t } = i18n.global;
 
 export interface ReimbursementGap {
   tone: 'short' | 'pending';
@@ -38,12 +41,12 @@ export function reimbursementGap(
     case 'erledigt':
       return {
         tone: 'short',
-        label: `Nicht vollständig erstattet – Eigenanteil ${formatMoney(invoice.remainingAmount)}`,
+        label: t('invoices.gap.short', { amount: formatMoney(invoice.remainingAmount) }),
       };
     case 'teilabgerechnet':
       return {
         tone: 'pending',
-        label: `Noch nicht vollständig erstattet – offen ${formatMoney(invoice.remainingAmount)}`,
+        label: t('invoices.gap.pending', { amount: formatMoney(invoice.remainingAmount) }),
       };
     default:
       return null;

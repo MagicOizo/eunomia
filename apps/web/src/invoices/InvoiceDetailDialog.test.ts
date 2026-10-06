@@ -4,6 +4,7 @@ import { nextTick } from 'vue';
 
 import EuDetailField from '../design-system/components/EuDetailField.vue';
 import EuDetailMask from '../design-system/components/EuDetailMask.vue';
+import { withLocale } from '../test/locale';
 import { grant } from '../test/permissions';
 import type { InvoiceDto } from './api';
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue';
@@ -309,5 +310,26 @@ describe('InvoiceDetailDialog without the write permission', () => {
     expect(wrapper.findComponent(EuDetailMask).props('readonly')).toBe(false);
     expect(wrapper.find('.eu-dialog__footer').text()).toContain('Speichern');
     wrapper.unmount();
+  });
+});
+
+describe('InvoiceDetailDialog in English', () => {
+  it('names the mask, the allocation block and the not-covered mark', async () => {
+    grant({ global: ['VIEW_INVOICES', 'MANAGE_INVOICES'] });
+    await withLocale('en', async () => {
+      const wrapper = open(
+        invoice({ treatmentDates: ['2025-01-15', '2025-01-22'], notCovered: true }),
+      );
+      await nextTick();
+      expect(wrapper.find('.eu-dialog__title').text()).toBe('Invoice details');
+      expect(row(wrapper, 'Not covered')?.props('modelValue')).toBe(true);
+      expect(row(wrapper, 'Reason')).toBeDefined();
+      expect(wrapper.text()).toContain('Further treatment days');
+      expect(wrapper.text()).toContain('Period 15/01–22/01/2025');
+      expect(wrapper.find('#eu-invoice-assignment').text()).toBe('Allocation');
+      expect(wrapper.text()).toContain('Not submitted to or marked at any policy yet.');
+      expect(wrapper.find('.eu-dialog__footer').text()).toContain('Save');
+      wrapper.unmount();
+    });
   });
 });

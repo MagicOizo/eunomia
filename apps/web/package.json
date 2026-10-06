@@ -1,7 +1,7 @@
 {
   "name": "@eunomia/web",
   "private": true,
-  "version": "1.2.0-slice.4",
+  "version": "1.2.0-slice.5",
   "description": "Eunomia frontend SPA.",
   "type": "module",
   "scripts": {

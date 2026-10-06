@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 
 import { paymentDetailLabel } from '../agencies/payment-details';
@@ -66,6 +67,8 @@ const RESULT_LIMIT = 50;
 
 const router = useRouter();
 
+const { t } = useI18n();
+
 const accounts = ref<AccountDto[]>([]);
 const agencies = ref<AgencyDto[]>([]);
 const facilities = ref<FacilityDto[]>([]);
@@ -124,19 +127,19 @@ const paymentDetailOptions = computed<SelectOption[]>(() => {
 const references = computed(() => [
   {
     key: 'agencyUID' as const,
-    label: 'Abrechnungsdienstleister',
+    label: t('fields.agencyUID'),
     options: agencyOptions.value,
     disabled: false,
   },
   {
     key: 'agencyAccountUID' as const,
-    label: 'Kontoverbindung',
+    label: t('fields.agencyAccountUID'),
     options: paymentDetailOptions.value,
     disabled: filter.agencyUID === '',
   },
   {
     key: 'facilityUID' as const,
-    label: 'Leistungserbringer',
+    label: t('fields.facilityUID'),
     options: facilityOptions.value,
     disabled: false,
   },
@@ -145,7 +148,8 @@ const references = computed(() => [
 const statusOptions = computed<SelectOption[]>(() =>
   STATUS_FILTER_ORDER.map((status) => ({
     value: status,
-    label: status === 'nicht-erledigt' ? 'Nicht erledigt' : STATUS_DISPLAY[status].label,
+    label:
+      status === 'nicht-erledigt' ? t('invoices.picker.notDone') : STATUS_DISPLAY[status].label,
   })),
 );
 
@@ -263,7 +267,11 @@ onMounted(async () => {
     <div class="eu-picker__filters">
       <!-- A plain text field, like the filter bar of the billings list: the
            native search input brings a clear button no other field here has. -->
-      <EuTextField v-model="filter.q" class="eu-picker__search" label="Rechnungsnummer suchen" />
+      <EuTextField
+        v-model="filter.q"
+        class="eu-picker__search"
+        :label="t('invoices.picker.search')"
+      />
       <EuSelectField
         v-for="reference in references"
         :key="reference.key"
@@ -271,23 +279,23 @@ onMounted(async () => {
         :label="reference.label"
         :options="reference.options"
         :disabled="reference.disabled"
-        empty-label="– alle –"
+        :empty-label="t('invoices.picker.all')"
         @update:model-value="setReference(reference.key, $event)"
       />
       <EuSelectField
         :model-value="filter.status"
-        label="Status"
+        :label="t('fields.status')"
         :options="statusOptions"
-        empty-label="– alle –"
+        :empty-label="t('invoices.picker.all')"
         @update:model-value="setStatus"
       />
     </div>
 
     <template v-if="searchActive">
-      <p v-if="searching" class="eu-picker__hint">Wird gesucht…</p>
+      <p v-if="searching" class="eu-picker__hint">{{ t('invoices.picker.searching') }}</p>
       <p v-else-if="searchError" class="eu-picker__error" role="alert">{{ searchError }}</p>
       <p v-else-if="results.length === 0" class="eu-picker__hint" role="status">
-        Keine Rechnung passt zu dieser Suche.
+        {{ t('invoices.picker.noMatch') }}
       </p>
 
       <ul v-else class="eu-picker__results">
@@ -295,7 +303,7 @@ onMounted(async () => {
           <RouterLink class="eu-picker__result" :to="hitTarget(invoice)">
             <span class="eu-picker__number">{{ invoice.invoiceNumber }}</span>
             <span class="eu-picker__person">{{
-              personName.get(invoice.accountUID) ?? 'Unbekannt'
+              personName.get(invoice.accountUID) ?? t('invoices.picker.unknown')
             }}</span>
             <EuBadge
               :tone="STATUS_DISPLAY[invoice.workflowStatus].tone"
@@ -305,9 +313,13 @@ onMounted(async () => {
               {{ STATUS_DISPLAY[invoice.workflowStatus].label }}
             </EuBadge>
             <span class="eu-picker__meta">
-              Rechnung vom {{ formatDate(invoice.invoiceDate) }} · Behandlung
-              {{ treatmentDaysLabel(invoice.treatmentDates) }} ·
-              {{ formatMoney(invoice.invoiceAmount) }}
+              {{
+                t('invoices.picker.meta', {
+                  date: formatDate(invoice.invoiceDate),
+                  treatment: treatmentDaysLabel(invoice.treatmentDates),
+                  amount: formatMoney(invoice.invoiceAmount),
+                })
+              }}
             </span>
             <span v-if="referenceLine(invoice)" class="eu-picker__refs">{{
               referenceLine(invoice)
@@ -316,16 +328,16 @@ onMounted(async () => {
         </li>
       </ul>
       <p v-if="truncated" class="eu-picker__hint" role="status">
-        Es werden die ersten {{ RESULT_LIMIT }} Rechnungen gezeigt. Bitte enger filtern.
+        {{ t('invoices.picker.truncated', { n: RESULT_LIMIT }) }}
       </p>
     </template>
 
     <template v-else>
-      <p class="eu-picker__lead">Für welchen Versicherten möchtest du die Rechnungen ansehen?</p>
+      <p class="eu-picker__lead">{{ t('invoices.picker.lead') }}</p>
 
-      <p v-if="loading" class="eu-picker__hint">Wird geladen…</p>
+      <p v-if="loading" class="eu-picker__hint">{{ t('common.loading') }}</p>
       <p v-else-if="accounts.length === 0" class="eu-picker__hint">
-        Noch keine Versicherten erfasst.
+        {{ t('invoices.picker.noAccounts') }}
       </p>
 
       <ul v-else class="eu-picker__grid">

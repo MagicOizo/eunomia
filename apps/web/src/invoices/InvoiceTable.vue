@@ -12,6 +12,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, nextTick, ref, watchEffect } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 
@@ -55,6 +56,8 @@ export interface InvoiceRowView {
   /** A document link a browser may follow (SEC-01) — only then is there a button. */
   hasDocument: boolean;
 }
+
+const { t } = useI18n();
 
 const props = defineProps<{
   rows: InvoiceRowView[];
@@ -155,49 +158,49 @@ defineExpose({ revealFound });
             <input
               ref="selectAllEl"
               type="checkbox"
-              aria-label="Alle auswählen"
+              :aria-label="t('invoices.table.selectAll')"
               :checked="allSelected"
               @change="emit('toggleAll')"
             />
           </th>
           <EuSortableTh
-            label="Status"
+            :label="t('fields.status')"
             :state="sort.stateOf('status')"
             @sort="sort.toggle('status')"
           />
           <EuSortableTh
-            label="Rechnungsdatum"
+            :label="t('fields.invoiceDate')"
             :state="sort.stateOf('invoiceDate')"
             @sort="sort.toggle('invoiceDate')"
           />
           <EuSortableTh
-            label="Behandlung"
+            :label="t('invoices.table.treatment')"
             :state="sort.stateOf('treatmentDate')"
             @sort="sort.toggle('treatmentDate')"
           />
           <EuSortableTh
-            label="Nummer"
+            :label="t('invoices.columns.number')"
             :state="sort.stateOf('number')"
             @sort="sort.toggle('number')"
           />
           <EuSortableTh
-            label="Leistungserbringer"
+            :label="t('fields.facilityUID')"
             :state="sort.stateOf('facility')"
             @sort="sort.toggle('facility')"
           />
           <EuSortableTh
-            label="Betrag"
+            :label="t('invoices.columns.amount')"
             align="center"
             :state="sort.stateOf('amount')"
             @sort="sort.toggle('amount')"
           />
           <EuSortableTh
-            label="Erstattung"
+            :label="t('invoices.table.reimbursed')"
             align="center"
             :state="sort.stateOf('reimbursed')"
             @sort="sort.toggle('reimbursed')"
           />
-          <th class="eu-ws__actions-head">Aktionen</th>
+          <th class="eu-ws__actions-head">{{ t('common.actions') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -212,7 +215,7 @@ defineExpose({ revealFound });
           <td>
             <input
               type="checkbox"
-              :aria-label="`Rechnung ${row.invoice.invoiceNumber} auswählen`"
+              :aria-label="t('invoices.table.select', { number: row.invoice.invoiceNumber })"
               :checked="selected.has(row.invoice.invoiceUID)"
               @change="emit('toggle', row.invoice)"
             />
@@ -229,8 +232,8 @@ defineExpose({ revealFound });
                 v-if="row.invoice.hasOpenObjection"
                 class="eu-ws__objection"
                 role="img"
-                aria-label="Im Widerspruch"
-                title="Im Widerspruch"
+                :aria-label="t('invoices.table.inObjection')"
+                :title="t('invoices.table.inObjection')"
               >
                 <FontAwesomeIcon :icon="faTriangleExclamation" aria-hidden="true" />
               </span>
@@ -240,7 +243,7 @@ defineExpose({ revealFound });
                 :icon="faBan"
                 :title="row.notCoveredTitle"
               >
-                Nicht gedeckt
+                {{ t('fields.notCovered') }}
               </EuBadge>
               <RecommendationBadge v-if="row.badge" :badge="row.badge" />
             </div>
@@ -265,8 +268,8 @@ defineExpose({ revealFound });
                     type="button"
                     class="eu-ws__ampel"
                     :style="{ color: row.payment.color }"
-                    :aria-label="`${row.payment.label} – Zahlungsinformationen anzeigen`"
-                    :title="`${row.payment.label} – Zahlungsinformationen anzeigen`"
+                    :aria-label="t('invoices.table.showPayment', { state: row.payment.label })"
+                    :title="t('invoices.table.showPayment', { state: row.payment.label })"
                     :aria-expanded="expanded"
                     :aria-controls="panelId"
                   >
@@ -294,8 +297,8 @@ defineExpose({ revealFound });
               variant="secondary"
               icon-only
               :icon="faUpRightFromSquare"
-              aria-label="Dokument öffnen"
-              title="Hinterlegtes Dokument öffnen"
+              :aria-label="t('invoices.paymentInfo.openDocument')"
+              :title="t('invoices.table.openDocumentTitle')"
               @click="emit('document', row.invoice)"
             />
             <EuButton
@@ -303,9 +306,9 @@ defineExpose({ revealFound });
               variant="secondary"
               icon-only
               :icon="faPaperPlane"
-              aria-label="Einreichen"
+              :aria-label="t('invoices.actions.submit')"
               :disabled="!canManage"
-              :title="canManage ? 'Rechnung bei der Versicherung einreichen' : noPermission()"
+              :title="canManage ? t('invoices.table.submitTitle') : noPermission()"
               @click="emit('submit', [row.invoice])"
             />
             <EuButton
@@ -313,20 +316,18 @@ defineExpose({ revealFound });
               variant="secondary"
               icon-only
               :icon="faCircleCheck"
-              aria-label="Als bezahlt markieren"
+              :aria-label="t('invoices.settle.title')"
               :disabled="!canManage"
-              :title="canManage ? 'Rechnung als bezahlt markieren' : noPermission()"
+              :title="canManage ? t('invoices.table.settleTitle') : noPermission()"
               @click="emit('settle', row.invoice)"
             />
             <EuButton
               variant="secondary"
               icon-only
               :icon="canManage ? faPen : faEye"
-              aria-label="Details"
+              :aria-label="t('invoices.table.details')"
               :title="
-                canManage
-                  ? 'Rechnungsdetails öffnen – bearbeiten, einreichen, abrechnen'
-                  : 'Rechnungsdetails ansehen'
+                canManage ? t('invoices.table.detailsTitle') : t('invoices.table.detailsView')
               "
               @click="emit('detail', row.invoice)"
             />
@@ -334,9 +335,9 @@ defineExpose({ revealFound });
               variant="secondary"
               icon-only
               :icon="faTrash"
-              aria-label="Löschen"
+              :aria-label="t('common.delete')"
               :disabled="!canManage"
-              :title="canManage ? 'Rechnung löschen' : noPermission()"
+              :title="canManage ? t('invoices.table.deleteTitle') : noPermission()"
               @click="emit('remove', [row.invoice.invoiceUID])"
             />
           </td>

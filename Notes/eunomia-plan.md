@@ -2303,5 +2303,13 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - Auswahllisten (Art, Bonus-Verfall, Stufen-Art, Verwirkung) sind `computed`, damit sie einem Sprachwechsel folgen. Feldnamen kommen, wo vorhanden, aus `fields.*`.
 - `no-raw-text` gilt jetzt zusätzlich für `contracts/` und `dashboard/`.
 
+### Slice 81 — Rechnungen I (umgesetzt 2026-10-06, `1.2.0-slice.5`)
+- **Grenze zu 82 je Datei, nicht je Verzeichnis:** 81 umfasst Arbeitsfläche, Tabelle, Anlegen-Dialog, Details (eigene Texte samt „Als bezahlt“ und „Nicht erstattungsfähig“), Zusammenfassung, Badges, Zahlungs-/GiroCode-Popover und Rechnungssuche; `no-raw-text` listet diese Dateien einzeln, 82 ersetzt das durch `invoices/**/*.vue`. Bis dahin ist der Detail-Dialog auf `?lang=en` in den Einreichungskarten und seinen Unterdialogen gemischt.
+- **Badge-Tabellen bleiben Tabellen:** `STATUS_DISPLAY`, `PAYMENT_DISPLAY`, `POLICY_STATUS_BADGE` haben `label` als Getter über den Katalog; die Startseite ist damit vollständig übersetzt.
+- **Empfehlungen als ganze Sätze** (`invoices.advice.*`, `.verdict.*`, `.bonus.*`): Nummern und Beträge als Parameter, ein optionaler zweiter Satz ist eine eigene Nachricht. „ist/sind erschöpft“ zählt jetzt nach der Zahl der Policen. Glossar um die Verben des Optimierers ergänzt (submit · wait · withdraw · hold back · spare/use · exhausted; Rest → remainder).
+- **Datumsspanne je Format:** `formatDayMonth` in `lib/format.ts` statt `formatDate(…).slice(0, 6)`, das nur für `de-DE` stimmte.
+- Die Fallbacks hinter `describeCode` in `not-covered.ts`/`treatment-days.ts` lesen den Fehlercode-Satz jetzt direkt per `t()` (kompilergeprüft).
+- Spaltenkopf „Erstattung“ englisch „Reimbursed“ statt „Reimbursement“: das eine Wort trennt Chromium unter Linux nicht, und die Tabelle lief bei 1440 px um 24 px über.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

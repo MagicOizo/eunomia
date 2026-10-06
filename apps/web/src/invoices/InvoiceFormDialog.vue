@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { computed, ref, toRef, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import PaymentDetailFormDialog from '../agencies/PaymentDetailFormDialog.vue';
 import type { AgencyPaymentDetailDto } from '../agencies/api';
@@ -14,6 +15,7 @@ import EuToggle from '../design-system/components/EuToggle.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
 import ResourceFormDialog from '../components/resource/ResourceFormDialog.vue';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
+import { kindName } from '../lib/kind-names';
 import { usePaymentDetailPicker } from './payment-detail-picker';
 import { paymentTermSuggestions } from './payment-terms';
 import type { InvoiceDto } from './api';
@@ -25,6 +27,8 @@ import {
   normalizeDays,
   sameCalendarYear,
 } from './treatment-days';
+
+const { t } = useI18n();
 
 const props = defineProps<
   FormDialogProps & {
@@ -165,7 +169,7 @@ function submit(): void {
   clear();
   const f = form.value;
   if (!f.invoiceNumber.trim() || !f.invoiceDate || !f.treatmentDate || f.invoiceAmount === null) {
-    return fail('Bitte Rechnungsnummer, Rechnungsdatum, Behandlungsdatum und Betrag ausfüllen.');
+    return fail(t('invoices.form.required'));
   }
   // The whole list, the leading day included — the API reads `treatmentDates`
   // as the complete set and takes its earliest entry as `treatmentDate`.
@@ -202,13 +206,13 @@ function submit(): void {
 <template>
   <EuDialog
     :open="open"
-    :title="editing ? 'Rechnung bearbeiten' : 'Rechnung anlegen'"
+    :title="editing ? t('invoices.form.editTitle') : t('invoices.form.createTitle')"
     @close="emit('close')"
   >
     <form class="eu-form" @submit.prevent="submit">
-      <EuTextField v-model="form.invoiceNumber" label="Rechnungsnummer" />
-      <EuTextField v-model="form.invoiceDate" label="Rechnungsdatum" type="date" />
-      <EuTextField v-model="form.treatmentDate" label="Behandlungsdatum" type="date" />
+      <EuTextField v-model="form.invoiceNumber" :label="t('fields.invoiceNumber')" />
+      <EuTextField v-model="form.invoiceDate" :label="t('fields.invoiceDate')" type="date" />
+      <EuTextField v-model="form.treatmentDate" :label="t('fields.treatmentDate')" type="date" />
 
       <!-- One bill of a practice often covers several appointments (Slice 41),
            but only about one in ten: the first day stays the field above, the
@@ -218,7 +222,7 @@ function submit(): void {
         <div v-for="(day, index) in extraDays" :key="index" class="eu-form__day">
           <EuTextField
             :model-value="day"
-            :label="`Behandlungstag ${index + 2}`"
+            :label="t('invoices.form.day', { n: index + 2 })"
             type="date"
             @update:model-value="extraDays[index] = $event"
           />
@@ -226,47 +230,47 @@ function submit(): void {
             variant="secondary"
             icon-only
             :icon="faXmark"
-            :aria-label="`Behandlungstag ${index + 2} entfernen`"
+            :aria-label="t('invoices.form.removeDay', { n: index + 2 })"
             @click="removeDay(index)"
           />
         </div>
         <p v-if="extraDays.length > 0" class="eu-form__hint">
-          Alle Behandlungstage müssen im selben Kalenderjahr liegen.
+          {{ t('invoices.form.sameYear') }}
         </p>
-        <EuButton class="eu-form__add-day" variant="ghost" :icon="faPlus" @click="addDay"
-          >Behandlungstag hinzufügen</EuButton
-        >
+        <EuButton class="eu-form__add-day" variant="ghost" :icon="faPlus" @click="addDay">{{
+          t('invoices.form.addDay')
+        }}</EuButton>
       </div>
       <EuEntityPicker
         :model-value="form.facilityUID || null"
-        label="Leistungserbringer"
+        :label="t('fields.facilityUID')"
         :options="localFacilities"
         allow-create
-        create-noun="Leistungserbringer"
+        :create-noun="kindName('facility')"
         @update:model-value="form.facilityUID = $event ?? ''"
         @create="openCreate('facility', $event)"
       />
-      <EuCurrencyField v-model="form.invoiceAmount" label="Betrag" />
+      <EuCurrencyField v-model="form.invoiceAmount" :label="t('invoices.columns.amount')" />
 
       <!-- What a direct payment does to the two dates is the API's rule
            (Slice 43) and needs no sentence here: the fields it would talk
            about are gone from the form the moment the switch is on. -->
-      <EuToggle v-model="directPayment" label="Direkt-/Barzahlung" />
+      <EuToggle v-model="directPayment" :label="t('fields.directPayment')" />
 
       <template v-if="!directPayment">
         <EuSuggestedDateField
           v-model="form.transferUntilDate"
-          label="Zahlungsziel"
+          :label="t('fields.transferUntilDate')"
           :suggestions="paymentTerms"
-          suggestions-label="Typische Zahlungsziele"
+          :suggestions-label="t('invoices.form.paymentTerms')"
         />
-        <EuTextField v-model="form.transferSubject" label="Verwendungszweck" />
+        <EuTextField v-model="form.transferSubject" :label="t('fields.transferSubject')" />
         <EuEntityPicker
           :model-value="form.agencyUID || null"
-          label="Abrechnungsdienstleister"
+          :label="t('fields.agencyUID')"
           :options="localAgencies"
           allow-create
-          create-noun="Abrechnungsdienstleister"
+          :create-noun="kindName('agency')"
           @update:model-value="pickAgency($event)"
           @create="openCreate('agency', $event)"
         />
@@ -276,23 +280,23 @@ function submit(): void {
         <EuEntityPicker
           v-if="form.agencyUID"
           :model-value="form.agencyAccountUID || null"
-          label="Kontoverbindung"
+          :label="t('fields.agencyAccountUID')"
           :options="paymentDetailOptions"
           allow-create
-          create-noun="Kontoverbindung"
+          :create-noun="kindName('agencyAccount')"
           @update:model-value="form.agencyAccountUID = $event ?? ''"
           @create="paymentDetailPicker.start(form.agencyUID)"
         />
       </template>
 
-      <EuTextField v-model="form.documentLink" label="Dokument-Link" />
+      <EuTextField v-model="form.documentLink" :label="t('fields.documentLink')" />
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">
-        {{ submitting ? 'Speichern…' : 'Speichern' }}
+        {{ submitting ? t('common.saving') : t('common.save') }}
       </EuButton>
     </template>
   </EuDialog>

@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withLocale } from '../test/locale';
 import { settled } from '../test/settle';
 import InvoicePickerView from './InvoicePickerView.vue';
 import { EMPTY_FILTER, rememberFilter } from './invoice-search';
@@ -249,5 +250,44 @@ describe('InvoicePickerView search', () => {
     await wrapper.find('.eu-picker__search input').setValue('');
     await settled(() => wrapper.find('.eu-picker__grid').exists(), 'the tiles to come back');
     expect(wrapper.find('.eu-picker__grid').exists()).toBe(true);
+  });
+});
+
+describe('InvoicePickerView in English', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    rememberFilter(EMPTY_FILTER);
+    mockMasterData();
+  });
+
+  it('names the status filter, a hit and the empty search', async () => {
+    await withLocale('en', async () => {
+      searchInvoices.mockResolvedValue([hit]);
+      const wrapper = await mountView();
+      expect(wrapper.find('.eu-picker__lead').text()).toBe('Whose invoices do you want to see?');
+      const status = selectFor(wrapper, 'Status');
+      expect(status.findAll('option').map((option) => option.text())).toEqual([
+        '– all –',
+        'Not done',
+        'Open',
+        'Submitted',
+        'Partially settled',
+        'Settled',
+        'Done',
+      ]);
+
+      await wrapper.find('.eu-picker__search input').setValue('2024-100');
+      await flushPromises();
+      await settled(() => wrapper.find('.eu-picker__result').exists(), 'the hit to show');
+      expect(wrapper.find('.eu-picker__meta').text()).toBe(
+        'Invoice of 20/03/2024 · treatment 14/03–21/03/2024 · €248.50',
+      );
+
+      searchInvoices.mockResolvedValue([]);
+      await wrapper.find('.eu-picker__search input').setValue('none-such');
+      await flushPromises();
+      await settled(() => !wrapper.text().includes('Searching'), 'the search to come back');
+      expect(wrapper.text()).toContain('No invoice matches this search.');
+    });
   });
 });

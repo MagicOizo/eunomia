@@ -11,6 +11,10 @@
  * `qrcode` library, client-side — payment data never reaches a third party.
  */
 
+import { i18n } from '../lib/i18n';
+
+const { t } = i18n.global;
+
 /** Longest beneficiary name the scheme allows (field AT-21). */
 const MAX_NAME = 70;
 /** Longest unstructured remittance information (field AT-05). */
@@ -59,16 +63,16 @@ function utf8Length(value: string): number {
 export function buildGirocode(input: GirocodeInput): GirocodeResult {
   const iban = input.iban.replace(/\s+/g, '').toUpperCase();
   if (iban === '') {
-    return { ok: false, reason: 'Für diese Rechnung ist keine IBAN hinterlegt.' };
+    return { ok: false, reason: t('invoices.qr.noIban') };
   }
 
   const recipient = input.recipient.trim().slice(0, MAX_NAME);
   if (recipient === '') {
-    return { ok: false, reason: 'Für diese Rechnung ist kein Empfänger hinterlegt.' };
+    return { ok: false, reason: t('invoices.qr.noRecipient') };
   }
 
   if (!Number.isFinite(input.amount) || input.amount < MIN_AMOUNT || input.amount > MAX_AMOUNT) {
-    return { ok: false, reason: 'Der Rechnungsbetrag lässt sich nicht als GiroCode darstellen.' };
+    return { ok: false, reason: t('invoices.qr.amountOutOfRange') };
   }
 
   const subject = (input.subject ?? '').trim().slice(0, MAX_SUBJECT);
@@ -89,7 +93,7 @@ export function buildGirocode(input: GirocodeInput): GirocodeResult {
   ].join('\n');
 
   if (utf8Length(payload) > MAX_BYTES) {
-    return { ok: false, reason: 'Die Zahlungsdaten sind für einen GiroCode zu lang.' };
+    return { ok: false, reason: t('invoices.qr.tooLong') };
   }
 
   return { ok: true, payload };

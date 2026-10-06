@@ -46,42 +46,45 @@ compiler and needs no `unsafe-eval` in the Content Security Policy.
 The domain is German private health insurance (PKV). These terms are binding for every catalogue
 and for English project documentation (README, CHANGELOG) from 1.2.0 on.
 
-| German                                                         | English                                               | In the code            |
-| -------------------------------------------------------------- | ----------------------------------------------------- | ---------------------- |
-| Rechnung                                                       | invoice                                               | `Invoice`              |
-| Versicherte(r)                                                 | insured person                                        | `Account`              |
-| Hauptversicherte(r)                                            | policyholder                                          |                        |
-| Police                                                         | policy                                                | `Contract`             |
-| Versicherung (the company)                                     | insurer                                               | `InsuranceCompany`     |
-| Leistungserbringer                                             | provider                                              | `Facility`             |
-| Abrechnungsdienstleister                                       | billing agency                                        | `CollectionAgency`     |
-| Kontoverbindung                                                | bank details                                          | `paymentDetail`        |
-| Einreichung / einreichen                                       | submission / submit                                   | `Submission`           |
-| Leistungsabrechnung                                            | service billing                                       | `ServiceBilling`       |
-| Zuordnung                                                      | allocation                                            | `Allocation`           |
-| Erstattung                                                     | reimbursement                                         |                        |
-| Selbstbeteiligung                                              | deductible                                            |                        |
-| Erstattungssatz / Erstattungsobergrenze                        | reimbursement rate / reimbursement cap                |                        |
-| Konditionen (per year)                                         | terms                                                 | `ContractTerms`        |
-| Versicherungsjahr                                              | insurance year                                        |                        |
-| Bonus, Bonus-Staffel, Stufe                                    | no-claims bonus (short: bonus), bonus scale, tier     | `ContractBonusTiers`   |
-| leistungsfreie Jahre                                           | claim-free years                                      |                        |
-| Bonus verwirkt / verfällt                                      | bonus forfeited                                       |                        |
-| Monatsbeitrag / bonusrelevanter Monatsbeitrag                  | monthly premium / bonus-relevant monthly premium      | `ContractPremiums`     |
-| Erstattungsplan                                                | reimbursement plan                                    |                        |
-| Behandlungsdatum / Behandlungstage                             | treatment date / treatment days                       |                        |
-| Zahlungsziel                                                   | due date                                              |                        |
-| Direkt-/Barzahlung                                             | paid on the spot                                      |                        |
-| Widerspruch                                                    | objection                                             |                        |
-| nicht erstattungsfähig                                         | not reimbursable                                      | exclusion              |
-| nicht gedeckt                                                  | not covered                                           |                        |
-| Belegnummer                                                    | reference number                                      |                        |
-| Verwendungszweck                                               | payment reference                                     |                        |
-| Zahlungserinnerung                                             | payment reminder                                      |                        |
-| Papierkorb                                                     | trash                                                 |                        |
-| offen · eingereicht · teilabgerechnet · abgerechnet · erledigt | open · submitted · partially settled · settled · done | workflow status values |
-| Startseite · Nutzer & Rechte · Einstellungen · Mein Konto      | Home · Users & permissions · Settings · My account    |                        |
-| Anmelden / Abmelden                                            | Sign in / Sign out                                    |                        |
+| German                                                                                         | English                                                                        | In the code            |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------- |
+| Rechnung                                                                                       | invoice                                                                        | `Invoice`              |
+| Versicherte(r)                                                                                 | insured person                                                                 | `Account`              |
+| Hauptversicherte(r)                                                                            | policyholder                                                                   |                        |
+| Police                                                                                         | policy                                                                         | `Contract`             |
+| Versicherung (the company)                                                                     | insurer                                                                        | `InsuranceCompany`     |
+| Leistungserbringer                                                                             | provider                                                                       | `Facility`             |
+| Abrechnungsdienstleister                                                                       | billing agency                                                                 | `CollectionAgency`     |
+| Kontoverbindung                                                                                | bank details                                                                   | `paymentDetail`        |
+| Einreichung / einreichen                                                                       | submission / submit                                                            | `Submission`           |
+| Leistungsabrechnung                                                                            | service billing                                                                | `ServiceBilling`       |
+| Zuordnung                                                                                      | allocation                                                                     | `Allocation`           |
+| Erstattung                                                                                     | reimbursement                                                                  |                        |
+| Selbstbeteiligung                                                                              | deductible                                                                     |                        |
+| Erstattungssatz / Erstattungsobergrenze                                                        | reimbursement rate / reimbursement cap                                         |                        |
+| Konditionen (per year)                                                                         | terms                                                                          | `ContractTerms`        |
+| Versicherungsjahr                                                                              | insurance year                                                                 |                        |
+| Bonus, Bonus-Staffel, Stufe                                                                    | no-claims bonus (short: bonus), bonus scale, tier                              | `ContractBonusTiers`   |
+| leistungsfreie Jahre                                                                           | claim-free years                                                               |                        |
+| Bonus verwirkt / verfällt                                                                      | bonus forfeited                                                                |                        |
+| Monatsbeitrag / bonusrelevanter Monatsbeitrag                                                  | monthly premium / bonus-relevant monthly premium                               | `ContractPremiums`     |
+| Erstattungsplan                                                                                | reimbursement plan                                                             |                        |
+| Empfehlung: einreichen · abwarten · zurückziehen · zurückhalten · schonen / nutzen · erschöpft | recommendation: submit · wait · withdraw · hold back · spare / use · exhausted | optimizer advice       |
+| Bonus sicher · in Gefahr · erhalten                                                            | bonus safe · at risk · received                                                |                        |
+| Rest (what a second policy reimburses)                                                         | remainder                                                                      |                        |
+| Behandlungsdatum / Behandlungstage                                                             | treatment date / treatment days                                                |                        |
+| Zahlungsziel                                                                                   | due date                                                                       |                        |
+| Direkt-/Barzahlung                                                                             | paid on the spot                                                               |                        |
+| Widerspruch                                                                                    | objection                                                                      |                        |
+| nicht erstattungsfähig                                                                         | not reimbursable                                                               | exclusion              |
+| nicht gedeckt                                                                                  | not covered                                                                    |                        |
+| Belegnummer                                                                                    | reference number                                                               |                        |
+| Verwendungszweck                                                                               | payment reference                                                              |                        |
+| Zahlungserinnerung                                                                             | payment reminder                                                               |                        |
+| Papierkorb                                                                                     | trash                                                                          |                        |
+| offen · eingereicht · teilabgerechnet · abgerechnet · erledigt                                 | open · submitted · partially settled · settled · done                          | workflow status values |
+| Startseite · Nutzer & Rechte · Einstellungen · Mein Konto                                      | Home · Users & permissions · Settings · My account                             |                        |
+| Anmelden / Abmelden                                                                            | Sign in / Sign out                                                             |                        |
 
 "Billing agency" replaces "collection agency", which earlier changelog entries use: in English,
 the latter mostly means a debt collector.

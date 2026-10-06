@@ -2,6 +2,7 @@
 import { faQrcode } from '@fortawesome/free-solid-svg-icons';
 import QRCode from 'qrcode';
 import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuPopover from '../design-system/components/EuPopover.vue';
@@ -28,6 +29,8 @@ const props = defineProps<{
   amount: number;
   subject: string | null;
 }>();
+
+const { t } = useI18n();
 
 const requested = ref(false);
 const imageUrl = ref<string | null>(null);
@@ -62,7 +65,7 @@ async function generate(): Promise<void> {
     problem.value = null;
   } catch {
     imageUrl.value = null;
-    problem.value = 'Der GiroCode konnte nicht erzeugt werden.';
+    problem.value = t('invoices.qr.failed');
   }
 }
 
@@ -90,8 +93,8 @@ watch(
         variant="ghost"
         icon-only
         :icon="faQrcode"
-        aria-label="GiroCode anzeigen"
-        title="GiroCode für die Überweisung anzeigen"
+        :aria-label="t('invoices.qr.show')"
+        :title="t('invoices.qr.showTitle')"
         :aria-expanded="expanded"
         :aria-controls="panelId"
         @click="onOpen"
@@ -103,9 +106,9 @@ watch(
         <img
           class="eu-girocode__image"
           :src="imageUrl"
-          :alt="`GiroCode für eine Überweisung von ${formatMoney(amount)} an ${recipient}`"
+          :alt="t('invoices.qr.alt', { amount: formatMoney(amount), recipient })"
         />
-        <p class="eu-girocode__hint">Mit der Banking-App scannen.</p>
+        <p class="eu-girocode__hint">{{ t('invoices.qr.hint') }}</p>
       </template>
       <p v-else-if="problem" class="eu-girocode__hint">{{ problem }}</p>
     </div>

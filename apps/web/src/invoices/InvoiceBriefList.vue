@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+
 import { formatDate, formatMoney } from '../lib/format';
 import type { InvoiceDto } from './api';
 
@@ -12,16 +14,18 @@ defineProps<{
   /** facilityUID → name; an invoice without a provider shows a dash. */
   facilityNames: Record<string, string>;
 }>();
+
+const { t } = useI18n();
 </script>
 
 <template>
   <table class="eu-brief">
     <thead>
       <tr>
-        <th scope="col">Nummer</th>
-        <th scope="col">Leistungserbringer</th>
-        <th scope="col">Datum</th>
-        <th scope="col" class="eu-brief__num">Betrag</th>
+        <th scope="col">{{ t('invoices.columns.number') }}</th>
+        <th scope="col">{{ t('fields.facilityUID') }}</th>
+        <th scope="col">{{ t('invoices.columns.date') }}</th>
+        <th scope="col" class="eu-brief__num">{{ t('invoices.columns.amount') }}</th>
       </tr>
     </thead>
     <tbody>

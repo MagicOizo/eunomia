@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -21,6 +22,8 @@ const emit = defineEmits<{
   submit: [payload: { contractUID: string; note: string | null }];
 }>();
 
+const { t } = useI18n();
+
 const contractUID = ref('');
 const note = ref('');
 
@@ -31,28 +34,28 @@ const { shownError, fail, clear } = useFormDialog(props, () => {
 
 function submit(): void {
   clear();
-  if (!contractUID.value) return fail('Bitte die Police wählen.');
+  if (!contractUID.value) return fail(t('invoices.exclusion.contractRequired'));
   emit('submit', { contractUID: contractUID.value, note: note.value.trim() || null });
 }
 </script>
 
 <template>
-  <EuDialog :open="open" title="Nicht erstattungsfähig markieren" @close="emit('close')">
+  <EuDialog :open="open" :title="t('invoices.exclusion.title')" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <EuEntityPicker
         :model-value="contractUID || null"
-        label="Police"
+        :label="t('fields.contractUID')"
         required
         :options="contracts"
         @update:model-value="contractUID = $event ?? ''"
       />
-      <EuTextField v-model="note" label="Notiz (z. B. stationäre Leistung)" />
+      <EuTextField v-model="note" :label="t('invoices.exclusion.note')" />
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">{{
-        submitting ? 'Speichern…' : 'Markieren'
+        submitting ? t('common.saving') : t('invoices.exclusion.submit')
       }}</EuButton>
     </template>
   </EuDialog>

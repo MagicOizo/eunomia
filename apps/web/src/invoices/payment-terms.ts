@@ -1,5 +1,6 @@
 import { isoPlusDays } from '../lib/date-input';
 import { formatDate } from '../lib/format';
+import { i18n } from '../lib/i18n';
 
 /**
  * The payment terms a bill usually names (issues.md 0.15.0-2).
@@ -36,7 +37,9 @@ export interface PaymentTermSuggestion {
 
 /** The step's name: "sofort" for the invoice date itself, otherwise "14 Tage". */
 function termLabel(days: number): string {
-  return days === 0 ? 'sofort' : `${days} Tage`;
+  return days === 0
+    ? i18n.global.t('invoices.form.termNow')
+    : i18n.global.t('invoices.form.termDays', { n: days });
 }
 
 /**

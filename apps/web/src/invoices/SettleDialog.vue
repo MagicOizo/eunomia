@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -12,6 +13,8 @@ const props = defineProps<FormDialogProps & { invoice: InvoiceDto | null }>();
 
 const emit = defineEmits<{ close: []; submit: [transferDate: string] }>();
 
+const { t } = useI18n();
+
 const transferDate = ref('');
 
 const { shownError, fail } = useFormDialog(props, () => {
@@ -19,25 +22,25 @@ const { shownError, fail } = useFormDialog(props, () => {
 });
 
 function submit(): void {
-  if (!transferDate.value) return fail('Bitte ein Zahlungsdatum wählen.');
+  if (!transferDate.value) return fail(t('invoices.settle.dateRequired'));
   emit('submit', transferDate.value);
 }
 </script>
 
 <template>
-  <EuDialog :open="open" title="Als bezahlt markieren" @close="emit('close')">
+  <EuDialog :open="open" :title="t('invoices.settle.title')" @close="emit('close')">
     <form class="eu-form" @submit.prevent="submit">
       <p v-if="invoice" class="eu-form__note">
-        Rechnung {{ invoice.invoiceNumber }} als erstattet/bezahlt markieren.
+        {{ t('invoices.settle.note', { number: invoice.invoiceNumber }) }}
       </p>
-      <EuTextField v-model="transferDate" label="Zahlungsdatum" type="date" />
+      <EuTextField v-model="transferDate" :label="t('fields.transferDate')" type="date" />
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">
-        {{ submitting ? 'Speichern…' : 'Bestätigen' }}
+        {{ submitting ? t('common.saving') : t('invoices.settle.confirm') }}
       </EuButton>
     </template>
   </EuDialog>
