@@ -6,6 +6,7 @@ import {
   faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -14,7 +15,8 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { settingLabel } from '../lib/field-labels';
-import { formatDateTime, plural } from '../lib/format';
+import { formatDateTime } from '../lib/format';
+import { countedKind } from '../lib/kind-names';
 import { boolOf, statusOf, stringOf } from './settings-values';
 import {
   type RetentionRunResult,
@@ -34,6 +36,7 @@ import {
  */
 const props = defineProps<{ snapshot: SettingsSnapshot }>();
 const emit = defineEmits<{ snapshot: [SettingsSnapshot] }>();
+const { t } = useI18n();
 
 /** The editable form. The number is held as text, like the mail port. */
 const retention = reactive({ enabled: false, trashDays: '90' });
@@ -55,7 +58,7 @@ const daysError = computed(() => {
   const parsed = Number(retention.trashDays);
   return Number.isInteger(parsed) && parsed >= 1 && parsed <= 3650
     ? undefined
-    : 'Bitte eine Zahl zwischen 1 und 3650 angeben.';
+    : t('settings.retention.daysError');
 });
 
 const status = computed(() => ({
@@ -107,22 +110,20 @@ async function runNow(dryRun: boolean): Promise<void> {
 const runSentence = computed(() => {
   const result = lastRun.value;
   if (!result) return null;
-  const records = plural(result.purged, 'Eintrag', 'Einträge');
-  const users =
+  const records = t('settings.retention.entryCount', result.purged);
+  const what =
     result.users === 0
-      ? ''
-      : ` und ${plural(result.users, 'gelöschter Nutzer', 'gelöschte Nutzer')}`;
-  const held =
-    result.skipped === 0
-      ? ''
-      : ` ${plural(result.skipped, 'Eintrag', 'Einträge')} ${
-          result.skipped === 1 ? 'bleibt' : 'bleiben'
-        } noch: dort hängt etwas Aktives daran.`;
-  const age = `älter als ${plural(result.days, 'Tag', 'Tage')}`;
+      ? records
+      : t('settings.retention.withUsers', {
+          records,
+          users: countedKind('user', result.users),
+        });
+  const held = result.skipped === 0 ? '' : ` ${t('settings.retention.held', result.skipped)}`;
   if (result.dryRun) {
-    return `Probelauf: ${records}${users} ${age} würden endgültig gelöscht.${held} Es wurde nichts gelöscht.`;
+    const days = t('settings.retention.dayCount', result.days);
+    return `${t('settings.retention.dryRunSentence', { what, days })}${held} ${t('settings.retention.nothingDeleted')}`;
   }
-  return `${records}${users} endgültig gelöscht.${held}`;
+  return `${t('settings.retention.purgedSentence', { what })}${held}`;
 });
 
 /**
@@ -134,11 +135,16 @@ const runDetail = computed(() =>
   (lastRun.value?.byKind ?? [])
     .filter((entry) => entry.purged + entry.skipped > 0)
     .map((entry) => {
-      const name = (count: number): string => plural(count, entry.singular, entry.plural);
       const parts = [
-        ...(entry.purged > 0 ? [name(entry.purged)] : []),
+        ...(entry.purged > 0 ? [countedKind(entry.kind, entry.purged)] : []),
         ...(entry.skipped > 0
-          ? [`${name(entry.skipped)} ${entry.skipped === 1 ? 'bleibt' : 'bleiben'} noch`]
+          ? [
+              t(
+                'settings.retention.kindRemains',
+                { what: countedKind(entry.kind, entry.skipped) },
+                entry.skipped,
+              ),
+            ]
           : []),
       ];
       return { kind: entry.kind, text: parts.join(' — ') };
@@ -147,7 +153,7 @@ const runDetail = computed(() =>
 </script>
 
 <template>
-  <EuCollapsibleSection title="Aufbewahrung">
+  <EuCollapsibleSection :title="t('settings.retention.title')">
     <template #status>
       <EuBadge
         v-if="status.lastRunResult"
@@ -155,23 +161,19 @@ const runDetail = computed(() =>
         :icon="status.lastRunResult === 'ok' ? faCircleCheck : faCircleExclamation"
       >
         {{
-          `Letzter Lauf ${formatDateTime(status.lastRunAt)}` +
-          (status.lastRunResult === 'ok'
-            ? ` — ${status.lastRunPurged ?? 0} entfernt`
-            : ' — fehlgeschlagen')
+          status.lastRunResult === 'ok'
+            ? t('settings.retention.lastRunPurged', {
+                at: formatDateTime(status.lastRunAt),
+                n: status.lastRunPurged ?? 0,
+              })
+            : t('settings.lastRunFailed', { at: formatDateTime(status.lastRunAt) })
         }}
       </EuBadge>
-      <EuBadge v-else tone="neutral">Noch nicht gelaufen</EuBadge>
+      <EuBadge v-else tone="neutral">{{ t('settings.notRunYet') }}</EuBadge>
     </template>
 
     <form class="eu-settings__form" @submit.prevent="saveRetention">
-      <p class="eu-settings__hint">
-        Gelöschte Datensätze bleiben im Papierkorb, bis jemand sie dort endgültig entfernt. Mit
-        einer Frist tut Eunomia das selbst: Was länger als die eingestellte Zahl von Tagen im
-        Papierkorb liegt, wird einmal täglich endgültig gelöscht — und mit ihm, was darunter hängt
-        und selbst gelöscht ist. Gelöschte Nutzer gehen nach derselben Frist. Das ist nicht
-        umkehrbar; der Probelauf zeigt vorher, was es trifft.
-      </p>
+      <p class="eu-settings__hint">{{ t('settings.retention.lead') }}</p>
 
       <EuToggle v-model="retention.enabled" :label="settingLabel('retention.enabled')" />
 
@@ -183,15 +185,14 @@ const runDetail = computed(() =>
           type="text"
         />
       </div>
-      <p class="eu-settings__hint">
-        Einträge aus der Zeit vor dem Papierkorb haben kein Löschdatum und werden von der Frist nie
-        erfasst — die bleiben von Hand zu löschen.
-      </p>
+      <p class="eu-settings__hint">{{ t('settings.retention.legacyHint') }}</p>
 
       <div class="eu-settings__actions">
-        <EuButton type="submit" :disabled="action.busy || Boolean(daysError)">Speichern</EuButton>
+        <EuButton type="submit" :disabled="action.busy || Boolean(daysError)">{{
+          t('common.save')
+        }}</EuButton>
         <EuButton variant="secondary" :icon="faEye" :disabled="action.busy" @click="runNow(true)">
-          Probelauf
+          {{ t('settings.retention.dryRun') }}
         </EuButton>
         <EuButton
           variant="secondary"
@@ -199,15 +200,15 @@ const runDetail = computed(() =>
           :disabled="action.busy || !retention.enabled"
           @click="runNow(false)"
         >
-          Jetzt aufräumen
+          {{ t('settings.retention.runNow') }}
         </EuButton>
       </div>
 
-      <p v-if="saved" class="eu-settings__ok" role="status">Einstellungen gespeichert.</p>
+      <p v-if="saved" class="eu-settings__ok" role="status">{{ t('settings.saved') }}</p>
       <p v-if="runSentence" class="eu-settings__ok" role="status">{{ runSentence }}</p>
       <p v-if="action.error" class="eu-settings__error" role="alert">{{ action.error }}</p>
       <p v-if="status.lastRunResult === 'error' && status.lastRunError" class="eu-settings__hint">
-        Meldung beim letzten Lauf: {{ status.lastRunError }}
+        {{ t('settings.lastRunMessage', { message: status.lastRunError }) }}
       </p>
 
       <ul v-if="runDetail.length > 0" class="eu-settings__list">

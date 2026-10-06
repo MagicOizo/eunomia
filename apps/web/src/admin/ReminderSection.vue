@@ -6,6 +6,7 @@ import {
   faEye,
 } from '@fortawesome/free-solid-svg-icons';
 import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -31,6 +32,7 @@ import {
  */
 const props = defineProps<{ snapshot: SettingsSnapshot }>();
 const emit = defineEmits<{ snapshot: [SettingsSnapshot] }>();
+const { t } = useI18n();
 
 /** The editable reminder form. Numbers are held as text, like the mail port. */
 const reminders = reactive({
@@ -64,14 +66,14 @@ const hourError = computed(() => {
   const parsed = Number(reminders.hour);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23
     ? undefined
-    : 'Bitte eine volle Stunde zwischen 0 und 23 angeben.';
+    : t('settings.reminders.hourError');
 });
 
 const repeatError = computed(() => {
   const parsed = Number(reminders.repeatDays);
   return Number.isInteger(parsed) && parsed >= 1 && parsed <= 90
     ? undefined
-    : 'Bitte eine Zahl zwischen 1 und 90 angeben.';
+    : t('settings.reminders.repeatError');
 });
 
 const status = computed(() => ({
@@ -121,27 +123,19 @@ async function runNow(dryRun: boolean): Promise<void> {
   });
 }
 
-/** German plural without a library: the forms these sentences need. */
-function plural(n: number, singular: string, forms: string): string {
-  const [one, many] = forms.split('|');
-  return `${n} ${singular}${n === 1 ? one : many}`;
-}
-
 /** What the last manual run did, in one sentence. */
 const runSentence = computed(() => {
   const result = lastRun.value;
   if (!result) return null;
   if (result.recipients === 0) {
-    const checked = plural(result.invoices, 'offene Rechnung', '|en');
-    return `Keine fälligen Zahlungen: ${checked} geprüft, niemand zu benachrichtigen.`;
+    const checked = t('settings.reminders.openInvoices', result.invoices);
+    return t('settings.reminders.nothingDue', { checked });
   }
-  if (result.dryRun) {
-    const who = plural(result.recipients, 'Empfänger', '|');
-    const verb = result.recipients === 1 ? 'würde' : 'würden';
-    return `Vorschau: ${who} ${verb} eine Erinnerung bekommen. Es wurde nichts versendet.`;
-  }
-  const failed = result.failed > 0 ? `, ${result.failed} fehlgeschlagen` : '';
-  return `${plural(result.sent, 'Erinnerung', '|en')} versendet${failed}.`;
+  if (result.dryRun) return t('settings.reminders.previewSentence', result.recipients);
+  const sent = t('settings.reminders.reminderCount', result.sent);
+  return result.failed > 0
+    ? t('settings.reminders.sentWithFailures', { sent, failed: result.failed })
+    : t('settings.reminders.sent', { sent });
 });
 
 /**
@@ -151,16 +145,12 @@ const runSentence = computed(() => {
  */
 const hiddenSentence = computed(() => {
   const hidden = lastRun.value?.previewHidden ?? 0;
-  if (hidden === 0) return null;
-  const who = plural(hidden, 'Empfänger', '|');
-  const verb = hidden === 1 ? 'wird' : 'werden';
-  const whose = hidden === 1 ? 'dessen' : 'deren';
-  return `${who} ${verb} nicht angezeigt: für ${whose} Rechnungen fehlt die Leseberechtigung.`;
+  return hidden === 0 ? null : t('settings.reminders.hidden', hidden);
 });
 </script>
 
 <template>
-  <EuCollapsibleSection title="Zahlungserinnerungen">
+  <EuCollapsibleSection :title="t('settings.reminders.title')">
     <template #status>
       <EuBadge
         v-if="status.lastRunResult"
@@ -168,27 +158,22 @@ const hiddenSentence = computed(() => {
         :icon="status.lastRunResult === 'ok' ? faCircleCheck : faCircleExclamation"
       >
         {{
-          `Letzter Lauf ${formatDateTime(status.lastRunAt)}` +
-          (status.lastRunResult === 'ok'
-            ? ` — ${status.lastRunSent ?? 0} versendet`
-            : ' — fehlgeschlagen')
+          status.lastRunResult === 'ok'
+            ? t('settings.reminders.lastRunSent', {
+                at: formatDateTime(status.lastRunAt),
+                n: status.lastRunSent ?? 0,
+              })
+            : t('settings.lastRunFailed', { at: formatDateTime(status.lastRunAt) })
         }}
       </EuBadge>
-      <EuBadge v-else tone="neutral">Noch nicht gelaufen</EuBadge>
+      <EuBadge v-else tone="neutral">{{ t('settings.notRunYet') }}</EuBadge>
     </template>
 
     <form class="eu-settings__form" @submit.prevent="saveReminders">
-      <p class="eu-settings__hint">
-        Eunomia meldet sich von selbst, wenn die Zahlung einer Rechnung fällig wird oder überfällig
-        ist. Jeder Nutzer bekommt eine Mail über genau die Rechnungen, die er auch in der App sehen
-        darf. Eine fällige Rechnung wird einmal angekündigt, eine überfällige wiederholt sich im
-        eingestellten Abstand.
-      </p>
+      <p class="eu-settings__hint">{{ t('settings.reminders.lead') }}</p>
 
       <EuToggle v-model="reminders.enabled" :label="settingLabel('reminders.enabled')" />
-      <p v-if="!mailEnabled" class="eu-settings__hint">
-        Der E-Mail-Versand ist ausgeschaltet — ohne ihn kann keine Erinnerung verschickt werden.
-      </p>
+      <p v-if="!mailEnabled" class="eu-settings__hint">{{ t('settings.reminders.mailOff') }}</p>
 
       <div class="eu-settings__grid">
         <EuTextField
@@ -209,35 +194,39 @@ const hiddenSentence = computed(() => {
         <EuTextField v-model="reminders.timeZone" :label="settingLabel('reminders.timeZone')" />
         <EuTextField v-model="reminders.appUrl" :label="settingLabel('reminders.appUrl')" />
       </div>
-      <p class="eu-settings__hint">
-        Die Uhrzeit gilt in dieser Zeitzone. Ohne Adresse verschickt Eunomia die Erinnerung ohne
-        Link.
-      </p>
+      <p class="eu-settings__hint">{{ t('settings.reminders.timeZoneHint') }}</p>
 
       <div class="eu-settings__actions">
         <EuButton type="submit" :disabled="action.busy || Boolean(hourError || repeatError)">
-          Speichern
+          {{ t('common.save') }}
         </EuButton>
         <EuButton variant="secondary" :icon="faEye" :disabled="action.busy" @click="runNow(true)">
-          Vorschau
+          {{ t('settings.reminders.preview') }}
         </EuButton>
         <EuButton variant="secondary" :icon="faBell" :disabled="action.busy" @click="runNow(false)">
-          Jetzt ausführen
+          {{ t('settings.reminders.runNow') }}
         </EuButton>
       </div>
 
-      <p v-if="saved" class="eu-settings__ok" role="status">Einstellungen gespeichert.</p>
+      <p v-if="saved" class="eu-settings__ok" role="status">{{ t('settings.saved') }}</p>
       <p v-if="runSentence" class="eu-settings__ok" role="status">{{ runSentence }}</p>
       <p v-if="action.error" class="eu-settings__error" role="alert">{{ action.error }}</p>
       <p v-if="status.lastRunResult === 'error' && status.lastRunError" class="eu-settings__hint">
-        Meldung beim letzten Lauf: {{ status.lastRunError }}
+        {{ t('settings.lastRunMessage', { message: status.lastRunError }) }}
       </p>
 
       <template v-if="lastRun?.dryRun">
         <template v-if="lastRun.preview.length > 0">
-          <p class="eu-settings__hint">Das würde versendet:</p>
+          <p class="eu-settings__hint">{{ t('settings.reminders.previewHead') }}</p>
           <div v-for="mailPreview in lastRun.preview" :key="mailPreview.email">
-            <p class="eu-settings__hint">An {{ mailPreview.email }}: {{ mailPreview.subject }}</p>
+            <p class="eu-settings__hint">
+              {{
+                t('settings.reminders.previewTo', {
+                  email: mailPreview.email,
+                  subject: mailPreview.subject,
+                })
+              }}
+            </p>
             <pre class="eu-settings__preview">{{ mailPreview.text }}</pre>
           </div>
         </template>

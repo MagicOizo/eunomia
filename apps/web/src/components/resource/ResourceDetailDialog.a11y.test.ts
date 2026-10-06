@@ -6,13 +6,12 @@ import type { FieldConfig } from '../../resources/config';
 import ResourceDetailDialog from './ResourceDetailDialog.vue';
 
 const fields: FieldConfig[] = [
-  { key: 'facilityName', label: 'Name', type: 'text', required: true },
-  { key: 'note', label: 'Notiz', type: 'text' },
-  { key: 'distanceKm', label: 'Entfernung (km)', type: 'number', step: '1' },
-  { key: 'companyUID', label: 'Versicherung', type: 'select', optionsFrom: 'companies' },
+  { key: 'facilityName', type: 'text', required: true },
+  { key: 'note', type: 'text' },
+  { key: 'distanceKm', label: () => 'Entfernung (km)', type: 'number', step: '1' },
+  { key: 'companyUID', type: 'select', optionsFrom: 'companies' },
   {
     key: 'accountUID',
-    label: 'Versicherter',
     type: 'select',
     immutable: true,
     optionsFrom: 'accounts',

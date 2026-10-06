@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuDialog from '../design-system/components/EuDialog.vue';
@@ -8,9 +9,11 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
+import { fieldLabel } from '../lib/field-labels';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { useAuthStore } from '../stores/auth';
 import type { AdminUserDto, RoleDto } from './api';
+import { roleName } from './role-names';
 
 export interface UserFormPayload {
   user: {
@@ -33,6 +36,7 @@ const props = defineProps<
 >();
 
 const emit = defineEmits<{ close: []; submit: [payload: UserFormPayload] }>();
+const { t } = useI18n();
 
 const email = ref('');
 const firstname = ref('');
@@ -54,7 +58,7 @@ const editingSelf = computed(
 
 const roleUidByName = computed(() => new Map(props.roles.map((r) => [r.roleName, r.roleUID])));
 const roleOptions = computed<SelectOption[]>(() =>
-  props.roles.map((r) => ({ value: r.roleUID, label: r.roleName })),
+  props.roles.map((r) => ({ value: r.roleUID, label: roleName(r.roleName) })),
 );
 const defaultRoleUID = computed(
   () => roleUidByName.value.get('Nutzer') ?? props.roles[0]?.roleUID ?? '',
@@ -99,10 +103,10 @@ function removeGrant(index: number): void {
 function submit(): void {
   clear();
   if (!email.value.trim() || !firstname.value.trim()) {
-    return fail('Bitte E-Mail und Vorname ausfüllen.');
+    return fail(t('users.form.emailAndFirstnameRequired'));
   }
   if (!props.editing && password.value.length < 8) {
-    return fail('Bitte ein Passwort mit mindestens 8 Zeichen vergeben.');
+    return fail(t('users.form.passwordTooShort'));
   }
   const validGrants = grants.value.filter((g) => g.accountUID && g.roleUID);
 
@@ -121,51 +125,51 @@ function submit(): void {
 <template>
   <EuDialog
     :open="open"
-    :title="editing ? 'Nutzer bearbeiten' : 'Neuer Nutzer'"
+    :title="editing ? t('users.editTitle') : t('users.form.newTitle')"
     @close="emit('close')"
   >
     <form class="eu-form" @submit.prevent="submit">
-      <EuTextField v-model="email" label="E-Mail" type="email" />
-      <EuTextField v-model="firstname" label="Vorname" />
-      <EuTextField v-model="surname" label="Nachname" />
+      <EuTextField v-model="email" :label="t('users.form.email')" type="email" />
+      <EuTextField v-model="firstname" :label="fieldLabel('firstname')" />
+      <EuTextField v-model="surname" :label="fieldLabel('surname')" />
       <EuTextField
         v-if="!editingSelf"
         v-model="password"
-        :label="editing ? 'Neues Passwort (optional)' : 'Passwort'"
+        :label="editing ? t('users.form.newPassword') : t('users.form.password')"
         type="password"
       />
-      <p v-else class="eu-form__hint">
-        Das eigene Passwort änderst du unter
-        <RouterLink to="/profile">Mein Konto</RouterLink> — dort wird das alte Passwort als
-        Bestätigung verlangt.
-      </p>
-      <EuToggle v-if="editing" v-model="active" label="Aktiv" />
+      <i18n-t v-else keypath="users.form.ownPassword" tag="p" class="eu-form__hint" scope="global">
+        <template #link>
+          <RouterLink to="/profile">{{ t('nav.profile') }}</RouterLink>
+        </template>
+      </i18n-t>
+      <EuToggle v-if="editing" v-model="active" :label="t('users.form.active')" />
 
       <fieldset class="eu-form__group">
-        <legend>Globale Rollen</legend>
+        <legend>{{ t('users.form.globalRoles') }}</legend>
         <EuToggle
           v-for="role in roles"
           :key="role.roleUID"
           :model-value="globalRoleUIDs.has(role.roleUID)"
-          :label="role.roleName"
+          :label="roleName(role.roleName)"
           @update:model-value="(on: boolean) => toggleRole(role.roleUID, on)"
         />
       </fieldset>
 
       <fieldset class="eu-form__group">
-        <legend>Konto-Zugriffe</legend>
-        <p v-if="grants.length === 0" class="eu-form__hint">Kein konto-spezifischer Zugriff.</p>
+        <legend>{{ t('users.form.grants') }}</legend>
+        <p v-if="grants.length === 0" class="eu-form__hint">{{ t('users.form.noGrants') }}</p>
         <div v-for="(grant, index) in grants" :key="index" class="eu-form__grant">
           <EuEntityPicker
             :model-value="grant.accountUID || null"
-            label="Konto"
+            :label="t('users.form.account')"
             required
             :options="accounts"
             @update:model-value="grant.accountUID = $event ?? ''"
           />
           <EuEntityPicker
             :model-value="grant.roleUID || null"
-            label="Rolle"
+            :label="t('users.form.role')"
             required
             :options="roleOptions"
             @update:model-value="grant.roleUID = $event ?? ''"
@@ -174,22 +178,22 @@ function submit(): void {
             variant="secondary"
             icon-only
             :icon="faXmark"
-            aria-label="Zugriff entfernen"
+            :aria-label="t('users.form.removeGrant')"
             @click="removeGrant(index)"
           />
         </div>
-        <EuButton variant="secondary" :icon="faPlus" @click="addGrant"
-          >Konto-Zugriff hinzufügen</EuButton
-        >
+        <EuButton variant="secondary" :icon="faPlus" @click="addGrant">{{
+          t('users.form.addGrant')
+        }}</EuButton>
       </fieldset>
 
       <p v-if="shownError" class="eu-form__error" role="alert">{{ shownError }}</p>
     </form>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">
-        {{ submitting ? 'Speichern…' : 'Speichern' }}
+        {{ submitting ? t('common.saving') : t('common.save') }}
       </EuButton>
     </template>
   </EuDialog>

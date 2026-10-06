@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faPen, faPlus, faRotateLeft, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -26,8 +27,11 @@ import {
   setGlobalRoles,
   updateUser,
 } from './api';
+import { roleName } from './role-names';
 import RolesOverview from './RolesOverview.vue';
 import UserFormDialog, { type UserFormPayload } from './UserFormDialog.vue';
+
+const { t } = useI18n();
 
 const users = ref<AdminUserDto[]>([]);
 /**
@@ -48,7 +52,7 @@ const deleteTarget = ref<AdminUserDto | null>(null);
 const purgeTarget = ref<AdminUserDto | null>(null);
 
 /** The same sentence for both: the e-mail address is what can collide. */
-const DUPLICATE_EMAIL = 'Diese E-Mail-Adresse wird bereits verwendet.';
+const DUPLICATE_EMAIL = (): string => t('users.duplicateEmail');
 const form = useDialogAction(reload);
 const removal = useDialogAction(reload);
 const purge = useDialogAction(reload);
@@ -65,7 +69,7 @@ function userSortValue(u: AdminUserDto, key: string): string | number {
     case 'status':
       return u.status;
     case 'roles':
-      return u.globalRoles.join(', ');
+      return u.globalRoles.map(roleName).join(', ');
     case 'grants':
       return u.accountGrants.length;
     default:
@@ -90,7 +94,7 @@ async function reload(): Promise<void> {
       label: [a.firstname, a.surname].filter(Boolean).join(' '),
     }));
   } catch (error) {
-    loadError.value = describeError(error, DUPLICATE_EMAIL);
+    loadError.value = describeError(error, DUPLICATE_EMAIL());
   } finally {
     loading.value = false;
   }
@@ -129,7 +133,7 @@ async function onSubmit(payload: UserFormPayload): Promise<void> {
       await setAccountRoles(uuid!, payload.grants);
     },
     () => (dialogOpen.value = false),
-    DUPLICATE_EMAIL,
+    DUPLICATE_EMAIL(),
   );
 }
 
@@ -139,7 +143,7 @@ async function confirmDelete(): Promise<void> {
   await removal.run(
     () => deleteUser(target.uuid),
     () => (deleteTarget.value = null),
-    DUPLICATE_EMAIL,
+    DUPLICATE_EMAIL(),
   );
 }
 
@@ -173,10 +177,10 @@ async function confirmPurge(): Promise<void> {
 <template>
   <section>
     <div class="eu-users__head">
-      <EuButton :icon="faPlus" @click="openCreate">Neuer Nutzer</EuButton>
+      <EuButton :icon="faPlus" @click="openCreate">{{ t('users.new') }}</EuButton>
     </div>
 
-    <p v-if="loading" class="eu-users__hint">Wird geladen…</p>
+    <p v-if="loading" class="eu-users__hint">{{ t('common.loading') }}</p>
     <p v-else-if="loadError" class="eu-users__error" role="alert">{{ loadError }}</p>
 
     <div v-else class="eu-users__table-wrap">
@@ -184,27 +188,31 @@ async function confirmPurge(): Promise<void> {
         <thead>
           <tr>
             <EuSortableTh
-              label="E-Mail"
+              :label="t('users.columns.email')"
               :state="sort.stateOf('email')"
               @sort="sort.toggle('email')"
             />
-            <EuSortableTh label="Name" :state="sort.stateOf('name')" @sort="sort.toggle('name')" />
             <EuSortableTh
-              label="Status"
+              :label="t('users.columns.name')"
+              :state="sort.stateOf('name')"
+              @sort="sort.toggle('name')"
+            />
+            <EuSortableTh
+              :label="t('users.columns.status')"
               :state="sort.stateOf('status')"
               @sort="sort.toggle('status')"
             />
             <EuSortableTh
-              label="Globale Rollen"
+              :label="t('users.columns.globalRoles')"
               :state="sort.stateOf('roles')"
               @sort="sort.toggle('roles')"
             />
             <EuSortableTh
-              label="Konto-Zugriffe"
+              :label="t('users.columns.grants')"
               :state="sort.stateOf('grants')"
               @sort="sort.toggle('grants')"
             />
-            <th class="eu-users__actions-head">Aktionen</th>
+            <th class="eu-users__actions-head">{{ t('common.actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -213,26 +221,26 @@ async function confirmPurge(): Promise<void> {
             <td>{{ [user.firstname, user.surname].filter(Boolean).join(' ') }}</td>
             <td>
               <EuBadge :tone="user.status === 1 ? 'done' : 'neutral'">
-                {{ user.status === 1 ? 'Aktiv' : 'Inaktiv' }}
+                {{ user.status === 1 ? t('users.active') : t('users.inactive') }}
               </EuBadge>
             </td>
-            <td>{{ user.globalRoles.join(', ') || '–' }}</td>
+            <td>{{ user.globalRoles.map(roleName).join(', ') || '–' }}</td>
             <td>{{ user.accountGrants.length }}</td>
             <td class="eu-users__actions">
               <EuButton
                 variant="secondary"
                 icon-only
                 :icon="faPen"
-                aria-label="Bearbeiten"
-                title="Nutzer bearbeiten"
+                :aria-label="t('users.edit')"
+                :title="t('users.editTitle')"
                 @click="openEdit(user)"
               />
               <EuButton
                 variant="secondary"
                 icon-only
                 :icon="faTrash"
-                aria-label="Löschen"
-                title="Nutzer löschen"
+                :aria-label="t('users.delete')"
+                :title="t('users.deleteTitle')"
                 @click="deleteTarget = user"
               />
             </td>
@@ -246,38 +254,39 @@ async function confirmPurge(): Promise<void> {
     <EuCollapsibleSection
       v-if="!loading && !loadError && deleted.length > 0"
       class="eu-users__deleted"
-      :title="`Gelöschte Nutzer (${deleted.length})`"
+      :title="t('users.deletedTitle', { n: deleted.length })"
       initially-collapsed
     >
-      <p class="eu-users__hint">
-        Ein gelöschter Nutzer kann sich nicht anmelden und steht in keiner Auswahl.
-        Wiederhergestellt kommt er deaktiviert zurück. Endgültig gelöscht gehen Name, Adresse,
-        Rollen, Konto-Zugriffe, Sitzungen und Erinnerungs-Vermerke mit — das ist nicht umkehrbar.
-        Ist eine Aufbewahrungsfrist eingestellt, geschieht es nach ihrem Ablauf von selbst.
-      </p>
+      <p class="eu-users__hint">{{ t('users.deletedLead') }}</p>
       <div class="eu-users__table-wrap">
         <table class="eu-users__table">
           <thead>
             <tr>
-              <th>E-Mail</th>
-              <th>Name</th>
-              <th>Gelöscht am</th>
-              <th class="eu-users__actions-head">Aktionen</th>
+              <th>{{ t('users.columns.email') }}</th>
+              <th>{{ t('users.columns.name') }}</th>
+              <th>{{ t('users.columns.deletedAt') }}</th>
+              <th class="eu-users__actions-head">{{ t('common.actions') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="user in deleted" :key="user.uuid">
               <td>{{ user.email }}</td>
               <td>{{ [user.firstname, user.surname].filter(Boolean).join(' ') }}</td>
-              <td>{{ user.deletedAt === null ? 'unbekannt' : formatDateTime(user.deletedAt) }}</td>
+              <td>
+                {{
+                  user.deletedAt === null
+                    ? t('users.unknownMoment')
+                    : formatDateTime(user.deletedAt)
+                }}
+              </td>
               <td class="eu-users__actions">
                 <EuButton
                   variant="secondary"
                   icon-only
                   :icon="faRotateLeft"
                   :disabled="busyUuid === user.uuid"
-                  aria-label="Wiederherstellen"
-                  title="Nutzer wiederherstellen (kommt deaktiviert zurück)"
+                  :aria-label="t('users.restore')"
+                  :title="t('users.restoreTitle')"
                   @click="restore(user)"
                 />
                 <EuButton
@@ -285,8 +294,8 @@ async function confirmPurge(): Promise<void> {
                   icon-only
                   :icon="faTrash"
                   :disabled="busyUuid === user.uuid"
-                  aria-label="Endgültig löschen"
-                  title="Nutzer endgültig löschen"
+                  :aria-label="t('users.purge')"
+                  :title="t('users.purgeTitle')"
                   @click="purgeTarget = user"
                 />
                 <p v-if="rowErrors[user.uuid]" class="eu-users__error" role="alert">
@@ -312,28 +321,35 @@ async function confirmPurge(): Promise<void> {
       @submit="onSubmit"
     />
 
-    <EuDialog :open="deleteTarget !== null" title="Nutzer löschen" @close="deleteTarget = null">
-      <p>Nutzer „{{ deleteTarget?.email }}" wirklich löschen?</p>
+    <EuDialog
+      :open="deleteTarget !== null"
+      :title="t('users.deleteTitle')"
+      @close="deleteTarget = null"
+    >
+      <p>{{ t('users.confirmDelete', { email: deleteTarget?.email ?? '' }) }}</p>
       <p v-if="removal.error" class="eu-users__error" role="alert">{{ removal.error }}</p>
       <template #footer>
-        <EuButton variant="secondary" @click="deleteTarget = null">Abbrechen</EuButton>
-        <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
+        <EuButton variant="secondary" @click="deleteTarget = null">{{
+          t('common.cancel')
+        }}</EuButton>
+        <EuButton :disabled="removal.busy" @click="confirmDelete">{{
+          t('common.delete')
+        }}</EuButton>
       </template>
     </EuDialog>
 
     <EuDialog
       :open="purgeTarget !== null"
-      title="Nutzer endgültig löschen"
+      :title="t('users.purgeTitle')"
       @close="purgeTarget = null"
     >
-      <p>
-        Nutzer „{{ purgeTarget?.email }}“ endgültig löschen? Name, Adresse, Rollen, Konto-Zugriffe,
-        Sitzungen und Erinnerungs-Vermerke gehen mit. Das lässt sich nicht rückgängig machen.
-      </p>
+      <p>{{ t('users.confirmPurge', { email: purgeTarget?.email ?? '' }) }}</p>
       <p v-if="purge.error" class="eu-users__error" role="alert">{{ purge.error }}</p>
       <template #footer>
-        <EuButton variant="secondary" @click="purgeTarget = null">Abbrechen</EuButton>
-        <EuButton :disabled="purge.busy" @click="confirmPurge">Endgültig löschen</EuButton>
+        <EuButton variant="secondary" @click="purgeTarget = null">{{
+          t('common.cancel')
+        }}</EuButton>
+        <EuButton :disabled="purge.busy" @click="confirmPurge">{{ t('users.purge') }}</EuButton>
       </template>
     </EuDialog>
   </section>

@@ -1,24 +1,44 @@
 import type { BonusForfeitRule, ContractKind } from '@eunomia/shared';
 
 import { apiData, apiFetch } from '../lib/api';
+import { i18n } from '../lib/i18n';
 
 /** The two enums are the API's, labelled here (see @eunomia/shared). */
 export type { BonusForfeitRule, ContractKind };
 
+const { t } = i18n.global;
+
+/*
+ * The labels are getters: read when shown, so they follow a change of
+ * language, while every caller keeps indexing a plain Record.
+ */
+
 export const CONTRACT_KIND_LABEL: Record<ContractKind, string> = {
-  FULL: 'Vollversicherung',
-  SUPPLEMENTARY: 'Zusatzversicherung',
+  get FULL() {
+    return t('contracts.kinds.FULL');
+  },
+  get SUPPLEMENTARY() {
+    return t('contracts.kinds.SUPPLEMENTARY');
+  },
 };
 
 /** Compact form for table columns. */
 export const CONTRACT_KIND_SHORT_LABEL: Record<ContractKind, string> = {
-  FULL: 'Voll',
-  SUPPLEMENTARY: 'Zusatz',
+  get FULL() {
+    return t('contracts.kindsShort.FULL');
+  },
+  get SUPPLEMENTARY() {
+    return t('contracts.kindsShort.SUPPLEMENTARY');
+  },
 };
 
 export const BONUS_FORFEIT_RULE_LABEL: Record<BonusForfeitRule, string> = {
-  ON_SUBMISSION: 'schon durch Einreichen',
-  ON_REIMBURSEMENT: 'erst durch Erstattung',
+  get ON_SUBMISSION() {
+    return t('contracts.forfeitRules.ON_SUBMISSION');
+  },
+  get ON_REIMBURSEMENT() {
+    return t('contracts.forfeitRules.ON_REIMBURSEMENT');
+  },
 };
 
 /** A premium (Beitragsstand); `validTo` is derived by the API from the next entry. */

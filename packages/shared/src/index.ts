@@ -18,3 +18,4 @@ export * from './payment-details.js';
 export * from './payment-state.js';
 export * from './permissions.js';
 export * from './settings-keys.js';
+export * from './trash.js';

@@ -12,8 +12,8 @@ import ResourceFormDialog from './ResourceFormDialog.vue';
  */
 
 const fields: FieldConfig[] = [
-  { key: 'agencyName', label: 'Name', type: 'text', required: true },
-  { key: 'bankAccount', label: 'IBAN', type: 'text', required: true, normalize: iban },
+  { key: 'agencyName', type: 'text', required: true },
+  { key: 'bankAccount', type: 'text', required: true, normalize: iban },
 ];
 
 function mountForm() {

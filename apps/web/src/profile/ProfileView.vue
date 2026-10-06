@@ -2,6 +2,7 @@
 import { faCircleCheck, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCollapsibleSection from '../design-system/components/EuCollapsibleSection.vue';
@@ -21,6 +22,7 @@ import { changePassword } from './api';
 const MIN_LENGTH = 8;
 
 const auth = useAuthStore();
+const { t } = useI18n();
 
 const currentPassword = ref('');
 const newPassword = ref('');
@@ -42,13 +44,8 @@ const fullName = computed(() => {
 /** The two checks the browser can make itself, so a typo costs no round trip. */
 function validate(): boolean {
   newPasswordError.value =
-    newPassword.value.length < MIN_LENGTH
-      ? `Das neue Passwort muss mindestens ${MIN_LENGTH} Zeichen haben.`
-      : null;
-  repeatError.value =
-    repeatPassword.value === newPassword.value
-      ? null
-      : 'Die Wiederholung stimmt nicht mit dem neuen Passwort überein.';
+    newPassword.value.length < MIN_LENGTH ? t('profile.tooShort', { min: MIN_LENGTH }) : null;
+  repeatError.value = repeatPassword.value === newPassword.value ? null : t('profile.mismatch');
   return newPasswordError.value === null && repeatError.value === null;
 }
 
@@ -79,43 +76,36 @@ async function submit(): Promise<void> {
   <div class="eu-profile">
     <!-- No heading of its own: AppHeader renders the route title as the page's
          h1, and the sections below are its h2s (like SettingsView). -->
-    <EuCollapsibleSection title="Angemeldet als">
+    <EuCollapsibleSection :title="t('profile.signedInAs')">
       <dl v-if="auth.user" class="eu-profile__facts">
-        <dt>Name</dt>
+        <dt>{{ t('profile.name') }}</dt>
         <dd>{{ fullName }}</dd>
-        <dt>E-Mail</dt>
+        <dt>{{ t('profile.email') }}</dt>
         <dd>{{ auth.user.email }}</dd>
       </dl>
-      <p class="eu-profile__hint">
-        Name und E-Mail-Adresse ändert die Benutzerverwaltung. Wende dich dafür an einen
-        Administrator.
-      </p>
+      <p class="eu-profile__hint">{{ t('profile.changeByAdmin') }}</p>
     </EuCollapsibleSection>
 
-    <EuCollapsibleSection title="Passwort">
-      <p class="eu-profile__hint">
-        Mindestens {{ MIN_LENGTH }} Zeichen. Mit dem neuen Passwort endet jede andere Sitzung dieses
-        Kontos — auf anderen Geräten und in anderen Browsern musst du dich neu anmelden. Diese hier
-        bleibt angemeldet.
-      </p>
+    <EuCollapsibleSection :title="t('profile.password')">
+      <p class="eu-profile__hint">{{ t('profile.passwordLead', { min: MIN_LENGTH }) }}</p>
       <form class="eu-profile__form" @submit.prevent="submit">
         <EuTextField
           v-model="currentPassword"
           type="password"
-          label="Aktuelles Passwort"
+          :label="t('profile.currentPassword')"
           autocomplete="current-password"
         />
         <EuTextField
           v-model="newPassword"
           type="password"
-          label="Neues Passwort"
+          :label="t('profile.newPassword')"
           autocomplete="new-password"
           :error="newPasswordError ?? undefined"
         />
         <EuTextField
           v-model="repeatPassword"
           type="password"
-          label="Neues Passwort wiederholen"
+          :label="t('profile.repeatPassword')"
           autocomplete="new-password"
           :error="repeatError ?? undefined"
         />
@@ -125,12 +115,12 @@ async function submit(): Promise<void> {
             :icon="faKey"
             :disabled="busy || currentPassword === '' || newPassword === ''"
           >
-            Passwort ändern
+            {{ t('profile.change') }}
           </EuButton>
         </div>
         <p v-if="done" class="eu-profile__ok" role="status">
           <FontAwesomeIcon :icon="faCircleCheck" aria-hidden="true" />
-          Passwort geändert. Alle anderen Sitzungen sind beendet.
+          {{ t('profile.changed') }}
         </p>
         <p v-if="error" class="eu-profile__error" role="alert">{{ error }}</p>
       </form>

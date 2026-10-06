@@ -1,24 +1,33 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+
 import EuBadge from '../design-system/components/EuBadge.vue';
 import type { RoleDto } from './api';
+import { permissionName, roleDescription, roleName } from './role-names';
 
 defineProps<{ roles: RoleDto[] }>();
+
+const { t } = useI18n();
 </script>
 
 <template>
   <section class="eu-roles">
-    <h3>Rollen</h3>
-    <p class="eu-roles__lead">
-      Rollen bündeln Rechte. Aktuell fest vorgegeben – eigene Rollen bearbeiten kommt später.
-    </p>
+    <h3>{{ t('roles.title') }}</h3>
+    <p class="eu-roles__lead">{{ t('roles.lead') }}</p>
     <div v-for="role in roles" :key="role.roleUID" class="eu-roles__card">
       <div class="eu-roles__head">
-        <strong>{{ role.roleName }}</strong>
-        <span v-if="role.description" class="eu-roles__desc">{{ role.description }}</span>
+        <strong>{{ roleName(role.roleName) }}</strong>
+        <span v-if="roleDescription(role)" class="eu-roles__desc">{{ roleDescription(role) }}</span>
       </div>
       <div class="eu-roles__perms">
-        <EuBadge v-for="perm in role.permissions" :key="perm" tone="neutral">{{ perm }}</EuBadge>
-        <span v-if="role.permissions.length === 0" class="eu-roles__desc">Keine Rechte</span>
+        <!-- The key stays reachable as a tooltip: it is what the API and the
+             logs speak, and what an administrator may search for. -->
+        <EuBadge v-for="perm in role.permissions" :key="perm" tone="neutral" :title="perm">{{
+          permissionName(perm)
+        }}</EuBadge>
+        <span v-if="role.permissions.length === 0" class="eu-roles__desc">{{
+          t('roles.noPermissions')
+        }}</span>
       </div>
     </div>
   </section>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faRotateLeft, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import EuCollapsibleSection from '../design-system/components/EuCollapsibleSection.vue';
@@ -8,9 +9,18 @@ import EuDialog from '../design-system/components/EuDialog.vue';
 import EuSortableTh from '../design-system/components/EuSortableTh.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import { describeError } from '../lib/errors';
-import { activeLanguage, formatDateTime, plural } from '../lib/format';
+import { activeLanguage, formatDateTime } from '../lib/format';
+import { countedKind, kindName, kindTitle } from '../lib/kind-names';
 import { useTableSort } from '../lib/table-sort';
 import { type TrashEntryDto, type TrashGroupDto, loadTrash, purgeEntry, restoreEntry } from './api';
+import {
+  attachedRecord,
+  contextText,
+  countedAttachedRows,
+  namedEntry,
+  notRestorableReason,
+  partText,
+} from './trash-text';
 
 /**
  * The Papierkorb (Slice 39): everything the app has deleted, in one place,
@@ -23,10 +33,12 @@ import { type TrashEntryDto, type TrashGroupDto, loadTrash, purgeEntry, restoreE
  * belongs to any more.
  */
 
+const { t } = useI18n();
+
 const groups = ref<TrashGroupDto[]>([]);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
-/** Free text over the rendered label and context of every group. */
+/** Free text over the rendered label, context and kind of every group. */
 const filter = ref('');
 /** Per-row error, keyed by UID, so a failure stays where it happened. */
 const rowErrors = ref<Record<string, string>>({});
@@ -45,7 +57,7 @@ const visibleGroups = computed<TrashGroupDto[]>(() => {
     .map((group) => ({
       ...group,
       entries: group.entries.filter((entry) =>
-        `${entry.label} ${entry.context} ${group.singular}`
+        `${partText(entry.label)} ${contextText(entry.context)} ${kindName(group.kind)}`
           .toLocaleLowerCase(activeLanguage())
           .includes(needle),
       ),
@@ -67,26 +79,27 @@ async function reload(): Promise<void> {
 
 onMounted(reload);
 
-/** "samt 3 Erstattungen, 1 Versicherungsjahr" — what a final delete takes along. */
-function attachedSummary(entry: TrashEntryDto): string {
-  // The API sends both German forms per record, so nothing is inflected here.
-  const records = new Map<string, { plural: string; count: number }>();
-  for (const child of entry.attached) {
-    const seen = records.get(child.singular);
-    records.set(child.singular, { plural: child.plural, count: (seen?.count ?? 0) + 1 });
-  }
-  const parts = [
-    ...[...records].map(([singular, { plural: many, count }]) => plural(count, singular, many)),
-    ...entry.attachedRows.map((row) => `${row.count} ${row.label}`),
+/** What a final delete takes along, counted per kind: "3 Erstattungen, 1 Versicherungsjahr". */
+function attachedCounts(entry: TrashEntryDto): string[] {
+  const records = new Map<string, number>();
+  for (const child of entry.attached) records.set(child.kind, (records.get(child.kind) ?? 0) + 1);
+  return [
+    ...[...records].map(([kind, count]) => countedKind(kind, count)),
+    ...entry.attachedRows.map((row) => countedAttachedRows(row.kind, row.count)),
   ];
-  return parts.length === 0 ? '' : `samt ${parts.join(', ')}`;
 }
 
-/** The German plural the API already carries, so the view does not invent one. */
+/** "samt 3 Erstattungen, 1 Versicherungsjahr" — the line under a row. */
+function attachedSummary(entry: TrashEntryDto): string {
+  const parts = attachedCounts(entry);
+  return parts.length === 0 ? '' : t('trash.attachedSummary', { list: parts.join(', ') });
+}
+
+/** Every record named, for the confirmation: "Erstattung 50,00 €, 1 Versicherungsjahr". */
 function attachedList(entry: TrashEntryDto): string {
   const parts = [
-    ...entry.attached.map((child) => `${child.singular} ${child.label}`),
-    ...entry.attachedRows.map((row) => `${row.count} ${row.label}`),
+    ...entry.attached.map((child) => attachedRecord(child.kind, child.label)),
+    ...entry.attachedRows.map((row) => countedAttachedRows(row.kind, row.count)),
   ];
   return parts.join(', ');
 }
@@ -97,10 +110,10 @@ function attachedList(entry: TrashEntryDto): string {
  * number rather than letting the "samt …" line next to it be read as a promise.
  */
 function restoreTitle(group: TrashGroupDto, entry: TrashEntryDto): string {
-  const name = `${group.singular} wiederherstellen`;
+  const kind = kindName(group.kind);
   return entry.restoresWith === 0
-    ? name
-    : `${name} (samt ${plural(entry.restoresWith, 'Eintrag', 'Einträgen')})`;
+    ? t('trash.restore', { kind })
+    : t('trash.restoreWith', { kind, n: entry.restoresWith }, entry.restoresWith);
 }
 
 async function onRestore(entry: TrashEntryDto): Promise<void> {
@@ -148,72 +161,69 @@ const flat = computed<Located[]>(() =>
 );
 
 const sort = useTableSort(flat, (row, key) => {
-  if (key === 'label') return row.entry.label;
-  if (key === 'context') return row.entry.context;
+  if (key === 'label') return partText(row.entry.label);
+  if (key === 'context') return contextText(row.entry.context);
   return row.entry.deletedAt;
 });
 
 // `useTableSort` hands back a reactive object, so `sorted` is already unwrapped.
 const entriesOf = (group: TrashGroupDto): TrashEntryDto[] =>
-  sort.sorted.filter((row: Located) => row.group.key === group.key).map((row) => row.entry);
+  sort.sorted.filter((row: Located) => row.group.kind === group.kind).map((row) => row.entry);
 </script>
 
 <template>
   <section>
-    <p class="eu-trash__lead">
-      Gelöschte Einträge bleiben hier liegen, bis sie zurückgeholt oder endgültig gelöscht werden.
-      Endgültig löschen nimmt mit, was an einem Eintrag hängt und selbst im Papierkorb liegt.
-    </p>
+    <p class="eu-trash__lead">{{ t('trash.lead') }}</p>
 
     <div class="eu-trash__head">
       <EuTextField
         v-if="!loading && !loadError && total > 0"
         v-model="filter"
         class="eu-trash__search"
-        label="Suchen"
+        :label="t('common.search')"
       />
     </div>
 
-    <p v-if="loading" class="eu-trash__hint">Wird geladen…</p>
+    <p v-if="loading" class="eu-trash__hint">{{ t('common.loading') }}</p>
     <p v-else-if="loadError" class="eu-trash__error" role="alert">{{ loadError }}</p>
-    <p v-else-if="total === 0" class="eu-trash__hint">Der Papierkorb ist leer.</p>
+    <p v-else-if="total === 0" class="eu-trash__hint">{{ t('trash.empty') }}</p>
     <p v-else-if="visibleGroups.length === 0" class="eu-trash__hint" role="status">
-      Kein Eintrag passt zu dieser Suche.
+      {{ t('common.noMatch') }}
     </p>
 
     <EuCollapsibleSection
       v-for="group in visibleGroups"
-      :key="group.key"
-      :title="`${group.plural} (${group.entries.length})`"
+      :key="group.kind"
+      :title="t('trash.groupTitle', { kind: kindTitle(group.kind, 2), n: group.entries.length })"
     >
       <div class="eu-trash__table-wrap">
         <table class="eu-trash__table">
           <thead>
             <tr>
               <EuSortableTh
-                :label="group.singular"
+                :label="kindTitle(group.kind)"
                 :state="sort.stateOf('label')"
                 @sort="sort.toggle('label')"
               />
               <EuSortableTh
-                label="Zusammenhang"
+                :label="t('trash.columns.context')"
                 :state="sort.stateOf('context')"
                 @sort="sort.toggle('context')"
               />
               <EuSortableTh
-                label="Gelöscht am"
+                :label="t('trash.columns.deletedAt')"
                 :state="sort.stateOf('deletedAt')"
                 @sort="sort.toggle('deletedAt')"
               />
-              <th class="eu-trash__actions-head">Aktionen</th>
+              <th class="eu-trash__actions-head">{{ t('common.actions') }}</th>
             </tr>
           </thead>
           <tbody>
             <template v-for="entry in entriesOf(group)" :key="entry.uid">
               <tr>
-                <td class="eu-trash__wrap">{{ entry.label || '–' }}</td>
+                <td class="eu-trash__wrap">{{ partText(entry.label) || '–' }}</td>
                 <td class="eu-trash__wrap">
-                  {{ entry.context || '–' }}
+                  {{ contextText(entry.context) || '–' }}
                   <span v-if="attachedSummary(entry)" class="eu-trash__attached">
                     {{ attachedSummary(entry) }}
                   </span>
@@ -221,10 +231,12 @@ const entriesOf = (group: TrashGroupDto): TrashEntryDto[] =>
                        says — not in the actions column, where it would push the
                        remaining button over the edge of the scroll container. -->
                   <span v-if="!entry.restorable" class="eu-trash__attached">
-                    {{ entry.restoreNote }}
+                    {{ notRestorableReason(group.kind) }}
                   </span>
                 </td>
-                <td>{{ entry.deletedAt ? formatDateTime(entry.deletedAt) : 'unbekannt' }}</td>
+                <td>
+                  {{ entry.deletedAt ? formatDateTime(entry.deletedAt) : t('trash.unknownMoment') }}
+                </td>
                 <td class="eu-trash__actions">
                   <EuButton
                     v-if="entry.restorable"
@@ -232,7 +244,7 @@ const entriesOf = (group: TrashGroupDto): TrashEntryDto[] =>
                     icon-only
                     :icon="faRotateLeft"
                     :disabled="busyUid === entry.uid"
-                    :aria-label="`${group.singular} wiederherstellen`"
+                    :aria-label="t('trash.restore', { kind: kindName(group.kind) })"
                     :title="restoreTitle(group, entry)"
                     @click="onRestore(entry)"
                   />
@@ -241,8 +253,8 @@ const entriesOf = (group: TrashGroupDto): TrashEntryDto[] =>
                     icon-only
                     :icon="faTrash"
                     :disabled="busyUid === entry.uid"
-                    :aria-label="`${group.singular} endgültig löschen`"
-                    :title="`${group.singular} endgültig löschen`"
+                    :aria-label="t('trash.purge', { kind: kindName(group.kind) })"
+                    :title="t('trash.purge', { kind: kindName(group.kind) })"
                     @click="
                       purgeTarget = { group, entry };
                       purgeError = null;
@@ -259,18 +271,29 @@ const entriesOf = (group: TrashGroupDto): TrashEntryDto[] =>
       </div>
     </EuCollapsibleSection>
 
-    <EuDialog :open="purgeTarget !== null" title="Endgültig löschen" @close="purgeTarget = null">
-      <p>
-        {{ purgeTarget?.group.singular }} „{{ purgeTarget?.entry.label }}“ endgültig löschen? Das
-        lässt sich nicht zurücknehmen.
+    <EuDialog
+      :open="purgeTarget !== null"
+      :title="t('trash.purgeDialog.title')"
+      @close="purgeTarget = null"
+    >
+      <p v-if="purgeTarget">
+        {{
+          t('trash.purgeDialog.question', {
+            entry: namedEntry(purgeTarget.group.kind, purgeTarget.entry.label),
+          })
+        }}
       </p>
       <p v-if="purgeTarget && attachedList(purgeTarget.entry)">
-        Mit gelöscht wird: {{ attachedList(purgeTarget.entry) }}.
+        {{ t('trash.purgeDialog.alsoDeleted', { list: attachedList(purgeTarget.entry) }) }}
       </p>
       <p v-if="purgeError" class="eu-trash__error" role="alert">{{ purgeError }}</p>
       <template #footer>
-        <EuButton variant="secondary" @click="purgeTarget = null">Abbrechen</EuButton>
-        <EuButton :disabled="busyUid !== null" @click="confirmPurge">Endgültig löschen</EuButton>
+        <EuButton variant="secondary" @click="purgeTarget = null">
+          {{ t('common.cancel') }}
+        </EuButton>
+        <EuButton :disabled="busyUid !== null" @click="confirmPurge">
+          {{ t('trash.purgeDialog.confirm') }}
+        </EuButton>
       </template>
     </EuDialog>
   </section>

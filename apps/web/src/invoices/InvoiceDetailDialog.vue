@@ -37,6 +37,7 @@ import { type BillingAllocationPayload, saveBillingAllocations } from './billing
 import AllocationDialog from './AllocationDialog.vue';
 import BillingDialog from './BillingDialog.vue';
 import { usePaymentDetailPicker } from './payment-detail-picker';
+import { createTitle } from '../resources/config';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import { type ContractOption, policyLabel, submittableContracts } from './eligibility';
 import { reasonRequiredMessage } from './not-covered';
@@ -810,7 +811,7 @@ function submit(): void {
   <!-- Ad-hoc create for the entity picked in the mask, prefilled with the typed name. -->
   <ResourceFormDialog
     :open="createOpen"
-    :title="`${CREATE_KINDS[createKind].config.singular} anlegen`"
+    :title="createTitle(CREATE_KINDS[createKind].config)"
     :fields="CREATE_KINDS[createKind].config.fields"
     :options="{}"
     :prefill="createPrefill"

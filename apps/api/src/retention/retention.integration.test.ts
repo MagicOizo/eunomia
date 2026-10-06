@@ -172,8 +172,6 @@ test('retention: the period empties the trash of what has aged out', async (t) =
       const facility = again.byKind.find((one) => one.kind === 'facility');
       assert.deepEqual(facility, {
         kind: 'facility',
-        singular: 'Leistungserbringer',
-        plural: 'Leistungserbringer',
         purged: 0,
         skipped: 1,
       });

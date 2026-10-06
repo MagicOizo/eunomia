@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HttpError } from '../lib/http';
+import { withLocale } from '../test/locale';
 import type { TrashGroupDto } from './api';
 
 const { loadTrash, restoreEntry, purgeEntry } = vi.hoisted(() => ({
@@ -22,38 +23,34 @@ const { default: TrashView } = await import('./TrashView.vue');
 function groups(): TrashGroupDto[] {
   return [
     {
-      key: 'serviceBilling',
-      singular: 'Leistungsabrechnung',
-      plural: 'Leistungsabrechnungen',
+      kind: 'serviceBilling',
       entries: [
         {
           uid: 'sBILLING0001',
-          label: 'LA-1',
-          context: 'Police PKV-1, vom 01.07.2024',
+          label: { type: 'text', value: 'LA-1' },
+          context: [
+            { type: 'policy', number: 'PKV-1' },
+            { type: 'dated', date: '2024-07-01' },
+          ],
           deletedAt: '2026-09-26T09:15:00',
           restorable: true,
-          restoreNote: null,
-          attached: [{ singular: 'Erstattung', plural: 'Erstattungen', label: '50,00 €' }],
+          attached: [{ kind: 'allocation', label: { type: 'money', value: 50 } }],
           attachedRows: [],
           restoresWith: 1,
         },
       ],
     },
     {
-      key: 'submission',
-      singular: 'Einreichung',
-      plural: 'Einreichungen',
+      kind: 'submission',
       entries: [
         {
           uid: 'eSUBMISSI001',
-          label: 'vom 01.10.2024',
-          context: 'Police PKV-1',
+          label: { type: 'dated', date: '2024-10-01' },
+          context: [{ type: 'policy', number: 'PKV-1' }],
           deletedAt: null,
           restorable: false,
-          restoreNote: 'Eine Einreichung ohne Rechnungen kann nicht wiederhergestellt werden.',
           attached: [],
-          // The API already sends the label in the right German number.
-          attachedRows: [{ label: 'Rechnungen in Einreichungen', count: 2 }],
+          attachedRows: [{ kind: 'submissionInvoice', count: 2 }],
           restoresWith: 0,
         },
       ],
@@ -80,6 +77,7 @@ describe('TrashView', () => {
     const text = wrapper.text();
     expect(text).toContain('Leistungsabrechnungen (1)');
     expect(text).toContain('LA-1');
+    expect(text).toContain('Police PKV-1, vom 01.07.2024');
     expect(text).toContain('samt 1 Erstattung');
     expect(text).toContain('26.09.2026, 09:15');
     // A row deleted before this version has no moment to show.
@@ -118,8 +116,8 @@ describe('TrashView', () => {
   it('shows the failure at the row and leaves the list as it was', async () => {
     restoreEntry.mockRejectedValue(
       new HttpError(409, 'PARENT_IN_TRASH', 'parent in trash', {
-        entry: { singular: 'Leistungsabrechnung', label: 'LA-1' },
-        parent: { singular: 'Police', label: 'PKV-1' },
+        entry: { kind: 'serviceBilling', label: { type: 'text', value: 'LA-1' } },
+        parent: { kind: 'contract', label: { type: 'text', value: 'PKV-1' } },
       }),
     );
     const wrapper = await mountView();
@@ -146,7 +144,8 @@ describe('TrashView', () => {
     const dialog = wrapper.find('dialog');
     expect(dialog.attributes('open')).toBeDefined();
     expect(dialog.text()).toContain('Leistungsabrechnung „LA-1“ endgültig löschen?');
-    expect(dialog.text()).toContain('Mit gelöscht wird: Erstattung 50,00 €');
+    // The amount comes from Intl, with a non-breaking space before the sign.
+    expect(dialog.text()).toMatch(/Mit gelöscht wird: Erstattung 50,00\s€\./);
     expect(purgeEntry).not.toHaveBeenCalled();
 
     const confirm = dialog
@@ -173,5 +172,23 @@ describe('TrashView', () => {
     loadTrash.mockResolvedValue([]);
     const wrapper = await mountView();
     expect(wrapper.text()).toContain('Der Papierkorb ist leer.');
+  });
+
+  it('speaks English, with the kinds, parts and plurals from the catalogue', async () => {
+    await withLocale('en', async () => {
+      const wrapper = await mountView();
+      const text = wrapper.text();
+      expect(text).toContain('Service billings (1)');
+      expect(text).toContain('Policy PKV-1, dated 01/07/2024');
+      expect(text).toContain('with 1 reimbursement');
+      // The deleted kind stays a name of its own, without a sentence around it.
+      expect(text).toContain('Deleted on');
+      expect(text).toContain('with 2 invoices in submissions');
+      expect(text).toContain('A submission without invoices cannot be restored.');
+      const restore = wrapper
+        .findAll('button')
+        .find((button) => button.attributes('aria-label') === 'Restore service billing');
+      expect(restore?.attributes('title')).toBe('Restore service billing (with 1 more entry)');
+    });
   });
 });

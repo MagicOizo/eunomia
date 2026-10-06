@@ -2,6 +2,7 @@
 import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import { describeError } from '../lib/errors';
 import MailSection from './MailSection.vue';
@@ -20,6 +21,8 @@ import { type SettingsSnapshot, loadSettings } from './settings-api';
  * with, so the one below always sees what the one above just saved — the mail
  * dispatch being off is something the reminders have to say (CR-30).
  */
+const { t } = useI18n();
+
 const loading = ref(true);
 const loadError = ref<string | null>(null);
 const snapshot = ref<SettingsSnapshot | null>(null);
@@ -41,14 +44,15 @@ onMounted(async () => {
   <div class="eu-settings">
     <!-- No heading of its own: AppHeader already renders the route title as the
          page's h1, and the sections below are its h2s (like BillingsView). -->
-    <p v-if="loading" class="eu-settings__hint">Einstellungen werden geladen…</p>
+    <p v-if="loading" class="eu-settings__hint">{{ t('settings.loading') }}</p>
     <p v-else-if="loadError" class="eu-settings__error" role="alert">{{ loadError }}</p>
 
     <template v-else-if="snapshot">
       <p v-if="!encryptionAvailable" class="eu-settings__error" role="alert">
         <FontAwesomeIcon :icon="faCircleExclamation" aria-hidden="true" />
-        In der Server-Umgebung fehlt <code>CONFIG_ENCRYPTION_KEY</code>. Passwörter und Token können
-        deshalb nicht gespeichert werden — alle übrigen Einstellungen schon.
+        <i18n-t keypath="settings.encryptionMissing" scope="global">
+          <template #key><code>CONFIG_ENCRYPTION_KEY</code></template>
+        </i18n-t>
       </p>
 
       <UpdateSection :snapshot="snapshot" @snapshot="snapshot = $event" />

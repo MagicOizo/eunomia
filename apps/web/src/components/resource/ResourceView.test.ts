@@ -3,6 +3,8 @@ import { faFilter } from '@fortawesome/free-solid-svg-icons';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withLocale } from '../../test/locale';
+
 import { noPermission } from '../../lib/error-messages';
 import type { ResourceConfig } from '../../resources/config';
 import { grant } from '../../test/permissions';
@@ -28,15 +30,11 @@ const accounts = [{ accountUID: 'a-1', firstname: 'Anna', surname: 'Muster' }];
 /** A list with a plain column and a looked-up one, like the policy list has. */
 const config: ResourceConfig = {
   path: '/facilities',
-  singular: 'Leistungserbringer',
-  plural: 'Leistungserbringer',
+  kind: 'facility',
   idKey: 'facilityUID',
   managePermission: 'MANAGE_FACILITIES',
-  columns: [
-    { key: 'facilityName', label: 'Name' },
-    { key: 'accountUID', label: 'Versicherter', lookup: 'accounts' },
-  ],
-  fields: [{ key: 'facilityName', label: 'Name', type: 'text', required: true }],
+  columns: [{ key: 'facilityName' }, { key: 'accountUID', lookup: 'accounts' }],
+  fields: [{ key: 'facilityName', type: 'text', required: true }],
   lookups: {
     accounts: {
       path: '/accounts',
@@ -200,17 +198,15 @@ describe('ResourceView permissions', () => {
   /** A policy-like list: account-scoped rows and an account picker in the form. */
   const scopedConfig: ResourceConfig = {
     path: '/contracts',
-    singular: 'Police',
-    plural: 'Policen',
+    kind: 'contract',
     idKey: 'contractUID',
     managePermission: 'MANAGE_CONTRACTS',
     accountKey: 'accountUID',
-    columns: [{ key: 'contractNumber', label: 'Vertragsnummer' }],
+    columns: [{ key: 'contractNumber' }],
     fields: [
-      { key: 'contractNumber', label: 'Vertragsnummer', type: 'text', required: true },
+      { key: 'contractNumber', type: 'text', required: true },
       {
         key: 'accountUID',
-        label: 'Versicherter',
         type: 'select',
         optionsFrom: 'accounts',
         scopedBy: 'MANAGE_CONTRACTS',
@@ -305,5 +301,22 @@ describe('ResourceView permissions', () => {
 
     const offered = wrapper.findComponent(ResourceFormDialog).props('options').accounts;
     expect(offered.map((option: SelectOption) => option.value)).toEqual(['a-1']);
+  });
+});
+
+describe('ResourceView in English', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listResource.mockImplementation((path: string) =>
+      Promise.resolve(path === '/accounts' ? accounts : []),
+    );
+  });
+
+  it('names the kind and the columns from the catalogue', async () => {
+    await withLocale('en', async () => {
+      const wrapper = await mountView();
+      expect(wrapper.text()).toContain('No providers recorded yet.');
+      expect(wrapper.find('button').text()).toContain('New');
+    });
   });
 });

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useId } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 export interface SelectOption {
   value: string;
@@ -19,6 +20,7 @@ defineProps<{
   emptyLabel?: string;
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
+const { t } = useI18n();
 
 const selectId = useId();
 </script>
@@ -33,7 +35,9 @@ const selectId = useId();
       :disabled="disabled"
       @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
-      <option value="">{{ emptyLabel ?? (required ? '– bitte wählen –' : '– keine –') }}</option>
+      <option value="">
+        {{ emptyLabel ?? (required ? t('common.pleaseChoose') : t('common.none')) }}
+      </option>
       <option v-for="option in options" :key="option.value" :value="option.value">
         {{ option.label }}
       </option>

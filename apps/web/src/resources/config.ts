@@ -1,14 +1,26 @@
-import type { PermissionKey } from '@eunomia/shared';
+import type { PermissionKey, RecordKind } from '@eunomia/shared';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import type { Component } from 'vue';
 
 import type { SelectOption } from '../components/resource/EuSelectField.vue';
+import { fieldLabel } from '../lib/field-labels';
+import { i18n } from '../lib/i18n';
+import { kindName } from '../lib/kind-names';
 import type { ResourceRow } from '../lib/resource';
+
+/**
+ * A label is a function rather than a string: the configs are built once, and a
+ * text read when it is shown follows a change of language (Slice 79). Without
+ * one, a field or column is named like the API field it shows (`fields.*`, the
+ * same names the error sentences use).
+ */
+export type LabelFn = () => string;
 
 /** One editable field in a resource form. */
 export interface FieldConfig {
   key: string;
-  label: string;
+  /** Overrides the field's name from `fields.*`, e.g. "Entfernung (km)". */
+  label?: LabelFn;
   type: 'text' | 'email' | 'number' | 'currency' | 'date' | 'select';
   required?: boolean;
   /** Not editable once the record exists (rendered read-only in edit mode). */
@@ -40,7 +52,8 @@ export interface FieldConfig {
 /** One column in a resource list. */
 export interface ColumnConfig {
   key: string;
-  label: string;
+  /** Overrides the field's name from `fields.*`, e.g. "Beitrag aktuell". */
+  label?: LabelFn;
   /** Resolve the cell via a lookup (UID → human label) instead of showing the raw value. */
   lookup?: string;
   /** Custom cell formatting (money, units, …). */
@@ -86,9 +99,8 @@ export interface RowActionConfig {
 
 export interface ResourceConfig {
   path: string;
-  /** Singular/plural German labels for headings and buttons. */
-  singular: string;
-  plural: string;
+  /** What a row is; names it in headings and buttons (lib/kind-names.ts). */
+  kind: RecordKind;
   /** The row's public id field, used for edit/delete and as the row key. */
   idKey: string;
   /** The permission creating, editing and deleting a row requires (CR-26). */
@@ -112,14 +124,24 @@ export interface ResourceConfig {
   rowActions?: RowActionConfig[];
   lookups?: Record<string, LookupConfig>;
   /**
-   * Title of the view/edit mask, naming the record ("Versicherung: AXA").
-   * Falls back to "<Singular> bearbeiten".
+   * The record's name for the title of the view/edit mask ("Versicherung: AXA").
+   * Without it the title is "<Kind> bearbeiten".
    */
-  detailTitle?: (row: ResourceRow) => string;
+  detailName?: (row: ResourceRow) => string;
   /**
    * Opened instead of the generic form when editing an existing row (create
    * keeps the classic form). Receives `open`, `uid` and the resolved lookup
    * `options`; emits `close`, and `changed` whenever the list should reload.
    */
   detailDialog?: Component;
+}
+
+/** The label of a field or column: its own, or the name of the API field it shows. */
+export function labelOf(item: { key: string; label?: LabelFn }): string {
+  return item.label ? item.label() : fieldLabel(item.key);
+}
+
+/** "Police anlegen" — article-neutral, so it reads right for every gender. */
+export function createTitle(config: ResourceConfig): string {
+  return i18n.global.t('resources.create', { kind: kindName(config.kind) });
 }

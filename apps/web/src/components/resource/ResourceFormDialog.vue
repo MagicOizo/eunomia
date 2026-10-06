@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../../design-system/components/EuButton.vue';
 import EuCurrencyField from '../../design-system/components/EuCurrencyField.vue';
@@ -7,7 +8,7 @@ import EuDialog from '../../design-system/components/EuDialog.vue';
 import EuEntityPicker from '../../design-system/components/EuEntityPicker.vue';
 import EuTextField from '../../design-system/components/EuTextField.vue';
 import { useFormDialog, type FormDialogProps } from '../../lib/form-dialog';
-import type { FieldConfig } from '../../resources/config';
+import { type FieldConfig, labelOf } from '../../resources/config';
 import { type SelectOption } from './EuSelectField.vue';
 
 /**
@@ -27,6 +28,7 @@ const props = defineProps<
 >();
 
 const emit = defineEmits<{ close: []; submit: [payload: Record<string, unknown>] }>();
+const { t } = useI18n();
 
 const values = ref<Record<string, string>>({});
 
@@ -63,7 +65,7 @@ function submit(): void {
     // never left, and would otherwise be the one that sends its raw text.
     const value = field.normalize ? field.normalize(typed) : typed;
     if (value === '') {
-      if (field.required) return fail(`Bitte „${field.label}“ ausfüllen.`);
+      if (field.required) return fail(t('errors.issue.required', { label: labelOf(field) }));
       continue; // omit empty optionals so the server keeps its default / null
     }
     const numeric = field.type === 'number' || field.type === 'currency';
@@ -81,7 +83,7 @@ function submit(): void {
         <EuEntityPicker
           v-if="field.type === 'select'"
           :model-value="values[field.key] || null"
-          :label="field.label"
+          :label="labelOf(field)"
           :required="field.required"
           :options="field.options ?? (field.optionsFrom ? (options[field.optionsFrom] ?? []) : [])"
           @update:model-value="values[field.key] = $event ?? ''"
@@ -89,13 +91,13 @@ function submit(): void {
         <EuCurrencyField
           v-else-if="field.type === 'currency'"
           :model-value="values[field.key] ? Number(values[field.key]) : null"
-          :label="field.label"
+          :label="labelOf(field)"
           @update:model-value="values[field.key] = $event === null ? '' : String($event)"
         />
         <EuTextField
           v-else
           v-model="values[field.key]"
-          :label="field.label"
+          :label="labelOf(field)"
           :type="field.type"
           :normalize="field.normalize"
         />
@@ -104,9 +106,9 @@ function submit(): void {
     </form>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Abbrechen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.cancel') }}</EuButton>
       <EuButton :disabled="submitting" @click="submit">
-        {{ submitting ? 'Speichern…' : 'Speichern' }}
+        {{ submitting ? t('common.saving') : t('common.save') }}
       </EuButton>
     </template>
   </EuDialog>

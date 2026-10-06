@@ -1,8 +1,10 @@
+import type { RetentionKind } from '@eunomia/shared';
+
 import { apiData } from '../lib/api';
 
 /**
  * The system settings endpoints (Slice 30). Mirrors the API's shapes; the
- * German labels for the keys live in lib/field-labels.ts, because a rejected
+ * labels for the keys live in lib/field-labels.ts, because a rejected
  * value has to be named in an error message too.
  */
 
@@ -63,13 +65,8 @@ export interface RetentionRunResult {
   users: number;
   /** Entries something active still points at; the next sweep tries again. */
   skipped: number;
-  byKind: Array<{
-    kind: string;
-    singular: string;
-    plural: string;
-    purged: number;
-    skipped: number;
-  }>;
+  /** Per kind of record (`RetentionKind`), named by the web (lib/kind-names.ts). */
+  byKind: Array<{ kind: RetentionKind; purged: number; skipped: number }>;
   dryRun: boolean;
 }
 

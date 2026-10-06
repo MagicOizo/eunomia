@@ -1,3 +1,5 @@
+import type { AttachedRowKind, RecordKind, TrashPart } from '@eunomia/shared';
+
 import { apiData, apiFetch } from '../lib/api';
 
 /**
@@ -6,35 +8,32 @@ import { apiData, apiFetch } from '../lib/api';
  * prefix, so the client never has to name an entity.
  */
 
-/** Something counted, already in the right German number ("2 Rechnungen"). */
-export interface CountedDto {
-  label: string;
-  count: number;
+/** A record the trash names: its kind and what it is called. */
+export interface TrashRefDto {
+  kind: RecordKind;
+  label: TrashPart;
 }
 
 export interface TrashEntryDto {
   uid: string;
   /** What the record is called: an invoice number, a person's name, an amount. */
-  label: string;
-  /** Where it belongs — may be empty. */
-  context: string;
+  label: TrashPart;
+  /** Where it belongs — may be empty. Put into words by `contextText`. */
+  context: TrashPart[];
   /** Local time, or null for a record deleted before this version. */
   deletedAt: string | null;
+  /** False for a kind that cannot come back at all (`notRestorableReason`). */
   restorable: boolean;
-  /** Why it cannot be restored, when it cannot. */
-  restoreNote: string | null;
   /** Deleted records that go with it when it is removed for good. */
-  attached: Array<{ singular: string; plural: string; label: string }>;
+  attached: TrashRefDto[];
   /** Attached rows that are not records of their own (links, reminders, grants). */
-  attachedRows: CountedDto[];
+  attachedRows: Array<{ kind: AttachedRowKind; count: number }>;
   /** How many records come back together with it. */
   restoresWith: number;
 }
 
 export interface TrashGroupDto {
-  key: string;
-  singular: string;
-  plural: string;
+  kind: RecordKind;
   entries: TrashEntryDto[];
 }
 

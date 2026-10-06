@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 
-import { germanMoney } from '@eunomia/shared';
+import type { TrashPart } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 import request from 'supertest';
 
@@ -12,22 +13,25 @@ import { bootstrapAdmin, openTestDatabase, resetData, testConfig } from '../test
 
 interface TrashEntryDto {
   uid: string;
-  label: string;
-  context: string;
+  label: TrashPart;
+  context: TrashPart[];
   deletedAt: string | null;
   restorable: boolean;
-  restoreNote: string | null;
-  attached: Array<{ singular: string; plural: string; label: string }>;
-  attachedRows: Array<{ label: string; count: number }>;
+  attached: Array<{ kind: string; label: TrashPart }>;
+  attachedRows: Array<{ kind: string; count: number }>;
   restoresWith: number;
 }
 
 interface TrashGroupDto {
-  key: string;
-  singular: string;
-  plural: string;
+  kind: string;
   entries: TrashEntryDto[];
 }
+
+/** A plain value as the API describes it. */
+const text = (value: string): TrashPart => ({ type: 'text', value });
+
+/** The label of the premium the tests delete and restore. */
+const fromNewYear: TrashPart = { type: 'validFrom', date: '2021-01-01' };
 
 test('trash: list, restore and delete for good', async (t) => {
   const opened = await openTestDatabase(t);
@@ -79,9 +83,15 @@ test('trash: list, restore and delete for good', async (t) => {
       return res.body.data.groups as TrashGroupDto[];
     };
     const group = async (key: string): Promise<TrashGroupDto | undefined> =>
-      (await trash()).find((one) => one.key === key);
-    const entry = async (key: string, label: string): Promise<TrashEntryDto | undefined> =>
-      (await group(key))?.entries.find((one) => one.label === label);
+      (await trash()).find((one) => one.kind === key);
+    /** An entry by its label — a plain string stands for a text part. */
+    const entry = async (
+      key: string,
+      label: TrashPart | string,
+    ): Promise<TrashEntryDto | undefined> => {
+      const wanted = typeof label === 'string' ? text(label) : label;
+      return (await group(key))?.entries.find((one) => isDeepStrictEqual(one.label, wanted));
+    };
 
     // Master data and one full workflow to delete pieces out of.
     const accountUID = (
@@ -132,11 +142,10 @@ test('trash: list, restore and delete for good', async (t) => {
       const found = await entry('facility', 'Apotheke Nord');
       assert.ok(found, 'the deleted facility is in the trash');
       assert.equal(found.restorable, true);
-      assert.equal(found.restoreNote, null);
       assert.match(String(found.deletedAt), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
       const groups = await trash();
       assert.deepEqual(
-        groups.map((one) => one.key),
+        groups.map((one) => one.kind),
         ['facility'],
         'only the group that has something in it',
       );
@@ -160,7 +169,11 @@ test('trash: list, restore and delete for good', async (t) => {
       await del(`/api/v1/invoices/${invoiceUID}`);
       const found = await entry('invoice', 'R-TRASH');
       assert.ok(found);
-      assert.equal(found.context, `Anna Muster, ${germanMoney(120)}, 01.05.2024`);
+      assert.deepEqual(found.context, [
+        text('Anna Muster'),
+        { type: 'money', value: 120 },
+        { type: 'date', value: '2024-05-01' },
+      ]);
       await post(`/api/v1/trash/${invoiceUID}/restore`, {});
     });
 
@@ -177,12 +190,12 @@ test('trash: list, restore and delete for good', async (t) => {
       const res = await post(`/api/v1/trash/${premium}/restore`, {});
       assert.equal(res.status, 409);
       assert.equal(res.body.error.code, 'PARENT_IN_TRASH');
-      assert.equal(res.body.error.details.parent.singular, 'Police');
-      assert.equal(res.body.error.details.parent.label, 'PKV-1');
-      assert.equal(res.body.error.details.entry.singular, 'Beitragsstand');
+      assert.equal(res.body.error.details.parent.kind, 'contract');
+      assert.deepEqual(res.body.error.details.parent.label, text('PKV-1'));
+      assert.equal(res.body.error.details.entry.kind, 'premium');
 
       // Nothing moved: the premium is still deleted.
-      const still = await entry('premium', 'ab 01.01.2021');
+      const still = await entry('premium', fromNewYear);
       assert.ok(still, 'the premium stayed in the trash');
 
       // With the policy back, the premium comes back too.
@@ -207,9 +220,9 @@ test('trash: list, restore and delete for good', async (t) => {
       const res = await post(`/api/v1/trash/${existing.premiumUID}/restore`, {});
       assert.equal(res.status, 409);
       assert.equal(res.body.error.code, 'HISTORY_START_EXISTS');
-      assert.equal(res.body.error.details.entry.singular, 'Beitragsstand');
-      assert.equal(res.body.error.details.entry.label, 'ab 01.01.2021');
-      assert.ok(await entry('premium', 'ab 01.01.2021'), 'it stayed in the trash');
+      assert.equal(res.body.error.details.entry.kind, 'premium');
+      assert.deepEqual(res.body.error.details.entry.label, fromNewYear);
+      assert.ok(await entry('premium', fromNewYear), 'it stayed in the trash');
     });
 
     let billingUID = '';
@@ -236,7 +249,7 @@ test('trash: list, restore and delete for good', async (t) => {
       const found = await entry('serviceBilling', 'LA-1');
       assert.ok(found);
       assert.deepEqual(found.attached, [
-        { singular: 'Erstattung', plural: 'Erstattungen', label: germanMoney(50) },
+        { kind: 'allocation', label: { type: 'money', value: 50 } },
       ]);
       assert.equal(found.restoresWith, 1, 'the reimbursement was deleted in the same batch');
     });
@@ -269,8 +282,8 @@ test('trash: list, restore and delete for good', async (t) => {
       const res = await post(`/api/v1/trash/${billingUID}/restore`, {});
       assert.equal(res.status, 409);
       assert.equal(res.body.error.code, 'REIMBURSEMENT_EXCEEDS_INVOICE');
-      assert.equal(res.body.error.details.entry.singular, 'Erstattung');
-      assert.equal(res.body.error.details.entry.label, germanMoney(50));
+      assert.equal(res.body.error.details.entry.kind, 'allocation');
+      assert.deepEqual(res.body.error.details.entry.label, { type: 'money', value: 50 });
 
       // All or nothing: the billing itself is still deleted as well.
       const rows = await pool.query<Array<{ billingStatus: number }>>(
@@ -299,7 +312,7 @@ test('trash: list, restore and delete for good', async (t) => {
       const res = await post(`/api/v1/trash/${third}/restore`, {});
       assert.equal(res.status, 409);
       assert.equal(res.body.error.code, 'BILLING_NUMBER_TAKEN');
-      assert.equal(res.body.error.details.entry.label, 'LA-3');
+      assert.deepEqual(res.body.error.details.entry.label, text('LA-3'));
     });
 
     // Slice 44: bank accounts stand side by side, so a returning one breaks no
@@ -323,7 +336,7 @@ test('trash: list, restore and delete for good', async (t) => {
       assert.equal((await del(`/api/v1/agencies/${agencyUID}/accounts/${secondUID}`)).status, 204);
       const deleted = await entry('agencyAccount', 'DE89370400440532013000');
       assert.ok(deleted, 'it is in the trash');
-      assert.match(deleted.context, /Inkasso Papierkorb/);
+      assert.deepEqual(deleted.context, [text('Inkasso Papierkorb'), text('zweites Konto')]);
       assert.equal((await post(`/api/v1/trash/${secondUID}/restore`, {})).status, 200);
       assert.equal(
         (await request(app).get(`/api/v1/agencies/${agencyUID}`).set(admin)).body.data.accounts
@@ -341,7 +354,7 @@ test('trash: list, restore and delete for good', async (t) => {
       const res = await del(`/api/v1/trash/${firstUID}`);
       assert.equal(res.status, 409);
       assert.equal(res.body.error.code, 'STILL_REFERENCED');
-      assert.deepEqual(res.body.error.details.blockers, [{ label: 'Rechnung', count: 1 }]);
+      assert.deepEqual(res.body.error.details.blockers, [{ kind: 'invoice', count: 1 }]);
       assert.equal((await post(`/api/v1/trash/${firstUID}/restore`, {})).status, 200);
     });
 
@@ -350,7 +363,7 @@ test('trash: list, restore and delete for good', async (t) => {
       const res = await del(`/api/v1/trash/${facilityUID}`);
       assert.equal(res.status, 409);
       assert.equal(res.body.error.code, 'STILL_REFERENCED');
-      assert.deepEqual(res.body.error.details.blockers, [{ label: 'Rechnung', count: 1 }]);
+      assert.deepEqual(res.body.error.details.blockers, [{ kind: 'invoice', count: 1 }]);
       assert.ok(await entry('facility', 'Dr. Weg'), 'it stayed in the trash');
     });
 
@@ -384,10 +397,9 @@ test('trash: list, restore and delete for good', async (t) => {
       ).body.data.submissionUID as string;
       await del(`/api/v1/submissions/${submissionUID}/invoices/${invoiceUID}`);
 
-      const found = await entry('submission', 'vom 01.10.2024');
+      const found = await entry('submission', { type: 'dated', date: '2024-10-01' });
       assert.ok(found);
       assert.equal(found.restorable, false);
-      assert.match(String(found.restoreNote), /kann nicht wiederhergestellt werden/);
 
       const restore = await post(`/api/v1/trash/${submissionUID}/restore`, {});
       assert.equal(restore.status, 409);
@@ -395,7 +407,7 @@ test('trash: list, restore and delete for good', async (t) => {
 
       const purge = await del(`/api/v1/trash/${submissionUID}`);
       assert.equal(purge.status, 204);
-      assert.equal(await entry('submission', 'vom 01.10.2024'), undefined);
+      assert.equal(await entry('submission', { type: 'dated', date: '2024-10-01' }), undefined);
     });
 
     await t.test('purging an invoice takes its submission links along', async () => {
@@ -429,7 +441,7 @@ test('trash: list, restore and delete for good', async (t) => {
 
       const found = await entry('invoice', 'R-PURGE');
       assert.ok(found);
-      assert.deepEqual(found.attachedRows, [{ label: 'Rechnung in einer Einreichung', count: 1 }]);
+      assert.deepEqual(found.attachedRows, [{ kind: 'submissionInvoice', count: 1 }]);
 
       const res = await del(`/api/v1/trash/${invoiceUID}`);
       assert.equal(res.status, 204);

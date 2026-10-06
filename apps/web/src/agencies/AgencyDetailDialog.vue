@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { faCommentDots, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../design-system/components/EuButton.vue';
 import type { DetailValue } from '../design-system/components/EuDetailField.vue';
@@ -11,6 +12,8 @@ import EuIconLabel from '../design-system/components/EuIconLabel.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { noPermission as noPermissionText } from '../lib/error-messages';
 import { describeError } from '../lib/errors';
+import { fieldLabel } from '../lib/field-labels';
+import { kindTitle } from '../lib/kind-names';
 import { paymentDetailLabel } from './payment-details';
 import {
   type AgencyPaymentDetailDto,
@@ -43,6 +46,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ close: []; changed: [] }>();
+const { t } = useI18n();
 
 const auth = useAuthStore();
 /**
@@ -93,8 +97,8 @@ watch(
 
 const title = computed(() =>
   agency.value
-    ? `Abrechnungsdienstleister: ${agency.value.agencyName}`
-    : 'Abrechnungsdienstleister',
+    ? t('resources.detailTitle', { kind: kindTitle('agency'), name: agency.value.agencyName })
+    : kindTitle('agency'),
 );
 const str = (value: DetailValue): string => (typeof value === 'string' ? value.trim() : '');
 
@@ -103,7 +107,7 @@ async function saveMask(): Promise<void> {
   if (!current) return;
   mask.clear();
   if (!str(values.agencyName)) {
-    mask.error = 'Bitte einen Namen angeben.';
+    mask.error = t('agencies.nameRequired');
     return;
   }
   await mask.run(() => updateAgency(current.agencyUID, str(values.agencyName)));
@@ -112,7 +116,7 @@ async function saveMask(): Promise<void> {
 // --- Payment details --------------------------------------------------------
 
 const detailDialog = reactive({ open: false, entry: null as AgencyPaymentDetailDto | null });
-const pendingDelete = ref<{ uid: string; label: string } | null>(null);
+const pendingDelete = ref<{ uid: string; iban: string } | null>(null);
 
 function openPaymentDetail(forEntry: AgencyPaymentDetailDto | null): void {
   entry.clear();
@@ -156,7 +160,7 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
         <EuDetailField
           v-model="values.agencyName"
           :saved-value="saved.agencyName"
-          label="Name"
+          :label="fieldLabel('agencyName')"
           type="text"
           required
         />
@@ -165,27 +169,27 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
 
       <section class="eu-agency__block" aria-labelledby="eu-agency-payment-details">
         <div class="eu-agency__block-head">
-          <h3 id="eu-agency-payment-details">Kontoverbindungen</h3>
+          <h3 id="eu-agency-payment-details">{{ t('agencies.paymentDetails') }}</h3>
           <EuButton
             variant="secondary"
             :icon="faPlus"
             :disabled="!mayManage"
             :title="noPermission"
             @click="openPaymentDetail(null)"
-            >Kontoverbindung hinzufügen</EuButton
+            >{{ t('agencies.addPaymentDetail') }}</EuButton
           >
         </div>
         <p v-if="agency.accounts.length === 0" class="eu-agency__hint">
-          Noch keine Kontoverbindung erfasst.
+          {{ t('agencies.noPaymentDetails') }}
         </p>
         <div v-else class="eu-agency__scroll eu-scroll-focus-safe">
           <table class="eu-agency__table">
             <thead>
               <tr>
-                <th scope="col">IBAN / BIC</th>
-                <th scope="col">Empfänger</th>
-                <th scope="col">Notiz</th>
-                <th scope="col" class="eu-agency__actions">Aktionen</th>
+                <th scope="col">{{ t('agencies.columns.ibanBic') }}</th>
+                <th scope="col">{{ t('agencies.columns.recipient') }}</th>
+                <th scope="col">{{ t('agencies.columns.note') }}</th>
+                <th scope="col" class="eu-agency__actions">{{ t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -207,7 +211,9 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
                     variant="secondary"
                     icon-only
                     :icon="faPen"
-                    :aria-label="`Kontoverbindung ${paymentDetailLabel(detail)} bearbeiten`"
+                    :aria-label="
+                      t('agencies.editPaymentDetailOf', { iban: paymentDetailLabel(detail) })
+                    "
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="openPaymentDetail(detail)"
@@ -216,13 +222,15 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
                     variant="secondary"
                     icon-only
                     :icon="faTrash"
-                    :aria-label="`Kontoverbindung ${paymentDetailLabel(detail)} löschen`"
+                    :aria-label="
+                      t('agencies.deletePaymentDetailOf', { iban: paymentDetailLabel(detail) })
+                    "
                     :disabled="!mayManage"
                     :title="noPermission"
                     @click="
                       pendingDelete = {
                         uid: detail.agencyAccountUID,
-                        label: `die Kontoverbindung ${paymentDetailLabel(detail)}`,
+                        iban: paymentDetailLabel(detail),
                       }
                     "
                   />
@@ -235,9 +243,9 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
     </template>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.close') }}</EuButton>
       <EuButton v-if="mayManage" :disabled="mask.busy || !agency" @click="saveMask">{{
-        mask.busy ? 'Speichern…' : 'Speichern'
+        mask.busy ? t('common.saving') : t('common.save')
       }}</EuButton>
     </template>
   </EuDialog>
@@ -252,14 +260,16 @@ const paymentDetails = computed(() => agency.value?.accounts ?? []);
   />
   <EuDialog
     :open="pendingDelete !== null"
-    title="Kontoverbindung löschen"
+    :title="t('agencies.deletePaymentDetail')"
     @close="pendingDelete = null"
   >
-    <p>Soll {{ pendingDelete?.label }} wirklich gelöscht werden?</p>
+    <p>{{ t('agencies.confirmDelete', { iban: pendingDelete?.iban ?? '' }) }}</p>
     <p v-if="removal.error" class="eu-agency__error" role="alert">{{ removal.error }}</p>
     <template #footer>
-      <EuButton variant="secondary" @click="pendingDelete = null">Abbrechen</EuButton>
-      <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
+      <EuButton variant="secondary" @click="pendingDelete = null">{{
+        t('common.cancel')
+      }}</EuButton>
+      <EuButton :disabled="removal.busy" @click="confirmDelete">{{ t('common.delete') }}</EuButton>
     </template>
   </EuDialog>
 </template>

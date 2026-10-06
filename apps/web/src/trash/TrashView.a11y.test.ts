@@ -20,35 +20,33 @@ const { default: TrashView } = await import('./TrashView.vue');
 
 const groups: TrashGroupDto[] = [
   {
-    key: 'invoice',
-    singular: 'Rechnung',
-    plural: 'Rechnungen',
+    kind: 'invoice',
     entries: [
       {
         uid: 'iINVOICE0001',
-        label: 'R-2026-1',
-        context: 'Anna Muster, 120,00 €, 01.05.2026',
+        label: { type: 'text', value: 'R-2026-1' },
+        context: [
+          { type: 'text', value: 'Anna Muster' },
+          { type: 'money', value: 120 },
+          { type: 'date', value: '2026-05-01' },
+        ],
         deletedAt: '2026-09-26T09:15:00',
         restorable: true,
-        restoreNote: null,
         attached: [],
-        attachedRows: [{ label: 'Rechnung in einer Einreichung', count: 1 }],
+        attachedRows: [{ kind: 'submissionInvoice', count: 1 }],
         restoresWith: 0,
       },
     ],
   },
   {
-    key: 'submission',
-    singular: 'Einreichung',
-    plural: 'Einreichungen',
+    kind: 'submission',
     entries: [
       {
         uid: 'eSUBMISSI001',
-        label: 'vom 01.10.2026',
-        context: 'Police PKV-1',
+        label: { type: 'dated', date: '2026-10-01' },
+        context: [{ type: 'policy', number: 'PKV-1' }],
         deletedAt: null,
         restorable: false,
-        restoreNote: 'Eine Einreichung ohne Rechnungen kann nicht wiederhergestellt werden.',
         attached: [],
         attachedRows: [],
         restoresWith: 0,

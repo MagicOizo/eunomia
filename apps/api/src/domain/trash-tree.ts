@@ -1,3 +1,5 @@
+import type { AttachedRowKind, RecordKind } from '@eunomia/shared';
+
 import { type Queryable, type Row, placeholders } from '../crud/repository.js';
 import { addTo, groupBy } from '../lib/group.js';
 import { linksTo } from './trash-references.js';
@@ -25,28 +27,20 @@ export interface Located {
   entry: TrashEntry;
 }
 
-/** A counted mention of something, in the right German number. */
-export interface Counted {
-  label: string;
+/** A counted mention of something; the web names it in the reader's language. */
+export interface Counted<Kind extends string = string> {
+  kind: Kind;
   count: number;
 }
 
-const counted = (names: { one: string; many: string }, count: number): Counted => ({
-  label: count === 1 ? names.one : names.many,
-  count,
-});
-
 /** Rows that are not records of their own but go with the record they belong to. */
-const ATTACHED_ROW_NAMES: Record<string, { one: string; many: string }> = {
-  SubmissionInvoices: { one: 'Rechnung in einer Einreichung', many: 'Rechnungen in Einreichungen' },
-  InvoiceExclusions: {
-    one: 'Markierung „nicht erstattungsfähig“',
-    many: 'Markierungen „nicht erstattungsfähig“',
-  },
-  ContractBonusTiers: { one: 'Stufe der Bonus-Staffel', many: 'Stufen der Bonus-Staffel' },
-  ContractYears: { one: 'Versicherungsjahr', many: 'Versicherungsjahre' },
-  UserAccountRoles: { one: 'Rechte-Zuweisung', many: 'Rechte-Zuweisungen' },
-  InvoiceReminders: { one: 'Zahlungserinnerung', many: 'Zahlungserinnerungen' },
+const ATTACHED_ROW_KINDS: Record<string, AttachedRowKind> = {
+  SubmissionInvoices: 'submissionInvoice',
+  InvoiceExclusions: 'invoiceExclusion',
+  ContractBonusTiers: 'bonusTier',
+  ContractYears: 'contractYear',
+  UserAccountRoles: 'roleGrant',
+  InvoiceReminders: 'reminder',
 };
 
 const describe = (entity: TrashEntity, row: Row): TrashEntry => ({
@@ -242,15 +236,15 @@ export async function attachedCounts(
   db: Queryable,
   entity: TrashEntity,
   entries: readonly Located[],
-): Promise<Map<string, Counted[]>> {
-  const counts = new Map<string, Counted[]>();
+): Promise<Map<string, Array<Counted<AttachedRowKind>>>> {
+  const counts = new Map<string, Array<Counted<AttachedRowKind>>>();
   if (entries.length === 0) return counts;
   const uids = entries.map((one) => one.uid);
 
   for (const link of await linksTo(db, entity.table.table, entity.table.uidColumn)) {
     if (entityOfTable(link.table)) continue;
-    const names = ATTACHED_ROW_NAMES[link.table];
-    if (!names) continue;
+    const kind = ATTACHED_ROW_KINDS[link.table];
+    if (!kind) continue;
     const rows = await db.query<Array<{ parent: string; n: number }>>(
       `SELECT ${link.column} AS parent, COUNT(*) AS n FROM ${link.table}
         WHERE ${link.column} IN (${placeholders(uids)})
@@ -259,7 +253,7 @@ export async function attachedCounts(
     );
     for (const row of rows) {
       const n = Number(row.n);
-      if (n > 0) addTo(counts, String(row.parent), counted(names, n));
+      if (n > 0) addTo(counts, String(row.parent), { kind, count: n });
     }
   }
   return counts;
@@ -268,13 +262,16 @@ export async function attachedCounts(
 /**
  * What still ACTIVELY points at this record (or at one of the deleted records
  * below it) and therefore stops it from being removed for good. Counted per
- * kind, so the sentence reads "2 Rechnungen, 1 Police".
+ * kind, so the sentence can read "2 invoices, 1 policy".
  *
  * The counts stay per record: this hangs on purging one record, not on the
  * page, and the walk is bounded by that record's own subtree.
  */
-export async function blockers(db: Queryable, located: Located): Promise<Counted[]> {
-  const tally = new Map<string, { entity: TrashEntity; count: number }>();
+export async function blockers(
+  db: Queryable,
+  located: Located,
+): Promise<Array<Counted<RecordKind>>> {
+  const tally = new Map<RecordKind, number>();
   const edges = await childEdges(db, [located]);
 
   for (const current of [located, ...descendantsOf(located, edges)]) {
@@ -291,13 +288,8 @@ export async function blockers(db: Queryable, located: Located): Promise<Counted
         [current.uid],
       );
       const n = Number(rows[0]?.n ?? 0);
-      if (n > 0) {
-        const seenBefore = tally.get(entity.key);
-        tally.set(entity.key, { entity, count: (seenBefore?.count ?? 0) + n });
-      }
+      if (n > 0) tally.set(entity.key, (tally.get(entity.key) ?? 0) + n);
     }
   }
-  return [...tally.values()].map(({ entity, count }) =>
-    counted({ one: entity.singular, many: entity.plural }, count),
-  );
+  return [...tally].map(([kind, count]) => ({ kind, count }));
 }

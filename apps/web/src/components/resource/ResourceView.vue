@@ -2,6 +2,7 @@
 import type { PermissionKey } from '@eunomia/shared';
 import { faEye, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../../design-system/components/EuButton.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
@@ -11,6 +12,7 @@ import { useDialogAction } from '../../lib/dialog-action';
 import { noPermission } from '../../lib/error-messages';
 import { describeError } from '../../lib/errors';
 import { activeLanguage } from '../../lib/format';
+import { kindName, kindTitle } from '../../lib/kind-names';
 import { useTableSort } from '../../lib/table-sort';
 import {
   type ResourceRow,
@@ -19,7 +21,13 @@ import {
   listResource,
   updateResource,
 } from '../../lib/resource';
-import type { ColumnConfig, ResourceConfig, RowActionConfig } from '../../resources/config';
+import {
+  type ColumnConfig,
+  type ResourceConfig,
+  type RowActionConfig,
+  createTitle as createTitleOf,
+  labelOf,
+} from '../../resources/config';
 import { useAuthStore } from '../../stores/auth';
 import type { SelectOption } from './EuSelectField.vue';
 import ResourceDetailDialog from './ResourceDetailDialog.vue';
@@ -28,6 +36,10 @@ import ResourceFormDialog from './ResourceFormDialog.vue';
 const props = defineProps<{ config: ResourceConfig }>();
 
 const auth = useAuthStore();
+const { t } = useI18n();
+
+/** The kind's name inside a phrase ("Police bearbeiten", "edit policy"). */
+const noun = computed(() => kindName(props.config.kind));
 
 interface LookupData {
   options: SelectOption[];
@@ -77,13 +89,15 @@ async function runRowAction(action: RowActionConfig, row: ResourceRow): Promise<
 
 // Article-neutral so it reads correctly for every gender ("Police anlegen")
 // instead of a wrong "Neue Police".
-const createTitle = computed(() => `${props.config.singular} anlegen`);
+const createTitle = computed(() => createTitleOf(props.config));
 // The mask names the record it shows, like the invoice and policy masks do.
-const maskTitle = computed(() =>
-  editing.value
-    ? (props.config.detailTitle?.(editing.value) ?? `${props.config.singular} bearbeiten`)
-    : '',
-);
+const maskTitle = computed(() => {
+  if (!editing.value) return '';
+  const name = props.config.detailName?.(editing.value);
+  return name === undefined
+    ? t('resources.edit', { kind: noun.value })
+    : t('resources.detailTitle', { kind: kindTitle(props.config.kind), name });
+});
 const optionsForForm = computed<Record<string, SelectOption[]>>(() =>
   Object.fromEntries(Object.entries(lookups.value).map(([name, data]) => [name, data.options])),
 );
@@ -275,25 +289,25 @@ async function confirmDelete(): Promise<void> {
         v-if="!loading && !loadError && rows.length > 0"
         v-model="filter"
         class="eu-resource__search"
-        label="Suchen"
+        :label="t('common.search')"
       />
       <EuButton
         :icon="faPlus"
         :disabled="!mayCreate"
         :title="mayCreate ? undefined : noPermission()"
         @click="openCreate"
-        >Neu</EuButton
+        >{{ t('common.new') }}</EuButton
       >
     </div>
 
     <p v-if="actionError" class="eu-resource__error" role="alert">{{ actionError }}</p>
-    <p v-if="loading" class="eu-resource__hint">Wird geladen…</p>
+    <p v-if="loading" class="eu-resource__hint">{{ t('common.loading') }}</p>
     <p v-else-if="loadError" class="eu-resource__error" role="alert">{{ loadError }}</p>
     <p v-else-if="rows.length === 0" class="eu-resource__hint">
-      Noch keine {{ config.plural }} erfasst.
+      {{ t('resources.empty', { kinds: kindName(config.kind, 2) }) }}
     </p>
     <p v-else-if="visibleRows.length === 0" class="eu-resource__hint" role="status">
-      Kein Eintrag passt zu dieser Suche.
+      {{ t('common.noMatch') }}
     </p>
 
     <div v-else class="eu-resource__table-wrap">
@@ -303,12 +317,12 @@ async function confirmDelete(): Promise<void> {
             <EuSortableTh
               v-for="column in config.columns"
               :key="column.key"
-              :label="column.label"
+              :label="labelOf(column)"
               :align="column.align === 'right' ? 'center' : column.align"
               :state="sort.stateOf(column.key)"
               @sort="sort.toggle(column.key)"
             />
-            <th class="eu-resource__actions-head">Aktionen</th>
+            <th class="eu-resource__actions-head">{{ t('common.actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -340,14 +354,18 @@ async function confirmDelete(): Promise<void> {
                 variant="secondary"
                 icon-only
                 :icon="mayManage(row) ? faPen : faEye"
-                :aria-label="`${config.singular} ${mayManage(row) ? 'bearbeiten' : 'ansehen'}`"
+                :aria-label="
+                  mayManage(row)
+                    ? t('resources.edit', { kind: noun })
+                    : t('resources.view', { kind: noun })
+                "
                 @click="openEdit(row)"
               />
               <EuButton
                 variant="secondary"
                 icon-only
                 :icon="faTrash"
-                :aria-label="`${config.singular} löschen`"
+                :aria-label="t('resources.delete', { kind: noun })"
                 :disabled="!mayManage(row)"
                 :title="mayManage(row) ? undefined : noPermission()"
                 @click="confirmTarget = row"
@@ -394,14 +412,18 @@ async function confirmDelete(): Promise<void> {
 
     <EuDialog
       :open="confirmTarget !== null"
-      :title="`${config.singular} löschen`"
+      :title="t('resources.delete', { kind: noun })"
       @close="confirmTarget = null"
     >
-      <p>Diesen Eintrag wirklich löschen?</p>
+      <p>{{ t('resources.confirmDelete') }}</p>
       <p v-if="removal.error" class="eu-resource__error" role="alert">{{ removal.error }}</p>
       <template #footer>
-        <EuButton variant="secondary" @click="confirmTarget = null">Abbrechen</EuButton>
-        <EuButton :disabled="removal.busy" @click="confirmDelete">Löschen</EuButton>
+        <EuButton variant="secondary" @click="confirmTarget = null">{{
+          t('common.cancel')
+        }}</EuButton>
+        <EuButton :disabled="removal.busy" @click="confirmDelete">{{
+          t('common.delete')
+        }}</EuButton>
       </template>
     </EuDialog>
   </section>

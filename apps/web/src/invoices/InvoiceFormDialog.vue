@@ -17,6 +17,7 @@ import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
 import { usePaymentDetailPicker } from './payment-detail-picker';
 import { paymentTermSuggestions } from './payment-terms';
 import type { InvoiceDto } from './api';
+import { createTitle } from '../resources/config';
 import { CREATE_KINDS, useEntityCreate } from './entity-create';
 import {
   differentYearsMessage,
@@ -309,7 +310,7 @@ function submit(): void {
   <!-- Ad-hoc create for the entity picked above, prefilled with the typed name. -->
   <ResourceFormDialog
     :open="createOpen"
-    :title="`${CREATE_KINDS[createKind].config.singular} anlegen`"
+    :title="createTitle(CREATE_KINDS[createKind].config)"
     :fields="CREATE_KINDS[createKind].config.fields"
     :options="{}"
     :prefill="createPrefill"

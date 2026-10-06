@@ -1,4 +1,10 @@
-import { ERROR_CODES, PERMISSIONS } from '@eunomia/shared';
+import {
+  type AttachedRowKind,
+  ERROR_CODES,
+  PERMISSIONS,
+  type RecordKind,
+  type TrashPart,
+} from '@eunomia/shared';
 import { Router } from 'express';
 import type { Pool } from 'mariadb';
 
@@ -55,22 +61,31 @@ import {
 
 /** One deleted record, ready for the UI. */
 export interface TrashEntryDto extends TrashEntry {
+  /** False for a kind that cannot come back at all; the web says why. */
   restorable: boolean;
-  restoreNote: string | null;
   /** Deleted records that go with it when it is removed for good. */
-  attached: Array<{ singular: string; plural: string; label: string }>;
+  attached: TrashRef[];
   /** Attached rows that are not records of their own (links, reminders, grants). */
-  attachedRows: Counted[];
+  attachedRows: Array<Counted<AttachedRowKind>>;
   /** How many of `attached` come back together with it (same deletion batch). */
   restoresWith: number;
 }
 
 export interface TrashGroupDto {
-  key: string;
-  singular: string;
-  plural: string;
+  kind: RecordKind;
   entries: TrashEntryDto[];
 }
+
+/** A record named in a payload or in an error's details: its kind and its label. */
+export interface TrashRef {
+  kind: RecordKind;
+  label: TrashPart;
+}
+
+const refOf = (located: Located): TrashRef => ({
+  kind: located.entity.key,
+  label: located.entry.label,
+});
 
 /** The whole trash, grouped by kind in the registry's order; empty groups fall away. */
 async function listTrash(db: Queryable): Promise<TrashGroupDto[]> {
@@ -87,32 +102,20 @@ async function listTrash(db: Queryable): Promise<TrashGroupDto[]> {
       const batch = descendantsOf(one, edges, batchOf(one));
       entries.push({
         ...one.entry,
-        restorable: entity.restoreNote === undefined,
-        restoreNote: entity.restoreNote ?? null,
-        // Both German forms travel with the child, so the view never has to
-        // invent a plural ("Policeen").
-        attached: attached.map((child) => ({
-          singular: child.entity.singular,
-          plural: child.entity.plural,
-          label: child.entry.label,
-        })),
+        restorable: entity.restorable !== false,
+        attached: attached.map(refOf),
         attachedRows: counts.get(one.uid) ?? [],
         restoresWith: batch.length,
       });
     }
-    groups.push({
-      key: entity.key,
-      singular: entity.singular,
-      plural: entity.plural,
-      entries,
-    });
+    groups.push({ kind: entity.key, entries });
   }
   return groups;
 }
 
 /** Adds the record a failure hung on to an error's details, and keeps its code. */
 function blame(error: unknown, located: Located): unknown {
-  const entry = { singular: located.entity.singular, label: located.entry.label };
+  const entry = refOf(located);
   if (error instanceof ApiError) {
     return new ApiError(error.httpStatus, error.code, error.message, {
       ...error.details,
@@ -143,12 +146,9 @@ async function assertAncestorsPresent(db: Queryable, located: Located): Promise<
     if (value === null || value === undefined) continue;
     const deleted = await loadOne(db, parent, String(value));
     if (deleted) {
-      throw conflict(`The ${parent.singular} of this record is in the trash as well`, {
+      throw conflict(`The ${parent.key} of this record is in the trash as well`, {
         code: ERROR_CODES.PARENT_IN_TRASH,
-        details: {
-          entry: { singular: located.entity.singular, label: located.entry.label },
-          parent: { singular: parent.singular, label: deleted.entry.label },
-        },
+        details: { entry: refOf(located), parent: refOf(deleted) },
       });
     }
   }
@@ -171,13 +171,10 @@ async function restoreOne(db: Queryable, located: Located): Promise<void> {
  * child is checked. Returns how many rows came back.
  */
 async function restoreEntry(pool: Pool, located: Located): Promise<number> {
-  if (located.entity.restoreNote !== undefined) {
+  if (located.entity.restorable === false) {
     throw conflict('This kind of record cannot be restored', {
       code: ERROR_CODES.NOT_RESTORABLE,
-      details: {
-        entry: { singular: located.entity.singular, label: located.entry.label },
-        reason: located.entity.restoreNote,
-      },
+      details: { entry: refOf(located) },
     });
   }
   return withTransaction(pool, async (conn) => {

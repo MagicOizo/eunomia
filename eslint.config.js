@@ -103,13 +103,28 @@ export default tseslint.config(
       'apps/web/src/layouts/**/*.vue',
       'apps/web/src/views/**/*.vue',
       'apps/web/src/design-system/components/**/*.vue',
+      'apps/web/src/components/resource/**/*.vue',
+      'apps/web/src/agencies/**/*.vue',
+      'apps/web/src/admin/**/*.vue',
+      'apps/web/src/profile/**/*.vue',
+      'apps/web/src/trash/**/*.vue',
     ],
     rules: {
       '@intlify/vue-i18n/no-raw-text': [
         'error',
         {
           // Brand and technical literals that read the same in every language.
-          ignoreText: ['Eunomia', '–', '·', '€', '%', 'POST /api/v1/setup', 'SETUP_TOKEN', '.env'],
+          ignoreText: [
+            'Eunomia',
+            '–',
+            '·',
+            '€',
+            '%',
+            'POST /api/v1/setup',
+            'SETUP_TOKEN',
+            '.env',
+            'CONFIG_ENCRYPTION_KEY',
+          ],
           ignorePattern: '^[\\s\\d.,:;()/+*×-]+$',
         },
       ],

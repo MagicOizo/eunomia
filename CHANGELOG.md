@@ -7,6 +7,24 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.0-slice.3 — 2026-10-06
+
+The third preview of 1.2.0. The UI still starts in German for everyone.
+
+- **Master data, administration and trash speak the UI language.** The lists of insured persons,
+  insurers, policies, providers and billing agencies, the user administration, the settings, the
+  profile and the trash take their texts from the catalogues.
+- **The trash API describes records instead of naming them in German.** `GET /api/v1/trash` and
+  the error details of a refused restore or purge now carry the kind of a record (`kind`) and its
+  description as typed parts (`{ "type": "validFrom", "date": "2021-01-01" }`, `{ "type": "money",
+"value": 50 }`, …) instead of German nouns and finished phrases; `restoreNote`, `singular` and
+  `plural` are gone, and counted mentions read `{ kind, count }`. The retention sweep reports
+  `byKind` as `{ kind, purged, skipped }`. The web puts all of it into words, in the format in
+  effect.
+- **The system roles and the permissions have names.** The two built-in roles are shown in the UI
+  language, and each permission reads as what it allows ("Manage the trash") rather than as its
+  key, which stays available as a tooltip.
+
 ## 1.2.0-slice.2 — 2026-10-06
 
 The second preview of 1.2.0. The UI still starts in German for everyone.

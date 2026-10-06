@@ -7,7 +7,19 @@
     "resetToSaved": "Auf gespeicherten Wert zurücksetzen",
     "clearValue": "Wert löschen",
     "entry": "Eintrag",
-    "addNoun": "{noun} hinzufügen"
+    "addNoun": "{noun} hinzufügen",
+    "new": "Neu",
+    "search": "Suchen",
+    "loading": "Wird geladen…",
+    "noMatch": "Kein Eintrag passt zu dieser Suche.",
+    "actions": "Aktionen",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "saving": "Speichern…",
+    "delete": "Löschen",
+    "pleaseChoose": "– bitte wählen –",
+    "none": "– keine –",
+    "km": "{km} km"
   },
   "nav": {
     "home": "Startseite",
@@ -71,7 +83,7 @@
     "noPermission": "Dazu fehlt dir die Berechtigung.",
     "actionFailed": "Die Aktion ist fehlgeschlagen.",
     "unexpected": "Unerwarteter Fehler.",
-    "namedEntry": "{singular} „{label}“",
+    "namedEntry": "{kind} „{label}“",
     "nothingRestored": "Es wurde nichts wiederhergestellt.",
     "issue": {
       "required": "Bitte „{label}“ ausfüllen.",
@@ -286,5 +298,323 @@
       "enabled": "Papierkorb automatisch leeren",
       "trashDays": "Gelöschtes endgültig entfernen nach (Tagen)"
     }
+  },
+  "trash": {
+    "lead": "Gelöschte Einträge bleiben hier liegen, bis sie zurückgeholt oder endgültig gelöscht werden. Endgültig löschen nimmt mit, was an einem Eintrag hängt und selbst im Papierkorb liegt.",
+    "empty": "Der Papierkorb ist leer.",
+    "groupTitle": "{kind} ({n})",
+    "columns": {
+      "context": "Zusammenhang",
+      "deletedAt": "Gelöscht am"
+    },
+    "unknownMoment": "unbekannt",
+    "restore": "{kind} wiederherstellen",
+    "restoreWith": "{kind} wiederherstellen (samt {n} Eintrag) | {kind} wiederherstellen (samt {n} Einträgen)",
+    "purge": "{kind} endgültig löschen",
+    "attachedSummary": "samt {list}",
+    "purgeDialog": {
+      "title": "Endgültig löschen",
+      "question": "{entry} endgültig löschen? Das lässt sich nicht zurücknehmen.",
+      "alsoDeleted": "Mit gelöscht wird: {list}.",
+      "confirm": "Endgültig löschen"
+    },
+    "notRestorable": {
+      "submission": "Eine Einreichung ohne Rechnungen kann nicht wiederhergestellt werden.",
+      "other": "Dieser Eintrag kann nicht wiederhergestellt werden."
+    },
+    "attachedRows": {
+      "submissionInvoice": "{n} Rechnung in einer Einreichung | {n} Rechnungen in Einreichungen",
+      "invoiceExclusion": "{n} Markierung „nicht erstattungsfähig“ | {n} Markierungen „nicht erstattungsfähig“",
+      "bonusTier": "{n} Stufe der Bonus-Staffel | {n} Stufen der Bonus-Staffel",
+      "contractYear": "{n} Versicherungsjahr | {n} Versicherungsjahre",
+      "roleGrant": "{n} Rechte-Zuweisung | {n} Rechte-Zuweisungen",
+      "reminder": "{n} Zahlungserinnerung | {n} Zahlungserinnerungen"
+    },
+    "parts": {
+      "born": "geboren {date}",
+      "policy": "Police {number}",
+      "validFrom": "ab {date}",
+      "validFromYear": "ab Jahr {year}",
+      "dated": "vom {date}",
+      "premium": "{amount} im Monat",
+      "bonusRelevantPremium": "{amount} bonusrelevant im Monat",
+      "invoice": "Rechnung {number}",
+      "billing": "Abrechnung {number}"
+    },
+    "attachedRecord": "{kind} {label}"
+  },
+  "kinds": {
+    "account": "Versicherter | Versicherte",
+    "company": "Versicherung | Versicherungen",
+    "contract": "Police | Policen",
+    "premium": "Beitragsstand | Beitragsstände",
+    "contractTerms": "Konditionen | Konditionen",
+    "facility": "Leistungserbringer | Leistungserbringer",
+    "agency": "Abrechnungsdienstleister | Abrechnungsdienstleister",
+    "agencyAccount": "Kontoverbindung | Kontoverbindungen",
+    "submission": "Einreichung | Einreichungen",
+    "invoice": "Rechnung | Rechnungen",
+    "serviceBilling": "Leistungsabrechnung | Leistungsabrechnungen",
+    "allocation": "Erstattung | Erstattungen"
+  },
+  "kindCounts": {
+    "account": "{n} Versicherter | {n} Versicherte",
+    "company": "{n} Versicherung | {n} Versicherungen",
+    "contract": "{n} Police | {n} Policen",
+    "premium": "{n} Beitragsstand | {n} Beitragsstände",
+    "contractTerms": "{n} Konditionen | {n} Konditionen",
+    "facility": "{n} Leistungserbringer | {n} Leistungserbringer",
+    "agency": "{n} Abrechnungsdienstleister | {n} Abrechnungsdienstleister",
+    "agencyAccount": "{n} Kontoverbindung | {n} Kontoverbindungen",
+    "submission": "{n} Einreichung | {n} Einreichungen",
+    "invoice": "{n} Rechnung | {n} Rechnungen",
+    "serviceBilling": "{n} Leistungsabrechnung | {n} Leistungsabrechnungen",
+    "allocation": "{n} Erstattung | {n} Erstattungen",
+    "user": "{n} gelöschter Nutzer | {n} gelöschte Nutzer"
+  },
+  "resources": {
+    "create": "{kind} anlegen",
+    "edit": "{kind} bearbeiten",
+    "view": "{kind} ansehen",
+    "delete": "{kind} löschen",
+    "detailTitle": "{kind}: {name}",
+    "empty": "Noch keine {kinds} erfasst.",
+    "confirmDelete": "Diesen Eintrag wirklich löschen?",
+    "accounts": {
+      "export": "Daten von {name} exportieren"
+    },
+    "companies": {
+      "hotline": "Hotline"
+    },
+    "contracts": {
+      "currentPremium": "Beitrag aktuell",
+      "currentDeductible": "SB aktuell",
+      "term": "Laufzeit",
+      "since": "seit {date}",
+      "initialMonthlyPremium": "Monatsbeitrag ab Vertragsbeginn",
+      "initialBonusRelevantPremium": "Bonusrelevanter Monatsbeitrag ab Vertragsbeginn",
+      "initialDeductible": "Selbstbeteiligung pro Jahr",
+      "initialReimbursementCap": "Erstattungsobergrenze pro Jahr"
+    },
+    "facilities": {
+      "distanceKm": "Entfernung (km)",
+      "showInvoices": "Rechnungen von {name} anzeigen"
+    },
+    "agencies": {
+      "recipientIfDifferent": "Empfänger (nur wenn abweichend)",
+      "moreAccounts": "{iban} (+{n} weitere)",
+      "showInvoices": "Rechnungen über {name} anzeigen"
+    }
+  },
+  "contracts": {
+    "kinds": {
+      "FULL": "Vollversicherung",
+      "SUPPLEMENTARY": "Zusatzversicherung"
+    },
+    "kindsShort": {
+      "FULL": "Voll",
+      "SUPPLEMENTARY": "Zusatz"
+    },
+    "forfeitRules": {
+      "ON_SUBMISSION": "schon durch Einreichen",
+      "ON_REIMBURSEMENT": "erst durch Erstattung"
+    }
+  },
+  "agencies": {
+    "nameRequired": "Bitte einen Namen angeben.",
+    "paymentDetails": "Kontoverbindungen",
+    "addPaymentDetail": "Kontoverbindung hinzufügen",
+    "editPaymentDetail": "Kontoverbindung bearbeiten",
+    "deletePaymentDetail": "Kontoverbindung löschen",
+    "editPaymentDetailOf": "Kontoverbindung {iban} bearbeiten",
+    "deletePaymentDetailOf": "Kontoverbindung {iban} löschen",
+    "confirmDelete": "Soll die Kontoverbindung {iban} wirklich gelöscht werden?",
+    "noPaymentDetails": "Noch keine Kontoverbindung erfasst.",
+    "columns": {
+      "ibanBic": "IBAN / BIC",
+      "recipient": "Empfänger",
+      "note": "Notiz"
+    },
+    "form": {
+      "ibanRequired": "Bitte eine IBAN angeben.",
+      "iban": "IBAN",
+      "bic": "BIC (optional)",
+      "recipient": "Empfänger (nur wenn abweichend)",
+      "note": "Notiz (z. B. wofür dieses Konto gilt)"
+    }
+  },
+  "roles": {
+    "title": "Rollen",
+    "lead": "Rollen bündeln Rechte. Aktuell fest vorgegeben – eigene Rollen bearbeiten kommt später.",
+    "noPermissions": "Keine Rechte",
+    "system": {
+      "Admin": {
+        "name": "Admin",
+        "description": "Voller Zugriff auf alles"
+      },
+      "Nutzer": {
+        "name": "Nutzer",
+        "description": "Arbeitet mit den Rechnungen der zugewiesenen Konten"
+      }
+    }
+  },
+  "permissions": {
+    "VIEW_INVOICES": "Rechnungen und Abrechnungen ansehen",
+    "MANAGE_INVOICES": "Rechnungen anlegen, einreichen und abrechnen",
+    "VIEW_ACCOUNTS": "Versicherte ansehen",
+    "MANAGE_ACCOUNTS": "Versicherte anlegen und bearbeiten",
+    "VIEW_CONTRACTS": "Policen ansehen",
+    "MANAGE_CONTRACTS": "Policen anlegen und bearbeiten",
+    "MANAGE_FACILITIES": "Leistungserbringer verwalten",
+    "MANAGE_COMPANIES": "Versicherungen verwalten",
+    "MANAGE_AGENCIES": "Abrechnungsdienstleister verwalten",
+    "MANAGE_USERS": "Nutzer, Rollen und Zugriffe verwalten",
+    "MANAGE_SETTINGS": "System-Einstellungen ändern",
+    "MANAGE_TRASH": "Papierkorb verwalten"
+  },
+  "users": {
+    "new": "Neuer Nutzer",
+    "duplicateEmail": "Diese E-Mail-Adresse wird bereits verwendet.",
+    "columns": {
+      "email": "E-Mail",
+      "name": "Name",
+      "status": "Status",
+      "globalRoles": "Globale Rollen",
+      "grants": "Konto-Zugriffe",
+      "deletedAt": "Gelöscht am"
+    },
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "edit": "Bearbeiten",
+    "editTitle": "Nutzer bearbeiten",
+    "delete": "Löschen",
+    "deleteTitle": "Nutzer löschen",
+    "deletedTitle": "Gelöschte Nutzer ({n})",
+    "deletedLead": "Ein gelöschter Nutzer kann sich nicht anmelden und steht in keiner Auswahl. Wiederhergestellt kommt er deaktiviert zurück. Endgültig gelöscht gehen Name, Adresse, Rollen, Konto-Zugriffe, Sitzungen und Erinnerungs-Vermerke mit — das ist nicht umkehrbar. Ist eine Aufbewahrungsfrist eingestellt, geschieht es nach ihrem Ablauf von selbst.",
+    "unknownMoment": "unbekannt",
+    "restore": "Wiederherstellen",
+    "restoreTitle": "Nutzer wiederherstellen (kommt deaktiviert zurück)",
+    "purge": "Endgültig löschen",
+    "purgeTitle": "Nutzer endgültig löschen",
+    "confirmDelete": "Nutzer „{email}“ wirklich löschen?",
+    "confirmPurge": "Nutzer „{email}“ endgültig löschen? Name, Adresse, Rollen, Konto-Zugriffe, Sitzungen und Erinnerungs-Vermerke gehen mit. Das lässt sich nicht rückgängig machen.",
+    "form": {
+      "newTitle": "Neuer Nutzer",
+      "email": "E-Mail",
+      "newPassword": "Neues Passwort (optional)",
+      "password": "Passwort",
+      "ownPassword": "Das eigene Passwort änderst du unter {link} — dort wird das alte Passwort als Bestätigung verlangt.",
+      "active": "Aktiv",
+      "globalRoles": "Globale Rollen",
+      "grants": "Konto-Zugriffe",
+      "noGrants": "Kein konto-spezifischer Zugriff.",
+      "account": "Konto",
+      "role": "Rolle",
+      "removeGrant": "Zugriff entfernen",
+      "addGrant": "Konto-Zugriff hinzufügen",
+      "emailAndFirstnameRequired": "Bitte E-Mail und Vorname ausfüllen.",
+      "passwordTooShort": "Bitte ein Passwort mit mindestens 8 Zeichen vergeben."
+    }
+  },
+  "settings": {
+    "loading": "Einstellungen werden geladen…",
+    "encryptionMissing": "In der Server-Umgebung fehlt {key}. Passwörter und Token können deshalb nicht gespeichert werden — alle übrigen Einstellungen schon.",
+    "saved": "Einstellungen gespeichert.",
+    "notRunYet": "Noch nicht gelaufen",
+    "lastRunFailed": "Letzter Lauf {at} — fehlgeschlagen",
+    "lastRunMessage": "Meldung beim letzten Lauf: {message}",
+    "mail": {
+      "title": "E-Mail-Versand",
+      "lastSendOk": "Letzter Versand erfolgreich ({at})",
+      "lastSendFailed": "Letzter Versand fehlgeschlagen ({at})",
+      "nothingSent": "Noch nichts versendet",
+      "portError": "Bitte eine Portnummer zwischen 1 und 65535 angeben.",
+      "secureHint": "Für Port 465 einschalten, für 587 mit STARTTLS ausgeschaltet lassen.",
+      "passwordStored": "Ein Passwort ist hinterlegt. Das Feld bleibt leer — eine Eingabe ersetzt es.",
+      "passwordOptional": "Leer lassen, wenn der Mailserver keine Anmeldung verlangt.",
+      "removePassword": "Passwort entfernen",
+      "sendTest": "Testmail an mich senden",
+      "testSent": "Testmail an {recipient} versendet.",
+      "serverMessage": "Meldung des Mailservers beim letzten Versuch: {message}"
+    },
+    "reminders": {
+      "title": "Zahlungserinnerungen",
+      "lastRunSent": "Letzter Lauf {at} — {n} versendet",
+      "lead": "Eunomia meldet sich von selbst, wenn die Zahlung einer Rechnung fällig wird oder überfällig ist. Jeder Nutzer bekommt eine Mail über genau die Rechnungen, die er auch in der App sehen darf. Eine fällige Rechnung wird einmal angekündigt, eine überfällige wiederholt sich im eingestellten Abstand.",
+      "mailOff": "Der E-Mail-Versand ist ausgeschaltet — ohne ihn kann keine Erinnerung verschickt werden.",
+      "hourError": "Bitte eine volle Stunde zwischen 0 und 23 angeben.",
+      "repeatError": "Bitte eine Zahl zwischen 1 und 90 angeben.",
+      "timeZoneHint": "Die Uhrzeit gilt in dieser Zeitzone. Ohne Adresse verschickt Eunomia die Erinnerung ohne Link.",
+      "preview": "Vorschau",
+      "runNow": "Jetzt ausführen",
+      "openInvoices": "{n} offene Rechnung | {n} offene Rechnungen",
+      "nothingDue": "Keine fälligen Zahlungen: {checked} geprüft, niemand zu benachrichtigen.",
+      "previewSentence": "Vorschau: {n} Empfänger würde eine Erinnerung bekommen. Es wurde nichts versendet. | Vorschau: {n} Empfänger würden eine Erinnerung bekommen. Es wurde nichts versendet.",
+      "reminderCount": "{n} Erinnerung | {n} Erinnerungen",
+      "sent": "{sent} versendet.",
+      "sentWithFailures": "{sent} versendet, {failed} fehlgeschlagen.",
+      "hidden": "{n} Empfänger wird nicht angezeigt: für dessen Rechnungen fehlt die Leseberechtigung. | {n} Empfänger werden nicht angezeigt: für deren Rechnungen fehlt die Leseberechtigung.",
+      "previewHead": "Das würde versendet:",
+      "previewTo": "An {email}: {subject}"
+    },
+    "retention": {
+      "title": "Aufbewahrung",
+      "lastRunPurged": "Letzter Lauf {at} — {n} entfernt",
+      "lead": "Gelöschte Datensätze bleiben im Papierkorb, bis jemand sie dort endgültig entfernt. Mit einer Frist tut Eunomia das selbst: Was länger als die eingestellte Zahl von Tagen im Papierkorb liegt, wird einmal täglich endgültig gelöscht — und mit ihm, was darunter hängt und selbst gelöscht ist. Gelöschte Nutzer gehen nach derselben Frist. Das ist nicht umkehrbar; der Probelauf zeigt vorher, was es trifft.",
+      "legacyHint": "Einträge aus der Zeit vor dem Papierkorb haben kein Löschdatum und werden von der Frist nie erfasst — die bleiben von Hand zu löschen.",
+      "daysError": "Bitte eine Zahl zwischen 1 und 3650 angeben.",
+      "dryRun": "Probelauf",
+      "runNow": "Jetzt aufräumen",
+      "entryCount": "{n} Eintrag | {n} Einträge",
+      "dayCount": "{n} Tag | {n} Tage",
+      "withUsers": "{records} und {users}",
+      "dryRunSentence": "Probelauf: {what} älter als {days} würden endgültig gelöscht.",
+      "nothingDeleted": "Es wurde nichts gelöscht.",
+      "purgedSentence": "{what} endgültig gelöscht.",
+      "held": "{n} Eintrag bleibt noch: dort hängt etwas Aktives daran. | {n} Einträge bleiben noch: dort hängt etwas Aktives daran.",
+      "kindRemains": "{what} bleibt noch | {what} bleiben noch"
+    },
+    "update": {
+      "title": "Version und Aktualisierung",
+      "versionUnknown": "Version unbekannt",
+      "running": "Laufende Version",
+      "latest": "Neueste veröffentlichte Version",
+      "checkedAt": "Zuletzt geprüft",
+      "notYet": "noch nicht",
+      "checkNow": "Jetzt prüfen",
+      "releaseNotes": "Release-Notes öffnen (neuer Tab)",
+      "tokenStored": "Ein Token ist hinterlegt. Das Feld bleibt leer — eine Eingabe ersetzt es.",
+      "tokenMissing": "Ohne Token kann eine private Instanz die Releases nicht lesen. Ein Token mit reinem Lesezugriff genügt.",
+      "saveToken": "Token speichern",
+      "removeToken": "Token entfernen",
+      "tokenSaved": "Token gespeichert.",
+      "status": {
+        "notQueried": "Der Stand der Aktualisierung ist noch nicht abgefragt.",
+        "disabled": "Die Update-Prüfung ist per Konfiguration abgeschaltet (UPDATE_CHECK_ENABLED=false).",
+        "noTokenPrivate": "GitHub antwortet mit „nicht gefunden“. Das Repository ist privat — dafür braucht die Prüfung ein GitHub-Token mit Lesezugriff (siehe unten).",
+        "notFound": "GitHub findet das eingestellte Repository nicht, obwohl ein Token gesendet wurde. Bitte UPDATE_CHECK_REPO und die Rechte des Tokens prüfen.",
+        "unauthorized": "GitHub hat das Token abgelehnt. Bitte ein gültiges Token mit Lesezugriff hinterlegen.",
+        "rateLimited": "Das Anfragelimit von GitHub ist erreicht. Die Prüfung versucht es später erneut.",
+        "noRelease": "Es gibt noch keine veröffentlichte Version, gegen die verglichen werden könnte.",
+        "unreachable": "GitHub war nicht erreichbar. Ohne Internetverbindung bleibt die Prüfung ohne Ergebnis.",
+        "available": "Version {version} ist verfügbar.",
+        "upToDate": "Diese Instanz läuft auf der neuesten veröffentlichten Version."
+      }
+    }
+  },
+  "profile": {
+    "signedInAs": "Angemeldet als",
+    "name": "Name",
+    "email": "E-Mail",
+    "changeByAdmin": "Name und E-Mail-Adresse ändert die Benutzerverwaltung. Wende dich dafür an einen Administrator.",
+    "password": "Passwort",
+    "passwordLead": "Mindestens {min} Zeichen. Mit dem neuen Passwort endet jede andere Sitzung dieses Kontos — auf anderen Geräten und in anderen Browsern musst du dich neu anmelden. Diese hier bleibt angemeldet.",
+    "currentPassword": "Aktuelles Passwort",
+    "newPassword": "Neues Passwort",
+    "repeatPassword": "Neues Passwort wiederholen",
+    "tooShort": "Das neue Passwort muss mindestens {min} Zeichen haben.",
+    "mismatch": "Die Wiederholung stimmt nicht mit dem neuen Passwort überein.",
+    "change": "Passwort ändern",
+    "changed": "Passwort geändert. Alle anderen Sitzungen sind beendet."
   }
 }

@@ -6,6 +6,7 @@ import {
   faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 import { computed, reactive, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -31,6 +32,7 @@ import {
  */
 const props = defineProps<{ snapshot: SettingsSnapshot }>();
 const emit = defineEmits<{ snapshot: [SettingsSnapshot] }>();
+const { t } = useI18n();
 
 /** The editable mail form, filled from the snapshot on load. */
 const mail = reactive({
@@ -74,7 +76,7 @@ const portError = computed(() => {
   const parsed = Number(mail.port);
   return Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535
     ? undefined
-    : 'Bitte eine Portnummer zwischen 1 und 65535 angeben.';
+    : t('settings.mail.portError');
 });
 
 async function saveMail(): Promise<void> {
@@ -115,7 +117,7 @@ async function runTest(): Promise<void> {
   await test.run(async () => {
     try {
       const { recipient } = await sendTestMail();
-      testResult.value = `Testmail an ${recipient} versendet.`;
+      testResult.value = t('settings.mail.testSent', { recipient });
     } finally {
       // The attempt is part of the status now — the failed one too, which is
       // why this runs either way, inside the action so the button stays
@@ -131,7 +133,7 @@ async function runTest(): Promise<void> {
 </script>
 
 <template>
-  <EuCollapsibleSection title="E-Mail-Versand">
+  <EuCollapsibleSection :title="t('settings.mail.title')">
     <template #status>
       <EuBadge
         v-if="mailStatus?.lastSendResult"
@@ -140,11 +142,11 @@ async function runTest(): Promise<void> {
       >
         {{
           mailStatus.lastSendResult === 'ok'
-            ? `Letzter Versand erfolgreich (${formatDateTime(mailStatus.lastSendAt)})`
-            : `Letzter Versand fehlgeschlagen (${formatDateTime(mailStatus.lastSendAt)})`
+            ? t('settings.mail.lastSendOk', { at: formatDateTime(mailStatus.lastSendAt) })
+            : t('settings.mail.lastSendFailed', { at: formatDateTime(mailStatus.lastSendAt) })
         }}
       </EuBadge>
-      <EuBadge v-else tone="neutral">Noch nichts versendet</EuBadge>
+      <EuBadge v-else tone="neutral">{{ t('settings.mail.nothingSent') }}</EuBadge>
     </template>
 
     <form class="eu-settings__form" @submit.prevent="saveMail">
@@ -161,9 +163,7 @@ async function runTest(): Promise<void> {
       </div>
 
       <EuToggle v-model="mail.secure" :label="settingLabel('mail.secure')" />
-      <p class="eu-settings__hint">
-        Für Port 465 einschalten, für 587 mit STARTTLS ausgeschaltet lassen.
-      </p>
+      <p class="eu-settings__hint">{{ t('settings.mail.secureHint') }}</p>
 
       <div class="eu-settings__grid">
         <EuTextField v-model="mail.user" :label="settingLabel('mail.user')" />
@@ -176,8 +176,8 @@ async function runTest(): Promise<void> {
           <p class="eu-settings__hint">
             {{
               passwordStored
-                ? 'Ein Passwort ist hinterlegt. Das Feld bleibt leer — eine Eingabe ersetzt es.'
-                : 'Leer lassen, wenn der Mailserver keine Anmeldung verlangt.'
+                ? t('settings.mail.passwordStored')
+                : t('settings.mail.passwordOptional')
             }}
           </p>
         </div>
@@ -189,7 +189,9 @@ async function runTest(): Promise<void> {
       </div>
 
       <div class="eu-settings__actions">
-        <EuButton type="submit" :disabled="action.busy || Boolean(portError)">Speichern</EuButton>
+        <EuButton type="submit" :disabled="action.busy || Boolean(portError)">{{
+          t('common.save')
+        }}</EuButton>
         <EuButton
           v-if="passwordStored"
           variant="ghost"
@@ -197,7 +199,7 @@ async function runTest(): Promise<void> {
           :disabled="action.busy"
           @click="clearPassword"
         >
-          Passwort entfernen
+          {{ t('settings.mail.removePassword') }}
         </EuButton>
         <EuButton
           variant="secondary"
@@ -205,11 +207,11 @@ async function runTest(): Promise<void> {
           :disabled="test.busy || action.busy"
           @click="runTest"
         >
-          Testmail an mich senden
+          {{ t('settings.mail.sendTest') }}
         </EuButton>
       </div>
 
-      <p v-if="saved" class="eu-settings__ok" role="status">Einstellungen gespeichert.</p>
+      <p v-if="saved" class="eu-settings__ok" role="status">{{ t('settings.saved') }}</p>
       <p v-if="testResult" class="eu-settings__ok" role="status">{{ testResult }}</p>
       <p v-if="action.error ?? test.error" class="eu-settings__error" role="alert">
         {{ action.error ?? test.error }}
@@ -218,7 +220,7 @@ async function runTest(): Promise<void> {
         v-if="mailStatus?.lastSendResult === 'error' && mailStatus.lastSendError"
         class="eu-settings__hint"
       >
-        Meldung des Mailservers beim letzten Versuch: {{ mailStatus.lastSendError }}
+        {{ t('settings.mail.serverMessage', { message: mailStatus.lastSendError }) }}
       </p>
     </form>
   </EuCollapsibleSection>

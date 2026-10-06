@@ -2,6 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withLocale } from '../test/locale';
+
 import type { AdminUserDto, RoleDto } from './api';
 
 /**
@@ -143,5 +145,29 @@ describe('UsersView: deleted users', () => {
     listUsers.mockResolvedValue([user()]);
     const wrapper = await mountView();
     expect(wrapper.text()).not.toContain('Gelöschte Nutzer');
+  });
+
+  it('names the system roles and the sections in English', async () => {
+    await withLocale('en', async () => {
+      listUsers.mockResolvedValue([user({ globalRoles: ['Nutzer'] }), deletedUser]);
+      listRoles.mockResolvedValue([
+        {
+          roleUID: 'r-1',
+          roleName: 'Nutzer',
+          description: 'Standard user: work with invoices for assigned accounts',
+          isSystem: true,
+          permissions: ['VIEW_INVOICES'],
+        },
+      ]);
+      const wrapper = await mountView();
+      const text = wrapper.text();
+      expect(text).toContain('Deleted users (1)');
+      // The seeded German name is a key, not what the table shows.
+      expect(wrapper.find('tbody').text()).toContain('User');
+      expect(text).toContain('Works with the invoices of the assigned accounts');
+      const badge = wrapper.find('.eu-roles__perms span');
+      expect(badge.text()).toBe('View invoices and service billings');
+      expect(badge.attributes('title')).toBe('VIEW_INVOICES');
+    });
   });
 });

@@ -2,6 +2,7 @@
 import { faCircleCheck, faCircleInfo, faRotate, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuBadge from '../design-system/components/EuBadge.vue';
 import EuButton from '../design-system/components/EuButton.vue';
@@ -23,6 +24,7 @@ import { type SettingsSnapshot, saveSettings } from './settings-api';
  */
 const props = defineProps<{ snapshot: SettingsSnapshot }>();
 const emit = defineEmits<{ snapshot: [SettingsSnapshot] }>();
+const { t } = useI18n();
 
 const update = updateStatus;
 const token = ref('');
@@ -78,28 +80,28 @@ async function checkNow(): Promise<void> {
 /** The state of the update check in words — the footer can only stay silent. */
 const updateSentence = computed(() => {
   const status = update.value;
-  if (!status) return 'Der Stand der Aktualisierung ist noch nicht abgefragt.';
-  if (status.status === 'disabled') {
-    return 'Die Update-Prüfung ist per Konfiguration abgeschaltet (UPDATE_CHECK_ENABLED=false).';
-  }
+  if (!status) return t('settings.update.status.notQueried');
+  if (status.status === 'disabled') return t('settings.update.status.disabled');
   if (status.status === 'unavailable') {
     switch (status.reason) {
       case 'no_token_private':
-        return 'GitHub antwortet mit „nicht gefunden". Das Repository ist privat — dafür braucht die Prüfung ein GitHub-Token mit Lesezugriff (siehe unten).';
+        return t('settings.update.status.noTokenPrivate');
       case 'not_found':
-        return 'GitHub findet das eingestellte Repository nicht, obwohl ein Token gesendet wurde. Bitte UPDATE_CHECK_REPO und die Rechte des Tokens prüfen.';
+        return t('settings.update.status.notFound');
       case 'unauthorized':
-        return 'GitHub hat das Token abgelehnt. Bitte ein gültiges Token mit Lesezugriff hinterlegen.';
+        return t('settings.update.status.unauthorized');
       case 'rate_limited':
-        return 'Das Anfragelimit von GitHub ist erreicht. Die Prüfung versucht es später erneut.';
+        return t('settings.update.status.rateLimited');
       case 'no_release':
-        return 'Es gibt noch keine veröffentlichte Version, gegen die verglichen werden könnte.';
+        return t('settings.update.status.noRelease');
       default:
-        return 'GitHub war nicht erreichbar. Ohne Internetverbindung bleibt die Prüfung ohne Ergebnis.';
+        return t('settings.update.status.unreachable');
     }
   }
-  if (status.updateAvailable) return `Version ${status.latest} ist verfügbar.`;
-  return 'Diese Instanz läuft auf der neuesten veröffentlichten Version.';
+  if (status.updateAvailable) {
+    return t('settings.update.status.available', { version: status.latest ?? '' });
+  }
+  return t('settings.update.status.upToDate');
 });
 
 const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
@@ -110,20 +112,22 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
 </script>
 
 <template>
-  <EuCollapsibleSection title="Version und Aktualisierung">
+  <EuCollapsibleSection :title="t('settings.update.title')">
     <template #status>
       <EuBadge :tone="updateTone">
-        {{ update?.current ? `v${update.current}` : 'Version unbekannt' }}
+        {{ update?.current ? `v${update.current}` : t('settings.update.versionUnknown') }}
       </EuBadge>
     </template>
 
     <dl class="eu-settings__facts">
-      <dt>Laufende Version</dt>
+      <dt>{{ t('settings.update.running') }}</dt>
       <dd>{{ update?.current ?? '–' }}</dd>
-      <dt>Neueste veröffentlichte Version</dt>
+      <dt>{{ t('settings.update.latest') }}</dt>
       <dd>{{ update?.latest ?? '–' }}</dd>
-      <dt>Zuletzt geprüft</dt>
-      <dd>{{ update?.checkedAt ? formatDateTime(update.checkedAt) : 'noch nicht' }}</dd>
+      <dt>{{ t('settings.update.checkedAt') }}</dt>
+      <dd>
+        {{ update?.checkedAt ? formatDateTime(update.checkedAt) : t('settings.update.notYet') }}
+      </dd>
     </dl>
 
     <p class="eu-settings__sentence">
@@ -136,7 +140,7 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
 
     <div class="eu-settings__actions">
       <EuButton variant="secondary" :icon="faRotate" :disabled="action.busy" @click="checkNow">
-        Jetzt prüfen
+        {{ t('settings.update.checkNow') }}
       </EuButton>
       <a
         v-if="update?.releaseUrl"
@@ -145,7 +149,7 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
         target="_blank"
         rel="noreferrer noopener"
       >
-        Release-Notes öffnen (neuer Tab)
+        {{ t('settings.update.releaseNotes') }}
       </a>
     </div>
 
@@ -157,14 +161,12 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
         :error="undefined"
       />
       <p class="eu-settings__hint">
-        {{
-          tokenStored
-            ? 'Ein Token ist hinterlegt. Das Feld bleibt leer — eine Eingabe ersetzt es.'
-            : 'Ohne Token kann eine private Instanz die Releases nicht lesen. Ein Token mit reinem Lesezugriff genügt.'
-        }}
+        {{ tokenStored ? t('settings.update.tokenStored') : t('settings.update.tokenMissing') }}
       </p>
       <div class="eu-settings__actions">
-        <EuButton type="submit" :disabled="action.busy || token === ''">Token speichern</EuButton>
+        <EuButton type="submit" :disabled="action.busy || token === ''">{{
+          t('settings.update.saveToken')
+        }}</EuButton>
         <EuButton
           v-if="tokenStored"
           variant="ghost"
@@ -172,10 +174,12 @@ const updateTone = computed<'done' | 'submitted' | 'neutral'>(() => {
           :disabled="action.busy"
           @click="clearToken"
         >
-          Token entfernen
+          {{ t('settings.update.removeToken') }}
         </EuButton>
       </div>
-      <p v-if="tokenSaved" class="eu-settings__ok" role="status">Token gespeichert.</p>
+      <p v-if="tokenSaved" class="eu-settings__ok" role="status">
+        {{ t('settings.update.tokenSaved') }}
+      </p>
       <p v-if="action.error" class="eu-settings__error" role="alert">{{ action.error }}</p>
     </form>
   </EuCollapsibleSection>

@@ -1,6 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { withLocale } from '../test/locale';
+
 import type { RetentionRunResult, SettingWrite, SettingsSnapshot } from './settings-api';
 
 /**
@@ -54,9 +56,7 @@ function result(overrides: Partial<RetentionRunResult> = {}): RetentionRunResult
     purged: 3,
     users: 0,
     skipped: 0,
-    byKind: [
-      { kind: 'invoice', singular: 'Rechnung', plural: 'Rechnungen', purged: 3, skipped: 0 },
-    ],
+    byKind: [{ kind: 'invoice', purged: 3, skipped: 0 }],
     dryRun: false,
     ...overrides,
   };
@@ -144,15 +144,7 @@ describe('RetentionSection', () => {
         purged: 0,
         skipped: 1,
         days: 1,
-        byKind: [
-          {
-            kind: 'facility',
-            singular: 'Leistungserbringer',
-            plural: 'Leistungserbringer',
-            purged: 0,
-            skipped: 1,
-          },
-        ],
+        byKind: [{ kind: 'facility', purged: 0, skipped: 1 }],
       }),
     );
 
@@ -180,5 +172,22 @@ describe('RetentionSection', () => {
     });
     expect(wrapper.text()).toContain('fehlgeschlagen');
     expect(wrapper.text()).toContain('Deadlock found when trying to get lock');
+  });
+
+  it('reports a dry run in English, with the kinds named', async () => {
+    await withLocale('en', async () => {
+      const wrapper = mountSection();
+      runRetention.mockResolvedValueOnce(
+        result({ dryRun: true, purged: 2, users: 1, skipped: 1, days: 1 }),
+      );
+      await button(wrapper, 'Dry run')!.trigger('click');
+      await flushPromises();
+      const text = wrapper.text();
+      expect(text).toContain(
+        'Dry run: 2 entries and 1 deleted user older than 1 day would be deleted permanently.',
+      );
+      expect(text).toContain('1 entry remains: something active still hangs on it.');
+      expect(text).toContain('3 invoices');
+    });
   });
 });

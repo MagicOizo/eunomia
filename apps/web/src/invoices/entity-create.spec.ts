@@ -23,7 +23,7 @@ describe('useEntityCreate', () => {
     expect(create.open.value).toBe(true);
     expect(create.kind.value).toBe('agency');
     expect(create.prefill.value).toEqual({ agencyName: 'Inkasso Nord' });
-    expect(CREATE_KINDS.agency.config.singular).toBe('Abrechnungsdienstleister');
+    expect(CREATE_KINDS.agency.config.kind).toBe('agency');
   });
 
   it('hands the saved row back as a picker option and closes', async () => {

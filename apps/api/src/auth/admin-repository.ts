@@ -17,7 +17,7 @@ export interface AdminUser {
   status: number;
   /**
    * When the user was deleted, as local time `YYYY-MM-DDTHH:MM:SS` — the same
-   * shape the trash hands over, so the web reads it with `germanDateTime`.
+   * shape the trash hands over, so the web reads it with `formatDateTime`.
    * Null for every user that is not deleted, and for one deleted before
    * migration 018 recorded the moment.
    */

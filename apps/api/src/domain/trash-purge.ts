@@ -28,7 +28,7 @@ export async function purgeEntry(pool: Pool, located: Located): Promise<number> 
     throw conflict('The record is still referenced by active records', {
       code: ERROR_CODES.STILL_REFERENCED,
       details: {
-        entry: { singular: located.entity.singular, label: located.entry.label },
+        entry: { kind: located.entity.key, label: located.entry.label },
         blockers: stopping,
       },
     });

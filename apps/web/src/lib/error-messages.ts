@@ -2,7 +2,9 @@ import type { ErrorCode } from '@eunomia/shared';
 
 import { fieldFormat, fieldLabel, settingLabel } from './field-labels';
 import { activeLanguage } from './format';
+import { isTrashRef, namedEntry, notRestorableReason } from '../trash/trash-text';
 import { i18n } from './i18n';
+import { capitalized, countedKind } from './kind-names';
 
 /**
  * Sentences for what the API reports, in the UI language. The API answers in
@@ -152,19 +154,14 @@ const NOT_FOUND: Record<string, () => string> = {
  */
 const isTerms = (details: Details): boolean => details.kind === 'terms';
 
-/** A record as the trash names it: `Rechnung „R-1“`. */
-const namedEntry = (singular: string, label: string): string =>
-  t('errors.namedEntry', { singular, label });
-
 /**
  * The record a failure hung on, when the API named one (`details.entry`). The
  * trash needs it: a restore covers a record AND what was deleted with it, so
  * the sentence has to say which of them refused — and that nothing moved.
  */
 function entryPrefix(details: Details): string {
-  const entry = details.entry as { singular?: unknown; label?: unknown } | undefined;
-  if (typeof entry?.singular !== 'string' || typeof entry.label !== 'string') return '';
-  return `${namedEntry(entry.singular, entry.label)}: `;
+  const entry = details.entry;
+  return isTrashRef(entry) ? `${capitalized(namedEntry(entry.kind, entry.label))}: ` : '';
 }
 
 /** Lower-cases the sentence's first letter after a prefix ("Rechnung „R-1“: die …"). */
@@ -190,9 +187,9 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
   DUPLICATE_VALUE: () => t('errors.code.DUPLICATE_VALUE'),
   STILL_REFERENCED: (d) => {
     const blockers = Array.isArray(d.blockers)
-      ? (d.blockers as Array<{ label?: unknown; count?: unknown }>)
-          .filter((one) => typeof one.label === 'string')
-          .map((one) => `${String(one.count ?? '')} ${String(one.label)}`.trim())
+      ? (d.blockers as Array<{ kind?: unknown; count?: unknown }>)
+          .filter((one) => typeof one.kind === 'string' && typeof one.count === 'number')
+          .map((one) => countedKind(String(one.kind), Number(one.count)))
       : [];
     return blockers.length === 0
       ? t('errors.code.STILL_REFERENCED')
@@ -267,17 +264,18 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
 
   // Papierkorb
   PARENT_IN_TRASH: (d) => {
-    const parent = d.parent as { singular?: unknown; label?: unknown } | undefined;
-    const named =
-      typeof parent?.singular === 'string' && typeof parent.label === 'string'
-        ? namedEntry(parent.singular, parent.label)
-        : t('errors.code.PARENT_UNNAMED');
+    const parent = d.parent;
+    const named = isTrashRef(parent)
+      ? capitalized(namedEntry(parent.kind, parent.label))
+      : t('errors.code.PARENT_UNNAMED');
     // Not lower-cased after the prefix: it starts with a noun.
     const text = t('errors.code.PARENT_IN_TRASH', { parent: named });
     return `${entryPrefix(d)}${text} ${t('errors.nothingRestored')}`;
   },
   NOT_RESTORABLE: (d) =>
-    typeof d.reason === 'string' ? `${entryPrefix(d)}${d.reason}` : t('errors.code.NOT_RESTORABLE'),
+    isTrashRef(d.entry)
+      ? `${entryPrefix(d)}${notRestorableReason(d.entry.kind)}`
+      : t('errors.code.NOT_RESTORABLE'),
   RESTORE_CONFLICT: (d) =>
     `${sentence(entryPrefix(d), t('errors.code.RESTORE_CONFLICT'))} ${t('errors.nothingRestored')}`,
 

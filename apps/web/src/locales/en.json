@@ -7,7 +7,19 @@
     "resetToSaved": "Reset to the saved value",
     "clearValue": "Clear value",
     "entry": "entry",
-    "addNoun": "Add {noun}"
+    "addNoun": "Add {noun}",
+    "new": "New",
+    "search": "Search",
+    "loading": "Loading…",
+    "noMatch": "No entry matches this search.",
+    "actions": "Actions",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "delete": "Delete",
+    "pleaseChoose": "– please choose –",
+    "none": "– none –",
+    "km": "{km} km"
   },
   "nav": {
     "home": "Home",
@@ -71,7 +83,7 @@
     "noPermission": "You do not have permission to do this.",
     "actionFailed": "The action failed.",
     "unexpected": "Unexpected error.",
-    "namedEntry": "{singular} “{label}”",
+    "namedEntry": "{kind} “{label}”",
     "nothingRestored": "Nothing was restored.",
     "issue": {
       "required": "Please fill in “{label}”.",
@@ -286,5 +298,323 @@
       "enabled": "Empty the trash automatically",
       "trashDays": "Remove deleted entries permanently after (days)"
     }
+  },
+  "trash": {
+    "lead": "Deleted entries stay here until they are restored or deleted permanently. Deleting permanently takes along whatever hangs on an entry and is in the trash itself.",
+    "empty": "The trash is empty.",
+    "groupTitle": "{kind} ({n})",
+    "columns": {
+      "context": "Context",
+      "deletedAt": "Deleted on"
+    },
+    "unknownMoment": "unknown",
+    "restore": "Restore {kind}",
+    "restoreWith": "Restore {kind} (with {n} more entry) | Restore {kind} (with {n} more entries)",
+    "purge": "Delete {kind} permanently",
+    "attachedSummary": "with {list}",
+    "purgeDialog": {
+      "title": "Delete permanently",
+      "question": "Delete {entry} permanently? This cannot be undone.",
+      "alsoDeleted": "Also deleted: {list}.",
+      "confirm": "Delete permanently"
+    },
+    "notRestorable": {
+      "submission": "A submission without invoices cannot be restored.",
+      "other": "This entry cannot be restored."
+    },
+    "attachedRows": {
+      "submissionInvoice": "{n} invoice in a submission | {n} invoices in submissions",
+      "invoiceExclusion": "{n} “not reimbursable” mark | {n} “not reimbursable” marks",
+      "bonusTier": "{n} bonus scale tier | {n} bonus scale tiers",
+      "contractYear": "{n} insurance year | {n} insurance years",
+      "roleGrant": "{n} role assignment | {n} role assignments",
+      "reminder": "{n} payment reminder | {n} payment reminders"
+    },
+    "parts": {
+      "born": "born {date}",
+      "policy": "Policy {number}",
+      "validFrom": "from {date}",
+      "validFromYear": "from year {year}",
+      "dated": "dated {date}",
+      "premium": "{amount} per month",
+      "bonusRelevantPremium": "{amount} bonus-relevant per month",
+      "invoice": "Invoice {number}",
+      "billing": "Billing {number}"
+    },
+    "attachedRecord": "{kind} {label}"
+  },
+  "kinds": {
+    "account": "insured person | insured persons",
+    "company": "insurer | insurers",
+    "contract": "policy | policies",
+    "premium": "premium | premiums",
+    "contractTerms": "terms | terms",
+    "facility": "provider | providers",
+    "agency": "billing agency | billing agencies",
+    "agencyAccount": "bank details | bank details",
+    "submission": "submission | submissions",
+    "invoice": "invoice | invoices",
+    "serviceBilling": "service billing | service billings",
+    "allocation": "reimbursement | reimbursements"
+  },
+  "kindCounts": {
+    "account": "{n} insured person | {n} insured persons",
+    "company": "{n} insurer | {n} insurers",
+    "contract": "{n} policy | {n} policies",
+    "premium": "{n} premium | {n} premiums",
+    "contractTerms": "{n} set of terms | {n} sets of terms",
+    "facility": "{n} provider | {n} providers",
+    "agency": "{n} billing agency | {n} billing agencies",
+    "agencyAccount": "{n} set of bank details | {n} sets of bank details",
+    "submission": "{n} submission | {n} submissions",
+    "invoice": "{n} invoice | {n} invoices",
+    "serviceBilling": "{n} service billing | {n} service billings",
+    "allocation": "{n} reimbursement | {n} reimbursements",
+    "user": "{n} deleted user | {n} deleted users"
+  },
+  "resources": {
+    "create": "Create {kind}",
+    "edit": "Edit {kind}",
+    "view": "View {kind}",
+    "delete": "Delete {kind}",
+    "detailTitle": "{kind}: {name}",
+    "empty": "No {kinds} recorded yet.",
+    "confirmDelete": "Really delete this entry?",
+    "accounts": {
+      "export": "Export the data of {name}"
+    },
+    "companies": {
+      "hotline": "Hotline"
+    },
+    "contracts": {
+      "currentPremium": "Current premium",
+      "currentDeductible": "Current deductible",
+      "term": "Term",
+      "since": "since {date}",
+      "initialMonthlyPremium": "Monthly premium from the start of the policy",
+      "initialBonusRelevantPremium": "Bonus-relevant monthly premium from the start of the policy",
+      "initialDeductible": "Deductible per year",
+      "initialReimbursementCap": "Reimbursement cap per year"
+    },
+    "facilities": {
+      "distanceKm": "Distance (km)",
+      "showInvoices": "Show invoices from {name}"
+    },
+    "agencies": {
+      "recipientIfDifferent": "Recipient (only if different)",
+      "moreAccounts": "{iban} (+{n} more)",
+      "showInvoices": "Show invoices via {name}"
+    }
+  },
+  "contracts": {
+    "kinds": {
+      "FULL": "Comprehensive cover",
+      "SUPPLEMENTARY": "Supplementary cover"
+    },
+    "kindsShort": {
+      "FULL": "Comprehensive",
+      "SUPPLEMENTARY": "Supplementary"
+    },
+    "forfeitRules": {
+      "ON_SUBMISSION": "as soon as it is submitted",
+      "ON_REIMBURSEMENT": "only once it is reimbursed"
+    }
+  },
+  "agencies": {
+    "nameRequired": "Please enter a name.",
+    "paymentDetails": "Bank details",
+    "addPaymentDetail": "Add bank details",
+    "editPaymentDetail": "Edit bank details",
+    "deletePaymentDetail": "Delete bank details",
+    "editPaymentDetailOf": "Edit bank details {iban}",
+    "deletePaymentDetailOf": "Delete bank details {iban}",
+    "confirmDelete": "Really delete the bank details {iban}?",
+    "noPaymentDetails": "No bank details recorded yet.",
+    "columns": {
+      "ibanBic": "IBAN / BIC",
+      "recipient": "Recipient",
+      "note": "Note"
+    },
+    "form": {
+      "ibanRequired": "Please enter an IBAN.",
+      "iban": "IBAN",
+      "bic": "BIC (optional)",
+      "recipient": "Recipient (only if different)",
+      "note": "Note (e.g. what this account is for)"
+    }
+  },
+  "roles": {
+    "title": "Roles",
+    "lead": "Roles bundle permissions. They are fixed for now – editing your own roles comes later.",
+    "noPermissions": "No permissions",
+    "system": {
+      "Admin": {
+        "name": "Admin",
+        "description": "Full access to everything"
+      },
+      "Nutzer": {
+        "name": "User",
+        "description": "Works with the invoices of the assigned accounts"
+      }
+    }
+  },
+  "permissions": {
+    "VIEW_INVOICES": "View invoices and service billings",
+    "MANAGE_INVOICES": "Create, submit and settle invoices",
+    "VIEW_ACCOUNTS": "View insured persons",
+    "MANAGE_ACCOUNTS": "Create and edit insured persons",
+    "VIEW_CONTRACTS": "View policies",
+    "MANAGE_CONTRACTS": "Create and edit policies",
+    "MANAGE_FACILITIES": "Manage providers",
+    "MANAGE_COMPANIES": "Manage insurers",
+    "MANAGE_AGENCIES": "Manage billing agencies",
+    "MANAGE_USERS": "Manage users, roles and access",
+    "MANAGE_SETTINGS": "Change system settings",
+    "MANAGE_TRASH": "Manage the trash"
+  },
+  "users": {
+    "new": "New user",
+    "duplicateEmail": "This email address is already in use.",
+    "columns": {
+      "email": "Email",
+      "name": "Name",
+      "status": "Status",
+      "globalRoles": "Global roles",
+      "grants": "Account access",
+      "deletedAt": "Deleted on"
+    },
+    "active": "Active",
+    "inactive": "Inactive",
+    "edit": "Edit",
+    "editTitle": "Edit user",
+    "delete": "Delete",
+    "deleteTitle": "Delete user",
+    "deletedTitle": "Deleted users ({n})",
+    "deletedLead": "A deleted user cannot sign in and appears in no selection. Restored, they come back deactivated. Deleted permanently, their name, address, roles, account access, sessions and reminder records go with them — this cannot be undone. If a retention period is set, this happens on its own once it has passed.",
+    "unknownMoment": "unknown",
+    "restore": "Restore",
+    "restoreTitle": "Restore user (comes back deactivated)",
+    "purge": "Delete permanently",
+    "purgeTitle": "Delete user permanently",
+    "confirmDelete": "Really delete user “{email}”?",
+    "confirmPurge": "Delete user “{email}” permanently? Their name, address, roles, account access, sessions and reminder records go with them. This cannot be undone.",
+    "form": {
+      "newTitle": "New user",
+      "email": "Email",
+      "newPassword": "New password (optional)",
+      "password": "Password",
+      "ownPassword": "You change your own password under {link} — there, your old password is asked for as confirmation.",
+      "active": "Active",
+      "globalRoles": "Global roles",
+      "grants": "Account access",
+      "noGrants": "No account-specific access.",
+      "account": "Account",
+      "role": "Role",
+      "removeGrant": "Remove access",
+      "addGrant": "Add account access",
+      "emailAndFirstnameRequired": "Please fill in email and first name.",
+      "passwordTooShort": "Please choose a password with at least 8 characters."
+    }
+  },
+  "settings": {
+    "loading": "Loading settings…",
+    "encryptionMissing": "{key} is missing from the server environment. Passwords and tokens therefore cannot be stored — all other settings can.",
+    "saved": "Settings saved.",
+    "notRunYet": "Not run yet",
+    "lastRunFailed": "Last run {at} — failed",
+    "lastRunMessage": "Message from the last run: {message}",
+    "mail": {
+      "title": "Email dispatch",
+      "lastSendOk": "Last dispatch succeeded ({at})",
+      "lastSendFailed": "Last dispatch failed ({at})",
+      "nothingSent": "Nothing sent yet",
+      "portError": "Please enter a port number between 1 and 65535.",
+      "secureHint": "Switch on for port 465, leave off for 587 with STARTTLS.",
+      "passwordStored": "A password is stored. The field stays empty — typing replaces it.",
+      "passwordOptional": "Leave empty if the mail server asks for no login.",
+      "removePassword": "Remove password",
+      "sendTest": "Send a test mail to me",
+      "testSent": "Test mail sent to {recipient}.",
+      "serverMessage": "Message from the mail server on the last attempt: {message}"
+    },
+    "reminders": {
+      "title": "Payment reminders",
+      "lastRunSent": "Last run {at} — {n} sent",
+      "lead": "Eunomia speaks up by itself when an invoice's payment falls due or is overdue. Every user gets a mail about exactly the invoices they may see in the app. An invoice falling due is announced once; an overdue one repeats at the interval set.",
+      "mailOff": "Email dispatch is switched off — without it, no reminder can be sent.",
+      "hourError": "Please enter a full hour between 0 and 23.",
+      "repeatError": "Please enter a number between 1 and 90.",
+      "timeZoneHint": "The hour applies in this time zone. Without an address, Eunomia sends the reminder without a link.",
+      "preview": "Preview",
+      "runNow": "Run now",
+      "openInvoices": "{n} open invoice | {n} open invoices",
+      "nothingDue": "No payments due: {checked} checked, nobody to notify.",
+      "previewSentence": "Preview: {n} recipient would get a reminder. Nothing was sent. | Preview: {n} recipients would get a reminder. Nothing was sent.",
+      "reminderCount": "{n} reminder | {n} reminders",
+      "sent": "{sent} sent.",
+      "sentWithFailures": "{sent} sent, {failed} failed.",
+      "hidden": "{n} recipient is not shown: you may not read their invoices. | {n} recipients are not shown: you may not read their invoices.",
+      "previewHead": "This would be sent:",
+      "previewTo": "To {email}: {subject}"
+    },
+    "retention": {
+      "title": "Retention",
+      "lastRunPurged": "Last run {at} — {n} removed",
+      "lead": "Deleted records stay in the trash until someone removes them there for good. With a retention period, Eunomia does it by itself: whatever has been in the trash longer than the number of days set is deleted permanently once a day — and with it whatever hangs below it and is deleted itself. Deleted users go after the same period. This cannot be undone; the dry run shows beforehand what it affects.",
+      "legacyHint": "Entries from before the trash existed have no deletion date and are never caught by the period — they stay to be deleted by hand.",
+      "daysError": "Please enter a number between 1 and 3650.",
+      "dryRun": "Dry run",
+      "runNow": "Clean up now",
+      "entryCount": "{n} entry | {n} entries",
+      "dayCount": "{n} day | {n} days",
+      "withUsers": "{records} and {users}",
+      "dryRunSentence": "Dry run: {what} older than {days} would be deleted permanently.",
+      "nothingDeleted": "Nothing was deleted.",
+      "purgedSentence": "{what} deleted permanently.",
+      "held": "{n} entry remains: something active still hangs on it. | {n} entries remain: something active still hangs on them.",
+      "kindRemains": "{what} remains | {what} remain"
+    },
+    "update": {
+      "title": "Version and updates",
+      "versionUnknown": "Version unknown",
+      "running": "Running version",
+      "latest": "Latest published version",
+      "checkedAt": "Last checked",
+      "notYet": "not yet",
+      "checkNow": "Check now",
+      "releaseNotes": "Open the release notes (new tab)",
+      "tokenStored": "A token is stored. The field stays empty — typing replaces it.",
+      "tokenMissing": "Without a token, a private instance cannot read the releases. A token with read-only access is enough.",
+      "saveToken": "Save token",
+      "removeToken": "Remove token",
+      "tokenSaved": "Token saved.",
+      "status": {
+        "notQueried": "The update status has not been queried yet.",
+        "disabled": "The update check is switched off by configuration (UPDATE_CHECK_ENABLED=false).",
+        "noTokenPrivate": "GitHub answers “not found”. The repository is private — for that, the check needs a GitHub token with read access (see below).",
+        "notFound": "GitHub does not find the configured repository, although a token was sent. Please check UPDATE_CHECK_REPO and the token's permissions.",
+        "unauthorized": "GitHub rejected the token. Please store a valid token with read access.",
+        "rateLimited": "GitHub's request limit has been reached. The check will try again later.",
+        "noRelease": "There is no published version yet to compare against.",
+        "unreachable": "GitHub could not be reached. Without an internet connection, the check has no result.",
+        "available": "Version {version} is available.",
+        "upToDate": "This instance runs the latest published version."
+      }
+    }
+  },
+  "profile": {
+    "signedInAs": "Signed in as",
+    "name": "Name",
+    "email": "Email",
+    "changeByAdmin": "Name and email address are changed in the user administration. Please ask an administrator.",
+    "password": "Password",
+    "passwordLead": "At least {min} characters. A new password ends every other session of this account — on other devices and in other browsers you will have to sign in again. This one stays signed in.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "repeatPassword": "Repeat new password",
+    "tooShort": "The new password must have at least {min} characters.",
+    "mismatch": "The repetition does not match the new password.",
+    "change": "Change password",
+    "changed": "Password changed. All other sessions have ended."
   }
 }

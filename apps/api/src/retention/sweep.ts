@@ -1,4 +1,4 @@
-import { ERROR_CODES } from '@eunomia/shared';
+import { ERROR_CODES, type RetentionKind } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
 import { expiredDeletedUsers, hardDeleteUser } from '../auth/admin-repository.js';
@@ -49,9 +49,7 @@ export const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 /** What a sweep did, per kind of record — numbers only, never a label. */
 export interface SweptKind {
   /** The registry key of the entity (`invoice`, `contract`, …), or `user`. */
-  kind: string;
-  singular: string;
-  plural: string;
+  kind: RetentionKind;
   purged: number;
   /** Still held by something active; the next sweep tries again. */
   skipped: number;
@@ -155,13 +153,7 @@ export async function sweepRetention(pool: Pool, options: SweepOptions): Promise
 
     purged += kindPurged;
     skipped += kindSkipped;
-    byKind.push({
-      kind: entity.key,
-      singular: entity.singular,
-      plural: entity.plural,
-      purged: kindPurged,
-      skipped: kindSkipped,
-    });
+    byKind.push({ kind: entity.key, purged: kindPurged, skipped: kindSkipped });
   }
 
   const dueUsers = await expiredDeletedUsers(pool, cutoff);
@@ -176,13 +168,7 @@ export async function sweepRetention(pool: Pool, options: SweepOptions): Promise
     auditUserPurged({ actor: SYSTEM_ACTOR, user: uuid });
   }
   if (dueUsers.length > 0) {
-    byKind.push({
-      kind: 'user',
-      singular: 'Nutzer',
-      plural: 'Nutzer',
-      purged: users,
-      skipped: 0,
-    });
+    byKind.push({ kind: 'user', purged: users, skipped: 0 });
   }
 
   const result: SweepResult = {

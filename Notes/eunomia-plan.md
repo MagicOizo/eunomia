@@ -2287,7 +2287,14 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - **`plural()` bleibt** (Abweichung vom Paketplan): Seine Aufrufer reichen deutsche Wortformen herein, es geht mit den Texten seiner Bereiche und wird in 83 gelöscht.
 - **Betragsfeld:** Dezimalzeichen und €-Position aus `Intl…formatToParts`; mit Dezimalkomma bleibt die alte Nachsicht („12.5" ohne Komma = 12,5), mit Dezimalpunkt sind Kommas immer Tausender.
 - **Datums-Einfügen:** Punkt-Form immer (Tag zuerst), Schrägstrich-Form nur nach Region (`en-GB` Tag zuerst, `en-US` Monat zuerst, `de-DE` gar nicht). Das native `<input type="date">` zeigt weiter im Browser-Format.
-- Die Papierkorb-Nomen in Fehlersätzen kommen noch deutsch von der API (Slice 79).
+- Die Papierkorb-Nomen in Fehlersätzen kamen noch deutsch von der API — erledigt mit Slice 79.
+
+### Slice 79 — Stammdaten, Verwaltung, Papierkorb (umgesetzt 2026-10-06, `1.2.0-slice.3`)
+- **Papierkorb strukturiert:** Die API liefert je Eintrag `kind` (`RECORD_KINDS` in `@eunomia/shared`, `trash.ts`) und Beschreibungen als `TrashPart`-Union (`text`, `date`, `money`, `born`, `policy`, `validFrom`, `validFromYear`, `dated`, `premium`, `distance`, `invoice`, `billing`); Anhänge als `{ kind, count }` über `ATTACHED_ROW_KINDS`. Fehler-Details `entry`/`parent` = `{ kind, label }`, `NOT_RESTORABLE` ohne `reason` (der Grund hängt im Web an der Art). Die Sätze bildet `trash/trash-text.ts` (erschöpfender `switch`).
+- **Namen der Datensatz-Arten an einer Stelle:** `lib/kind-names.ts` (`kinds.*`, `kindCounts.*`) dient Papierkorb, Stammdaten, Fehlersätzen und Aufbewahrung. Englisch steht die Art im Katalog klein (Satzinneres), `kindTitle` setzt den Großbuchstaben für Überschriften.
+- **Stammdaten-Konfiguration:** `ResourceConfig.kind` statt `singular`/`plural`, `detailName` statt `detailTitle`; Spalten- und Feldnamen sind optional `() => string` und fallen sonst auf `fields.*` zurück (`labelOf`). Thunks statt Strings, weil die Configs einmal gebaut werden und ein Sprachwechsel greifen soll. Die Enum-Labels der Police (`CONTRACT_KIND_LABEL` u. a.) sind Getter-Objekte über den Katalog, damit ihre Aufrufer (Slice 80/81) unverändert bleiben.
+- **Rollen und Rechte (Entscheidung des Autors):** System-Rollen werden über ihren gesäten Namen (`Admin`, `Nutzer`) aus `roles.system.*` benannt, eigene Rollen zeigen den DB-Wert; Rechte über `permissions.<KEY>` (`Record` über `PermissionKey`), der Schlüssel bleibt als Tooltip (`admin/role-names.ts`).
+- `no-raw-text` gilt jetzt zusätzlich für `components/resource/`, `agencies/`, `admin/`, `profile/`, `trash/`. Die Vorschau der Erinnerungsmails (Betreff/Text) kommt weiter deutsch von der API — Mail-Katalog in Slice 82.
 
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

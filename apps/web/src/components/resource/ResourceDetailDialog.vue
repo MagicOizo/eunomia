@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 import EuButton from '../../design-system/components/EuButton.vue';
 import type { DetailType, DetailValue } from '../../design-system/components/EuDetailField.vue';
@@ -8,7 +9,7 @@ import EuDetailMask from '../../design-system/components/EuDetailMask.vue';
 import EuDialog from '../../design-system/components/EuDialog.vue';
 import { useFormDialog, type FormDialogProps } from '../../lib/form-dialog';
 import type { ResourceRow } from '../../lib/resource';
-import type { FieldConfig } from '../../resources/config';
+import { type FieldConfig, labelOf } from '../../resources/config';
 import { type SelectOption } from './EuSelectField.vue';
 
 /**
@@ -39,6 +40,7 @@ const props = defineProps<
 >();
 
 const emit = defineEmits<{ close: []; submit: [payload: Record<string, unknown>] }>();
+const { t } = useI18n();
 
 const values = ref<Record<string, DetailValue>>({});
 const saved = ref<Record<string, DetailValue>>({});
@@ -98,7 +100,7 @@ function submit(): void {
     const value = values.value[field.key] ?? null;
     const text = typeof value === 'string' ? value.trim() : '';
     if (value === null || (typeof value === 'string' && text === '')) {
-      if (field.required) return fail(`Bitte „${field.label}“ ausfüllen.`);
+      if (field.required) return fail(t('errors.issue.required', { label: labelOf(field) }));
       // Sent explicitly: clearing a field has to reach the server, unlike in
       // the create form where an empty optional is simply left out.
       payload[field.key] = null;
@@ -117,7 +119,7 @@ function submit(): void {
       <EuDetailField
         v-for="field in fields"
         :key="field.key"
-        :label="field.label"
+        :label="labelOf(field)"
         :type="typeOf(field)"
         :required="field.required"
         :step="field.step"
@@ -131,9 +133,9 @@ function submit(): void {
     <p v-if="shownError" class="eu-detail__error" role="alert">{{ shownError }}</p>
 
     <template #footer>
-      <EuButton variant="secondary" @click="emit('close')">Schließen</EuButton>
+      <EuButton variant="secondary" @click="emit('close')">{{ t('common.close') }}</EuButton>
       <EuButton v-if="!readonly" :disabled="submitting" @click="submit">
-        {{ submitting ? 'Speichern…' : 'Speichern' }}
+        {{ submitting ? t('common.saving') : t('common.save') }}
       </EuButton>
     </template>
   </EuDialog>
