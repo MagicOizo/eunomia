@@ -2330,5 +2330,13 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - **`no-raw-text` global** für `apps/web/src/**/*.vue`, nur `StyleGuideView` ausgenommen.
 - **Durchgang EN/DE mit Playwright** (1440 px und 390 px): einzig die Policen-Tabelle lief englisch über (+167 px, Aktionen nur per Scrollen erreichbar) — Spaltenköpfe jetzt „Premium“/„Deductible“, Kurzform der Art „Full“/„Add-on“ (Langform bleibt „comprehensive/supplementary cover“, Glossar ergänzt). Auf 390 px verhalten sich EN und DE gleich; das horizontale Scrollen der Arbeitsfläche dort besteht auch deutsch schon. Das Formatfeld im Profil ist breiter (32rem), sonst schnitt es das Beispiel ab.
 
+## Slice 84 — Öffentliches Repository (umgesetzt 2026-10-07, `1.2.1`)
+
+**Anlass:** Das Repository wird öffentlich. Vorher wurde die History am 2026-10-07 mit `git filter-repo` bereinigt: Zwei Screenshots in `Notes/` zeigten echte Belege (Gesundheitsdaten nach Art. 9 DSGVO), deshalb sind alle `Notes/*.png` aus jedem Commit entfernt, und die persönliche Mail-Adresse ist in den Metadaten durch die GitHub-noreply-Adresse ersetzt, im Dev-Seed durch `admin@example.com`. Der GitHub-Support hat die nicht mehr referenzierten Commits gelöscht. **Screenshots mit echten Daten gehören nie ins Repo**, `Notes/*.png` ist deshalb ignoriert. Die Texte in `Notes/` bleiben öffentlich, weil rund hundert Code-Kommentare auf diesen Plan verweisen.
+
+- **Der Update-Check braucht kein Token mehr.** Slice 25 hatte das optionale `UPDATE_CHECK_TOKEN` eingeführt, weil das Repo privat war. Es bleibt bestehen, gebraucht wird es aber nur noch für einen privaten Fork oder Mirror in `UPDATE_CHECK_REPO`. Der Reason-Code `no_token_private` bleibt unverändert (ein 404 ohne Token heißt „falsches oder privates Repo“), angepasst sind nur seine Beschreibung, die beiden Settings-Texte und die Betreiber-Doku.
+- **Mitwirken:** `CONTRIBUTING.md` (nur der Autor committet, Issues auf Deutsch oder Englisch, PRs nur nach Absprache im Issue), `SECURITY.md` (nur das neueste Release wird gepflegt, Meldung über GitHubs private Vulnerability-Meldung) und Issue-Templates für Fehler und Wünsche. Leere Issues sind abgeschaltet, Sicherheitsmeldungen haben einen eigenen Kontakt-Link. Die Templates warnen vor echten Daten in Screenshots und Logs.
+- **Patch statt Minor** (Entscheidung des Autors): Die Änderung bringt kein neues Feature. Sie korrigiert Texte, die mit dem Umstellen falsch werden. Getaggt wird erst, wenn das Repo öffentlich ist.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

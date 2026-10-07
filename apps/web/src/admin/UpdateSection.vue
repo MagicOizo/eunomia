@@ -17,8 +17,8 @@ import { isStored } from './settings-values';
 import { type SettingsSnapshot, saveSettings } from './settings-api';
 
 /**
- * Which version runs, whether a newer one is published, and the GitHub token a
- * private instance needs to find out. The answer itself is shared with the
+ * Which version runs, whether a newer one is published, and the GitHub token
+ * that is only needed when the releases come from a private repository. The answer itself is shared with the
  * footer's notice, so it comes from lib/update-status.ts rather than from the
  * settings snapshot — the button here asks GitHub again for both.
  */

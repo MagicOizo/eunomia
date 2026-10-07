@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in Eunomia does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. English or German are both fine.
+
+        **Eunomia handles health data. Never paste real invoices, names, policy numbers or other
+        personal data** — not in the text, not in screenshots, not in log excerpts. Replace them
+        with made-up values first.
+
+        A security vulnerability does not belong here: please report it privately, see
+        [SECURITY.md](https://github.com/MagicOizo/eunomia/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in the footer and under System > Settings.
+      placeholder: 1.2.1
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead, including any error message.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and operating system
+      placeholder: Firefox 131 on Windows 11
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log excerpt
+      description: 'If relevant: the matching lines from `docker logs eunomia` — checked for personal data.'
+      render: text

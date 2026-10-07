@@ -8,7 +8,7 @@ import { isNewerVersion, parseVersion } from './semver.js';
 /**
  * `ok` — we know the latest release. `disabled` — the operator turned the check
  * off. `unavailable` — we could not find out (offline, rate limited, or the
- * repository is private and no token is configured). The footer shows a notice
+ * configured repository is missing or private and no token is configured). The footer shows a notice
  * only for `ok`, so an unreachable GitHub is silent rather than noisy — but the
  * settings page shows `reason`, because there "silent" reads like a bug.
  */
@@ -16,7 +16,7 @@ export type UpdateCheckStatus = 'ok' | 'disabled' | 'unavailable';
 
 /** Why the latest release is unknown. Set whenever `status` is `unavailable`. */
 export type UpdateUnavailableReason =
-  /** 404 without a token: exactly what a private repository answers. */
+  /** 404 without a token: a wrong UPDATE_CHECK_REPO, or a private repository. */
   | 'no_token_private'
   /** 404 although a token was sent, or any other unexpected status. */
   | 'not_found'
@@ -148,8 +148,8 @@ export function createUpdateChecker(
     }
 
     if (!response.ok) {
-      // 404 is the normal answer for a private repository without a token, so
-      // none of this is an error — nothing here is broken.
+      // 404 is what a private repository (a fork or mirror in UPDATE_CHECK_REPO)
+      // answers without a token, so none of this is an error.
       const reason: UpdateUnavailableReason =
         response.status === 404
           ? token

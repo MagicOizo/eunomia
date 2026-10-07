@@ -80,9 +80,9 @@ export interface UpdateCheckConfig {
   /** `owner/repo` to read the latest release from. */
   repository: string;
   /**
-   * Optional read-only GitHub token. The project repository is private, so
-   * without one the API answers 404 and the check stays silent — it is not
-   * required to run Eunomia, only to learn about new releases.
+   * Optional read-only GitHub token. The project repository is public, so the
+   * check works without one; it is only needed when `repository` points at a
+   * private fork or mirror, which answers 404 to an anonymous request.
    */
   token: string | undefined;
   /** How long a successful lookup is reused before asking GitHub again. */

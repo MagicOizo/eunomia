@@ -143,9 +143,9 @@ locally.
 
 The update check reads the token from the settings first and falls back to `UPDATE_CHECK_TOKEN`.
 A successful answer is cached for six hours (`UPDATE_CHECK_TTL_SECONDS`), a failed one for fifteen
-minutes; **Check now** on the settings page bypasses the cache. The repository is private, so
-without a token GitHub answers 404 and the footer stays silent by design — the settings page names
-that reason.
+minutes; **Check now** on the settings page bypasses the cache. The repository is public, so the
+check needs no token; a private fork or mirror in `UPDATE_CHECK_REPO` answers 404 without one, and
+the footer stays silent by design — the settings page names that reason.
 
 ### Finding mail problems in the log
 

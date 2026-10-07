@@ -159,7 +159,7 @@ function dryRunResult(): ReminderRunResult {
   };
 }
 
-const privateRepo: UpdateStatus = {
+const repoNotFound: UpdateStatus = {
   current: '0.10.0',
   latest: null,
   updateAvailable: false,
@@ -182,15 +182,16 @@ describe('SettingsView', () => {
     saveSettings.mockImplementation(async () => snapshot());
     // The shared update state outlives a single case, so each one starts unasked.
     clearUpdateStatus();
-    apiDataMock.mockResolvedValue(privateRepo);
+    apiDataMock.mockResolvedValue(repoNotFound);
     runReminders.mockResolvedValue(dryRunResult());
   });
 
   it('names why the update check stays silent instead of showing nothing', async () => {
     const wrapper = await mountView();
     const text = wrapper.text();
-    // The exact confusion this section exists for: a private repository needs a token.
-    expect(text).toContain('Das Repository ist privat');
+    // The exact confusion this section exists for: a 404 means a wrong repository
+    // setting or a private repository that needs a token.
+    expect(text).toContain('Entweder stimmt UPDATE_CHECK_REPO nicht');
     expect(text).toContain('0.10.0');
     wrapper.unmount();
   });

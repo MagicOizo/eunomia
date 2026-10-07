@@ -6,7 +6,8 @@ an insurance company, recording the resulting reimbursement, and keeping tabs on
 thresholds and no-claims bonuses. It is built for home-lab operation, not as a public SaaS.
 
 > **Developing Eunomia?** See [DEV.md](DEV.md) for the local development setup. The architecture,
-> data model and implementation roadmap live in [Notes/eunomia-plan.md](Notes/eunomia-plan.md).
+> data model and implementation roadmap live in [Notes/eunomia-plan.md](Notes/eunomia-plan.md)
+> (in German, like the rest of the planning notes).
 
 ## Requirements
 
@@ -160,10 +161,12 @@ The app asks GitHub every few hours whether a newer release exists and shows adm
 release notes in the footer — nowhere else, and never to users who could not perform the update
 anyway. A failed lookup shows nothing at all; the check is a convenience, not a health signal.
 
-Because this repository is **private**, an anonymous request is answered with 404 and the notice
-never appears. To switch it on, create a fine-grained personal access token with read-only
-`Contents` access to this one repository and set `UPDATE_CHECK_TOKEN` in `.env`. To stop the
-instance from contacting GitHub at all, set `UPDATE_CHECK_ENABLED=false`.
+This repository is public, so the check needs no token. A token is only needed when
+`UPDATE_CHECK_REPO` points at a private fork or mirror: create a fine-grained personal access token
+with read-only `Contents` access to that one repository and set `UPDATE_CHECK_TOKEN` in `.env` (or
+enter it under System > Settings). An instance that was set up while this repository was still
+private can remove its token. To stop the instance from contacting GitHub at all, set
+`UPDATE_CHECK_ENABLED=false`.
 
 ### Updating to the policy model (migration 006)
 
@@ -271,7 +274,7 @@ All variables are read from `.env` (see `.env.example` for the template — neve
 | `TRUST_PROXY`               | Proxy hops in front of the app so rate limiting uses the real client IP (default `1`).                                                                      |
 | `RATE_LIMIT_*`              | Optional overrides for the auth / global rate limits (defaults in `.env.example`).                                                                          |
 | `UPDATE_CHECK_ENABLED`      | Whether the instance may ask GitHub for the latest release (default `true`).                                                                                |
-| `UPDATE_CHECK_TOKEN`        | Read-only GitHub token for the update check. Required while the repository is private; without it the check stays silent.                                   |
+| `UPDATE_CHECK_TOKEN`        | Optional read-only GitHub token for the update check; only needed when `UPDATE_CHECK_REPO` points at a private repository.                                  |
 | `UPDATE_CHECK_REPO`         | Repository to read releases from (default `MagicOizo/eunomia`).                                                                                             |
 | `UPDATE_CHECK_TTL_SECONDS`  | How long a successful lookup is reused before asking again (default `21600` = 6 h).                                                                         |
 
@@ -372,6 +375,14 @@ GitHub release and needs `MANAGE_SETTINGS`; it answers
 (`{ locale, format }`, `format` `null` = from the language) without a token, so the login page can
 pick its language. `PATCH /api/v1/me` sets the caller's own `locale` and `formatRegion` (`null` to
 follow the defaults again).
+
+## Contributing & security
+
+Eunomia is maintained by one person, who is the only one committing to this repository. Bug reports
+and ideas are welcome as [issues](https://github.com/MagicOizo/eunomia/issues), in English or
+German; pull requests only after agreeing on them in an issue — see
+[CONTRIBUTING.md](CONTRIBUTING.md). Please report security vulnerabilities privately, never in a
+public issue — see [SECURITY.md](SECURITY.md).
 
 ## License
 

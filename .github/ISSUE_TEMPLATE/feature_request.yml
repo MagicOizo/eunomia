@@ -1,0 +1,28 @@
+name: Feature request
+description: An idea for something Eunomia should do, or do differently.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. English or German are both fine. Please leave real personal or health
+        data out of examples and screenshots.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What do you want to achieve, and what stands in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How could Eunomia solve it?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds you use today, or other solutions you considered.

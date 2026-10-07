@@ -106,7 +106,7 @@ test('disabled by configuration means no request at all', async () => {
   assert.equal(calls.length, 0);
 });
 
-test('a 404 (private repository without a token) is unavailable, not an error', async () => {
+test('a 404 without a token (wrong or private repository) is unavailable, not an error', async () => {
   const { fetchImpl } = stubFetch(() => new Response('{"message":"Not Found"}', { status: 404 }));
   const check = createUpdateChecker(config, '0.9.0', { fetch: fetchImpl });
 

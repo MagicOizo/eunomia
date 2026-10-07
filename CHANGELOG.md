@@ -7,6 +7,18 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.2.1 — 2026-10-07
+
+The repository is public now.
+
+- **The update check needs no GitHub token any more.** An instance that stored one, under System >
+  Settings or as `UPDATE_CHECK_TOKEN`, can remove it. A token is only needed when
+  `UPDATE_CHECK_REPO` points at a private fork or mirror; the settings page, README, DEV.md and
+  `.env.example` say so instead of calling the repository private.
+- **Contributing:** issues are welcome in English or German, through templates for bug reports and
+  feature requests; pull requests only after agreeing on them in an issue (`CONTRIBUTING.md`).
+  Security vulnerabilities are reported privately through GitHub (`SECURITY.md`).
+
 ## 1.2.0 — 2026-10-06
 
 Eunomia speaks German and English, released as the seven previews below.
