@@ -742,7 +742,7 @@
       "buttonLabelError": "Höchstens {max} Zeichen.",
       "test": "Verbindung prüfen",
       "saveFirst": "Erst speichern, dann prüfen.",
-      "passwordHint": "Ausgeschaltet zeigt die Login-Seite nur noch den Knopf zum Anmeldedienst. Die Passwörter bleiben erhalten und werden etwa beim endgültigen Löschen weiter abgefragt.",
+      "passwordHint": "Ausgeschaltet zeigt die Login-Seite nur noch den Knopf zum Anmeldedienst. Die Passwörter bleiben erhalten und gelten wieder, sobald die Anmeldung mit Passwort eingeschaltet wird.",
       "passwordNoWayIn": "Erst den Anmeldedienst einschalten — sonst gäbe es keinen Weg herein.",
       "passwordTestRequired": "Zum Abschalten muss die gespeicherte Verbindung zum Anmeldedienst erfolgreich geprüft sein. Änderungen am Anbieter erst speichern, dann „Verbindung prüfen\".",
       "passwordForced": "Auf dem Server ist PASSWORD_LOGIN_FORCE gesetzt: Die Anmeldung mit Passwort ist offen, egal was hier eingestellt ist. Der Schalter gilt wieder, sobald die Variable entfernt und der Container neu erstellt ist.",

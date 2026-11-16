@@ -742,7 +742,7 @@
       "buttonLabelError": "At most {max} characters.",
       "test": "Check connection",
       "saveFirst": "Save first, then check.",
-      "passwordHint": "Switched off, the login page shows only the button to the provider. The passwords are kept and are still asked for, for instance when deleting permanently.",
+      "passwordHint": "Switched off, the login page shows only the button to the provider. The passwords are kept and work again once sign-in with a password is switched back on.",
       "passwordNoWayIn": "Switch the sign-in provider on first — otherwise there would be no way in.",
       "passwordTestRequired": "To switch it off, the saved connection to the provider has to be checked successfully. Save changes to the provider first, then \"Check connection\".",
       "passwordForced": "PASSWORD_LOGIN_FORCE is set on the server: sign-in with a password is open whatever is set here. The switch applies again once the variable is removed and the container recreated.",
