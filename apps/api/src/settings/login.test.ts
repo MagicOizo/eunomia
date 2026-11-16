@@ -4,7 +4,11 @@ import test from 'node:test';
 import { ERROR_CODES } from '@eunomia/shared';
 
 import { ApiError } from '../lib/api-error.js';
-import { assertLoginConfiguration } from './login.js';
+import {
+  assertLoginConfiguration,
+  oidcTestStatusResetFor,
+  touchesOidcConfiguration,
+} from './login.js';
 import type { SettingKey, SettingValue } from './registry.js';
 import type { PublicSetting } from './repository.js';
 
@@ -85,4 +89,50 @@ test('switching off, or editing while off, is always taken', () => {
   const on = [...stored({ 'login.oidcEnabled': true })];
   assert.equal(missingAfter(on, [['login.oidcEnabled', false]]), null);
   assert.equal(missingAfter([], [['login.oidcIssuer', null]]), null);
+});
+
+const STATUS_KEYS = [
+  'login.oidcLastTestAt',
+  'login.oidcLastTestResult',
+  'login.oidcLastTestError',
+  'login.oidcLastTestDetail',
+];
+
+test('a changed issuer or client ID clears the last connection test', () => {
+  for (const [key, value] of [
+    ['login.oidcIssuer', 'https://other.example.com/application/o/eunomia/'],
+    ['login.oidcIssuer', null],
+    ['login.oidcClientId', 'someone-else'],
+  ] as Array<[SettingKey, SettingValue]>) {
+    assert.deepEqual(oidcTestStatusResetFor(COMPLETE, new Map([[key, value]])), STATUS_KEYS, key);
+  }
+});
+
+test('writing the secret clears the status, since it cannot be compared', () => {
+  assert.deepEqual(
+    oidcTestStatusResetFor(COMPLETE, new Map([['login.oidcClientSecret', 'new-secret']])),
+    STATUS_KEYS,
+  );
+  assert.deepEqual(
+    oidcTestStatusResetFor(COMPLETE, new Map([['login.oidcClientSecret', null]])),
+    STATUS_KEYS,
+  );
+});
+
+test('resubmitting the same provider or saving other fields keeps the status', () => {
+  const same = new Map<SettingKey, SettingValue>([
+    ['login.oidcIssuer', 'https://login.example.com/application/o/eunomia/'],
+    ['login.oidcClientId', 'eunomia'],
+    ['login.oidcButtonLabel', 'Company login'],
+    ['login.oidcEnabled', true],
+    ['general.appUrl', 'https://new.example.com'],
+  ]);
+  assert.deepEqual(oidcTestStatusResetFor(COMPLETE, same), []);
+});
+
+test('the discovery cache is dropped for login keys and the instance address only', () => {
+  assert.equal(touchesOidcConfiguration(new Map([['login.oidcButtonLabel', 'x']])), true);
+  assert.equal(touchesOidcConfiguration(new Map([['general.appUrl', null]])), true);
+  assert.equal(touchesOidcConfiguration(new Map([['mail.host', 'smtp.example.com']])), false);
+  assert.equal(touchesOidcConfiguration(new Map()), false);
 });

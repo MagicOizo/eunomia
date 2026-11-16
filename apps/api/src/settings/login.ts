@@ -1,5 +1,6 @@
 import { ERROR_CODES } from '@eunomia/shared';
 
+import { OIDC_TEST_STATUS_KEYS } from '../auth/oidc/connection-test.js';
 import { badRequest } from '../lib/api-error.js';
 import type { SettingKey, SettingValue } from './registry.js';
 import type { PublicSetting } from './repository.js';
@@ -58,4 +59,40 @@ export function assertLoginConfiguration(
       { code: ERROR_CODES.LOGIN_CONFIG_INCOMPLETE, details: { missing } },
     );
   }
+}
+
+/**
+ * The keys that say which provider the last connection test spoke to. When one
+ * of them changes, that test's result no longer describes the configuration —
+ * and a green result is what Slice 90 accepts as evidence before the password
+ * login may close.
+ */
+const TESTED_IDENTITY: readonly SettingKey[] = ['login.oidcIssuer', 'login.oidcClientId'];
+
+/**
+ * The status keys a write has to clear along with itself (Slice 86): all of
+ * them, when the issuer or client ID changes value, or when the secret is
+ * written at all — it is stored encrypted, so "the same secret again" cannot be
+ * told apart from a new one. Otherwise none, so saving the button label keeps
+ * the status line as it is.
+ */
+export function oidcTestStatusResetFor(
+  current: readonly PublicSetting[],
+  updates: ReadonlyMap<SettingKey, SettingValue>,
+): SettingKey[] {
+  const identityChanged = TESTED_IDENTITY.some((key) => {
+    if (!updates.has(key)) return false;
+    const stored = current.find((entry) => entry.key === key)?.value ?? null;
+    return updates.get(key) !== stored;
+  });
+  return identityChanged || updates.has('login.oidcClientSecret') ? [...OIDC_TEST_STATUS_KEYS] : [];
+}
+
+/**
+ * Whether a write touches anything the provider's discovery depends on, so the
+ * login route's cache has to be thrown away. Generous on purpose: every `login.*`
+ * key and the instance address.
+ */
+export function touchesOidcConfiguration(updates: ReadonlyMap<SettingKey, SettingValue>): boolean {
+  return [...updates.keys()].some((key) => key.startsWith('login.') || key === 'general.appUrl');
 }

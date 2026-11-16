@@ -140,7 +140,15 @@ export const SETTINGS = {
     fallback: null,
     readonly: true,
   },
+  /** A cause code from `OIDC_TEST_FAILURES` in shared; the page phrases it (Slice 86). */
   'login.oidcLastTestError': {
+    section: 'login',
+    type: 'string',
+    fallback: null,
+    readonly: true,
+  },
+  /** The technical text behind that cause (ENOTFOUND, HTTP 404, …), untranslated. */
+  'login.oidcLastTestDetail': {
     section: 'login',
     type: 'string',
     fallback: null,

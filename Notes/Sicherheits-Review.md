@@ -148,6 +148,12 @@ konfigurierbar ist nur der `owner/repo`-Slug, und der ist regex-geprüft — als
 `UPDATE_CHECK_REPO`, geprüft beim Start in `config/env.ts` (`repositorySlug`), nicht als Einstellung
 in der Datenbank. Eine Konfiguration, aus der eine beliebige Ziel-URL wird, ist ein SSRF und braucht
 eine eigene Begründung.
+**Benannte Ausnahme (Slice 86):** der Issuer des Anmeldedienstes (`login.oidcIssuer`) ist eine
+konfigurierbare URL, und die Verbindungsprüfung ruft ihn samt dem `jwks_uri` aus seinem
+Discovery-Dokument ab. Begründung: anders lässt sich ein Anbieter nicht anbinden. Begrenzt durch:
+setzen und prüfen nur mit `MANAGE_SETTINGS`; nur https (Issuer-Prüfung in `shared/oidc.ts`,
+openid-client, eigener Check vor dem JWKS-Abruf); feste Timeouts; eine eigene CA über
+`NODE_EXTRA_CA_CERTS`, nie durch abgeschaltete TLS-Prüfung (`auth/oidc/provider.ts`).
 
 **I-12 Die Testmail geht nur an die eigene Adresse.** Eine Instanz mit fremdem SMTP-Konto darf nicht
 zum Versandweg für Dritte werden.

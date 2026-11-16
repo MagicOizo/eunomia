@@ -174,6 +174,7 @@ test('the client secret is a secret and the test status belongs to the applicati
     'login.oidcLastTestAt',
     'login.oidcLastTestResult',
     'login.oidcLastTestError',
+    'login.oidcLastTestDetail',
   ]) {
     rejects(key, 'ok', ERROR_CODES.SETTING_READONLY);
   }

@@ -18,7 +18,7 @@ Slices 85–91 in [eunomia-plan.md](eunomia-plan.md), Abschnitt „Paket Anmeldu
 | ✓   | Slice | Inhalt                                                  | Version         |
 | --- | ----- | ------------------------------------------------------- | --------------- |
 | ✓   | 85    | Konfigurierbar: Section `login`, `general.appUrl`       | `1.3.0-slice.1` |
-|     | 86    | Verbindung prüfen, Discovery-Cache                      | `1.3.0-slice.2` |
+| ✓   | 86    | Verbindung prüfen, Discovery-Cache                      | `1.3.0-slice.2` |
 |     | 87    | Ansicht in den Einstellungen                            | `1.3.0-slice.3` |
 |     | 88    | Login-Weg: start/callback, `Users.oidcSubject`          | `1.3.0-slice.4` |
 |     | 89    | Knopf auf der Login-Seite, Fehlercodes als Sätze        | `1.3.0-slice.5` |

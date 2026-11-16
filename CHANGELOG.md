@@ -7,6 +7,26 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0-slice.2 — 2026-11-16
+
+The second preview of sign-in through an OpenID Connect provider (1.3.0). Still nothing signs in
+that way; the connection to the provider can now be tested.
+
+- **Connection test** `POST /api/v1/settings/login/test` (System > Settings permission): fetches the
+  provider's discovery document fresh, then checks that the provider signs ID tokens with an
+  asymmetric algorithm and that its key set publishes at least one key to check them with. A
+  provider that answers discovery but only signs with HS256 — Authentik without a signing
+  certificate — fails the test instead of passing it. Works while the provider is still switched
+  off; an incomplete configuration is refused and not recorded.
+- **The result is recorded** in `login.oidcLastTestAt/Result/Error` and the new
+  `login.oidcLastTestDetail`: a cause code the settings page will phrase in German and English, plus
+  the technical text behind it (for example `ENOTFOUND`, `HTTP 404` or a certificate error).
+- **Changing the issuer, client ID or client secret clears the last result**, so a success never
+  vouches for a provider other than the one configured.
+- The login route that follows caches the discovery document; any save of a `login.*` setting or
+  the instance URL discards that cache, and a failed discovery is never cached.
+- New dependency: `openid-client` 6.
+
 ## 1.3.0-slice.1 — 2026-11-16
 
 The first preview of sign-in through an OpenID Connect provider (1.3.0). Nothing signs in that way

@@ -19,6 +19,7 @@ export const SETTING_KEYS = [
   'login.oidcLastTestAt',
   'login.oidcLastTestResult',
   'login.oidcLastTestError',
+  'login.oidcLastTestDetail',
   'mail.enabled',
   'mail.host',
   'mail.port',

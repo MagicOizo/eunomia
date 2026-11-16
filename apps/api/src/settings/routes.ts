@@ -4,6 +4,12 @@ import type { Pool } from 'mariadb';
 import { z } from 'zod';
 
 import { createRequireAuth, createRequirePermission, getAuthUser } from '../auth/middleware.js';
+import { runOidcConnectionTest } from '../auth/oidc/connection-test.js';
+import {
+  type OidcDeps,
+  invalidateOidcDiscovery,
+  readOidcClientConfig,
+} from '../auth/oidc/provider.js';
 import { getAccessibleAccounts } from '../auth/permissions.js';
 import type { AppConfig } from '../config/env.js';
 import { sendData } from '../crud/envelope.js';
@@ -18,9 +24,13 @@ import {
 } from '../reminders/runner.js';
 import { createReminderStore } from '../reminders/store.js';
 import { readRetentionSettings, sweepRetention } from '../retention/sweep.js';
-import { assertLoginConfiguration } from './login.js';
+import {
+  assertLoginConfiguration,
+  oidcTestStatusResetFor,
+  touchesOidcConfiguration,
+} from './login.js';
 import { type SettingKey, type SettingValue, validateIncoming } from './registry.js';
-import { getPublicSettings, setSettings } from './repository.js';
+import { getPublicSettings, getSettings, setSettings } from './repository.js';
 
 /**
  * The system settings API (see Notes/eunomia-plan.md, 2.6 / Slice 30), guarded
@@ -50,6 +60,8 @@ export interface SettingsRouterDeps {
   mailerDeps?: MailerDeps;
   /** Injectable for the same reason: a run without a real mail server. */
   reminderRunner?: ReminderRunner;
+  /** openid-client and fetch as the connection test uses them, stubbed in tests. */
+  oidc?: OidcDeps;
 }
 
 export function createSettingsRouter(
@@ -98,9 +110,17 @@ export function createSettingsRouter(
       const [validKey, validValue] = validateIncoming(key, value);
       updates.set(validKey, validValue);
     }
-    assertLoginConfiguration(await getPublicSettings(pool), updates);
+    const current = await getPublicSettings(pool);
+    assertLoginConfiguration(current, updates);
 
-    await setSettings(pool, updates, config.configEncryptionKey, getAuthUser(res).userId);
+    // A changed provider makes the last connection test describe something
+    // else; its status goes in the same transaction (Slice 86). Built as a
+    // separate map so the audit line below lists only what the admin sent.
+    const written = new Map(updates);
+    for (const key of oidcTestStatusResetFor(current, updates)) written.set(key, null);
+
+    await setSettings(pool, written, config.configEncryptionKey, getAuthUser(res).userId);
+    if (touchesOidcConfiguration(updates)) invalidateOidcDiscovery();
 
     // Keys only. A value here would mean the mail password in a log line the
     // moment someone changes it (SEC-09, rule 2 in lib/audit.ts) — and the one
@@ -123,6 +143,30 @@ export function createSettingsRouter(
   router.post('/settings/mail/test', async (_req, res) => {
     const user = getAuthUser(res);
     sendData(res, { recipient: user.email, status: await mailer.sendTestMail(user.email, user) });
+  });
+
+  /**
+   * Tests the connection to the sign-in provider with what is stored (Slice
+   * 86): discovery without the cache, the advertised signing algorithms, and
+   * the key set. Works while the provider is switched off — testing comes
+   * before switching on.
+   *
+   * Answers 200 with the recorded status for a green and a red result alike:
+   * a provider that fails the test is the answer, not a fault of this endpoint.
+   * An incomplete configuration is a 409 and is not recorded, since nothing
+   * was attempted (as with the test mail's MAIL_NOT_CONFIGURED).
+   */
+  router.post('/settings/login/test', async (_req, res) => {
+    const resolved = readOidcClientConfig(await getSettings(pool, config.configEncryptionKey));
+    if (!resolved.ok) {
+      throw new ApiError(
+        409,
+        ERROR_CODES.LOGIN_CONFIG_INCOMPLETE,
+        `The connection test needs these settings first: ${resolved.missing.join(', ')}`,
+        { missing: resolved.missing },
+      );
+    }
+    sendData(res, { status: await runOidcConnectionTest(pool, resolved.config, deps.oidc) });
   });
 
   /**
