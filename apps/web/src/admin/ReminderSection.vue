@@ -40,7 +40,6 @@ const reminders = reactive({
   hour: '7',
   timeZone: '',
   repeatDays: '7',
-  appUrl: '',
 });
 const saved = ref(false);
 const lastRun = ref<ReminderRunResult | null>(null);
@@ -54,7 +53,6 @@ watch(
     reminders.hour = stringOf(snapshot, 'reminders.hour', '7');
     reminders.timeZone = stringOf(snapshot, 'reminders.timeZone', 'Europe/Berlin');
     reminders.repeatDays = stringOf(snapshot, 'reminders.repeatDays', '7');
-    reminders.appUrl = stringOf(snapshot, 'reminders.appUrl');
   },
   { immediate: true },
 );
@@ -94,7 +92,6 @@ async function saveReminders(): Promise<void> {
         'reminders.hour': Number(reminders.hour),
         'reminders.timeZone': reminders.timeZone,
         'reminders.repeatDays': Number(reminders.repeatDays),
-        'reminders.appUrl': reminders.appUrl,
       }),
     );
     saved.value = true;
@@ -192,7 +189,6 @@ const hiddenSentence = computed(() => {
 
       <div class="eu-settings__grid">
         <EuTextField v-model="reminders.timeZone" :label="settingLabel('reminders.timeZone')" />
-        <EuTextField v-model="reminders.appUrl" :label="settingLabel('reminders.appUrl')" />
       </div>
       <p class="eu-settings__hint">{{ t('settings.reminders.timeZoneHint') }}</p>
 

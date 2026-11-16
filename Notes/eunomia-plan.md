@@ -2392,5 +2392,12 @@ Geplant 2026-11-16. Eunomia kennt bis 1.2.1 nur die Passwort-Anmeldung. Im Schwe
 
 Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden wird, steht danach hier unter der Scheibe bzw. in `CHANGELOG.md`.
 
+### Slice 85 — Konfigurierbar (umgesetzt 2026-11-16, `1.3.0-slice.1`)
+- **`general.appUrl` statt `reminders.appUrl`:** Migration 021 benennt den Schlüssel in `SystemSettings` um (ohne sie verschwände ein gespeicherter Wert still, weil das Repository unbekannte Schlüssel überspringt). Das Feld steht jetzt in der ersten Section, die dafür „Allgemein" heißt statt „Sprache und Format"; der Hinweis bei den Erinnerungen verweist dorthin.
+- **Section `login`:** `oidcEnabled`, `oidcIssuer`, `oidcClientId`, `oidcClientSecret` (secret), `oidcButtonLabel` (≤ 50, leer = Standardbeschriftung), `oidcLastTest{At,Result,Error}` readonly. Der Issuer muss eine **https**-URL sein und darf nicht auf `/.well-known/` zeigen (`isOidcIssuer` in `shared`, damit die Ansicht in 87 dasselbe prüfen kann).
+- **Querprüfung** `settings/login.ts`: beurteilt den Zustand **nach** dem Schreiben. Ist der Anbieter dann an, müssen `general.appUrl`, Issuer, Client-ID und Secret gesetzt sein, sonst 400 `LOGIN_CONFIG_INCOMPLETE` mit `details.missing`; das Web nennt die Felder mit ihren Beschriftungen. Greift auch beim Leeren eines Teils, während der Anbieter an ist. Hier hängen in 90 die Sperren der Passwort-Tür an.
+- **`OIDC_CALLBACK_PATH` und `oidcRedirectUri()`** in `shared/oidc.ts` — die eine Quelle für Route (88) und angezeigte Zeile (87).
+- Die Beschriftungen der `login.*`-Schlüssel stehen schon im Katalog, weil die Fehlermeldung sie nennt; die Ansicht folgt in 87.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

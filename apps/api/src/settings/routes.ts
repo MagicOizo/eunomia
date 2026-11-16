@@ -18,6 +18,7 @@ import {
 } from '../reminders/runner.js';
 import { createReminderStore } from '../reminders/store.js';
 import { readRetentionSettings, sweepRetention } from '../retention/sweep.js';
+import { assertLoginConfiguration } from './login.js';
 import { type SettingKey, type SettingValue, validateIncoming } from './registry.js';
 import { getPublicSettings, setSettings } from './repository.js';
 
@@ -97,6 +98,7 @@ export function createSettingsRouter(
       const [validKey, validValue] = validateIncoming(key, value);
       updates.set(validKey, validValue);
     }
+    assertLoginConfiguration(await getPublicSettings(pool), updates);
 
     await setSettings(pool, updates, config.configEncryptionKey, getAuthUser(res).userId);
 

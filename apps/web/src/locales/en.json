@@ -179,6 +179,7 @@
       "SETTING_READONLY": "The application writes this value itself; it cannot be set.",
       "SETTING_INVALID_VALUE": "The value for “{label}” does not fit.",
       "SETTING_INVALID_VALUE_UNNAMED": "The value does not fit this setting.",
+      "LOGIN_CONFIG_INCOMPLETE": "Sign-in through a provider can only be switched on once these are set: {list}.",
       "SETTINGS_ENCRYPTION_UNAVAILABLE": "Passwords and tokens cannot be stored without the key CONFIG_ENCRYPTION_KEY in the server environment.",
       "MAIL_NOT_CONFIGURED": "Sending email is not fully set up. Please check that it is enabled and that the mail server and sender address are filled in.",
       "MAIL_SEND_FAILED": "The mail server refused to send: {reason}",
@@ -276,7 +277,15 @@
   "settingLabels": {
     "general": {
       "defaultLocale": "Default language",
-      "defaultFormat": "Default format for numbers and dates"
+      "defaultFormat": "Default format for numbers and dates",
+      "appUrl": "URL of this instance"
+    },
+    "login": {
+      "oidcEnabled": "Sign-in through a provider",
+      "oidcIssuer": "Issuer URL",
+      "oidcClientId": "Client ID",
+      "oidcClientSecret": "Client secret",
+      "oidcButtonLabel": "Button label"
     },
     "mail": {
       "enabled": "Send emails",
@@ -296,8 +305,7 @@
       "enabled": "Send payment reminders",
       "hour": "Time of the daily run (full hour)",
       "timeZone": "Time zone",
-      "repeatDays": "Remind again after (days)",
-      "appUrl": "URL of this instance (for the link in the email)"
+      "repeatDays": "Remind again after (days)"
     },
     "retention": {
       "enabled": "Empty the trash automatically",
@@ -676,7 +684,8 @@
     "lastRunFailed": "Last run {at} — failed",
     "lastRunMessage": "Message from the last run: {message}",
     "general": {
-      "title": "Language and format",
+      "title": "General",
+      "appUrlHint": "The address Eunomia is reached at, e.g. https://eunomia.example.com. Emails link to it, and sign-in through a provider builds its return address from it.",
       "lead": "The default for everyone who has not chosen in their profile: in the interface when the browser reports no supported language, and for the mails they receive.",
       "fromLanguage": "From the language"
     },
@@ -701,7 +710,7 @@
       "mailOff": "Email dispatch is switched off — without it, no reminder can be sent.",
       "hourError": "Please enter a full hour between 0 and 23.",
       "repeatError": "Please enter a number between 1 and 90.",
-      "timeZoneHint": "The hour applies in this time zone. Without an address, Eunomia sends the reminder without a link.",
+      "timeZoneHint": "The hour applies in this time zone. Without the URL of this instance (under “General”), Eunomia sends the reminder without a link.",
       "preview": "Preview",
       "runNow": "Run now",
       "openInvoices": "{n} open invoice | {n} open invoices",

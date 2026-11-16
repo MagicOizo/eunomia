@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 
 import EuSelectField from '../components/resource/EuSelectField.vue';
 import EuButton from '../design-system/components/EuButton.vue';
+import EuTextField from '../design-system/components/EuTextField.vue';
 import EuCollapsibleSection from '../design-system/components/EuCollapsibleSection.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { settingLabel } from '../lib/field-labels';
@@ -14,16 +15,18 @@ import { stringOf } from './settings-values';
 import { type SettingsSnapshot, saveSettings } from './settings-api';
 
 /**
- * The instance's language and format (Slice 83): what everyone sees who has
- * chosen neither in the profile and whose browser speaks no language Eunomia
- * does, and what their mails are written in.
+ * What belongs to the instance as a whole: its language and format (Slice 83) —
+ * what everyone sees who has chosen neither in the profile and whose browser
+ * speaks no language Eunomia does, and what their mails are written in — and
+ * the address it is reached at (Slice 85), which the mails link to and the
+ * sign-in provider returns to.
  */
 const props = defineProps<{ snapshot: SettingsSnapshot }>();
 const emit = defineEmits<{ snapshot: [SettingsSnapshot] }>();
 const { t } = useI18n();
 
 /** `''` in the format select means "from the language". */
-const general = reactive({ locale: 'de', format: '' });
+const general = reactive({ locale: 'de', format: '', appUrl: '' });
 const saved = ref(false);
 
 const action = useDialogAction();
@@ -33,6 +36,7 @@ watch(
   (snapshot) => {
     general.locale = stringOf(snapshot, 'general.defaultLocale', 'de');
     general.format = stringOf(snapshot, 'general.defaultFormat');
+    general.appUrl = stringOf(snapshot, 'general.appUrl');
   },
   { immediate: true },
 );
@@ -50,6 +54,8 @@ async function saveGeneral(): Promise<void> {
         // An empty language falls back to German on the server, too.
         'general.defaultLocale': isLocale(general.locale) ? general.locale : null,
         'general.defaultFormat': isFormatRegion(general.format) ? general.format : null,
+        // Empty clears it on the server, like every text setting.
+        'general.appUrl': general.appUrl,
       }),
     );
     saved.value = true;
@@ -78,6 +84,11 @@ async function saveGeneral(): Promise<void> {
           :empty-label="t('settings.general.fromLanguage')"
         />
       </div>
+
+      <div class="eu-settings__grid">
+        <EuTextField v-model="general.appUrl" :label="settingLabel('general.appUrl')" />
+      </div>
+      <p class="eu-settings__hint">{{ t('settings.general.appUrlHint') }}</p>
 
       <div class="eu-settings__actions">
         <EuButton type="submit" :disabled="action.busy">{{ t('common.save') }}</EuButton>

@@ -7,6 +7,21 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0-slice.1 — 2026-11-16
+
+The first preview of sign-in through an OpenID Connect provider (1.3.0). Nothing signs in that way
+yet; this slice makes the provider configurable.
+
+- **The URL of this instance moved from _Payment reminders_ to _General_** under System > Settings
+  and is now `general.appUrl`. A stored address moves along with the update. It is the one base URL
+  of the instance: the reminder mails link to it, and the redirect URI for the sign-in provider will
+  be built from it — never from the address a request happens to arrive at.
+- **New settings `login.*`** for the provider: issuer (an https address, not its `.well-known`
+  document), client ID, client secret (encrypted like the mail password, never sent back) and a
+  button label. Switching the provider on is refused until the issuer, client ID, secret and
+  instance URL are all set, and so is clearing one of them while it is on. The page for these
+  settings follows in a later preview.
+
 ## 1.2.1 — 2026-10-07
 
 The repository is public now.

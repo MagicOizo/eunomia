@@ -292,6 +292,13 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
     typeof d.key === 'string'
       ? t('errors.code.SETTING_INVALID_VALUE', { label: settingLabel(d.key) })
       : t('errors.code.SETTING_INVALID_VALUE_UNNAMED'),
+  LOGIN_CONFIG_INCOMPLETE: (d) =>
+    t('errors.code.LOGIN_CONFIG_INCOMPLETE', {
+      list: (Array.isArray(d.missing) ? d.missing : [])
+        .filter((key): key is string => typeof key === 'string')
+        .map((key) => settingLabel(key))
+        .join(', '),
+    }),
   SETTINGS_ENCRYPTION_UNAVAILABLE: () => t('errors.code.SETTINGS_ENCRYPTION_UNAVAILABLE'),
   MAIL_NOT_CONFIGURED: () => t('errors.code.MAIL_NOT_CONFIGURED'),
   MAIL_SEND_FAILED: (d) =>

@@ -101,6 +101,11 @@ export const ERROR_CODES = {
   SETTING_READONLY: 'SETTING_READONLY',
   /** Value has the wrong type or is out of range; `details.expected` says what fits. */
   SETTING_INVALID_VALUE: 'SETTING_INVALID_VALUE',
+  /**
+   * Sign-in through the provider would be switched on (or stay on) without
+   * everything it needs; `details.missing` lists the setting keys that are absent.
+   */
+  LOGIN_CONFIG_INCOMPLETE: 'LOGIN_CONFIG_INCOMPLETE',
   /** A secret cannot be stored or read because CONFIG_ENCRYPTION_KEY is missing. */
   SETTINGS_ENCRYPTION_UNAVAILABLE: 'SETTINGS_ENCRYPTION_UNAVAILABLE',
   /** Mail is switched off or incompletely configured; nothing was attempted. */

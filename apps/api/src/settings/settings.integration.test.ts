@@ -225,6 +225,62 @@ test('system settings: gating, write cases, encryption at rest, mail status', as
       assert.equal(rows.length, 0, 'the row is deleted, not blanked');
     });
 
+    await t.test(
+      'the provider configuration is stored, hidden, and only on when complete',
+      async () => {
+        const write = (values: Record<string, unknown>) =>
+          request(app).put('/api/v1/settings').set(admin).send({ values });
+
+        const incomplete = await write({
+          'login.oidcEnabled': true,
+          'login.oidcClientId': 'eunomia',
+        });
+        assert.equal(incomplete.status, 400, JSON.stringify(incomplete.body));
+        assert.equal(incomplete.body.error.code, ERROR_CODES.LOGIN_CONFIG_INCOMPLETE);
+        assert.deepEqual(incomplete.body.error.details.missing, [
+          'general.appUrl',
+          'login.oidcIssuer',
+          'login.oidcClientSecret',
+        ]);
+        // Refused as a whole: the client id of the same write was not stored.
+        const unchanged = await request(app).get('/api/v1/settings').set(admin);
+        assert.equal(setting(unchanged.body, 'login.oidcClientId').value, null);
+
+        try {
+          const complete = await write({
+            'general.appUrl': 'https://eunomia.example.com',
+            'login.oidcIssuer': 'https://login.example.com/application/o/eunomia/',
+            'login.oidcClientId': 'eunomia',
+            'login.oidcClientSecret': 'provider-secret',
+            'login.oidcEnabled': true,
+          });
+          assert.equal(complete.status, 200, JSON.stringify(complete.body));
+          const secret = setting(complete.body, 'login.oidcClientSecret');
+          assert.equal(secret.isSet, true);
+          assert.equal(secret.value, null);
+          assert.ok(!JSON.stringify(complete.body).includes('provider-secret'));
+          const [row] = await pool.query<Array<{ settingValue: string }>>(
+            "SELECT settingValue FROM SystemSettings WHERE settingKey = 'login.oidcClientSecret'",
+          );
+          assert.ok(row && !row.settingValue.includes('provider-secret'));
+
+          // Taking a required part away again while the provider is on is refused.
+          const cleared = await write({ 'general.appUrl': null });
+          assert.equal(cleared.status, 400);
+          assert.equal(cleared.body.error.code, ERROR_CODES.LOGIN_CONFIG_INCOMPLETE);
+        } finally {
+          // Back to the state every other test expects (Blueprint, Fund 8).
+          await write({
+            'login.oidcEnabled': null,
+            'general.appUrl': null,
+            'login.oidcIssuer': null,
+            'login.oidcClientId': null,
+            'login.oidcClientSecret': null,
+          });
+        }
+      },
+    );
+
     await t.test('without CONFIG_ENCRYPTION_KEY a secret cannot be stored', async () => {
       const keyless = createApp({ pool, config: testConfig({ database }) });
       const login = await request(keyless)

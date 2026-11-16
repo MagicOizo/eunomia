@@ -106,7 +106,7 @@ export function createReminderStore(pool: Pool, encryptionKey: EncryptionKey): R
         hour: settings['reminders.hour'],
         timeZone: settings['reminders.timeZone'],
         repeatDays: settings['reminders.repeatDays'],
-        appUrl: settings['reminders.appUrl'],
+        appUrl: settings['general.appUrl'],
         defaultLocale: settings['general.defaultLocale'],
         defaultFormat: settings['general.defaultFormat'],
       };

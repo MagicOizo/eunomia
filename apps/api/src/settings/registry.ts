@@ -3,6 +3,7 @@ import {
   FORMAT_REGIONS,
   isFormatRegion,
   isHttpUrl,
+  isOidcIssuer,
   SETTING_KEYS,
   SUPPORTED_LOCALES,
   type SettingKey,
@@ -21,7 +22,8 @@ import { badRequest } from '../lib/api-error.js';
  * storage is key-value (migration 009).
  */
 
-export type SettingSection = 'general' | 'mail' | 'updateCheck' | 'reminders' | 'retention';
+export type SettingSection =
+  'general' | 'login' | 'mail' | 'updateCheck' | 'reminders' | 'retention';
 
 export type SettingValue = string | number | boolean | null;
 
@@ -91,6 +93,60 @@ export const SETTINGS = {
     fallback: null,
     check: { ok: isFormatRegion, expected: `one of ${FORMAT_REGIONS.join(', ')}` },
   },
+  /**
+   * The address this instance is reached at, the one base URL there is (Slice
+   * 85, formerly `reminders.appUrl`): the mails link back to it, and the
+   * redirect URI for the sign-in provider is built from it. Never taken from
+   * the request's Host header instead — see `oidcRedirectUri` in shared.
+   * Optional: without it the mails carry no link and the provider cannot be
+   * switched on (settings/login.ts).
+   */
+  'general.appUrl': {
+    section: 'general',
+    type: 'string',
+    fallback: null,
+    maxLength: 255,
+    check: { ok: isHttpUrl, expected: 'an absolute http(s) URL, e.g. https://eunomia.example.com' },
+  },
+
+  /*
+   * Sign-in through an OpenID Connect provider (Slices 85–91). One provider per
+   * instance; the configuration lives here rather than in `.env` so that the
+   * connection can be tested from the page before anything depends on it.
+   * Switching it on needs the whole set (settings/login.ts).
+   */
+  'login.oidcEnabled': { section: 'login', type: 'bool', fallback: false },
+  'login.oidcIssuer': {
+    section: 'login',
+    type: 'string',
+    fallback: null,
+    maxLength: 255,
+    check: {
+      ok: isOidcIssuer,
+      expected:
+        'an absolute https URL of the issuer, not of its .well-known document, e.g. https://login.example.com/application/o/eunomia/',
+    },
+  },
+  'login.oidcClientId': { section: 'login', type: 'string', fallback: null, maxLength: 255 },
+  'login.oidcClientSecret': { section: 'login', type: 'secret', fallback: null },
+  /** Text of the button on the login page; null leaves it to the web's default. */
+  'login.oidcButtonLabel': { section: 'login', type: 'string', fallback: null, maxLength: 50 },
+  /** Status of the last connection test, written by the test itself (Slice 86). */
+  'login.oidcLastTestAt': { section: 'login', type: 'string', fallback: null, readonly: true },
+  /** 'ok' | 'error' — a plain string, as with the mail status. */
+  'login.oidcLastTestResult': {
+    section: 'login',
+    type: 'string',
+    fallback: null,
+    readonly: true,
+  },
+  'login.oidcLastTestError': {
+    section: 'login',
+    type: 'string',
+    fallback: null,
+    readonly: true,
+  },
+
   'mail.enabled': { section: 'mail', type: 'bool', fallback: false },
   'mail.host': { section: 'mail', type: 'string', fallback: null, maxLength: 255 },
   'mail.port': { section: 'mail', type: 'int', fallback: 587, min: 1, max: 65535 },
@@ -132,14 +188,6 @@ export const SETTINGS = {
   },
   /** Days between two reminders about the same overdue invoice. */
   'reminders.repeatDays': { section: 'reminders', type: 'int', fallback: 7, min: 1, max: 90 },
-  /** Optional base URL; only when set do the mails carry a link back. */
-  'reminders.appUrl': {
-    section: 'reminders',
-    type: 'string',
-    fallback: null,
-    maxLength: 255,
-    check: { ok: isHttpUrl, expected: 'an absolute http(s) URL, e.g. https://eunomia.example.com' },
-  },
   /**
    * Status of the last run, written by the runner. `lastRunAt` doubles as the
    * scheduler's watermark ("has today's run happened?"), so that there is one

@@ -122,7 +122,6 @@ function reminderSettings(overrides: Record<string, unknown> = {}): SettingsSnap
     'reminders.hour': 7,
     'reminders.timeZone': 'Europe/Berlin',
     'reminders.repeatDays': 7,
-    'reminders.appUrl': null,
     'reminders.lastRunAt': '2026-09-24T05:00:00.000Z',
     'reminders.lastRunResult': 'ok',
     'reminders.lastRunError': null,

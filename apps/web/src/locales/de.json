@@ -179,6 +179,7 @@
       "SETTING_READONLY": "Diese Angabe schreibt die Anwendung selbst, sie kann nicht gesetzt werden.",
       "SETTING_INVALID_VALUE": "Der Wert für „{label}“ passt nicht.",
       "SETTING_INVALID_VALUE_UNNAMED": "Der Wert passt nicht zu dieser Einstellung.",
+      "LOGIN_CONFIG_INCOMPLETE": "Die Anmeldung über einen Anmeldedienst lässt sich erst einschalten, wenn das gesetzt ist: {list}.",
       "SETTINGS_ENCRYPTION_UNAVAILABLE": "Ohne den Schlüssel CONFIG_ENCRYPTION_KEY in der Server-Umgebung können Passwörter und Token nicht gespeichert werden.",
       "MAIL_NOT_CONFIGURED": "Der E-Mail-Versand ist nicht vollständig eingerichtet. Bitte Aktivierung, Mailserver und Absenderadresse prüfen.",
       "MAIL_SEND_FAILED": "Der Mailserver hat den Versand abgelehnt: {reason}",
@@ -276,7 +277,15 @@
   "settingLabels": {
     "general": {
       "defaultLocale": "Standardsprache",
-      "defaultFormat": "Standardformat für Zahlen und Daten"
+      "defaultFormat": "Standardformat für Zahlen und Daten",
+      "appUrl": "URL dieser Instanz"
+    },
+    "login": {
+      "oidcEnabled": "Anmeldung über Anmeldedienst aktiv",
+      "oidcIssuer": "Issuer-URL",
+      "oidcClientId": "Client-ID",
+      "oidcClientSecret": "Client-Secret",
+      "oidcButtonLabel": "Beschriftung des Knopfs"
     },
     "mail": {
       "enabled": "E-Mail-Versand aktiv",
@@ -296,8 +305,7 @@
       "enabled": "Zahlungserinnerungen aktiv",
       "hour": "Uhrzeit des täglichen Laufs (volle Stunde)",
       "timeZone": "Zeitzone",
-      "repeatDays": "Erneut erinnern nach (Tagen)",
-      "appUrl": "URL dieser Instanz (für den Link in der Mail)"
+      "repeatDays": "Erneut erinnern nach (Tagen)"
     },
     "retention": {
       "enabled": "Papierkorb automatisch leeren",
@@ -676,7 +684,8 @@
     "lastRunFailed": "Letzter Lauf {at} — fehlgeschlagen",
     "lastRunMessage": "Meldung beim letzten Lauf: {message}",
     "general": {
-      "title": "Sprache und Format",
+      "title": "Allgemein",
+      "appUrlHint": "Die Adresse, unter der Eunomia erreichbar ist, z. B. https://eunomia.example.com. Die Mails verlinken darauf, und die Anmeldung über einen Anmeldedienst baut ihre Rücksprungadresse daraus.",
       "lead": "Die Vorgabe für alle, die im Profil nichts gewählt haben: auf der Oberfläche, wenn der Browser keine unterstützte Sprache meldet, und für die Mails an sie.",
       "fromLanguage": "Nach der Sprache"
     },
@@ -701,7 +710,7 @@
       "mailOff": "Der E-Mail-Versand ist ausgeschaltet — ohne ihn kann keine Erinnerung verschickt werden.",
       "hourError": "Bitte eine volle Stunde zwischen 0 und 23 angeben.",
       "repeatError": "Bitte eine Zahl zwischen 1 und 90 angeben.",
-      "timeZoneHint": "Die Uhrzeit gilt in dieser Zeitzone. Ohne Adresse verschickt Eunomia die Erinnerung ohne Link.",
+      "timeZoneHint": "Die Uhrzeit gilt in dieser Zeitzone. Ohne die URL dieser Instanz (unter „Allgemein“) verschickt Eunomia die Erinnerung ohne Link.",
       "preview": "Vorschau",
       "runNow": "Jetzt ausführen",
       "openInvoices": "{n} offene Rechnung | {n} offene Rechnungen",

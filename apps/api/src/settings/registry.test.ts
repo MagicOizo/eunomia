@@ -138,7 +138,49 @@ test('an unparsable stored value falls back instead of breaking the page', () =>
   assert.equal(parseStoredValue('mail.enabled', 'yes'), false);
 });
 
-test('only the password and the GitHub token are secrets', () => {
+test('only the provider secret, the mail password and the GitHub token are secrets', () => {
   const secrets = SETTING_KEYS.filter(isSecretKey);
-  assert.deepEqual(secrets, ['mail.password', 'updateCheck.token']);
+  assert.deepEqual(secrets, ['login.oidcClientSecret', 'mail.password', 'updateCheck.token']);
+});
+
+test('the issuer is an https address and not its discovery document', () => {
+  assert.deepEqual(
+    validateIncoming('login.oidcIssuer', ' https://login.example.com/application/o/eunomia/ '),
+    ['login.oidcIssuer', 'https://login.example.com/application/o/eunomia/'],
+  );
+  rejects(
+    'login.oidcIssuer',
+    'http://login.example.com/application/o/eunomia/',
+    ERROR_CODES.SETTING_INVALID_VALUE,
+  );
+  rejects(
+    'login.oidcIssuer',
+    'https://login.example.com/application/o/eunomia/.well-known/openid-configuration',
+    ERROR_CODES.SETTING_INVALID_VALUE,
+  );
+});
+
+test('the button label is short text', () => {
+  assert.deepEqual(validateIncoming('login.oidcButtonLabel', 'Mit Firmenkonto anmelden'), [
+    'login.oidcButtonLabel',
+    'Mit Firmenkonto anmelden',
+  ]);
+  rejects('login.oidcButtonLabel', 'x'.repeat(51), ERROR_CODES.SETTING_INVALID_VALUE);
+});
+
+test('the client secret is a secret and the test status belongs to the application', () => {
+  assert.ok(isSecretKey('login.oidcClientSecret'));
+  for (const key of [
+    'login.oidcLastTestAt',
+    'login.oidcLastTestResult',
+    'login.oidcLastTestError',
+  ]) {
+    rejects(key, 'ok', ERROR_CODES.SETTING_READONLY);
+  }
+});
+
+test('the provider is off and the instance address unset until someone says otherwise', () => {
+  assert.equal(fallbackOf('login.oidcEnabled'), false);
+  assert.equal(fallbackOf('general.appUrl'), null);
+  assert.ok(!isSettingKey('reminders.appUrl'));
 });
