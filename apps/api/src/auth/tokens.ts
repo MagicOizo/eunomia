@@ -48,6 +48,11 @@ export async function verifyAccessToken(token: string, secret: string): Promise<
   if (typeof payload.sub !== 'string' || payload.sub === '') {
     throw new Error('Access token has no subject');
   }
+  // Other tokens signed with the same secret say what they are for (the OIDC
+  // flow state, auth/oidc/flow-state.ts); an access token says nothing. Refused
+  // here as well, not only by the missing `sub`, so the two cannot be swapped
+  // even if one of them grows a field one day.
+  if (payload.use !== undefined) throw new Error('Not an access token');
   return payload.sub;
 }
 

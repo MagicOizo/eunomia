@@ -1,10 +1,18 @@
-import { PERMISSIONS } from '@eunomia/shared';
-import { Router } from 'express';
+import {
+  OIDC_CALLBACK_PATH,
+  OIDC_START_PATH,
+  type OidcLoginError,
+  PERMISSIONS,
+} from '@eunomia/shared';
+import { type Response, Router } from 'express';
 import type { Pool } from 'mariadb';
 
 import type { AppConfig } from '../config/env.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './http.js';
 import { createRequireAuth, getAuthUser } from './middleware.js';
+import { clearFlowCookie, readFlowCookie, setFlowCookie } from './oidc/flow-state.js';
+import { finishOidcLogin, startOidcLogin } from './oidc/login.js';
+import type { OidcLoginDeps } from './oidc/provider.js';
 import { getEffectivePermissions } from './permissions.js';
 import { type AuthUser, findUserByUuid, updateLocalePreferences } from './repository.js';
 import {
@@ -27,12 +35,30 @@ function publicUser(user: AuthUser): Record<string, unknown> {
   };
 }
 
+/** Where this router is mounted (API_MOUNTS in app.ts); the OIDC paths are spelled in full in shared. */
+const MOUNT = '/api/v1';
+
+/**
+ * A failed sign-in through the provider. The browser is navigating, not
+ * fetching, so the answer is a redirect to the login page with the code rather
+ * than a JSON error — an error object would be a blank page full of braces.
+ * Relative, so it lands on whichever origin the browser is on (in dev, Vite's).
+ */
+export function redirectToLoginWithError(res: Response, code: OidcLoginError): void {
+  res.redirect(302, `/login?oidcError=${encodeURIComponent(code)}`);
+}
+
+export interface AuthRouterDeps {
+  /** openid-client as the sign-in uses it, stubbed in tests. */
+  oidc?: OidcLoginDeps;
+}
+
 /**
  * Auth + rights routes, mounted under /api/v1. Handlers are async; thrown
  * AuthError/ZodError propagate to the shared error middleware (Express 5
  * forwards rejected promises automatically).
  */
-export function createAuthRouter(pool: Pool, config: AppConfig): Router {
+export function createAuthRouter(pool: Pool, config: AppConfig, deps: AuthRouterDeps = {}): Router {
   const router = Router();
   const requireAuth = createRequireAuth(pool, config);
 
@@ -49,6 +75,44 @@ export function createAuthRouter(pool: Pool, config: AppConfig): Router {
     const session = await login(pool, config.auth, input, req.ip);
     setRefreshCookie(res, session.refreshToken, session.refreshExpiresAt, config.isProduction);
     res.json({ accessToken: session.accessToken, user: publicUser(session.user) });
+  });
+
+  // The sign-in through the provider (Slice 88): out to the provider with the
+  // flow state in a cookie, back with a code that becomes the same session a
+  // password earns. The access token never travels in a URL — the callback only
+  // sets the refresh cookie, and the SPA's usual bootstrap (POST /auth/refresh)
+  // turns it into an access token, as for a returning session.
+  router.get(OIDC_START_PATH.slice(MOUNT.length), async (req, res) => {
+    const started = await startOidcLogin(pool, config, req.ip, deps.oidc);
+    if (!started.ok) {
+      redirectToLoginWithError(res, started.code);
+      return;
+    }
+    setFlowCookie(res, started.value.flowToken, config.isProduction);
+    res.redirect(302, started.value.url.href);
+  });
+
+  router.get(OIDC_CALLBACK_PATH.slice(MOUNT.length), async (req, res) => {
+    // One flow, one return — whatever comes of it.
+    clearFlowCookie(res, config.isProduction);
+    const queryStart = req.originalUrl.indexOf('?');
+    const finished = await finishOidcLogin(
+      pool,
+      config,
+      {
+        query: queryStart === -1 ? '' : req.originalUrl.slice(queryStart),
+        flowToken: readFlowCookie(req.headers.cookie),
+        ip: req.ip,
+      },
+      deps.oidc,
+    );
+    if (!finished.ok) {
+      redirectToLoginWithError(res, finished.code);
+      return;
+    }
+    const session = finished.value;
+    setRefreshCookie(res, session.refreshToken, session.refreshExpiresAt, config.isProduction);
+    res.redirect(302, '/');
   });
 
   router.post('/auth/refresh', async (req, res) => {

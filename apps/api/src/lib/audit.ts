@@ -47,6 +47,8 @@ export const AUDIT_EVENTS = [
   'AUTH_UNAUTHENTICATED',
   'AUTH_FORBIDDEN',
   'AUTH_REFRESH_REUSE',
+  'AUTH_OIDC_LINKED',
+  'AUTH_OIDC_FAILED',
   'USER_CREATED',
   'USER_UPDATED',
   'USER_DEACTIVATED',
@@ -113,8 +115,41 @@ type RequestOrigin = {
   ip: SourceIp;
 };
 
-export function auditLoginOk(fields: { user: string; ip: SourceIp }): void {
-  logEvent('info', 'AUTH_LOGIN_OK', fields);
+/** How a session was earned: the password, or the sign-in provider (Slice 88). */
+export type LoginMethod = 'password' | 'oidc';
+
+export function auditLoginOk(fields: { user: string; ip: SourceIp; method: LoginMethod }): void {
+  logEvent('info', 'AUTH_LOGIN_OK', { user: fields.user, ip: fields.ip, method: fields.method });
+}
+
+/**
+ * An account was linked to an identity at the sign-in provider — the one time
+ * the address decides; from now on `sub` does. Worth a line of its own: it is
+ * the moment an outside identity starts to count as this account.
+ */
+export function auditOidcLinked(fields: { user: string; ip: SourceIp }): void {
+  logEvent('info', 'AUTH_OIDC_LINKED', fields);
+}
+
+/**
+ * A sign-in through the provider that ended without a session. `reason` is the
+ * code the login page receives (OIDC_LOGIN_ERRORS); `detail` is what the code
+ * leaves out — the library's message, the provider's error. The address only
+ * when the provider vouched for it, under the same exception as
+ * AUTH_LOGIN_FAILED. Never the `sub`, never a token.
+ */
+export function auditOidcFailed(fields: {
+  reason: string;
+  email?: string;
+  detail?: string;
+  ip: SourceIp;
+}): void {
+  logEvent('warn', 'AUTH_OIDC_FAILED', {
+    reason: fields.reason,
+    email: fields.email,
+    ip: fields.ip,
+    detail: fields.detail,
+  });
 }
 
 export function auditLoginFailed(fields: {

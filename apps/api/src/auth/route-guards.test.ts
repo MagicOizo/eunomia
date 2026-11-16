@@ -58,6 +58,12 @@ const DECLARED: Record<string, Declared> = {
   'POST /api/v1/auth/login': anonymous('hands out the first token'),
   'POST /api/v1/auth/refresh': anonymous('authenticated by the refresh cookie, not by a token'),
   'POST /api/v1/auth/logout': anonymous('must work even with an expired access token'),
+  'GET /api/v1/auth/oidc/start': anonymous(
+    'sends the browser to the sign-in provider; answers only with redirects, never with data',
+  ),
+  'GET /api/v1/auth/oidc/callback': anonymous(
+    'the way back from the sign-in provider, proven by the signed flow cookie and the code',
+  ),
   'GET /api/v1/locale-defaults': anonymous(
     'the login page picks its language before anyone signs in; two instance values, nothing personal',
   ),

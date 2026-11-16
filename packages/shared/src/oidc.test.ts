@@ -3,8 +3,11 @@ import test from 'node:test';
 
 import {
   OIDC_CALLBACK_PATH,
+  OIDC_LOGIN_ERRORS,
+  OIDC_START_PATH,
   isAsymmetricJwsAlg,
   isOidcIssuer,
+  isOidcLoginError,
   isOidcTestFailure,
   oidcRedirectUri,
 } from './oidc.js';
@@ -53,4 +56,16 @@ test('only the documented failure codes are recognised', () => {
   assert.equal(isOidcTestFailure('discovery_failed'), true);
   assert.equal(isOidcTestFailure('something else'), false);
   assert.equal(isOidcTestFailure(null), false);
+});
+
+test('login error codes are recognised, anything else is not', () => {
+  for (const code of Object.values(OIDC_LOGIN_ERRORS)) assert.equal(isOidcLoginError(code), true);
+  assert.equal(isOidcLoginError('access_denied'), false);
+  assert.equal(isOidcLoginError(undefined), false);
+});
+
+test('start and callback live under the same cookie path', () => {
+  const prefix = '/api/v1/auth/oidc/';
+  assert.ok(OIDC_START_PATH.startsWith(prefix));
+  assert.ok(OIDC_CALLBACK_PATH.startsWith(prefix));
 });

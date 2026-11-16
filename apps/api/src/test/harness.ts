@@ -138,7 +138,14 @@ export function testConfig(overrides: TestConfigOverrides = {}): AppConfig {
     trustProxy: 1,
     // High enough that no suite trips the limiter; the limits themselves have
     // their own test.
-    rateLimit: { authMax: 100000, authWindowMs: 60000, globalMax: 100000, globalWindowMs: 60000 },
+    rateLimit: {
+      authMax: 100000,
+      authWindowMs: 60000,
+      globalMax: 100000,
+      globalWindowMs: 60000,
+      oidcMax: 100000,
+      oidcWindowMs: 60000,
+    },
     // Disabled so no test ever reaches out to GitHub.
     updateCheck: {
       enabled: false,

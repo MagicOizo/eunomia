@@ -2416,5 +2416,14 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - Der Satz zu `LOGIN_CONFIG_INCOMPLETE` ist neutral formuliert, weil auch der 409 des Tests ihn nutzt.
 - Beispiel-Issuer in den Texten als `https://login.example.com/…`: vue-i18n weist `<…>`-Platzhalter in Meldungen als HTML ab.
 
+### Slice 88 — Login-Weg (umgesetzt 2026-11-16, `1.3.0-slice.4`)
+- **Migration 022** `Users.oidcSubject` (VARCHAR(255), nullable, UNIQUE). Kontoauflösung in `auth/oidc/login.ts`: erst `sub`, dann die Adresse (Kollation, also ohne Groß/Klein); ein gelöschtes Konto (`userStatus = -1`) zählt als keines. Verknüpft wird **erst, wenn die Anmeldung sicher gelingt** — ein deaktiviertes Konto bekommt keine Identität, die es nie benutzt hat. Die Verknüpfung schreibt `WHERE oidcSubject IS NULL`; ein Wettlauf (0 Zeilen oder Duplicate-Key) wird zu `linked_elsewhere`. Eine Adresse im Token wird nicht ins Konto übernommen.
+- **Fehlercodes** `OIDC_LOGIN_ERRORS` in `shared/oidc.ts`: `disabled`, `unavailable`, `flow_invalid`, `denied`, `email_missing`, `no_account`, `account_inactive`, `linked_elsewhere`, `rate_limited`, `failed`. Der Callback prüft zuerst den Schalter (abgeschaltet während des Flows → `disabled`), dann Flow-Cookie und `state`, dann ein `error=` des Anbieters selbst (statt die Ausnahmeklasse der Bibliothek zu unterscheiden), erst danach den Token-Tausch.
+- **Flow-Zustand** `auth/oidc/flow-state.ts`: JWT mit `use: 'oidc-flow'`, ohne `sub`; `verifyAccessToken` weist seither jeden Token mit `use`-Anspruch ab. Cookie `oidc_flow`, `lax`, Pfad `/api/v1/auth/oidc`, 10 min, vom Callback in jedem Ausgang gelöscht.
+- **`email_verified` wird nicht verlangt:** der Anbieter ist vom Admin gewählt und entscheidet, wer herein darf; manche Anbieter senden für jede Adresse `false`, die Erstverknüpfung käme nie zustande.
+- **Limiter** `RATE_LIMIT_OIDC_MAX`/`_WINDOW_MS` (20 / 5 min, `.env.example`, `docker-compose.yml`), antwortet mit `302 /login?oidcError=rate_limited` statt JSON.
+- **Audit:** `AUTH_LOGIN_OK` trägt `method=password|oidc`; neu `AUTH_OIDC_LINKED` und `AUTH_OIDC_FAILED` (Code, Adresse falls vom Anbieter, technisches Detail; nie `sub` oder Token). `issueSession` ist aus `service.ts` exportiert — beide Wege enden in derselben Sitzung.
+- `OIDC_START_PATH` und `OIDC_SCOPES` in `shared`; I-1 und I-11 im Sicherheits-Review ergänzt.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

@@ -72,6 +72,9 @@ export interface RateLimitConfig {
   /** Requests per window allowed across the whole API (generous baseline). */
   globalMax: number;
   globalWindowMs: number;
+  /** Requests per window on the sign-in through the provider (start + callback). */
+  oidcMax: number;
+  oidcWindowMs: number;
 }
 
 export interface UpdateCheckConfig {
@@ -174,6 +177,8 @@ export function loadConfig(): AppConfig {
       authWindowMs: optionalInt('RATE_LIMIT_AUTH_WINDOW_MS', 15 * 60 * 1000),
       globalMax: optionalInt('RATE_LIMIT_GLOBAL_MAX', 300),
       globalWindowMs: optionalInt('RATE_LIMIT_GLOBAL_WINDOW_MS', 60 * 1000),
+      oidcMax: optionalInt('RATE_LIMIT_OIDC_MAX', 20),
+      oidcWindowMs: optionalInt('RATE_LIMIT_OIDC_WINDOW_MS', 5 * 60 * 1000),
     },
     updateCheck: {
       enabled: optionalBoolean('UPDATE_CHECK_ENABLED', true),

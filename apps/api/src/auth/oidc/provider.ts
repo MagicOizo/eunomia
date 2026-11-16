@@ -41,6 +41,26 @@ export const defaultOidcDeps: OidcDeps = {
   fetch: (...args) => globalThis.fetch(...args),
 };
 
+/** What the sign-in itself uses on top of discovery (Slice 88), stubbed the same way in tests. */
+export interface OidcLoginDeps extends OidcDeps {
+  buildAuthorizationUrl: typeof client.buildAuthorizationUrl;
+  authorizationCodeGrant: typeof client.authorizationCodeGrant;
+  randomState: typeof client.randomState;
+  randomNonce: typeof client.randomNonce;
+  randomPKCECodeVerifier: typeof client.randomPKCECodeVerifier;
+  calculatePKCECodeChallenge: typeof client.calculatePKCECodeChallenge;
+}
+
+export const defaultOidcLoginDeps: OidcLoginDeps = {
+  ...defaultOidcDeps,
+  buildAuthorizationUrl: client.buildAuthorizationUrl,
+  authorizationCodeGrant: client.authorizationCodeGrant,
+  randomState: client.randomState,
+  randomNonce: client.randomNonce,
+  randomPKCECodeVerifier: client.randomPKCECodeVerifier,
+  calculatePKCECodeChallenge: client.calculatePKCECodeChallenge,
+};
+
 const REQUIRED: ReadonlyArray<[SettingKey, keyof OidcClientConfig]> = [
   ['login.oidcIssuer', 'issuer'],
   ['login.oidcClientId', 'clientId'],

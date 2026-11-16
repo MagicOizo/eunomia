@@ -7,6 +7,28 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0-slice.4 — 2026-11-16
+
+The fourth preview of sign-in through an OpenID Connect provider (1.3.0). The way in exists now;
+the login page does not offer it yet (no button), so it is reached by opening
+`/api/v1/auth/oidc/start` directly.
+
+- **Sign-in through the provider:** `GET /api/v1/auth/oidc/start` sends the browser to the provider
+  (state, nonce and PKCE, kept for ten minutes in a signed cookie), and
+  `GET /api/v1/auth/oidc/callback` turns the answer into the same session a password earns. The
+  callback URL comes from the configured instance address, never from the request.
+- **No accounts are created and no roles are taken from the provider.** The first sign-in links an
+  existing account by its e-mail address; after that the provider's identity (`sub`) leads, so a
+  changed address no longer matters. An account already linked to a different identity is refused
+  rather than taken over.
+- **Failures go back to the login page** as `/login?oidcError=<code>` (switched off, provider
+  unreachable, flow expired, refused by the provider, no address, no account, account deactivated,
+  linked elsewhere, too many attempts). The login page will put them into words with the button.
+- New database column `Users.oidcSubject` (migration 022).
+- New optional settings `RATE_LIMIT_OIDC_MAX` (20) and `RATE_LIMIT_OIDC_WINDOW_MS` (5 minutes).
+- Audit trail: `AUTH_LOGIN_OK` now says `method=password` or `method=oidc`; new events
+  `AUTH_OIDC_LINKED` and `AUTH_OIDC_FAILED`.
+
 ## 1.3.0-slice.3 — 2026-11-16
 
 The third preview of sign-in through an OpenID Connect provider (1.3.0). Still nothing signs in

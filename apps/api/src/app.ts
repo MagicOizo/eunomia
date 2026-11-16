@@ -1,14 +1,14 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { ERROR_CODES } from '@eunomia/shared';
+import { ERROR_CODES, OIDC_LOGIN_ERRORS } from '@eunomia/shared';
 import express, { type Express, type Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import type { Pool } from 'mariadb';
 
 import { createUserAdminRouter } from './auth/admin-routes.js';
-import { createAuthRouter } from './auth/routes.js';
+import { createAuthRouter, redirectToLoginWithError } from './auth/routes.js';
 import type { AppConfig } from './config/env.js';
 import { createAccountsRouter } from './domain/accounts.js';
 import { createAgencyPaymentDetailsRouter } from './domain/agency-payment-details.js';
@@ -179,6 +179,18 @@ export function createApp(deps?: AppDependencies): Express {
         '/api/v1/setup',
       ],
       limiter(config.rateLimit.authWindowMs, config.rateLimit.authMax),
+    );
+    // The sign-in through the provider: a browser navigates here, so a 429 in
+    // JSON would be a blank page — it goes back to the login page with a code.
+    app.use(
+      '/api/v1/auth/oidc',
+      rateLimit({
+        windowMs: config.rateLimit.oidcWindowMs,
+        max: config.rateLimit.oidcMax,
+        standardHeaders: true,
+        legacyHeaders: false,
+        handler: (_req, res) => redirectToLoginWithError(res, OIDC_LOGIN_ERRORS.RATE_LIMITED),
+      }),
     );
   }
 

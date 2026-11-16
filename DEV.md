@@ -170,10 +170,10 @@ restart (it is stored with the settings).
 
 Everything security-relevant the API does writes one line in the same format, from one place
 (`apps/api/src/lib/audit.ts`). After an incident these are what say who did what; while nothing is
-wrong, `AUTH_LOGIN_FAILED` is the one worth watching. All seventeen:
+wrong, `AUTH_LOGIN_FAILED` is the one worth watching. All twenty:
 
 ```bash
-docker logs eunomia 2>&1 | grep AUTH_LOGIN_OK         # a session was issued
+docker logs eunomia 2>&1 | grep AUTH_LOGIN_OK         # a session was issued (method=password|oidc)
 docker logs eunomia 2>&1 | grep AUTH_LOGIN_FAILED     # ip, attempted email and why it failed
 docker logs eunomia 2>&1 | grep AUTH_LOGOUT           # a session ended on purpose
 docker logs eunomia 2>&1 | grep AUTH_PASSWORD_CHANGED # someone changed their own password
@@ -181,6 +181,8 @@ docker logs eunomia 2>&1 | grep AUTH_SETUP_COMPLETED  # the first admin was crea
 docker logs eunomia 2>&1 | grep AUTH_UNAUTHENTICATED  # a request without a usable token
 docker logs eunomia 2>&1 | grep AUTH_FORBIDDEN        # a request without the permission it needed
 docker logs eunomia 2>&1 | grep AUTH_REFRESH_REUSE    # a refresh token shown twice: likely theft
+docker logs eunomia 2>&1 | grep AUTH_OIDC_LINKED      # an account was linked to its sign-in provider identity
+docker logs eunomia 2>&1 | grep AUTH_OIDC_FAILED      # a provider sign-in without a session: code and cause
 docker logs eunomia 2>&1 | grep USER_CREATED          # a new user account
 docker logs eunomia 2>&1 | grep USER_UPDATED          # which fields changed, never their values
 docker logs eunomia 2>&1 | grep USER_DEACTIVATED      # a user account was switched off

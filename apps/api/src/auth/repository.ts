@@ -93,6 +93,55 @@ export async function findUserByUuid(pool: Pool, uuidText: string): Promise<Auth
   return rows[0] ?? null;
 }
 
+/** A user as the sign-in through the provider finds them, with the identity linked so far. */
+export interface OidcCandidate extends AuthUser {
+  /** The provider's `sub` this account is linked to, or null (migration 022). */
+  oidcSubject: string | null;
+}
+
+/** The account linked to a provider identity, or null. */
+export async function findUserByOidcSubject(
+  pool: Pool,
+  subject: string,
+): Promise<OidcCandidate | null> {
+  const rows = await pool.query<OidcCandidate[]>(
+    `SELECT ${USER_COLUMNS}, oidcSubject FROM Users WHERE oidcSubject = ? LIMIT 1`,
+    [subject],
+  );
+  return rows[0] ?? null;
+}
+
+/** The account with this address (case-insensitive, like the column's collation), or null. */
+export async function findUserByEmailForOidc(
+  pool: Pool,
+  email: string,
+): Promise<OidcCandidate | null> {
+  const rows = await pool.query<OidcCandidate[]>(
+    `SELECT ${USER_COLUMNS}, oidcSubject FROM Users WHERE email = ? LIMIT 1`,
+    [email],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Links an account to a provider identity — only while it is linked to none.
+ * Returns false when the row was not changed: someone linked it in between.
+ * A second account claiming the same `sub` fails on the unique key instead,
+ * which the caller turns into the same refusal.
+ */
+export async function linkOidcSubject(
+  pool: Pool,
+  userId: number,
+  subject: string,
+): Promise<boolean> {
+  const result = await execute(
+    pool,
+    'UPDATE Users SET oidcSubject = ? WHERE userID = ? AND oidcSubject IS NULL',
+    [subject, userId],
+  );
+  return result.affectedRows > 0;
+}
+
 /** Inserts a user (DB generates the UUID) and returns the created row. */
 export async function createUser(
   pool: Pool,

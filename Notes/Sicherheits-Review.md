@@ -88,7 +88,9 @@ begründet ändern — sie sind nicht Beschreibung, sondern Vorgabe.
 **I-1 Jede Route ist bewacht.** Kein Endpunkt unter `/api/v1` antwortet mit Daten ohne
 `createRequireAuth`. Ausnahmen sind abschließend: `/version`, `/setup`, `/auth/login`,
 `/auth/refresh`, `/auth/logout`, `/locale-defaults` (Slice 83: die zwei Instanz-Vorgaben für Sprache
-und Format, damit die Login-Seite ihre Sprache wählen kann).
+und Format, damit die Login-Seite ihre Sprache wählen kann), `/auth/oidc/start` und
+`/auth/oidc/callback` (Slice 88: der Weg zum Anmeldedienst und zurück; beide antworten nur mit
+Redirects, der Rückweg ist durch das signierte Flow-Cookie und den Code des Anbieters belegt).
 
 **I-2 Jeder Zugriff auf Falldaten ist kontogeprüft.** Wer eine Rechnung, Police, Einreichung,
 Leistungsabrechnung oder Buchung liest oder schreibt, hält die Berechtigung **auf deren Konto** —
@@ -154,6 +156,9 @@ Discovery-Dokument ab. Begründung: anders lässt sich ein Anbieter nicht anbind
 setzen und prüfen nur mit `MANAGE_SETTINGS`; nur https (Issuer-Prüfung in `shared/oidc.ts`,
 openid-client, eigener Check vor dem JWKS-Abruf); feste Timeouts; eine eigene CA über
 `NODE_EXTRA_CA_CERTS`, nie durch abgeschaltete TLS-Prüfung (`auth/oidc/provider.ts`).
+Seit Slice 88 nutzt auch der Login-Weg diese Ziele: Discovery (gecacht), dann Token-Tausch und
+Schlüsselabruf durch openid-client an den Endpunkten, die das Discovery-Dokument nennt — dieselben
+Grenzen, keine weitere konfigurierbare Adresse (`auth/oidc/login.ts`).
 
 **I-12 Die Testmail geht nur an die eigene Adresse.** Eine Instanz mit fremdem SMTP-Konto darf nicht
 zum Versandweg für Dritte werden.

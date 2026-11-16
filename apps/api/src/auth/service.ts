@@ -64,8 +64,12 @@ function safeEquals(a: string, b: string): boolean {
   return timingSafeEqual(bufferA, bufferB);
 }
 
-/** Signs an access token and issues + stores a fresh refresh token for a user. */
-async function issueSession(
+/**
+ * Signs an access token and issues + stores a fresh refresh token for a user.
+ * Exported for the sign-in through the provider (auth/oidc/login.ts): both ways
+ * in end in the same session, so there is one place that makes it.
+ */
+export async function issueSession(
   pool: Pool,
   config: AuthConfig,
   user: AuthUser,
@@ -139,7 +143,7 @@ export async function login(
     throw invalidCredentials();
   }
 
-  auditLoginOk({ user: user.uuidText, ip });
+  auditLoginOk({ user: user.uuidText, ip, method: 'password' });
   return issueSession(pool, config, user);
 }
 
