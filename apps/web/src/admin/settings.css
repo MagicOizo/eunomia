@@ -108,6 +108,26 @@
   gap: 0.75rem;
 }
 
+/* The redirect URI to register at the sign-in provider: label, the line itself
+   and its copy button. The line wraps anywhere rather than pushing the page
+   sideways on a phone; it is copied whole, not read. */
+.eu-settings__uri {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  max-width: 44rem;
+  font-family: var(--eu-font-data);
+}
+
+.eu-settings__uri-label {
+  color: var(--eu-color-text-muted);
+}
+
+.eu-settings__uri-value {
+  overflow-wrap: anywhere;
+}
+
 .eu-settings__link {
   color: var(--eu-color-accent-text);
 }

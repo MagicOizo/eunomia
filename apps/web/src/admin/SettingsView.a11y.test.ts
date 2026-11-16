@@ -16,6 +16,7 @@ vi.mock('./settings-api', () => ({
   saveSettings: (values: SettingWrite): Promise<SettingsSnapshot> => saveSettings(values),
   sendTestMail: (): Promise<unknown> => sendTestMail(),
   runReminders: (dryRun: boolean): Promise<ReminderRunResult> => runReminders(dryRun),
+  testLoginConnection: vi.fn(),
 }));
 
 // The update check is not mocked away: its state is shared with the footer
@@ -110,6 +111,7 @@ function snapshot(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
         isSet: false,
       },
       ...reminderSettings(),
+      ...loginSettings(),
     ],
     ...overrides,
   };
@@ -168,6 +170,38 @@ const repoNotFound: UpdateStatus = {
   reason: 'no_token_private',
 };
 
+/**
+ * A provider whose last test failed, with the instance address set — so the
+ * section shows its fullest state: the redirect URI with its copy button, and
+ * the cause sentence with the technical detail (Slice 87).
+ */
+function loginSettings(): SettingsSnapshot['settings'] {
+  const entry = (
+    key: string,
+    value: string | boolean | null,
+    { isSecret = false, readonly = false } = {},
+  ) => ({
+    key,
+    section: key.startsWith('general.') ? ('general' as const) : ('login' as const),
+    isSecret,
+    readonly,
+    value,
+    isSet: isSecret || value !== null,
+  });
+  return [
+    entry('general.appUrl', 'https://eunomia.example.com'),
+    entry('login.oidcEnabled', false),
+    entry('login.oidcIssuer', 'https://login.example.com/application/o/eunomia/'),
+    entry('login.oidcClientId', 'eunomia'),
+    entry('login.oidcClientSecret', null, { isSecret: true }),
+    entry('login.oidcButtonLabel', null),
+    entry('login.oidcLastTestAt', '2026-11-16T10:00:00.000Z', { readonly: true }),
+    entry('login.oidcLastTestResult', 'error', { readonly: true }),
+    entry('login.oidcLastTestError', 'no_asymmetric_alg', { readonly: true }),
+    entry('login.oidcLastTestDetail', 'HS256 only', { readonly: true }),
+  ];
+}
+
 async function mountView(attach = false) {
   const wrapper = mount(SettingsView, attach ? { attachTo: document.body } : {});
   await flushPromises();
@@ -215,8 +249,8 @@ describe('SettingsView', () => {
 
     // Enter in the empty field submits the form even though the button is
     // disabled; an empty secret would be read as "clear it". The token form is
-    // the second one, after the language and format.
-    await wrapper.findAll('form')[1]!.trigger('submit');
+    // the third one, after the general settings and the sign-in.
+    await wrapper.findAll('form')[2]!.trigger('submit');
     await flushPromises();
 
     expect(saveSettings).not.toHaveBeenCalled();
@@ -225,16 +259,17 @@ describe('SettingsView', () => {
 
   it('sends the password only when one was typed', async () => {
     const wrapper = await mountView();
-    // The forms, in order: language and format, update token, mail, reminders, retention.
+    // The forms, in order: general, sign-in, update token, mail, reminders, retention.
     const forms = wrapper.findAll('form');
-    const mailForm = forms[2];
+    const mailForm = forms[3];
     expect(mailForm).toBeDefined();
 
     await mailForm!.trigger('submit');
     await flushPromises();
     expect(Object.hasOwn(saveSettings.mock.calls[0]?.[0] ?? {}, 'mail.password')).toBe(false);
 
-    const passwordInput = wrapper.findAll('input[type="password"]')[1];
+    // Password inputs, in order: client secret, update token, mail password.
+    const passwordInput = wrapper.findAll('input[type="password"]')[2];
     expect(passwordInput).toBeDefined();
     await passwordInput!.setValue('hunter2');
     await mailForm!.trigger('submit');
@@ -316,6 +351,15 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain(
       '2 Empfänger werden nicht angezeigt: für deren Rechnungen fehlt die Leseberechtigung.',
     );
+    wrapper.unmount();
+  });
+
+  it('shows the sign-in section with the reason of the last failed check', async () => {
+    const wrapper = await mountView();
+    const text = wrapper.text();
+    expect(text).toContain('Prüfung fehlgeschlagen');
+    expect(text).toContain('Signaturzertifikat');
+    expect(text).toContain('https://eunomia.example.com/api/v1/auth/oidc/callback');
     wrapper.unmount();
   });
 

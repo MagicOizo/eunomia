@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n';
 
 import { describeError } from '../lib/errors';
 import GeneralSection from './GeneralSection.vue';
+import LoginSection from './LoginSection.vue';
 import MailSection from './MailSection.vue';
 import ReminderSection from './ReminderSection.vue';
 import RetentionSection from './RetentionSection.vue';
@@ -13,7 +14,7 @@ import UpdateSection from './UpdateSection.vue';
 import { type SettingsSnapshot, loadSettings } from './settings-api';
 
 /**
- * System settings (Slice 30, extended in Slice 31, Scheibe 18 and Slice 83). The first
+ * System settings (Slice 30, extended in Slice 31, Scheibe 18, Slices 83 and 87). The first
  * area of the admin section. This file holds only what the sections share:
  * the snapshot they are filled from, and the notice that secrets cannot be
  * stored at all.
@@ -57,6 +58,7 @@ onMounted(async () => {
       </p>
 
       <GeneralSection :snapshot="snapshot" @snapshot="snapshot = $event" />
+      <LoginSection :snapshot="snapshot" @snapshot="snapshot = $event" />
       <UpdateSection :snapshot="snapshot" @snapshot="snapshot = $event" />
       <MailSection :snapshot="snapshot" @snapshot="snapshot = $event" />
       <ReminderSection :snapshot="snapshot" @snapshot="snapshot = $event" />

@@ -2408,5 +2408,13 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - Das entschlüsselte Secret geht als Metadaten-String an `discovery()` (→ `client_secret_post`); Tests stubben openid-clients `discovery` und `fetch` per Injektion (`SettingsRouterDeps.oidc`), nicht das eigene Modul. Logzeilen `OIDC_TEST_OK`/`OIDC_TEST_FAILED` mit Issuer, Ursache, Detail.
 - I-11 im Sicherheits-Review um die benannte Ausnahme ergänzt.
 
+### Slice 87 — Ansicht (umgesetzt 2026-11-16, `1.3.0-slice.3`)
+- **`LoginSection.vue`** nach dem Muster der Mail-Section, direkt nach „Allgemein" (Reihenfolge der Registry). Secret wie das Mail-Passwort: leeres Feld wird nicht gesendet, „Secret entfernen" schreibt `null`. Issuer-Prüfung im Formular mit `isOidcIssuer` aus `shared`, Beschriftung ≤ 50.
+- **„Verbindung prüfen" gesperrt bei ungespeicherten Änderungen** (Entscheidung des Autors), mit Hinweis „Erst speichern, dann prüfen." Ein eingetipptes Secret zählt als Änderung. Der Test läuft gegen das Gespeicherte, danach wird der Snapshot neu geladen (wie bei der Testmail).
+- **Status** als Badge im Kopf der Section (Text + Icon). Die Ursache eines Fehlschlags wird zum Satz in `lib/oidc-test-text.ts`, eine Tabelle über `OidcTestFailure` — ein neuer Code ohne Satz kompiliert nicht; ein unbekannter Wert bekommt einen allgemeinen Satz. Das Detail folgt als „Technische Meldung".
+- **Redirect-URI** aus dem **gespeicherten** `general.appUrl` über `oidcRedirectUri()`, mit „Kopieren" (`navigator.clipboard`; verweigert → Zeile markiert, Hinweis auf Strg+C). Ohne Instanz-Adresse ein Verweis auf „Allgemein".
+- Der Satz zu `LOGIN_CONFIG_INCOMPLETE` ist neutral formuliert, weil auch der 409 des Tests ihn nutzt.
+- Beispiel-Issuer in den Texten als `https://login.example.com/…`: vue-i18n weist `<…>`-Platzhalter in Meldungen als HTML ab.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

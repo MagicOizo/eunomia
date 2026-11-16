@@ -7,6 +7,26 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0-slice.3 — 2026-11-16
+
+The third preview of sign-in through an OpenID Connect provider (1.3.0). Still nothing signs in
+that way; the provider can now be set up and checked from the settings page.
+
+- **New settings section "Sign-in"** (System > Settings): switch, issuer URL, client ID, client
+  secret and button label. The issuer is checked as you type (https, not the `.well-known`
+  document); an untouched secret field keeps the stored secret, and "Remove secret" forgets it.
+- **Check connection** runs the connection test against the saved configuration. It is locked while
+  the form holds unsaved changes ("Save first, then check"), so a result always belongs to what is
+  on screen.
+- **The status of the last check** shows in the section header, and a failed check is explained in
+  German or English per cause — for example a provider that only signs with HS256 is told to set a
+  signing certificate — followed by the technical message.
+- **The redirect URI** to register at the provider is shown with a copy button, built from the
+  stored instance address; without one, the section points to "General". Where the browser refuses
+  the clipboard, the line is selected for a manual copy.
+- The "configuration incomplete" message now reads neutrally, since the connection test reports it
+  too, not only switching the provider on.
+
 ## 1.3.0-slice.2 — 2026-11-16
 
 The second preview of sign-in through an OpenID Connect provider (1.3.0). Still nothing signs in

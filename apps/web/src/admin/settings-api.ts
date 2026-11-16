@@ -10,7 +10,7 @@ import { apiData } from '../lib/api';
 
 export interface PublicSetting {
   key: string;
-  section: 'general' | 'mail' | 'updateCheck' | 'reminders' | 'retention';
+  section: 'general' | 'login' | 'mail' | 'updateCheck' | 'reminders' | 'retention';
   isSecret: boolean;
   readonly: boolean;
   /** Always null for a secret — the plaintext never leaves the API. */
@@ -23,6 +23,18 @@ export interface MailStatus {
   lastSendAt: string | null;
   lastSendResult: 'ok' | 'error' | null;
   lastSendError: string | null;
+}
+
+/**
+ * The recorded connection test of the sign-in provider (Slice 86), as
+ * apps/api/src/auth/oidc/connection-test.ts answers it. `lastTestError` is a
+ * code from `OIDC_TEST_FAILURES`; the page phrases it (lib/oidc-test-text.ts).
+ */
+export interface OidcTestStatus {
+  lastTestAt: string | null;
+  lastTestResult: 'ok' | 'error' | null;
+  lastTestError: string | null;
+  lastTestDetail: string | null;
 }
 
 export interface SettingsSnapshot {
@@ -88,6 +100,15 @@ export async function sendTestMail(): Promise<{ recipient: string; status: MailS
   return apiData<{ recipient: string; status: MailStatus }>('/settings/mail/test', {
     method: 'POST',
   });
+}
+
+/**
+ * Checks the stored provider configuration — discovery, signing algorithm, key
+ * set — and records the result. A failed check is an answer (200 with the
+ * status), not an error; an incomplete configuration is a 409.
+ */
+export async function testLoginConnection(): Promise<{ status: OidcTestStatus }> {
+  return apiData<{ status: OidcTestStatus }>('/settings/login/test', { method: 'POST' });
 }
 
 /**
