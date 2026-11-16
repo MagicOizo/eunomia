@@ -34,6 +34,7 @@ function snapshot(passwordStored = true): SettingsSnapshot {
   ) => ({ key, section: 'mail' as const, isSecret, readonly: false, value, isSet });
   return {
     encryptionAvailable: true,
+    passwordLoginForced: false,
     mailStatus: { lastSendAt: null, lastSendResult: null, lastSendError: null },
     settings: [
       entry('mail.enabled', true),

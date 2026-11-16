@@ -271,6 +271,7 @@ All variables are read from `.env` (see `.env.example` for the template — neve
 | `ACCESS_TOKEN_TTL_SECONDS`  | Access-token lifetime (default `900` = 15 min).                                                                                                             |
 | `REFRESH_TOKEN_TTL_SECONDS` | Refresh-token lifetime (default `2592000` = 30 days).                                                                                                       |
 | `SETUP_TOKEN`               | One-time token enabling `POST /api/v1/setup` for the first admin. Remove after setup to disable it.                                                         |
+| `PASSWORD_LOGIN_FORCE`      | `true` opens the password login even when it is switched off in the settings — the way back in if the sign-in provider fails. Needs `docker compose up -d`. |
 | `TRUST_PROXY`               | Proxy hops in front of the app so rate limiting uses the real client IP (default `1`).                                                                      |
 | `RATE_LIMIT_*`              | Optional overrides for the auth / global rate limits (defaults in `.env.example`).                                                                          |
 | `UPDATE_CHECK_ENABLED`      | Whether the instance may ask GitHub for the latest release (default `true`).                                                                                |

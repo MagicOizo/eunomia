@@ -61,6 +61,24 @@ describe('LoginView', () => {
     });
   });
 
+  it('gives way to the button when the password login closed behind the page (Slice 90)', async () => {
+    await withLocale('en', async () => {
+      vi.spyOn(useAuthStore(), 'login').mockRejectedValue(
+        new HttpError(403, 'PASSWORD_LOGIN_DISABLED', 'switched off'),
+      );
+      const wrapper = await mounted();
+      offering({ password: false, oidc: { label: null } });
+      await wrapper.find('form').trigger('submit');
+      await flushPromises();
+
+      expect(wrapper.find('[role="alert"]').text()).toBe(
+        'Sign-in with a password is switched off. Please sign in through the provider.',
+      );
+      expect(wrapper.find('form').exists()).toBe(false);
+      expect(wrapper.find('a.eu-login__oidc').exists()).toBe(true);
+    });
+  });
+
   describe('the way through the sign-in provider', () => {
     it('shows no button while the API offers none', async () => {
       const wrapper = await mounted();

@@ -32,6 +32,9 @@ interface Fixture {
   result?: 'ok' | 'error' | null;
   cause?: string | null;
   detail?: string | null;
+  oidcEnabled?: boolean;
+  passwordEnabled?: boolean;
+  forced?: boolean;
 }
 
 /** A configured provider; placeholders only — the repository is public. */
@@ -41,6 +44,9 @@ function snapshot({
   result = null,
   cause = null,
   detail = null,
+  oidcEnabled = false,
+  passwordEnabled = true,
+  forced = false,
 }: Fixture = {}): SettingsSnapshot {
   const entry = (
     key: string,
@@ -56,10 +62,12 @@ function snapshot({
   });
   return {
     encryptionAvailable: true,
+    passwordLoginForced: forced,
     mailStatus: { lastSendAt: null, lastSendResult: null, lastSendError: null },
     settings: [
       entry('general.appUrl', appUrl),
-      entry('login.oidcEnabled', false),
+      entry('login.oidcEnabled', oidcEnabled),
+      entry('login.passwordEnabled', passwordEnabled),
       entry('login.oidcIssuer', 'https://login.example.com/application/o/eunomia/'),
       entry('login.oidcClientId', 'eunomia'),
       entry('login.oidcClientSecret', null, { isSecret: true, isSet: secretStored }),
@@ -290,5 +298,69 @@ describe('LoginSection redirect URI', () => {
       'https://eunomia.example.com/api/v1/auth/oidc/callback',
     );
     wrapper.unmount();
+  });
+});
+
+describe('LoginSection password switch (Slice 90)', () => {
+  function passwordToggle(wrapper: Wrapper) {
+    const found = wrapper
+      .findAll('label.eu-toggle')
+      .find((candidate) => candidate.text().includes('Anmeldung mit Passwort erlauben'));
+    if (!found) throw new Error('no password toggle');
+    return found.find('input');
+  }
+
+  it('sends the switch with the form', async () => {
+    const wrapper = mountSection({ oidcEnabled: true, result: 'ok' });
+    await passwordToggle(wrapper).setValue(false);
+    await save(wrapper);
+
+    expect(saveSettings.mock.calls[0][0]['login.passwordEnabled']).toBe(false);
+  });
+
+  it('will not close the password login while the provider is off', async () => {
+    const wrapper = mountSection({ oidcEnabled: false, result: 'ok' });
+    await passwordToggle(wrapper).setValue(false);
+
+    expect(wrapper.text()).toContain('Erst den Anmeldedienst einschalten');
+    await save(wrapper);
+    expect(saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('asks for a green test of the saved provider before the first close', async () => {
+    const wrapper = mountSection({ oidcEnabled: true, result: 'error' });
+    await passwordToggle(wrapper).setValue(false);
+
+    expect(wrapper.text()).toContain('erfolgreich geprüft sein');
+    // The test itself stays reachable: the switch is no change to the provider.
+    expect(button(wrapper, 'Verbindung prüfen')?.attributes('disabled')).toBeUndefined();
+    await save(wrapper);
+    expect(saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('counts an unsaved change to the provider as untested', async () => {
+    const wrapper = mountSection({ oidcEnabled: true, result: 'ok' });
+    await passwordToggle(wrapper).setValue(false);
+    expect(wrapper.text()).not.toContain('erfolgreich geprüft sein');
+
+    await field(wrapper, 'Client-ID').setValue('other');
+    expect(wrapper.text()).toContain('erfolgreich geprüft sein');
+  });
+
+  it('keeps a closed door repairable with a red test, and lets it open again', async () => {
+    const wrapper = mountSection({ oidcEnabled: true, passwordEnabled: false, result: 'error' });
+    await field(wrapper, 'Client-ID').setValue('fixed');
+    await save(wrapper);
+    expect(saveSettings.mock.calls[0][0]['login.passwordEnabled']).toBe(false);
+
+    const reopened = mountSection({ oidcEnabled: false, passwordEnabled: false });
+    expect(reopened.text()).toContain('Erst den Anmeldedienst einschalten');
+    await passwordToggle(reopened).setValue(true);
+    expect(reopened.text()).not.toContain('Erst den Anmeldedienst einschalten');
+  });
+
+  it('says so when PASSWORD_LOGIN_FORCE holds the door open', () => {
+    expect(mountSection({ forced: true }).text()).toContain('PASSWORD_LOGIN_FORCE');
+    expect(mountSection().text()).not.toContain('PASSWORD_LOGIN_FORCE');
   });
 });

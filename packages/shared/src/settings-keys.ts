@@ -12,6 +12,7 @@ export const SETTING_KEYS = [
   'general.defaultFormat',
   'general.appUrl',
   'login.oidcEnabled',
+  'login.passwordEnabled',
   'login.oidcIssuer',
   'login.oidcClientId',
   'login.oidcClientSecret',

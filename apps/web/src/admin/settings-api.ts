@@ -41,6 +41,12 @@ export interface SettingsSnapshot {
   settings: PublicSetting[];
   /** False when CONFIG_ENCRYPTION_KEY is missing: secrets can then not be stored. */
   encryptionAvailable: boolean;
+  /**
+   * PASSWORD_LOGIN_FORCE on the server (Slice 90): the password login is open
+   * whatever `login.passwordEnabled` says. Kept apart from the switch so the
+   * page can say both.
+   */
+  passwordLoginForced: boolean;
   mailStatus: MailStatus;
 }
 

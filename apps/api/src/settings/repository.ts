@@ -1,4 +1,4 @@
-import { ERROR_CODES, type LoginOptions } from '@eunomia/shared';
+import { ERROR_CODES } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
 import { withTransaction } from '../db/transaction.js';
@@ -147,25 +147,24 @@ export async function getLocaleDefaults(
 }
 
 /**
- * What the public login page may know about the ways in (Slice 89), read
- * without a key: the switch and the button's text, never the secret. Whether
- * the provider is complete is not looked at here — the PUT refuses to switch
- * on an incomplete one (settings/login.ts), and a secret that no longer
- * decrypts turns a click into `unavailable`, which the page then phrases.
+ * What the public login page is built from (Slices 89/90), read without a key:
+ * the two switches and the button's text, never the secret. Whether the
+ * provider is complete is not looked at here — the PUT refuses to switch on an
+ * incomplete one (settings/login.ts), and a secret that no longer decrypts
+ * turns a click into `unavailable`, which the page then phrases. The answer the
+ * page gets is put together in auth/login-options.ts, where the password switch
+ * meets PASSWORD_LOGIN_FORCE.
  */
-export async function getLoginOptions(pool: Pool): Promise<LoginOptions> {
+export async function readLoginSwitches(
+  pool: Pool,
+): Promise<{ passwordEnabled: boolean; oidcEnabled: boolean; oidcLabel: string | null }> {
   const stored = await readRows(pool);
-  const enabled = parseStoredValue('login.oidcEnabled', stored.get('login.oidcEnabled') ?? null);
-  const label = parseStoredValue(
-    'login.oidcButtonLabel',
-    stored.get('login.oidcButtonLabel') ?? null,
-  );
+  const read = (key: SettingKey): SettingValue => parseStoredValue(key, stored.get(key) ?? null);
+  const label = read('login.oidcButtonLabel');
   return {
-    password: true,
-    oidc:
-      enabled === true
-        ? { label: typeof label === 'string' && label.trim() !== '' ? label.trim() : null }
-        : null,
+    passwordEnabled: read('login.passwordEnabled') === true,
+    oidcEnabled: read('login.oidcEnabled') === true,
+    oidcLabel: typeof label === 'string' && label.trim() !== '' ? label.trim() : null,
   };
 }
 

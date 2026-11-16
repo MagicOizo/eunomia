@@ -117,6 +117,8 @@ export interface TestConfigOverrides {
   database?: DatabaseConfig;
   /** Set by the suites that store secrets (settings, reminders). */
   configEncryptionKey?: Buffer | null;
+  /** PASSWORD_LOGIN_FORCE, for the suites that test the way out (Slice 90). */
+  passwordLoginForce?: boolean;
 }
 
 /** The app configuration every integration test runs against. */
@@ -134,6 +136,7 @@ export function testConfig(overrides: TestConfigOverrides = {}): AppConfig {
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 3600,
       setupToken: SETUP_TOKEN,
+      passwordLoginForce: overrides.passwordLoginForce ?? false,
     },
     trustProxy: 1,
     // High enough that no suite trips the limiter; the limits themselves have

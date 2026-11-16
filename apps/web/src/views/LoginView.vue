@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type LoginOptions, OIDC_START_PATH } from '@eunomia/shared';
+import { ERROR_CODES, type LoginOptions, OIDC_START_PATH } from '@eunomia/shared';
 import { onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
@@ -58,6 +58,13 @@ async function submit(): Promise<void> {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
     await router.push(redirect);
   } catch (err) {
+    if (err instanceof HttpError && err.code === ERROR_CODES.PASSWORD_LOGIN_DISABLED) {
+      // The page was older than the switch (Slice 90): say so, and fetch the
+      // ways in again so the form gives way to the button.
+      error.value = t('errors.code.PASSWORD_LOGIN_DISABLED');
+      options.value = await loadLoginOptions();
+      return;
+    }
     error.value =
       err instanceof HttpError && err.status === 401
         ? t('login.wrongCredentials')

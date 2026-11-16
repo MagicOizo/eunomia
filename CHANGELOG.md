@@ -7,6 +7,25 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0-slice.6 — 2026-11-16
+
+The sixth preview of sign-in through an OpenID Connect provider (1.3.0). Sign-in with a password
+can now be switched off — without a way to lock oneself out.
+
+- **Password sign-in can be switched off** under Settings → Sign-in ("Allow sign-in with a
+  password", on by default). Switched off, the login page shows only the provider button, and
+  `POST /api/v1/auth/login` answers `403 PASSWORD_LOGIN_DISABLED` before it reads anything — no
+  account lookup, no log line. The passwords themselves are kept.
+- **Two locks against a lockout:** the password login and the provider can never both be off, on
+  any save. Switching the password login off additionally needs a successful connection test of
+  the provider as saved; once it is off, the provider settings stay fixable even with a failing
+  test. Switching the password login back on is always possible. The settings page works out the
+  same rules and says why before saving.
+- **The way back in: `PASSWORD_LOGIN_FORCE=true`** in the environment opens the password login
+  whatever the settings say, for when the provider fails while it is the only way in. It leaves
+  the stored switch alone, is shown on the settings page next to it, logs a warning at every start
+  while set, and takes effect only when the container is recreated (`docker compose up -d`).
+
 ## 1.3.0-slice.5 — 2026-11-16
 
 The fifth preview of sign-in through an OpenID Connect provider (1.3.0). The login page now offers

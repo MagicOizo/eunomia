@@ -32,6 +32,7 @@ const { default: SettingsView } = await import('./SettingsView.vue');
 function snapshot(overrides: Partial<SettingsSnapshot> = {}): SettingsSnapshot {
   return {
     encryptionAvailable: true,
+    passwordLoginForced: false,
     mailStatus: {
       lastSendAt: '2026-09-24T08:30:00.000Z',
       lastSendResult: 'error',

@@ -63,6 +63,14 @@ export interface AuthConfig {
    * (undefined) disables the setup endpoint entirely.
    */
   setupToken: string | undefined;
+  /**
+   * PASSWORD_LOGIN_FORCE (Slice 90): opens the password login whatever the
+   * stored switch says — the way back in when the sign-in provider fails while
+   * it is the only one. It acts on the decision, not on the stored row, and it
+   * needs host access to set, which is what allows the switch to be in the
+   * page at all.
+   */
+  passwordLoginForce: boolean;
 }
 
 export interface RateLimitConfig {
@@ -171,6 +179,7 @@ export function loadConfig(): AppConfig {
       accessTokenTtlSeconds: optionalInt('ACCESS_TOKEN_TTL_SECONDS', 15 * 60),
       refreshTokenTtlSeconds: optionalInt('REFRESH_TOKEN_TTL_SECONDS', 30 * 24 * 60 * 60),
       setupToken: optionalString('SETUP_TOKEN'),
+      passwordLoginForce: optionalBoolean('PASSWORD_LOGIN_FORCE', false),
     },
     rateLimit: {
       authMax: optionalInt('RATE_LIMIT_AUTH_MAX', 10),

@@ -36,6 +36,7 @@ function snapshot(values: Record<string, string | number | boolean | null> = {})
   };
   return {
     encryptionAvailable: true,
+    passwordLoginForced: false,
     mailStatus: { lastSendAt: null, lastSendResult: null, lastSendError: null },
     settings: Object.entries(all).map(([key, value]) => ({
       key,

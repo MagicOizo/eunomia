@@ -6,6 +6,7 @@ import { ERROR_CODES } from '@eunomia/shared';
 import { ApiError } from '../lib/api-error.js';
 import {
   assertLoginConfiguration,
+  assertPasswordLoginLocks,
   oidcTestStatusResetFor,
   touchesOidcConfiguration,
 } from './login.js';
@@ -135,4 +136,120 @@ test('the discovery cache is dropped for login keys and the instance address onl
   assert.equal(touchesOidcConfiguration(new Map([['general.appUrl', null]])), true);
   assert.equal(touchesOidcConfiguration(new Map([['mail.host', 'smtp.example.com']])), false);
   assert.equal(touchesOidcConfiguration(new Map()), false);
+});
+
+/* The two locks in front of the password switch (Slice 90). */
+
+/** A provider that is on and was tested green — the state that may close the password login. */
+const READY = [
+  ...COMPLETE,
+  ...stored({ 'login.oidcEnabled': true, 'login.oidcLastTestResult': 'ok' }),
+];
+
+/** The code of the rejection, or null when the write is taken. */
+function lockAfter(current: PublicSetting[], updates: Array<[SettingKey, SettingValue]>): unknown {
+  try {
+    assertPasswordLoginLocks(current, new Map(updates));
+    return null;
+  } catch (error) {
+    assert.ok(error instanceof ApiError);
+    return error.code;
+  }
+}
+
+test('closing the password login with a tested provider is taken', () => {
+  assert.equal(lockAfter(READY, [['login.passwordEnabled', false]]), null);
+});
+
+test('closing the password login while the provider is off is refused', () => {
+  const off = READY.map((row) =>
+    row.key === 'login.oidcEnabled' ? { ...row, value: false } : row,
+  );
+  assert.equal(lockAfter(off, [['login.passwordEnabled', false]]), ERROR_CODES.LOGIN_NO_WAY_IN);
+});
+
+test('closing the password login and switching the provider off at once is refused', () => {
+  assert.equal(
+    lockAfter(READY, [
+      ['login.passwordEnabled', false],
+      ['login.oidcEnabled', false],
+    ]),
+    ERROR_CODES.LOGIN_NO_WAY_IN,
+  );
+});
+
+test('switching the provider off while the password login is closed is refused', () => {
+  const closed = [...READY, ...stored({ 'login.passwordEnabled': false })];
+  assert.equal(lockAfter(closed, [['login.oidcEnabled', false]]), ERROR_CODES.LOGIN_NO_WAY_IN);
+});
+
+test('closing the password login without a green test is refused', () => {
+  for (const result of ['error', null]) {
+    const untested = READY.map((row) =>
+      row.key === 'login.oidcLastTestResult' ? { ...row, value: result } : row,
+    );
+    assert.equal(
+      lockAfter(untested, [['login.passwordEnabled', false]]),
+      ERROR_CODES.LOGIN_TEST_REQUIRED,
+    );
+  }
+});
+
+test('a write that changes the provider while closing takes the green test with it', () => {
+  assert.equal(
+    lockAfter(READY, [
+      ['login.passwordEnabled', false],
+      ['login.oidcIssuer', 'https://other.example.com/application/o/eunomia/'],
+    ]),
+    ERROR_CODES.LOGIN_TEST_REQUIRED,
+  );
+  assert.equal(
+    lockAfter(READY, [
+      ['login.passwordEnabled', false],
+      ['login.oidcClientSecret', 'new-secret'],
+    ]),
+    ERROR_CODES.LOGIN_TEST_REQUIRED,
+  );
+});
+
+test('once closed, the provider can be repaired without a green test', () => {
+  const closedAndBroken = [
+    ...READY.map((row) =>
+      row.key === 'login.oidcLastTestResult' ? { ...row, value: 'error' } : row,
+    ),
+    ...stored({ 'login.passwordEnabled': false }),
+  ];
+  assert.equal(
+    lockAfter(closedAndBroken, [
+      ['login.oidcIssuer', 'https://fixed.example.com/application/o/eunomia/'],
+    ]),
+    null,
+  );
+  // Saving the whole form again, with the switch still off, is no step either.
+  assert.equal(lockAfter(closedAndBroken, [['login.passwordEnabled', false]]), null);
+});
+
+test('opening the password login again is always taken', () => {
+  const closed = [...stored({ 'login.passwordEnabled': false })];
+  assert.equal(lockAfter(closed, [['login.passwordEnabled', true]]), null);
+  // Clearing the row means the fallback, which is open.
+  assert.equal(lockAfter(closed, [['login.passwordEnabled', null]]), null);
+  assert.equal(
+    lockAfter(closed, [
+      ['login.passwordEnabled', true],
+      ['login.oidcEnabled', false],
+    ]),
+    null,
+  );
+});
+
+test('without a stored row the password login counts as open', () => {
+  assert.equal(lockAfter([], [['login.oidcEnabled', false]]), null);
+  assert.equal(
+    lockAfter(
+      [...COMPLETE, ...stored({ 'login.oidcEnabled': true })],
+      [['login.passwordEnabled', false]],
+    ),
+    ERROR_CODES.LOGIN_TEST_REQUIRED,
+  );
 });

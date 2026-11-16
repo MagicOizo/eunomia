@@ -18,6 +18,7 @@ services:
       ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
       REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-2592000}
       SETUP_TOKEN: ${SETUP_TOKEN:-}
+      PASSWORD_LOGIN_FORCE: ${PASSWORD_LOGIN_FORCE:-}
       # Everything below is optional and passed through as `${VAR:-}` on
       # purpose: an empty value counts as "unset" in config/env.ts, so the
       # application's own default applies and the defaults are not duplicated

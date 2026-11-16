@@ -28,6 +28,14 @@
   min-width: 0;
 }
 
+/* A switch with the sentences that belong to it, kept closer together than
+   the form's own gap (the password door, Slice 90). */
+.eu-settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .eu-settings__facts {
   display: grid;
   grid-template-columns: auto 1fr;

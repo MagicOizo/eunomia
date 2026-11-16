@@ -203,6 +203,7 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
 
   // Anmeldung und Ersteinrichtung
   INVALID_CREDENTIALS: () => t('errors.code.INVALID_CREDENTIALS'),
+  PASSWORD_LOGIN_DISABLED: () => t('errors.code.PASSWORD_LOGIN_DISABLED'),
   INVALID_CURRENT_PASSWORD: () => t('errors.code.INVALID_CURRENT_PASSWORD'),
   INVALID_REFRESH_TOKEN: () => t('errors.code.INVALID_REFRESH_TOKEN'),
   UNAUTHENTICATED: () => t('errors.code.UNAUTHENTICATED'),
@@ -299,6 +300,8 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
         .map((key) => settingLabel(key))
         .join(', '),
     }),
+  LOGIN_NO_WAY_IN: () => t('errors.code.LOGIN_NO_WAY_IN'),
+  LOGIN_TEST_REQUIRED: () => t('errors.code.LOGIN_TEST_REQUIRED'),
   SETTINGS_ENCRYPTION_UNAVAILABLE: () => t('errors.code.SETTINGS_ENCRYPTION_UNAVAILABLE'),
   MAIL_NOT_CONFIGURED: () => t('errors.code.MAIL_NOT_CONFIGURED'),
   MAIL_SEND_FAILED: (d) =>

@@ -22,6 +22,6 @@ Slices 85–91 in [eunomia-plan.md](eunomia-plan.md), Abschnitt „Paket Anmeldu
 | ✓   | 87    | Ansicht in den Einstellungen                            | `1.3.0-slice.3` |
 | ✓   | 88    | Login-Weg: start/callback, `Users.oidcSubject`          | `1.3.0-slice.4` |
 | ✓   | 89    | Knopf auf der Login-Seite, Fehlercodes als Sätze        | `1.3.0-slice.5` |
-|     | 90    | Passwort-Anmeldung abschaltbar, Notausgang              | `1.3.0-slice.6` |
+| ✓   | 90    | Passwort-Anmeldung abschaltbar, Notausgang              | `1.3.0-slice.6` |
 |     | 91    | Verknüpfung lösen, erzeugtes Passwort, Doku             | `1.3.0-slice.7` |
 |     | —     | Release nach Dev-Check und Probe am Anmeldedienst       | `1.3.0`         |

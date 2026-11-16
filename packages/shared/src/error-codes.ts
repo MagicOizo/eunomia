@@ -29,6 +29,11 @@ export const ERROR_CODES = {
   // Authentication and setup (see auth/errors.ts)
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
   /**
+   * The password form is closed on this instance (Slice 90); the way in is the
+   * sign-in provider. Answered before the request is even read.
+   */
+  PASSWORD_LOGIN_DISABLED: 'PASSWORD_LOGIN_DISABLED',
+  /**
    * The current password presented alongside a new one is wrong. Not
    * INVALID_CREDENTIALS and not a 401: the caller is authenticated, and a 401
    * would send the browser's client into a pointless token rotation and retry.
@@ -106,6 +111,17 @@ export const ERROR_CODES = {
    * everything it needs; `details.missing` lists the setting keys that are absent.
    */
   LOGIN_CONFIG_INCOMPLETE: 'LOGIN_CONFIG_INCOMPLETE',
+  /**
+   * The write would leave neither the password nor the provider as a way in
+   * (Slice 90). Refused on every write, whatever PASSWORD_LOGIN_FORCE says.
+   */
+  LOGIN_NO_WAY_IN: 'LOGIN_NO_WAY_IN',
+  /**
+   * The password login is to close, but the last connection test to the
+   * provider — as it stands after this write — is not green (Slice 90). Only
+   * the step from open to closed asks for it.
+   */
+  LOGIN_TEST_REQUIRED: 'LOGIN_TEST_REQUIRED',
   /** A secret cannot be stored or read because CONFIG_ENCRYPTION_KEY is missing. */
   SETTINGS_ENCRYPTION_UNAVAILABLE: 'SETTINGS_ENCRYPTION_UNAVAILABLE',
   /** Mail is switched off or incompletely configured; nothing was attempted. */

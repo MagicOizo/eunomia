@@ -2,14 +2,14 @@ import { ERROR_CODES } from '@eunomia/shared';
 
 import { OIDC_TEST_STATUS_KEYS } from '../auth/oidc/connection-test.js';
 import { badRequest } from '../lib/api-error.js';
-import type { SettingKey, SettingValue } from './registry.js';
+import { type SettingKey, type SettingValue, fallbackOf } from './registry.js';
 import type { PublicSetting } from './repository.js';
 
 /**
  * The rules that span several keys of the `login` section — the registry checks
  * one value at a time and cannot see them (Slice 85, see Notes/eunomia-plan.md
- * "Paket Anmeldung über OIDC"). Slice 90 adds the locks around the password
- * switch here.
+ * "Paket Anmeldung über OIDC"), and the two locks in front of the password
+ * switch (Slice 90).
  */
 
 /** What sign-in through the provider cannot work without, in the order a page shows them. */
@@ -57,6 +57,69 @@ export function assertLoginConfiguration(
     throw badRequest(
       `Sign-in through the provider needs these settings first: ${missing.join(', ')}`,
       { code: ERROR_CODES.LOGIN_CONFIG_INCOMPLETE, details: { missing } },
+    );
+  }
+}
+
+/**
+ * A plain value as it stands once `updates` are applied: a key absent from the
+ * write keeps what is stored, and `null` — like a missing row — means the
+ * registry's fallback, since clearing a setting deletes its row.
+ */
+function valueAfter(
+  key: SettingKey,
+  current: readonly PublicSetting[],
+  updates: ReadonlyMap<SettingKey, SettingValue>,
+): SettingValue {
+  const value = updates.has(key)
+    ? (updates.get(key) ?? null)
+    : (current.find((entry) => entry.key === key)?.value ?? null);
+  return value ?? fallbackOf(key);
+}
+
+/**
+ * The two locks in front of the password switch (Slice 90, blueprint section 2),
+ * on purpose of different reach:
+ *
+ * - **No way in**: after the write, the password login and the provider must
+ *   not both be off. Checked on every write — switching the provider off while
+ *   the password login is closed is refused too.
+ * - **The step from open to closed** needs a green last connection test, as it
+ *   stands after this write: a write that also changes the provider clears the
+ *   status (`oidcTestStatusResetFor`), and with it the evidence. Only the step,
+ *   not every later write — otherwise the form would be beyond repair exactly
+ *   when it is needed (password closed, provider broken, test red, the
+ *   corrected issuer refused).
+ *
+ * Opening the password login again is always taken. PASSWORD_LOGIN_FORCE plays
+ * no part here: it is the way out for the host, not a door the form may count on.
+ */
+export function assertPasswordLoginLocks(
+  current: readonly PublicSetting[],
+  updates: ReadonlyMap<SettingKey, SettingValue>,
+): void {
+  const passwordAfter = valueAfter('login.passwordEnabled', current, updates) === true;
+  if (passwordAfter) return;
+
+  if (valueAfter('login.oidcEnabled', current, updates) !== true) {
+    throw badRequest('The password login cannot be closed while the provider is off', {
+      code: ERROR_CODES.LOGIN_NO_WAY_IN,
+    });
+  }
+
+  const passwordBefore =
+    (current.find((entry) => entry.key === 'login.passwordEnabled')?.value ??
+      fallbackOf('login.passwordEnabled')) === true;
+  if (!passwordBefore) return;
+
+  const statusCleared = oidcTestStatusResetFor(current, updates).length > 0;
+  const lastResult = statusCleared
+    ? null
+    : current.find((entry) => entry.key === 'login.oidcLastTestResult')?.value;
+  if (lastResult !== 'ok') {
+    throw badRequest(
+      'Closing the password login needs a successful connection test of the provider as saved',
+      { code: ERROR_CODES.LOGIN_TEST_REQUIRED },
     );
   }
 }

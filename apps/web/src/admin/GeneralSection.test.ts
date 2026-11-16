@@ -31,6 +31,7 @@ function snapshot(
   });
   return {
     encryptionAvailable: true,
+    passwordLoginForced: false,
     mailStatus: { lastSendAt: null, lastSendResult: null, lastSendError: null },
     settings: [
       entry('general.defaultLocale', locale),

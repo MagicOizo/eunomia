@@ -8,11 +8,13 @@ import { type Response, Router } from 'express';
 import type { Pool } from 'mariadb';
 
 import type { AppConfig } from '../config/env.js';
+import { passwordLoginDisabled } from './errors.js';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './http.js';
 import { createRequireAuth, getAuthUser } from './middleware.js';
 import { clearFlowCookie, readFlowCookie, setFlowCookie } from './oidc/flow-state.js';
 import { finishOidcLogin, startOidcLogin } from './oidc/login.js';
 import type { OidcLoginDeps } from './oidc/provider.js';
+import { passwordLoginAllowed } from './password-login.js';
 import { getEffectivePermissions } from './permissions.js';
 import { type AuthUser, findUserByUuid, updateLocalePreferences } from './repository.js';
 import {
@@ -71,6 +73,10 @@ export function createAuthRouter(pool: Pool, config: AppConfig, deps: AuthRouter
   });
 
   router.post('/auth/login', async (req, res) => {
+    // A closed door answers before anything else happens (Slice 90): before the
+    // body is read, before an account is looked up, before an audit line. A
+    // browser that keeps sending a saved password for weeks leaves nothing.
+    if (!(await passwordLoginAllowed(pool, config.auth))) throw passwordLoginDisabled();
     const input = loginSchema.parse(req.body);
     const session = await login(pool, config.auth, input, req.ip);
     setRefreshCookie(res, session.refreshToken, session.refreshExpiresAt, config.isProduction);

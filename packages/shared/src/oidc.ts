@@ -155,9 +155,9 @@ export function isOidcLoginError(value: unknown): value is OidcLoginError {
  */
 export interface LoginOptions {
   /**
-   * Whether the password form is shown. Always true until the password sign-in
-   * can be switched off (Slice 90); the field is in the contract from the start
-   * so the page does not have to change shape then.
+   * Whether the password form is shown: the stored switch, outweighed by
+   * PASSWORD_LOGIN_FORCE (Slice 90) — the same decision the login endpoint
+   * makes, so the page never hides a form the server would take.
    */
   password: boolean;
   /**

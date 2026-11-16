@@ -40,6 +40,17 @@ export const invalidCredentials = (): AuthError =>
   new AuthError(401, ERROR_CODES.INVALID_CREDENTIALS, 'Invalid email or password');
 
 /**
+ * 403, not 401: nothing about the caller is wrong, the door is closed (Slice
+ * 90). A 401 would also send the browser's client into a token rotation.
+ */
+export const passwordLoginDisabled = (): AuthError =>
+  new AuthError(
+    403,
+    ERROR_CODES.PASSWORD_LOGIN_DISABLED,
+    'Sign-in with a password is switched off on this instance',
+  );
+
+/**
  * Deliberately 403, not 401: the caller IS authenticated, only the proof of the
  * old password is wrong. A 401 would make apps/web's apiFetch spend a refresh
  * and a retry on a request that cannot succeed either way.

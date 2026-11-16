@@ -6,6 +6,7 @@ import { createApp } from './app.js';
 import { startRefreshTokenCleanup } from './auth/cleanup.js';
 import { runMigrations } from './db/migrate.js';
 import { createPool, waitForDatabase } from './db/pool.js';
+import { logEvent } from './lib/log.js';
 import { createMailer } from './mail/mailer.js';
 import { createMailSettingsStore } from './mail/store.js';
 import { createReminderRunner } from './reminders/runner.js';
@@ -29,6 +30,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = process.env.WEB_ROOT ?? join(here, '..', '..', 'web', 'dist');
 
 const app = createApp({ pool, config, webRoot });
+
+// The way out is meant for an emergency; left set, it silently overrides the
+// switch in the settings for as long as it stays (Slice 90).
+if (config.auth.passwordLoginForce) {
+  logEvent('warn', 'PASSWORD_LOGIN_FORCED', {
+    note: 'PASSWORD_LOGIN_FORCE is set: sign-in with a password is open whatever the settings say',
+  });
+}
 
 const server = app.listen(config.port, () => {
   console.log(`Eunomia API listening on port ${config.port}`);

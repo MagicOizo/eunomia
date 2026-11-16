@@ -26,6 +26,7 @@ import { createReminderStore } from '../reminders/store.js';
 import { readRetentionSettings, sweepRetention } from '../retention/sweep.js';
 import {
   assertLoginConfiguration,
+  assertPasswordLoginLocks,
   oidcTestStatusResetFor,
   touchesOidcConfiguration,
 } from './login.js';
@@ -95,6 +96,10 @@ export function createSettingsRouter(
       // Lets the page name the cause instead of showing a puzzling failure when
       // saving a password (see 2.6: the key lives in the environment).
       encryptionAvailable: config.configEncryptionKey !== null,
+      // PASSWORD_LOGIN_FORCE next to the stored switch, not folded into it
+      // (Slice 90): an empty box while passwords still work would be
+      // inexplicable without it, and the page says both side by side.
+      passwordLoginForced: config.auth.passwordLoginForce,
       mailStatus: await mailer.readStatus(),
     };
   }
@@ -112,6 +117,7 @@ export function createSettingsRouter(
     }
     const current = await getPublicSettings(pool);
     assertLoginConfiguration(current, updates);
+    assertPasswordLoginLocks(current, updates);
 
     // A changed provider makes the last connection test describe something
     // else; its status goes in the same transaction (Slice 86). Built as a

@@ -19,6 +19,7 @@ import { useDialogAction } from '../lib/dialog-action';
 import { settingLabel } from '../lib/field-labels';
 import { formatDateTime } from '../lib/format';
 import { oidcTestCause } from '../lib/oidc-test-text';
+import { passwordDoorBlock } from './password-door';
 import { boolOf, isStored, statusOf, stringOf } from './settings-values';
 import {
   type SettingWrite,
@@ -46,6 +47,8 @@ const BUTTON_LABEL_MAX = 50;
 /** The editable form, filled from the snapshot on load. */
 const login = reactive({
   enabled: false,
+  /** `login.passwordEnabled` — the password door (Slice 90). */
+  passwordEnabled: true,
   issuer: '',
   clientId: '',
   buttonLabel: '',
@@ -53,7 +56,13 @@ const login = reactive({
   clientSecret: '',
 });
 /** What the snapshot filled the form with — the yardstick for unsaved changes. */
-const stored = reactive({ enabled: false, issuer: '', clientId: '', buttonLabel: '' });
+const stored = reactive({
+  enabled: false,
+  passwordEnabled: true,
+  issuer: '',
+  clientId: '',
+  buttonLabel: '',
+});
 const secretStored = ref(false);
 const saved = ref(false);
 const testDone = ref(false);
@@ -67,6 +76,8 @@ watch(
   () => props.snapshot,
   (snapshot) => {
     stored.enabled = boolOf(snapshot, 'login.oidcEnabled');
+    // The API sends the fallback (true) when no row is stored.
+    stored.passwordEnabled = boolOf(snapshot, 'login.passwordEnabled');
     stored.issuer = stringOf(snapshot, 'login.oidcIssuer');
     stored.clientId = stringOf(snapshot, 'login.oidcClientId');
     stored.buttonLabel = stringOf(snapshot, 'login.oidcButtonLabel');
@@ -76,6 +87,11 @@ watch(
   { immediate: true },
 );
 
+/**
+ * Unsaved changes to the provider, which lock the connection test. The
+ * password switch is left out: the test speaks to the stored provider only,
+ * and a test is exactly what the switch may be waiting for.
+ */
 const dirty = computed(
   () =>
     login.enabled !== stored.enabled ||
@@ -95,7 +111,6 @@ const buttonLabelError = computed(() =>
     ? t('settings.login.buttonLabelError', { max: BUTTON_LABEL_MAX })
     : undefined,
 );
-const formInvalid = computed(() => Boolean(issuerError.value ?? buttonLabelError.value));
 
 const lastTest = computed(() => {
   const result = statusOf(props.snapshot, 'login.oidcLastTestResult');
@@ -106,6 +121,31 @@ const lastTest = computed(() => {
     detail: statusOf(props.snapshot, 'login.oidcLastTestDetail'),
   };
 });
+
+/** Would clear the stored test status on the server, so it counts as untested. */
+const providerChanged = computed(
+  () =>
+    login.issuer.trim() !== stored.issuer ||
+    login.clientId.trim() !== stored.clientId ||
+    login.clientSecret !== '',
+);
+const passwordBlock = computed(() =>
+  passwordDoorBlock({
+    passwordEnabled: login.passwordEnabled,
+    oidcEnabled: login.enabled,
+    providerChanged: providerChanged.value,
+    storedPasswordEnabled: stored.passwordEnabled,
+    lastTestOk: lastTest.value.result === 'ok',
+  }),
+);
+const passwordError = computed(() => {
+  if (passwordBlock.value === 'no_way_in') return t('settings.login.passwordNoWayIn');
+  if (passwordBlock.value === 'test_required') return t('settings.login.passwordTestRequired');
+  return undefined;
+});
+const formInvalid = computed(() =>
+  Boolean(issuerError.value ?? buttonLabelError.value ?? passwordError.value),
+);
 
 /** Built from the stored instance address, never the browser's: the provider compares it. */
 const redirectUri = computed(() => {
@@ -126,6 +166,7 @@ async function saveLogin(): Promise<void> {
   await action.run(async () => {
     const values: SettingWrite = {
       'login.oidcEnabled': login.enabled,
+      'login.passwordEnabled': login.passwordEnabled,
       // Empty clears it on the server, like every text setting.
       'login.oidcIssuer': login.issuer.trim(),
       'login.oidcClientId': login.clientId.trim(),
@@ -230,6 +271,15 @@ watch(redirectUri, () => {
       </p>
 
       <EuToggle v-model="login.enabled" :label="settingLabel('login.oidcEnabled')" />
+
+      <div class="eu-settings__field">
+        <EuToggle v-model="login.passwordEnabled" :label="settingLabel('login.passwordEnabled')" />
+        <p v-if="passwordError" class="eu-settings__error" role="alert">{{ passwordError }}</p>
+        <p v-else class="eu-settings__hint">{{ t('settings.login.passwordHint') }}</p>
+        <p v-if="snapshot.passwordLoginForced" class="eu-settings__sentence" role="status">
+          {{ t('settings.login.passwordForced') }}
+        </p>
+      </div>
 
       <div class="eu-settings__grid">
         <div>

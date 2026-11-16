@@ -116,6 +116,13 @@ export const SETTINGS = {
    * Switching it on needs the whole set (settings/login.ts).
    */
   'login.oidcEnabled': { section: 'login', type: 'bool', fallback: false },
+  /**
+   * Whether the password form is a way in (Slice 90). No row means open. It can
+   * only close while the provider is on, and the first close needs a green
+   * connection test (settings/login.ts); PASSWORD_LOGIN_FORCE in the environment
+   * outweighs it without touching the row (auth/password-login.ts).
+   */
+  'login.passwordEnabled': { section: 'login', type: 'bool', fallback: true },
   'login.oidcIssuer': {
     section: 'login',
     type: 'string',
