@@ -18,6 +18,9 @@ const listRoles = vi.fn<() => Promise<RoleDto[]>>();
 const restoreUser = vi.fn<(uuid: string) => Promise<AdminUserDto>>();
 const purgeUser = vi.fn<(uuid: string) => Promise<void>>();
 const deleteUser = vi.fn<(uuid: string) => Promise<void>>();
+const unlinkOidc = vi.fn<(uuid: string) => Promise<AdminUserDto>>();
+const createUser = vi.fn<(body: Record<string, unknown>) => Promise<AdminUserDto>>();
+const loadLoginOptions = vi.fn<() => Promise<{ password: boolean; oidc: null }>>();
 
 vi.mock('./api', () => ({
   listUsers: (includeDeleted?: boolean): Promise<AdminUserDto[]> => listUsers(includeDeleted),
@@ -25,15 +28,21 @@ vi.mock('./api', () => ({
   restoreUser: (uuid: string): Promise<AdminUserDto> => restoreUser(uuid),
   purgeUser: (uuid: string): Promise<void> => purgeUser(uuid),
   deleteUser: (uuid: string): Promise<void> => deleteUser(uuid),
-  createUser: vi.fn(),
+  unlinkOidc: (uuid: string): Promise<AdminUserDto> => unlinkOidc(uuid),
+  createUser: (body: Record<string, unknown>): Promise<AdminUserDto> => createUser(body),
   updateUser: vi.fn(),
-  setGlobalRoles: vi.fn(),
-  setAccountRoles: vi.fn(),
+  setGlobalRoles: vi.fn(() => Promise.resolve()),
+  setAccountRoles: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../lib/login-options', () => ({
+  loadLoginOptions: (): Promise<{ password: boolean; oidc: null }> => loadLoginOptions(),
 }));
 
 vi.mock('../lib/resource', () => ({ listResource: (): Promise<unknown[]> => Promise.resolve([]) }));
 
 const { default: UsersView } = await import('./UsersView.vue');
+const { useAuthStore } = await import('../stores/auth');
 
 function user(overrides: Partial<AdminUserDto> = {}): AdminUserDto {
   return {
@@ -43,6 +52,7 @@ function user(overrides: Partial<AdminUserDto> = {}): AdminUserDto {
     surname: 'Lovelace',
     status: 1,
     deletedAt: null,
+    oidcLinked: false,
     globalRoles: ['Admin'],
     accountGrants: [],
     ...overrides,
@@ -72,6 +82,7 @@ describe('UsersView: deleted users', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    loadLoginOptions.mockResolvedValue({ password: true, oidc: null });
     listRoles.mockResolvedValue([]);
     listUsers.mockResolvedValue([user(), deletedUser]);
     restoreUser.mockResolvedValue(user({ ...deletedUser, status: 0, deletedAt: null }));
@@ -169,5 +180,156 @@ describe('UsersView: deleted users', () => {
       expect(badge.text()).toBe('View invoices and service billings');
       expect(badge.attributes('title')).toBe('VIEW_INVOICES');
     });
+  });
+});
+
+/**
+ * The link to the sign-in provider (Slice 91): a flag in the list, a row
+ * action that asks first, and one's own link held while the password login is
+ * closed (blueprint, finding 6).
+ */
+describe('UsersView: link to the sign-in provider', () => {
+  const me = user({ uuid: '33333333-3333-3333-3333-333333333333', email: 'ich@example.com' });
+  const linked = user({ email: 'verknuepft@example.com', oidcLinked: true });
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    useAuthStore().user = { uuid: me.uuid } as never;
+    listRoles.mockResolvedValue([]);
+    loadLoginOptions.mockResolvedValue({ password: true, oidc: null });
+    unlinkOidc.mockResolvedValue({ ...linked, oidcLinked: false });
+  });
+
+  const rowOf = (wrapper: Awaited<ReturnType<typeof mountView>>, email: string) =>
+    wrapper
+      .findAll('tbody')[0]!
+      .findAll('tr')
+      .find((row) => row.text().includes(email))!;
+
+  it('flags linked accounts and offers the action only there', async () => {
+    listUsers.mockResolvedValue([linked, me]);
+    const wrapper = await mountView();
+
+    const linkedRow = rowOf(wrapper, 'verknuepft@example.com');
+    expect(linkedRow.text()).toContain('Verknüpft');
+    expect(linkedRow.find('[aria-label="Verknüpfung lösen"]').exists()).toBe(true);
+
+    const plainRow = rowOf(wrapper, 'ich@example.com');
+    expect(plainRow.text()).not.toContain('Verknüpft');
+    expect(plainRow.find('[aria-label="Verknüpfung lösen"]').exists()).toBe(false);
+  });
+
+  it('asks first, then undoes the link and reloads', async () => {
+    listUsers.mockResolvedValue([linked, me]);
+    const wrapper = await mountView();
+    await button(wrapper, 'Verknüpfung lösen')!.trigger('click');
+    await flushPromises();
+
+    expect(unlinkOidc).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('wieder über seine E-Mail-Adresse zugeordnet');
+
+    const confirm = wrapper
+      .findAll('button')
+      .find(
+        (one) => one.text() === 'Verknüpfung lösen' && one.attributes('aria-label') === undefined,
+      );
+    await confirm!.trigger('click');
+    await flushPromises();
+    expect(unlinkOidc).toHaveBeenCalledWith(linked.uuid);
+    expect(listUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds one’s own link while the password login is closed, and says why', async () => {
+    loadLoginOptions.mockResolvedValue({ password: false, oidc: null });
+    listUsers.mockResolvedValue([{ ...me, oidcLinked: true }]);
+    const wrapper = await mountView();
+    await button(wrapper, 'Verknüpfung lösen')!.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('solange die Anmeldung mit Passwort ausgeschaltet ist');
+    const confirm = wrapper
+      .findAll('button')
+      .find(
+        (one) => one.text() === 'Verknüpfung lösen' && one.attributes('aria-label') === undefined,
+      );
+    expect(confirm).toBeUndefined();
+    expect(unlinkOidc).not.toHaveBeenCalled();
+  });
+
+  it('another account’s link stays repairable while the door is closed', async () => {
+    loadLoginOptions.mockResolvedValue({ password: false, oidc: null });
+    listUsers.mockResolvedValue([linked, me]);
+    const wrapper = await mountView();
+    await button(wrapper, 'Verknüpfung lösen')!.trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('solange die Anmeldung mit Passwort ausgeschaltet ist');
+    expect(wrapper.text()).toContain('wieder über seine E-Mail-Adresse zugeordnet');
+  });
+});
+
+/**
+ * A new user starts with a generated password, in the clear (Slice 91): the
+ * administrator passes it on now — after saving it exists only as a hash.
+ */
+describe('UsersView: the password of a new user', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    listRoles.mockResolvedValue([]);
+    listUsers.mockResolvedValue([user()]);
+    loadLoginOptions.mockResolvedValue({ password: true, oidc: null });
+    createUser.mockResolvedValue(user({ uuid: '44444444-4444-4444-4444-444444444444' }));
+  });
+
+  async function openCreate() {
+    const wrapper = await mountView();
+    const create = wrapper.findAll('button').find((one) => one.text() === 'Neuer Nutzer');
+    await create!.trigger('click');
+    await flushPromises();
+    return wrapper;
+  }
+
+  const passwordInput = (wrapper: Awaited<ReturnType<typeof mountView>>) =>
+    wrapper.find('.eu-form__password input');
+
+  it('comes generated, visible and noted as shown only now', async () => {
+    const wrapper = await openCreate();
+    const input = passwordInput(wrapper);
+    expect(input.attributes('type')).toBe('text');
+    expect((input.element as HTMLInputElement).value).toMatch(/^[^-]{4}(-[^-]{4}){3}$/);
+    expect(wrapper.text()).toContain('nur jetzt zu sehen');
+  });
+
+  it('can be drawn again or overwritten, and is what gets sent', async () => {
+    const wrapper = await openCreate();
+    const first = (passwordInput(wrapper).element as HTMLInputElement).value;
+    await button(wrapper, 'Neues Passwort erzeugen')!.trigger('click');
+    expect((passwordInput(wrapper).element as HTMLInputElement).value).not.toBe(first);
+
+    await passwordInput(wrapper).setValue('mein-eigenes-1');
+    const fields = wrapper.findAll('.eu-form input');
+    await fields[0]!.setValue('neu@example.com');
+    await fields[1]!.setValue('Neu');
+    const save = wrapper.findAll('button').find((one) => one.text() === 'Speichern');
+    await save!.trigger('click');
+    await flushPromises();
+
+    expect(createUser).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'neu@example.com', password: 'mein-eigenes-1' }),
+    );
+  });
+
+  it('copies the password, and says so', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const wrapper = await openCreate();
+    const shown = (passwordInput(wrapper).element as HTMLInputElement).value;
+    await button(wrapper, 'Passwort kopieren')!.trigger('click');
+    await flushPromises();
+
+    expect(writeText).toHaveBeenCalledWith(shown);
+    expect(wrapper.text()).toContain('Passwort kopiert');
   });
 });

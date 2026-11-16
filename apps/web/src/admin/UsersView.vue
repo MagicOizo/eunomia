@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { faPen, faPlus, faRotateLeft, faTrash } from '@fortawesome/free-solid-svg-icons';
+import {
+  faLinkSlash,
+  faPen,
+  faPlus,
+  faRotateLeft,
+  faTrash,
+} from '@fortawesome/free-solid-svg-icons';
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
@@ -12,8 +18,10 @@ import type { SelectOption } from '../components/resource/EuSelectField.vue';
 import { useDialogAction } from '../lib/dialog-action';
 import { describeError } from '../lib/errors';
 import { formatDateTime } from '../lib/format';
+import { loadLoginOptions } from '../lib/login-options';
 import { listResource } from '../lib/resource';
 import { useTableSort } from '../lib/table-sort';
+import { useAuthStore } from '../stores/auth';
 import {
   type AdminUserDto,
   type RoleDto,
@@ -25,6 +33,7 @@ import {
   restoreUser,
   setAccountRoles,
   setGlobalRoles,
+  unlinkOidc,
   updateUser,
 } from './api';
 import { roleName } from './role-names';
@@ -50,12 +59,30 @@ const dialogOpen = ref(false);
 const editing = ref<AdminUserDto | null>(null);
 const deleteTarget = ref<AdminUserDto | null>(null);
 const purgeTarget = ref<AdminUserDto | null>(null);
+const unlinkTarget = ref<AdminUserDto | null>(null);
+
+/**
+ * Whether one may sign in with a password right now — switch or
+ * PASSWORD_LOGIN_FORCE, as the login page is told. Undoing one's own link to
+ * the sign-in provider waits on it (blueprint, finding 6). Should the question
+ * fail, it counts as open, and the API's own refusal is what is said.
+ */
+const passwordLoginOpen = ref(true);
+const auth = useAuthStore();
+/** The own link while the password door is closed: the dialog explains instead of asking. */
+const unlinkLocked = computed(
+  () =>
+    unlinkTarget.value !== null &&
+    unlinkTarget.value.uuid === auth.user?.uuid &&
+    !passwordLoginOpen.value,
+);
 
 /** The same sentence for both: the e-mail address is what can collide. */
 const DUPLICATE_EMAIL = (): string => t('users.duplicateEmail');
 const form = useDialogAction(reload);
 const removal = useDialogAction(reload);
 const purge = useDialogAction(reload);
+const unlink = useDialogAction(reload);
 /** Per-row error in the deleted table, keyed by UUID, as the trash does it. */
 const rowErrors = ref<Record<string, string>>({});
 const busyUuid = ref<string | null>(null);
@@ -84,6 +111,7 @@ async function reload(): Promise<void> {
   try {
     users.value = await listUsers(true);
     roles.value = await listRoles();
+    passwordLoginOpen.value = (await loadLoginOptions()).password;
     const accounts = await listResource<{
       accountUID: string;
       firstname: string;
@@ -164,6 +192,20 @@ async function restore(user: AdminUserDto): Promise<void> {
   }
 }
 
+function openUnlink(user: AdminUserDto): void {
+  unlink.clear();
+  unlinkTarget.value = user;
+}
+
+async function confirmUnlink(): Promise<void> {
+  const target = unlinkTarget.value;
+  if (!target) return;
+  await unlink.run(
+    () => unlinkOidc(target.uuid),
+    () => (unlinkTarget.value = null),
+  );
+}
+
 async function confirmPurge(): Promise<void> {
   const target = purgeTarget.value;
   if (!target) return;
@@ -220,9 +262,14 @@ async function confirmPurge(): Promise<void> {
             <td>{{ user.email }}</td>
             <td>{{ [user.firstname, user.surname].filter(Boolean).join(' ') }}</td>
             <td>
-              <EuBadge :tone="user.status === 1 ? 'done' : 'neutral'">
-                {{ user.status === 1 ? t('users.active') : t('users.inactive') }}
-              </EuBadge>
+              <span class="eu-users__badges">
+                <EuBadge :tone="user.status === 1 ? 'done' : 'neutral'">
+                  {{ user.status === 1 ? t('users.active') : t('users.inactive') }}
+                </EuBadge>
+                <EuBadge v-if="user.oidcLinked" tone="neutral" :title="t('users.linkedTitle')">
+                  {{ t('users.linked') }}
+                </EuBadge>
+              </span>
             </td>
             <td>{{ user.globalRoles.map(roleName).join(', ') || '–' }}</td>
             <td>{{ user.accountGrants.length }}</td>
@@ -234,6 +281,15 @@ async function confirmPurge(): Promise<void> {
                 :aria-label="t('users.edit')"
                 :title="t('users.editTitle')"
                 @click="openEdit(user)"
+              />
+              <EuButton
+                v-if="user.oidcLinked"
+                variant="secondary"
+                icon-only
+                :icon="faLinkSlash"
+                :aria-label="t('users.unlink')"
+                :title="t('users.unlinkTitle')"
+                @click="openUnlink(user)"
               />
               <EuButton
                 variant="secondary"
@@ -339,6 +395,29 @@ async function confirmPurge(): Promise<void> {
     </EuDialog>
 
     <EuDialog
+      :open="unlinkTarget !== null"
+      :title="t('users.unlinkTitle')"
+      @close="unlinkTarget = null"
+    >
+      <p v-if="unlinkLocked">{{ t('users.unlinkLocked') }}</p>
+      <p v-else>{{ t('users.confirmUnlink', { email: unlinkTarget?.email ?? '' }) }}</p>
+      <p v-if="unlink.error" class="eu-users__error" role="alert">{{ unlink.error }}</p>
+      <template #footer>
+        <EuButton v-if="unlinkLocked" @click="unlinkTarget = null">{{
+          t('common.close')
+        }}</EuButton>
+        <template v-else>
+          <EuButton variant="secondary" @click="unlinkTarget = null">{{
+            t('common.cancel')
+          }}</EuButton>
+          <EuButton :disabled="unlink.busy" @click="confirmUnlink">{{
+            t('users.unlink')
+          }}</EuButton>
+        </template>
+      </template>
+    </EuDialog>
+
+    <EuDialog
       :open="purgeTarget !== null"
       :title="t('users.purgeTitle')"
       @close="purgeTarget = null"
@@ -401,6 +480,10 @@ async function confirmPurge(): Promise<void> {
   width: 1%;
   white-space: nowrap;
   text-align: right;
+}
+.eu-users__badges {
+  display: inline-flex;
+  gap: 0.4rem;
 }
 .eu-users__actions button + button {
   margin-left: 0.4rem;

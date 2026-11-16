@@ -8,6 +8,8 @@ export interface AdminUserDto {
   status: number;
   /** When the user was deleted — null unless `status` is -1 (SEC-15). */
   deletedAt: string | null;
+  /** Whether the account is linked to the sign-in provider — never to what. */
+  oidcLinked: boolean;
   globalRoles: string[];
   accountGrants: Array<{ accountUID: string; roleName: string }>;
 }
@@ -57,6 +59,15 @@ export async function restoreUser(uuid: string): Promise<AdminUserDto> {
 /** Removes a deleted user for good. Not undoable. */
 export async function purgeUser(uuid: string): Promise<void> {
   await apiFetch(`/users/${uuid}/permanent`, { method: 'DELETE' });
+}
+
+/**
+ * Undoes the account's link to the sign-in provider (Slice 91); the next
+ * sign-in there links by address again. One's own only while the password
+ * login is open — otherwise `SELF_UNLINK_LOCKED`.
+ */
+export async function unlinkOidc(uuid: string): Promise<AdminUserDto> {
+  return apiData<AdminUserDto>(`/users/${uuid}/oidc-link`, { method: 'DELETE' });
 }
 
 export async function setGlobalRoles(uuid: string, roleUIDs: string[]): Promise<AdminUserDto> {

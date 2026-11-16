@@ -22,6 +22,11 @@ export interface AdminUser {
    * migration 018 recorded the moment.
    */
   deletedAt: string | null;
+  /**
+   * Whether the account is linked to an identity at the sign-in provider
+   * (Slice 91). Only the fact — the `sub` itself never leaves the API.
+   */
+  oidcLinked: boolean;
   globalRoles: string[];
   accountGrants: Array<{ accountUID: string; roleName: string }>;
 }
@@ -64,10 +69,12 @@ export async function listUsers(
       surname: string | null;
       status: number;
       deletedAt: string | null;
+      oidcLinked: number;
     }>
   >(
     `SELECT userID, uuidText AS uuid, email, firstname, surname, userStatus AS status,
-            DATE_FORMAT(deletedAt, '%Y-%m-%dT%H:%i:%s') AS deletedAt
+            DATE_FORMAT(deletedAt, '%Y-%m-%dT%H:%i:%s') AS deletedAt,
+            oidcSubject IS NOT NULL AS oidcLinked
        FROM Users
       WHERE ${options.includeDeleted === true ? 'TRUE' : 'userStatus <> -1'}
       ORDER BY email`,
@@ -87,6 +94,7 @@ export async function listUsers(
     surname: u.surname,
     status: u.status,
     deletedAt: u.deletedAt,
+    oidcLinked: Number(u.oidcLinked) === 1,
     globalRoles: globalRoles.filter((g) => g.userID === u.userID).map((g) => g.roleName),
     accountGrants: grants
       .filter((g) => g.userID === u.userID)
@@ -102,6 +110,22 @@ export async function getUser(
 ): Promise<AdminUser | null> {
   const users = await listUsers(pool, options);
   return users.find((u) => u.uuid === uuid) ?? null;
+}
+
+/**
+ * Undoes a user's link to the sign-in provider (Slice 91): the next sign-in
+ * through the provider finds the account by its address again and links it
+ * anew. Nothing else changes — password, roles and sessions stay. Returns the
+ * rows affected, 0 when the user was not linked (or is deleted).
+ */
+export async function unlinkOidcSubject(pool: Pool, uuid: string): Promise<number> {
+  const result = await execute(
+    pool,
+    `UPDATE Users SET oidcSubject = NULL
+      WHERE uuidText = ? AND userStatus <> -1 AND oidcSubject IS NOT NULL`,
+    [uuid],
+  );
+  return result.affectedRows;
 }
 
 /** Updates the given user fields (only the provided ones). Returns rows affected. */

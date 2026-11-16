@@ -7,6 +7,29 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0-slice.8 — 2026-11-16
+
+The last preview of sign-in through an OpenID Connect provider (1.3.0): repairing a link, a
+generated password for new users, and the operator documentation.
+
+- **Undo a link to the provider:** in the user administration, an account linked to an identity at
+  the sign-in provider is marked _Linked_, and the row action "Undo link" removes the link after
+  asking. The next sign-in through the provider finds the account by its email address again and
+  links it anew. Password, roles and sessions stay. One's own link can only be undone while the
+  password login is open — otherwise a changed address at the provider would lock one out; the
+  dialog says so, and the API answers `409 SELF_UNLINK_LOCKED`. New endpoint
+  `DELETE /api/v1/users/:uuid/oidc-link` (`MANAGE_USERS`), new audit event `AUTH_OIDC_UNLINKED`,
+  and the user list carries `oidcLinked` — never the identity itself.
+- **Generated password for new users:** the "New user" dialog suggests a generated password (four
+  groups of four characters, without look-alikes such as 0/O and 1/l), shown in the clear with
+  "Generate a new password" and "Copy". It can be overwritten, and it is visible only while
+  creating the account.
+- **Operator documentation:** the README describes setting up sign-in through a provider — the
+  provider side with Authentik as the example, the settings in Eunomia, the connection check and
+  its common failures, a private CA through `NODE_EXTRA_CA_CERTS`, switching the password login
+  off, the way back in with `PASSWORD_LOGIN_FORCE`, and undoing a link — and lists the sign-in and
+  user administration endpoints in the API reference.
+
 ## 1.3.0-slice.7 — 2026-11-16
 
 A preview between the steps of sign-in through an OpenID Connect provider (1.3.0) that only updates

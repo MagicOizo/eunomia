@@ -285,6 +285,7 @@ const CODE_MESSAGES: Record<SentenceCode, (details: Details) => string> = {
   SELF_ACCOUNT_ACTION: () => t('errors.code.SELF_ACCOUNT_ACTION'),
   LAST_ADMIN: () => t('errors.code.LAST_ADMIN'),
   USER_NOT_DELETED: () => t('errors.code.USER_NOT_DELETED'),
+  SELF_UNLINK_LOCKED: () => t('errors.code.SELF_UNLINK_LOCKED'),
 
   // System-Einstellungen und E-Mail-Versand
   SETTING_UNKNOWN: () => t('errors.code.SETTING_UNKNOWN'),

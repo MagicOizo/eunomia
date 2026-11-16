@@ -193,6 +193,7 @@
       "SELF_ACCOUNT_ACTION": "This action is not possible for your own account.",
       "LAST_ADMIN": "The last active administrator cannot be removed or deactivated.",
       "USER_NOT_DELETED": "This user is not deleted. Please reload the page — the list is out of date.",
+      "SELF_UNLINK_LOCKED": "Your own link to the sign-in provider cannot be undone while sign-in with a password is switched off.",
       "SETTING_UNKNOWN": "The application does not know this setting. Please reload the page and try again.",
       "SETTING_READONLY": "The application writes this value itself; it cannot be set.",
       "SETTING_INVALID_VALUE": "The value for “{label}” does not fit.",
@@ -679,6 +680,12 @@
     "purgeTitle": "Delete user permanently",
     "confirmDelete": "Really delete user “{email}”?",
     "confirmPurge": "Delete user “{email}” permanently? Their name, address, roles, account access, sessions and reminder records go with them. This cannot be undone.",
+    "linked": "Linked",
+    "linkedTitle": "Linked to an identity at the sign-in provider",
+    "unlink": "Undo link",
+    "unlinkTitle": "Undo the link to the sign-in provider",
+    "confirmUnlink": "Undo the link of “{email}” to the sign-in provider? The next sign-in through the provider finds the account by its email address again and links it anew. Password, roles and current sessions stay.",
+    "unlinkLocked": "Your own link cannot be undone while sign-in with a password is switched off: had your address changed at the sign-in provider, you could not get back in. First switch on sign-in with a password under Settings → Sign-in, or have someone else who manages users undo the link.",
     "form": {
       "newTitle": "New user",
       "email": "Email",
@@ -694,7 +701,12 @@
       "removeGrant": "Remove access",
       "addGrant": "Add account access",
       "emailAndFirstnameRequired": "Please fill in email and first name.",
-      "passwordTooShort": "Please choose a password with at least 8 characters."
+      "passwordTooShort": "Please choose a password with at least 8 characters.",
+      "regeneratePassword": "Generate a new password",
+      "copyPassword": "Copy password",
+      "passwordShownOnce": "A generated password is suggested; one of your own with at least 8 characters works too. It is shown only now: copy it and pass it on before saving. The user can change it afterwards in the profile.",
+      "passwordCopied": "Password copied. Once saved, it is not shown again.",
+      "passwordCopyFailed": "Copying did not work — the password is selected, Ctrl+C takes it."
     }
   },
   "settings": {

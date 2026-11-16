@@ -10,6 +10,7 @@ import { pathParam } from '../crud/params.js';
 import { placeholders } from '../crud/repository.js';
 import { badRequest, conflict, notFound } from '../lib/api-error.js';
 import {
+  auditOidcUnlinked,
   auditUserCreated,
   auditUserDeactivated,
   auditUserPurged,
@@ -30,10 +31,12 @@ import {
   setAccountRoles,
   setGlobalRoles,
   softDeleteUser,
+  unlinkOidcSubject,
   updateUser,
   userIdByUuid,
 } from './admin-repository.js';
 import { createRequireAuth, createRequirePermission, getAuthUser } from './middleware.js';
+import { passwordLoginAllowed } from './password-login.js';
 import { createUser, deleteActiveRefreshTokens } from './repository.js';
 
 const roleRef = z.string().regex(entityIdPattern(ENTITY_PREFIX.role));
@@ -229,6 +232,33 @@ export function createUserAdminRouter(pool: Pool, config: AppConfig): Router {
     if ((await hardDeleteUser(pool, uuid)) === 0) throw await missingOrNotDeleted(uuid);
     auditUserPurged({ actor: getAuthUser(res).uuidText, user: uuid });
     res.status(204).end();
+  });
+
+  /**
+   * Undoes an account's link to its identity at the sign-in provider (Slice 91)
+   * — the repair for a link that went to the wrong identity, or for an account
+   * that moved to another one there. The next sign-in through the provider
+   * links by address again. Not behind a password confirmation on purpose: an
+   * account that never had a password could not give one, and nothing is
+   * deleted. Sessions stay for the same reason.
+   *
+   * One's own link, though, only while the password login is open (blueprint
+   * finding 6): had the address changed at the provider, the next sign-in would
+   * find no account, and with the password door closed nobody could get back
+   * in as this user. Undoing a link that is not there answers with the user as
+   * it is — the page asked for a state that already holds.
+   */
+  router.delete('/users/:uuid/oidc-link', async (req, res) => {
+    const uuid = userUuid(req);
+    await requireUserId(uuid);
+    const actor = getAuthUser(res).uuidText;
+    if (actor === uuid && !(await passwordLoginAllowed(pool, config.auth))) {
+      throw conflict('Your own link cannot be undone while sign-in with a password is off', {
+        code: ERROR_CODES.SELF_UNLINK_LOCKED,
+      });
+    }
+    if ((await unlinkOidcSubject(pool, uuid)) > 0) auditOidcUnlinked({ actor, user: uuid });
+    sendData(res, await getUser(pool, uuid));
   });
 
   router.put('/users/:uuid/global-roles', async (req, res) => {

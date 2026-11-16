@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faArrowsRotate, faCopy, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 
@@ -9,8 +9,10 @@ import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
 import EuEntityPicker from '../design-system/components/EuEntityPicker.vue';
 import { type SelectOption } from '../components/resource/EuSelectField.vue';
+import { copyText } from '../lib/clipboard';
 import { fieldLabel } from '../lib/field-labels';
 import { useFormDialog, type FormDialogProps } from '../lib/form-dialog';
+import { generatePassword } from '../lib/generate-password';
 import { useAuthStore } from '../stores/auth';
 import type { AdminUserDto, RoleDto } from './api';
 import { roleName } from './role-names';
@@ -45,6 +47,9 @@ const password = ref('');
 const active = ref(true);
 const globalRoleUIDs = ref<Set<string>>(new Set());
 const grants = ref<Array<{ accountUID: string; roleUID: string }>>([]);
+/** Where the password field sits, so a refused copy can mark its text instead. */
+const passwordRow = ref<HTMLElement | null>(null);
+const copyState = ref<'idle' | 'copied' | 'failed'>('idle');
 
 /**
  * One's own password is not set here. The API refuses it (auth/admin-routes.ts)
@@ -71,7 +76,11 @@ const { shownError, fail, clear } = useFormDialog(
     email.value = e?.email ?? '';
     firstname.value = e?.firstname ?? '';
     surname.value = e?.surname ?? '';
-    password.value = '';
+    // A new user starts with a generated password, shown in the clear (Slice
+    // 91): the administrator hands it on now, and only now — after saving it
+    // exists only as a hash. Editing keeps the empty, hidden field.
+    password.value = e ? '' : generatePassword();
+    copyState.value = 'idle';
     active.value = e ? e.status === 1 : true;
     globalRoleUIDs.value = new Set(
       (e?.globalRoles ?? [])
@@ -85,6 +94,28 @@ const { shownError, fail, clear } = useFormDialog(
   },
   () => props.editing,
 );
+
+function regeneratePassword(): void {
+  password.value = generatePassword();
+  copyState.value = 'idle';
+}
+
+/** Copies the password; refused, the field's text is selected so a Ctrl+C takes it. */
+async function copyPassword(): Promise<void> {
+  if (await copyText(password.value)) {
+    copyState.value = 'copied';
+    return;
+  }
+  copyState.value = 'failed';
+  const input = passwordRow.value?.querySelector('input');
+  input?.focus();
+  input?.select();
+}
+
+function onPasswordInput(value: string): void {
+  password.value = value;
+  copyState.value = 'idle';
+}
 
 function toggleRole(roleUID: string, on: boolean): void {
   const next = new Set(globalRoleUIDs.value);
@@ -132,10 +163,44 @@ function submit(): void {
       <EuTextField v-model="email" :label="t('users.form.email')" type="email" />
       <EuTextField v-model="firstname" :label="fieldLabel('firstname')" />
       <EuTextField v-model="surname" :label="fieldLabel('surname')" />
+      <template v-if="!editing">
+        <div ref="passwordRow" class="eu-form__password">
+          <EuTextField
+            :model-value="password"
+            :label="t('users.form.password')"
+            @update:model-value="onPasswordInput"
+          />
+          <EuButton
+            variant="secondary"
+            icon-only
+            :icon="faArrowsRotate"
+            :aria-label="t('users.form.regeneratePassword')"
+            :title="t('users.form.regeneratePassword')"
+            @click="regeneratePassword"
+          />
+          <EuButton
+            variant="secondary"
+            icon-only
+            :icon="faCopy"
+            :aria-label="t('users.form.copyPassword')"
+            :title="t('users.form.copyPassword')"
+            @click="copyPassword"
+          />
+        </div>
+        <p class="eu-form__hint" role="status">
+          {{
+            copyState === 'copied'
+              ? t('users.form.passwordCopied')
+              : copyState === 'failed'
+                ? t('users.form.passwordCopyFailed')
+                : t('users.form.passwordShownOnce')
+          }}
+        </p>
+      </template>
       <EuTextField
-        v-if="!editingSelf"
+        v-else-if="!editingSelf"
         v-model="password"
-        :label="editing ? t('users.form.newPassword') : t('users.form.password')"
+        :label="t('users.form.newPassword')"
         type="password"
       />
       <i18n-t v-else keypath="users.form.ownPassword" tag="p" class="eu-form__hint" scope="global">
@@ -219,6 +284,15 @@ function submit(): void {
   display: flex;
   align-items: flex-end;
   gap: 0.6rem;
+}
+
+.eu-form__password {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+.eu-form__password > :first-child {
+  flex: 1;
 }
 
 .eu-form__grant > :first-child {

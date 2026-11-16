@@ -48,6 +48,7 @@ export const AUDIT_EVENTS = [
   'AUTH_FORBIDDEN',
   'AUTH_REFRESH_REUSE',
   'AUTH_OIDC_LINKED',
+  'AUTH_OIDC_UNLINKED',
   'AUTH_OIDC_FAILED',
   'USER_CREATED',
   'USER_UPDATED',
@@ -129,6 +130,15 @@ export function auditLoginOk(fields: { user: string; ip: SourceIp; method: Login
  */
 export function auditOidcLinked(fields: { user: string; ip: SourceIp }): void {
   logEvent('info', 'AUTH_OIDC_LINKED', fields);
+}
+
+/**
+ * An administrator undid an account's link to its identity at the sign-in
+ * provider (Slice 91). Warn, because the next sign-in through the provider
+ * links by address again — the moment this line is the record of.
+ */
+export function auditOidcUnlinked(fields: Actor & { user: string }): void {
+  logEvent('warn', 'AUTH_OIDC_UNLINKED', fields);
 }
 
 /**

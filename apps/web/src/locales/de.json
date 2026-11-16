@@ -193,6 +193,7 @@
       "SELF_ACCOUNT_ACTION": "Diese Aktion ist für das eigene Konto nicht möglich.",
       "LAST_ADMIN": "Der letzte aktive Administrator kann nicht entfernt oder deaktiviert werden.",
       "USER_NOT_DELETED": "Dieser Nutzer ist nicht gelöscht. Bitte die Seite neu laden — die Liste ist nicht mehr aktuell.",
+      "SELF_UNLINK_LOCKED": "Deine eigene Verknüpfung mit dem Anmeldedienst lässt sich nicht lösen, solange die Anmeldung mit Passwort ausgeschaltet ist.",
       "SETTING_UNKNOWN": "Diese Einstellung kennt die Anwendung nicht. Bitte die Seite neu laden und es erneut versuchen.",
       "SETTING_READONLY": "Diese Angabe schreibt die Anwendung selbst, sie kann nicht gesetzt werden.",
       "SETTING_INVALID_VALUE": "Der Wert für „{label}“ passt nicht.",
@@ -679,6 +680,12 @@
     "purgeTitle": "Nutzer endgültig löschen",
     "confirmDelete": "Nutzer „{email}“ wirklich löschen?",
     "confirmPurge": "Nutzer „{email}“ endgültig löschen? Name, Adresse, Rollen, Konto-Zugriffe, Sitzungen und Erinnerungs-Vermerke gehen mit. Das lässt sich nicht rückgängig machen.",
+    "linked": "Verknüpft",
+    "linkedTitle": "Mit einer Identität beim Anmeldedienst verknüpft",
+    "unlink": "Verknüpfung lösen",
+    "unlinkTitle": "Verknüpfung mit dem Anmeldedienst lösen",
+    "confirmUnlink": "Die Verknüpfung von „{email}“ mit dem Anmeldedienst lösen? Bei der nächsten Anmeldung über den Anmeldedienst wird das Konto wieder über seine E-Mail-Adresse zugeordnet und neu verknüpft. Passwort, Rollen und laufende Sitzungen bleiben.",
+    "unlinkLocked": "Deine eigene Verknüpfung lässt sich nicht lösen, solange die Anmeldung mit Passwort ausgeschaltet ist: hätte sich deine Adresse beim Anmeldedienst geändert, kämst du danach nicht mehr herein. Schalte unter Einstellungen → Anmeldung zuerst die Anmeldung mit Passwort ein, oder lass die Verknüpfung von jemand anderem lösen, der Nutzer verwalten darf.",
     "form": {
       "newTitle": "Neuer Nutzer",
       "email": "E-Mail",
@@ -694,7 +701,12 @@
       "removeGrant": "Zugriff entfernen",
       "addGrant": "Konto-Zugriff hinzufügen",
       "emailAndFirstnameRequired": "Bitte E-Mail und Vorname ausfüllen.",
-      "passwordTooShort": "Bitte ein Passwort mit mindestens 8 Zeichen vergeben."
+      "passwordTooShort": "Bitte ein Passwort mit mindestens 8 Zeichen vergeben.",
+      "regeneratePassword": "Neues Passwort erzeugen",
+      "copyPassword": "Passwort kopieren",
+      "passwordShownOnce": "Vorgeschlagen ist ein erzeugtes Passwort, ein eigenes mit mindestens 8 Zeichen geht auch. Es ist nur jetzt zu sehen: vor dem Speichern kopieren und weitergeben. Danach kann der Nutzer es im Profil ändern.",
+      "passwordCopied": "Passwort kopiert. Nach dem Speichern ist es nicht mehr zu sehen.",
+      "passwordCopyFailed": "Kopieren ging nicht — das Passwort ist markiert, Strg+C übernimmt es."
     }
   },
   "settings": {

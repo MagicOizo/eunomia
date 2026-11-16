@@ -98,6 +98,13 @@ export const ERROR_CODES = {
    * good. Both actions exist only for a row with `userStatus = -1` (SEC-15).
    */
   USER_NOT_DELETED: 'USER_NOT_DELETED',
+  /**
+   * One's own link to the sign-in provider cannot be undone while the password
+   * login is closed (Slice 91, blueprint finding 6): had the address changed at
+   * the provider, the next sign-in would find no account and nobody could get
+   * back in as this user.
+   */
+  SELF_UNLINK_LOCKED: 'SELF_UNLINK_LOCKED',
 
   // System settings and mail (see settings/registry.ts, mail/mailer.ts)
   /** Key is not in the settings registry — a typo, or an outdated client. */

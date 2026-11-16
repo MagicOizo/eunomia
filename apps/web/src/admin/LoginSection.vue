@@ -15,6 +15,7 @@ import EuButton from '../design-system/components/EuButton.vue';
 import EuCollapsibleSection from '../design-system/components/EuCollapsibleSection.vue';
 import EuTextField from '../design-system/components/EuTextField.vue';
 import EuToggle from '../design-system/components/EuToggle.vue';
+import { copyText } from '../lib/clipboard';
 import { useDialogAction } from '../lib/dialog-action';
 import { settingLabel } from '../lib/field-labels';
 import { formatDateTime } from '../lib/format';
@@ -211,11 +212,9 @@ async function runTest(): Promise<void> {
  */
 async function copyRedirectUri(): Promise<void> {
   if (redirectUri.value === null) return;
-  try {
-    if (!navigator.clipboard) throw new Error('no clipboard');
-    await navigator.clipboard.writeText(redirectUri.value);
+  if (await copyText(redirectUri.value)) {
     copyState.value = 'copied';
-  } catch {
+  } else {
     copyState.value = 'failed';
     const element = uriElement.value;
     const selection = window.getSelection();

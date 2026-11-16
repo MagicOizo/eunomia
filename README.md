@@ -66,6 +66,97 @@ The created user gets the `Admin` role globally. Afterwards the endpoint returns
 `SETUP_TOKEN` from `.env` to disable it entirely. From then on, manage users and their access from
 the **System → Nutzer & Rechte** page in the app.
 
+## Sign-in through an OpenID Connect provider
+
+Besides the password, Eunomia can let people in through a sign-in provider that speaks OpenID
+Connect (Authentik, Keycloak, Authelia, …). Once that works, the password login can be switched off.
+Everything is set up in the app under **System > Settings → Sign-in**; nothing goes into `.env`
+except the way back in described below.
+
+**What it does and what it does not.** The provider only says _who_ someone is; what they may see
+stays in Eunomia. It creates no accounts and hands out no roles: someone the user administration
+does not know is turned away. The first sign-in finds the account by its email address and links
+it to the identity at the provider (its `sub`); from then on that link decides, so a changed
+address at the provider does not lose the account. An account already linked to a different
+identity is refused, never relinked silently. Scopes are `openid profile email`, nothing more.
+Signing out ends the session in Eunomia, not the one at the provider.
+
+### At the provider (Authentik as the example)
+
+1. Create a **provider** of type _OAuth2/OpenID Provider_ with client type **Confidential**.
+2. **Redirect URI:** exactly the line Eunomia shows under _Sign-in_ to copy, of the form
+   `https://<eunomia-host>/api/v1/auth/oidc/callback`. Do not leave it empty — Authentik then
+   remembers whichever URI is used first.
+3. **Signing key: pick a certificate — this is required.** Without one, Authentik signs the tokens
+   with HS256 and publishes no key, and Eunomia (rightly) refuses tokens it cannot verify with a
+   public key. The connection check says so.
+4. Scopes `openid`, `profile` and `email` (Authentik puts the address into the token only with
+   `profile`). Leave _Subject mode_ at its default; set to the email address, the identity would
+   move with every address change, which is exactly what the link is meant to survive.
+5. Create an **application** bound to that provider. Its slug determines the **issuer URL**:
+   `https://<provider>/application/o/<slug>/`, with the trailing slash. Authentik pairs application
+   and provider one to one, so a test and a production instance each need their own pair.
+
+Other providers need the same: a confidential client, the exact redirect URI, asymmetric token
+signatures (RS256, ES256, …) and the three scopes.
+
+### In Eunomia
+
+1. Under **General**, set **URL of this instance** (e.g. `https://<eunomia-host>`). The redirect
+   URI is built from it and never from the request, so it must be the address people actually use.
+2. Under **Sign-in**, enter the **issuer URL** — not the `.well-known/openid-configuration`
+   address: Eunomia appends that itself and checks that the document names the same issuer, a check
+   that entering the discovery URL would switch off. Then client ID and client secret. The secret
+   is stored encrypted and needs `CONFIG_ENCRYPTION_KEY` in the environment; it never leaves the
+   API again.
+3. Save, then **Check connection**. It fetches the discovery document and the provider's keys and
+   says in words what failed. Common causes: `ENOTFOUND`/`ECONNREFUSED` (wrong address, or not
+   reachable from the container), `SELF_SIGNED_CERT_IN_CHAIN`/`UNABLE_TO_VERIFY_LEAF_SIGNATURE`
+   (a private CA, see below), `404` on the discovery document (wrong slug) and "no asymmetric
+   signature" (step 3 above).
+4. Switch on **Sign-in through a provider**. The login page now shows the button (its label can be
+   set) below the password form.
+
+**A provider behind a private CA:** Node trusts only the public CAs. Mount your CA certificate
+into the container and point `NODE_EXTRA_CA_CERTS` at it, for instance in a
+`docker-compose.override.yml` next to `docker-compose.yml`:
+
+```yaml
+services:
+  api:
+    environment:
+      NODE_EXTRA_CA_CERTS: /certs/internal-ca.pem
+    volumes:
+      - ./internal-ca.pem:/certs/internal-ca.pem:ro
+```
+
+### Switching the password login off
+
+**Allow sign-in with a password** under _Sign-in_ can then be switched off; the login page shows
+only the provider button, and `POST /api/v1/auth/login` answers `403`. Two locks keep you from
+locking yourself out: password login and provider can never both be off, and switching the
+password login off needs a successful connection check of the provider as saved. Switching it back
+on is always possible. The passwords themselves are kept.
+
+**The way back in:** should the provider fail while it is the only way in, set
+`PASSWORD_LOGIN_FORCE=true` in `.env` and run `docker compose up -d` (a `restart` does not pick up
+a changed variable). The password login is then open whatever the settings say, the settings page
+says so, and every start logs a warning. Remove the variable and run `up -d` again once the
+provider works.
+
+### Undoing a link
+
+Under **System → Nutzer & Rechte**, a linked account carries the mark _Linked_, and the row action
+**Undo link** removes the link: the next sign-in through the provider finds the account by its
+address again and links it anew. That is the repair for an account linked to the wrong identity,
+or one that moved to another identity at the provider. Password, roles and sessions stay. Your own
+link can only be undone while the password login is open — had your address changed at the
+provider, you could not get back in.
+
+New users still get a password: the dialog suggests a generated one and shows it only while
+creating the account. With the password login switched off, nobody signs in with it; it is what
+`PASSWORD_LOGIN_FORCE` opens the door for.
+
 ## Language
 
 Eunomia speaks German and English. Each user picks language and format (German, British or US dates
@@ -292,6 +383,19 @@ under **Trash** below. Log in via
 `POST /api/v1/auth/login` (returns a short-lived `accessToken` in the body; a long-lived refresh
 token is set as an httpOnly cookie scoped to `/api/v1/auth`); use `POST /api/v1/auth/refresh` /
 `/auth/logout` to renew or end the session.
+
+Sign-in through the provider (see above) runs over `GET /api/v1/auth/oidc/start`, which redirects
+to the provider, and `GET /api/v1/auth/oidc/callback`, which ends in the same session as the
+password login (`302 /`) or back on the login page with `?oidcError=<code>`. Both are public and
+limited per address (by default 20 requests in 5 minutes, `RATE_LIMIT_OIDC_*`). `GET /api/v1/login-options` (public, 60 a minute)
+tells the login page whether the password form is open and whether there is a provider button, with
+its label. `POST /api/v1/settings/login/test` (`MANAGE_SETTINGS`) runs the connection check.
+
+**Users** (`MANAGE_USERS`, held globally): `/api/v1/users` (`GET`, `POST`, `PATCH /:uuid`,
+`DELETE /:uuid`, `POST /:uuid/restore`, `DELETE /:uuid/permanent`, `PUT /:uuid/global-roles`,
+`PUT /:uuid/account-roles`) and `GET /api/v1/roles`. A user carries `oidcLinked`, never the identity
+itself; `DELETE /:uuid/oidc-link` undoes the link, and for one's own account answers
+`409 SELF_UNLINK_LOCKED` while the password login is closed.
 
 **Master data**
 
