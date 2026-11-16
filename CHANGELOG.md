@@ -7,6 +7,44 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0 — 2026-11-16
+
+Sign-in through an OpenID Connect provider, released as the eight previews below and checked
+against a real Authentik.
+
+- **A second way in.** Under System > Settings, the new section _Sign-in_ sets up a provider that
+  speaks OpenID Connect (issuer, client ID, client secret, button label). The secret is stored
+  encrypted and never leaves the API. _Check connection_ fetches the discovery document and the
+  provider's keys and says in words what failed; the redirect URI to enter at the provider is shown
+  ready to copy. Its base is the new _URL of this instance_ under _General_, which also serves the
+  link in the reminder mails (formerly a reminder setting).
+- **The login page offers the provider** as a button below the password form. The first sign-in
+  links the account by its email address, later ones by the provider's identity. No accounts are
+  created and no roles taken from the provider; an unknown, deactivated or deleted account, a
+  missing address or an account linked elsewhere comes back to the login page with a sentence in
+  the reader's language.
+- **The password login can be switched off** — without a way to lock oneself out: password login
+  and provider are never both off, and switching off needs a successful connection check. Should
+  the provider fail, `PASSWORD_LOGIN_FORCE=true` in the environment opens the password login again
+  until it is removed.
+- **The user administration** marks linked accounts and can undo a link; one's own only while the
+  password login is open. A new user gets a generated password suggested, shown only while
+  creating the account.
+- **Copying works over plain http too:** on an instance reached without TLS under its own name, the
+  browser offers no clipboard API; the copy buttons for the redirect URI and the generated password
+  now copy anyway instead of only selecting the text.
+- **Documentation:** the README describes the setup on both sides, with Authentik as the example,
+  and the way back in. DEV.md explains own host names for the dev servers (`DEV_HOSTS`) and a
+  provider behind a private CA (`NODE_EXTRA_CA_CERTS`).
+- **API changes:** new public `GET /api/v1/auth/oidc/start`, `GET /api/v1/auth/oidc/callback` and
+  `GET /api/v1/login-options`; `POST /api/v1/settings/login/test`;
+  `DELETE /api/v1/users/:uuid/oidc-link`; `POST /api/v1/auth/login` answers
+  `403 PASSWORD_LOGIN_DISABLED` while the password login is off. New audit events
+  `AUTH_OIDC_LINKED`, `AUTH_OIDC_UNLINKED` and `AUTH_OIDC_FAILED`; `AUTH_LOGIN_OK` carries the
+  method. Migrations 021 (`reminders.appUrl` → `general.appUrl`) and 022 (`Users.oidcSubject`).
+- **Dependencies:** `mariadb` 3.5.5 and further updates from the audit, zod 3 → 4
+  (GHSA-mrhx-c7xc-m3w5).
+
 ## 1.3.0-slice.8 — 2026-11-16
 
 The last preview of sign-in through an OpenID Connect provider (1.3.0): repairing a link, a
