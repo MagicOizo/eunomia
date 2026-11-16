@@ -5,6 +5,15 @@ import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 
+/** The extra host names from DEV_HOSTS, or undefined for Vite's default. */
+function devHosts(): string[] | undefined {
+  const hosts = (process.env.DEV_HOSTS ?? '')
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean);
+  return hosts.length > 0 ? hosts : undefined;
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -16,6 +25,11 @@ export default defineConfig({
     }),
   ],
   server: {
+    // Vite answers only localhost and IP addresses by default. DEV_HOSTS
+    // (comma-separated, e.g. a name in the hosts file) adds more — set by
+    // whoever runs `npm run dev:up`, never written here: the repository is
+    // public, and the names are someone's network (see DEV.md).
+    allowedHosts: devHosts(),
     // In dev the SPA runs on :5173 and the API on :3000. Proxying keeps the
     // browser on one origin so the httpOnly refresh cookie (path /api/v1/auth)
     // is sent back without cross-site cookie friction.

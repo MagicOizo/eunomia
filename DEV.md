@@ -34,6 +34,24 @@ credentials it prints (default `admin@example.com` / `eunomia` — override via 
 `DEV_ADMIN_PASSWORD`). In WSL2, `localhost` forwards from Windows automatically, so the same URL
 works in your Windows browser.
 
+**A proper host name** (handy for testing sign-in through a provider, whose redirect URI wants a
+stable address): map the name to `127.0.0.1` in the hosts file of the machine the browser runs on
+(on Windows `C:\Windows\System32\drivers\etc\hosts`), and tell Vite about it — it answers only
+`localhost` and IP addresses otherwise ("Blocked request. This host is not allowed"):
+
+```bash
+DEV_HOSTS=eunomia-dev.example.lan npm run dev:up   # comma-separated for several
+```
+
+The names stay out of the repository on purpose; to keep one, export `DEV_HOSTS` in your shell
+profile. For sign-in through a provider, set **URL of this instance** under Settings → General to
+`http://<that name>:5173`; the redirect URI follows from it, and the cookies work over http in dev.
+
+**A sign-in provider behind a private CA:** the dev API runs on the host's Node, which trusts only
+the public CAs, so the connection check fails with `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. Pass the CA
+certificate (PEM) along: `NODE_EXTRA_CA_CERTS=/path/to/ca.pem npm run dev:up`. The start message
+names it, and warns when the file is not readable.
+
 `Ctrl-C` stops the API and web servers; the database keeps running. To stop it too:
 
 ```bash

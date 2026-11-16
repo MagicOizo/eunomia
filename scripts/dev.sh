@@ -46,9 +46,24 @@ npm run build --workspace packages/shared
 echo "▶ Migration + Seed (inkl. Dev-Admin)…"
 npm run seed --workspace apps/api
 
+# A sign-in provider behind a private CA: Node trusts only the public CAs, so
+# the API needs the CA certificate through NODE_EXTRA_CA_CERTS. Exported by the
+# caller, it reaches the API as it is; checked here because Node only warns
+# about a missing file once, deep in the log.
+if [ -n "${NODE_EXTRA_CA_CERTS:-}" ] && [ ! -r "$NODE_EXTRA_CA_CERTS" ]; then
+  echo "⚠ NODE_EXTRA_CA_CERTS zeigt auf keine lesbare Datei: $NODE_EXTRA_CA_CERTS"
+fi
+
 echo ""
 echo "───────────────────────────────────────────────"
 echo "  Web-App:  http://localhost:5173"
+# Extra host names (DEV_HOSTS, comma-separated) that Vite lets through.
+IFS=',' read -ra dev_hosts <<<"${DEV_HOSTS:-}"
+for host in "${dev_hosts[@]}"; do
+  host="${host// /}"
+  if [ -n "$host" ]; then echo "            http://${host}:5173"; fi
+done
+if [ -n "${NODE_EXTRA_CA_CERTS:-}" ]; then echo "  Eigene CA: ${NODE_EXTRA_CA_CERTS}"; fi
 echo "  Login:    ${DEV_ADMIN_EMAIL} / ${DEV_ADMIN_PASSWORD}"
 echo "  (Strg-C beendet API + Web; DB läuft weiter)"
 echo "───────────────────────────────────────────────"
