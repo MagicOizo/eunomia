@@ -2338,5 +2338,59 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - **Mitwirken:** `CONTRIBUTING.md` (nur der Autor committet, Issues auf Deutsch oder Englisch, PRs nur nach Absprache im Issue), `SECURITY.md` (nur das neueste Release wird gepflegt, Meldung über GitHubs private Vulnerability-Meldung) und Issue-Templates für Fehler und Wünsche. Leere Issues sind abgeschaltet, Sicherheitsmeldungen haben einen eigenen Kontakt-Link. Die Templates warnen vor echten Daten in Screenshots und Logs.
 - **Patch statt Minor** (Entscheidung des Autors): Die Änderung bringt kein neues Feature. Sie korrigiert Texte, die mit dem Umstellen falsch werden. Getaggt wird erst, wenn das Repo öffentlich ist.
 
+## Paket Anmeldung über OIDC — Slices 85–91 (1.3.0)
+
+Geplant 2026-11-16. Eunomia kennt bis 1.2.1 nur die Passwort-Anmeldung. Im Schwesterprojekt Hyperion ist die Anmeldung über einen OIDC-Anbieter in neun Scheiben gebaut und gegen ein echtes Authentik geprüft; die Entscheidungen, ihre Begründung und die Funde beim Bauen stehen in [oidc-blueprint.md](oidc-blueprint.md). Dieses Paket übernimmt die Entscheidungen, nicht den Code, und hat jede Stelle aus dessen Abschnitt 6 am Code gegengeprüft (Ergebnis unten). Der Anbieter heißt wie dort neutral **Anmeldedienst**.
+
+**Ziel:** ein zweiter Weg herein über einen Anmeldedienst, danach optional die Passwort-Anmeldung abschaltbar — ohne dass man sich zu irgendeinem Zeitpunkt aussperren kann. Deshalb die Reihenfolge: erst Konfiguration und Prüfung, dann der Login-Weg, der Schalter, der die Passwort-Tür schließt, ganz zum Schluss.
+
+**Entscheidungen des Autors (2026-11-16):**
+- **Basis-URL:** `reminders.appUrl` wird zu **`general.appUrl`** (Migration benennt den Schlüssel in `SystemSettings` um) und dient beiden: dem Link in der Erinnerungsmail und der Redirect-URI. Eine Quelle, in der App änderbar wie die übrige OIDC-Konfiguration; keine Umgebungsvariable `APP_URL`. Die Redirect-URI kommt nie aus dem Host-Header (Blueprint, Fund 3).
+- **Passwort beim Anlegen bleibt Pflicht** (`Users.passwordHash NOT NULL` bleibt). Der Anlegen-Dialog erzeugt eines, zeigt es einmal und lässt es überschreiben. Eunomia hat keine Einladungsmail, Fund 5 des Blueprints entfällt damit.
+- Aus dem Blueprint übernommen: Konfiguration in der Anwendung statt `.env`; Secret verschlüsselt, verlässt die API nie; zwei Verträge (Admin vs. öffentlich); **keine Kontoanlage, keine Rollen aus dem Token**, Scopes nur `openid profile email`; Verknüpfung einmal über die Adresse, danach über `sub`, eine fremde Verknüpfung wird abgewiesen statt überschrieben; Flow-Zustand im signierten, kurzlebigen Cookie; das Zugriffstoken wandert nie durch eine URL; Fehler des Login-Wegs als Redirect mit Code; Notausgang als Umgebungsvariable.
+
+**Gegenprüfung am Code (Blueprint §6):**
+
+| Blueprint | Eunomia | Folge |
+| --- | --- | --- |
+| Singleton-Zeile aus der Migration | Key-Value-Katalog `settings/registry.ts`, eine fehlende Zeile antwortet mit `fallback` | trägt gleich sicher: `login.passwordEnabled` mit `fallback: true` sagt ohne Zeile „Passwort an". Keine Tabelle |
+| Secret verschlüsselt | `type: 'secret'` + `lib/secret-box.ts` (`CONFIG_ENCRYPTION_KEY`) | wiederverwenden; ohne Schlüssel lässt sich kein Client-Secret speichern, wie beim Mail-Passwort |
+| eigene Admin-Endpunkte GET/PUT | generisches `GET/PUT /settings`, atomar über `setSettings` | **keine eigenen Endpunkte**; der PUT bekommt eine Querprüfung für die Section `login` |
+| Status der Prüfung | `readonly`-Schlüssel wie `mail.lastSend*` | `login.oidcLastTestAt/Result/Error` |
+| `APP_ORIGIN` | fehlt, nur das optionale `reminders.appUrl` | `general.appUrl` (siehe oben) |
+| JWT | `jose` (`auth/tokens.ts`) | Flow-Zustand per `SignJWT`/`jwtVerify`, eigener `use`-Anspruch |
+| Refresh-Cookie `strict` | `auth/http.ts`, Pfad `/api/v1/auth`, `secure: isProduction` | Fund 2 trifft 1:1: Flow-Cookie `lax`, Pfad `/api/v1/auth/oidc`, `secure` wie das Refresh-Cookie |
+| Brute-Force-Zählung, Sweeps an der Anmeldung | gibt es nicht: kein Zähler, der Refresh-Sweep läuft auf eigenem Timer (`auth/cleanup.ts`) | entfällt |
+| Fund 4 „hat ein Passwort"-Spalte | keine solche Spalte; die Empfänger der Erinnerung filtern nicht darauf | entfällt |
+| Fund 5 Einladungsmail | keine Einladung | entfällt (siehe oben) |
+| Fund 7 FK `updated_by` | `setSettings` schreibt den Akteur schon | entfällt |
+| Rate-Limit | `app.ts`: global 300/min, Auth 10/15 min auf feste Pfade | eigener Limiter für `/auth/oidc/*` (20 / 5 min) und `/login-options` (60 / min) |
+| — | CSP `form-action 'self'` | der Knopf ist ein Link (`<a href>`), kein Formular — sonst blockt Chromium den Redirect zum Anbieter |
+| — | **I-11** „ausgehende Aufrufe an feste Ziele" | der Issuer ist eine konfigurierbare URL: benannte, begründete Ausnahme (nur `MANAGE_SETTINGS`, nur https wie die Vorgabe von `openid-client`, eigene CA über `NODE_EXTRA_CA_CERTS`) |
+| — | **I-1** abschließende Liste öffentlicher Routen, `route-guards.test.ts` | um `/auth/oidc/start`, `/auth/oidc/callback` und `/login-options` erweitern |
+| — | Dev: Vite (:5173) proxyt `/api` | Redirects relativ (`/`, `/login?oidcError=…`); `general.appUrl` ist in der Dev der Vite-Origin |
+| `openid-client` | noch keine Abhängigkeit, Node 24 | `openid-client@^6` (panva), die Funktions-API |
+
+**Querschnittsregeln:**
+- **Öffentliches Repo:** keine echten Issuer, Hostnamen oder Adressen in Doku, Tests oder Fixtures — Platzhalter wie `https://<provider>/application/o/<slug>/`.
+- Jede Meldung in **de und en**; Fehlercodes des Login-Wegs sind ein Vertrag in `@eunomia/shared`, die Sätze bildet das Web (kompilergeprüft je Code wie `error-messages.ts`).
+- Tests mocken `openid-client`, nicht den eigenen Client, damit Issuer, Client-ID und das **entschlüsselte** Secret als übergeben festgehalten sind. Je Fehlerabzweigung ein Test auf den Code, nicht den Wortlaut.
+- Jede Integrationssuite legt ihren Akteur selbst an; wer `login.passwordEnabled` umlegt, stellt es in `afterEach` zurück (Blueprint, Fund 8).
+
+| Slice | Version | Scheibe |
+| --- | --- | --- |
+| 85 | `1.3.0-slice.1` | **Konfigurierbar.** Section `login` im Katalog: `login.oidcEnabled`, `login.oidcIssuer` (URL-Check), `login.oidcClientId`, `login.oidcClientSecret` (secret), `login.oidcButtonLabel`, die Status-Schlüssel readonly; `SETTING_KEYS` in `shared`. Migration 021 benennt `reminders.appUrl` in `general.appUrl` um, Erinnerung und Einstellungsseite ziehen mit. Querprüfung im PUT: `oidcEnabled` nur mit Issuer, Client-ID, Secret und `general.appUrl`. Eine Konstante für den Callback-Pfad, aus der Route und angezeigte Redirect-URI entstehen. Noch kein Login-Weg |
+| 86 | `1.3.0-slice.2` | **Prüfbar.** `POST /settings/login/test` (`MANAGE_SETTINGS`): Discovery ohne Cache, dann Signaturverfahren (nur asymmetrische) und mindestens ein Schlüssel am JWKS-Endpunkt mit eigenem Timeout — Fund 1 mit Ursache im Klartext. Ergebnis in die Status-Schlüssel. Discovery-Cache für den Login-Weg, verworfen bei jedem Speichern von `login.*`/`general.appUrl`, Fehlschläge werden nicht gemerkt |
+| 87 | `1.3.0-slice.3` | **Ansicht.** Abschnitt „Anmeldung" in den Einstellungen (Muster der Mail-Section): Formular, Statuszeile (Text + Icon), „Verbindung prüfen", Redirect-URI zum Kopieren |
+| 88 | `1.3.0-slice.4` | **Login-Weg.** Migration 022 `Users.oidcSubject` (nullable, UNIQUE). `GET /auth/oidc/start` (state, nonce, PKCE im signierten Flow-Cookie, 10 min) und `GET /auth/oidc/callback` (Callback-URL aus `general.appUrl` samt Query, Fund 3). Kontoauflösung `sub` → Adresse + sofortige Verknüpfung; fremde Verknüpfung, kein Konto, inaktives Konto, fehlende Adresse je eigener Code. Sitzung über `issueSession` wie nach der Passwort-Anmeldung, `302 /`; Fehler als `302 /login?oidcError=<code>`. Audit, Limiter, I-1, I-11. Noch kein Knopf |
+| 89 | `1.3.0-slice.5` | **Knopf.** `GET /login-options` öffentlich: nur ob die Passwort-Anmeldung offen ist und ob/mit welcher Beschriftung es einen Knopf gibt. Login-Seite zeigt den Knopf als Link, `oidcError` wird zum Satz |
+| 90 | `1.3.0-slice.6` | **Passwort-Anmeldung abschaltbar.** `login.passwordEnabled` (Vorgabe an). Eine Funktion beantwortet „darf man sich mit Passwort anmelden?" (Notausgang gegen Schalter); daran hören der Login-Endpunkt (weist **zuerst** ab), `/login-options` und die Sperre in 91. Sperren im PUT: „beide Türen zu" immer abgewiesen; der Übergang an → aus verlangt eine erfolgreiche letzte Prüfung; der Rückweg ist nie gesperrt. Notausgang `PASSWORD_LOGIN_FORCE` in `config/env.ts`, `.env.example` und `docker-compose.yml` (durchreichen, wirkt erst bei `up -d`); im Admin-Vertrag ein eigenes Feld neben dem Schalter, die Ansicht rechnet dasselbe aus |
+| 91 | `1.3.0-slice.7` | **Abschluss.** „Verknüpfung lösen" in der Benutzerverwaltung (`MANAGE_USERS`; für sich selbst gesperrt, solange die Passwort-Anmeldung zu ist — Fund 6), Kennzeichen „verknüpft" in der Liste. Anlegen-Dialog mit erzeugtem, einmal sichtbarem Passwort. Betreiber-Doku samt Einrichtung auf der Anbieterseite (Authentik, Platzhalter) |
+| — | `1.3.0` | Release-Commit erst nach Bestätigung in der Dev und der Probe am echten Anmeldedienst in der Reihenfolge aus Blueprint §5 |
+
+**Bewusst nicht:** Single Logout, Kontoanlage und Rollen aus dem Token, ein zweiter Anbieter parallel, eine Sitzungs-Migration beim Umschalten, ein Hinweis auf der „Passwort setzen"-Seite.
+
+Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden wird, steht danach hier unter der Scheibe bzw. in `CHANGELOG.md`.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)
