@@ -248,7 +248,7 @@ test('admin user/role management: DoD flow, gating, guards', async (t) => {
       assert.equal(
         (
           await request(app)
-            .delete('/api/v1/users/11111111-1111-1111-1111-111111111111/permanent')
+            .delete('/api/v1/users/11111111-1111-4111-8111-111111111111/permanent')
             .set(admin)
         ).status,
         404,

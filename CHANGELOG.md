@@ -7,6 +7,18 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0-slice.7 — 2026-11-16
+
+A preview between the steps of sign-in through an OpenID Connect provider (1.3.0) that only updates
+dependencies, to close the findings of the dependency audit in CI. No change in behaviour.
+
+- **Runtime dependencies updated:** `mariadb` 3.5.5 (SQL injection under `NO_BACKSLASH_ESCAPES`
+  and further advisories), `body-parser`, `qs`, `nodemailer` and the `@intlify/*` packages, all
+  within their existing ranges.
+- **zod 3 → 4:** the 3.x line has no fix for GHSA-mrhx-c7xc-m3w5 (memory exhaustion on large
+  arrays), so validation moves to zod 4.6.7. Request validation answers as before; a path
+  parameter that must be a UUID now also has to carry a valid RFC 4122 variant.
+
 ## 1.3.0-slice.6 — 2026-11-16
 
 The sixth preview of sign-in through an OpenID Connect provider (1.3.0). Sign-in with a password

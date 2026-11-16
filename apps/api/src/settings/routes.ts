@@ -49,7 +49,7 @@ import { getPublicSettings, getSettings, setSettings } from './repository.js';
  * The registry validates each value; this schema only fixes the envelope.
  */
 const updateSchema = z.object({
-  values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
 });
 
 /** A reminder run asked for by hand, rather than by the clock. */

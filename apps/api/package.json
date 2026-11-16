@@ -1,6 +1,6 @@
 {
   "name": "@eunomia/api",
-  "version": "1.3.0-slice.6",
+  "version": "1.3.0-slice.7",
   "private": true,
   "description": "Eunomia backend API.",
   "type": "module",
@@ -29,7 +29,7 @@
     "nodemailer": "^10.0.10",
     "openid-client": "^6.9.0",
     "umzug": "^3.8.3",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
