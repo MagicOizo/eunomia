@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import type { Pool } from 'mariadb';
 
 import { createUserAdminRouter } from './auth/admin-routes.js';
+import { createLoginOptionsRouter } from './auth/login-options.js';
 import { createAuthRouter, redirectToLoginWithError } from './auth/routes.js';
 import type { AppConfig } from './config/env.js';
 import { createAccountsRouter } from './domain/accounts.js';
@@ -54,8 +55,9 @@ export interface AppDependencies {
  * built app. It has to be readable here or nowhere.
  *
  * `versionRouter` is deliberately not in the list: it needs no pool and doubles
- * as the container health check. Like `/locale-defaults` (which is in it) it
- * answers before anyone has logged in — see the exception list of I-1.
+ * as the container health check. Like `/locale-defaults` and `/login-options`
+ * (which are in it) it answers before anyone has logged in — see the
+ * exception list of I-1.
  */
 export const API_MOUNTS: ReadonlyArray<{
   path: string;
@@ -66,6 +68,7 @@ export const API_MOUNTS: ReadonlyArray<{
   { path: '/api/v1', create: createUpdateCheckRouter },
   { path: '/api/v1', create: createSettingsRouter },
   { path: '/api/v1', create: createLocaleDefaultsRouter },
+  { path: '/api/v1', create: createLoginOptionsRouter },
   { path: '/api/v1/accounts', create: createAccountsRouter },
   { path: '/api/v1/accounts', create: createReimbursementPlanRouter },
   { path: '/api/v1/companies', create: createInsuranceCompaniesRouter },
@@ -113,6 +116,10 @@ const CSP_DIRECTIVES = {
   // the directive would upgrade this origin's own subresources to https, where
   // nothing answers.
 };
+
+/** The limit on `GET /login-options`: 60 a minute per address. */
+const LOGIN_OPTIONS_MAX = 60;
+const LOGIN_OPTIONS_WINDOW_MS = 60 * 1000;
 
 /** Builds a rate limiter that responds with our JSON error envelope on 429. */
 function limiter(windowMs: number, max: number) {
@@ -192,6 +199,10 @@ export function createApp(deps?: AppDependencies): Express {
         handler: (_req, res) => redirectToLoginWithError(res, OIDC_LOGIN_ERRORS.RATE_LIMITED),
       }),
     );
+    // Asked once per visit of the login page, before anyone signs in. Tighter
+    // than the global limit because it needs no token; a fixed figure, since
+    // nobody has a reason to tune it — the global limit stays the knob.
+    app.use('/api/v1/login-options', limiter(LOGIN_OPTIONS_WINDOW_MS, LOGIN_OPTIONS_MAX));
   }
 
   // Version endpoint (no DB) doubles as the container health check.

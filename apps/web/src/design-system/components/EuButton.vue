@@ -26,6 +26,13 @@ const props = withDefaults(
      * with a `router.push` never would.
      */
     to?: string;
+    /**
+     * Makes the button a plain link to an address outside the SPA's router —
+     * a full page navigation (Slice 89: the login page's way to the sign-in
+     * provider, which leaves through the API's redirect). `to` would not do:
+     * a RouterLink keeps `/api/...` inside the SPA and finds no route there.
+     */
+    href?: string;
   }>(),
   {
     variant: 'primary',
@@ -36,6 +43,7 @@ const props = withDefaults(
     ariaLabel: undefined,
     title: undefined,
     to: undefined,
+    href: undefined,
   },
 );
 
@@ -61,6 +69,16 @@ const classes = computed(() => [
     <FontAwesomeIcon v-if="icon" :icon="icon" aria-hidden="true" />
     <span v-if="!iconOnly"><slot /></span>
   </RouterLink>
+  <a
+    v-else-if="href"
+    :href="href"
+    :class="classes"
+    :title="title"
+    :aria-label="iconOnly ? ariaLabel : undefined"
+  >
+    <FontAwesomeIcon v-if="icon" :icon="icon" aria-hidden="true" />
+    <span v-if="!iconOnly"><slot /></span>
+  </a>
   <button
     v-else
     :type="type"

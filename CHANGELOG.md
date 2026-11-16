@@ -7,6 +7,23 @@ a minor per finished feature, a patch for a hotfix, and `X.Y.Z-slice.N` for a pr
 feature is being built. For the history before 0.9.0, see the git log and the slice list in
 `Notes/eunomia-plan.md`.
 
+## 1.3.0-slice.5 — 2026-11-16
+
+The fifth preview of sign-in through an OpenID Connect provider (1.3.0). The login page now offers
+the way in.
+
+- **Button on the login page:** when the provider is switched on in the settings, the login page
+  shows "Sign in with single sign-on" below the password form, or the label set in the settings.
+  It is a plain link to the start of the sign-in, so it also works with the strict
+  `form-action` policy.
+- **Failures in words:** a sign-in through the provider that does not end in a session comes back
+  to the login page with a sentence in the reader's language — provider unreachable, sign-in
+  expired, no account, account deactivated, linked to a different identity, too many attempts and
+  so on. The code then disappears from the address bar, so a reload does not repeat it.
+- **New public endpoint `GET /api/v1/login-options`:** tells the login page whether the password
+  form is open and whether there is a provider button, with its label — nothing about the
+  provider itself. Limited to 60 requests a minute per address.
+
 ## 1.3.0-slice.4 — 2026-11-16
 
 The fourth preview of sign-in through an OpenID Connect provider (1.3.0). The way in exists now;

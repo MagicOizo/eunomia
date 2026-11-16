@@ -60,7 +60,24 @@
     "submit": "Anmelden",
     "submitting": "Anmelden…",
     "wrongCredentials": "E-Mail oder Passwort ist falsch.",
-    "failed": "Anmeldung fehlgeschlagen. Bitte später erneut versuchen."
+    "failed": "Anmeldung fehlgeschlagen. Bitte später erneut versuchen.",
+    "or": "oder",
+    "oidc": {
+      "button": "Mit Anmeldedienst anmelden",
+      "error": {
+        "disabled": "Die Anmeldung über den Anmeldedienst ist abgeschaltet.",
+        "unavailable": "Der Anmeldedienst ist gerade nicht erreichbar. Bitte später erneut versuchen.",
+        "flow_invalid": "Die Anmeldung hat zu lange gedauert oder wurde unterbrochen. Bitte erneut versuchen.",
+        "denied": "Der Anmeldedienst hat die Anmeldung abgelehnt.",
+        "email_missing": "Der Anmeldedienst hat keine E-Mail-Adresse übermittelt, ohne sie lässt sich dein Konto nicht finden. Wende dich an einen Administrator.",
+        "no_account": "Zu dieser Anmeldung gibt es hier kein Konto. Wende dich an einen Administrator.",
+        "account_inactive": "Dein Konto ist deaktiviert. Wende dich an einen Administrator.",
+        "linked_elsewhere": "Dein Konto ist bereits mit einer anderen Identität beim Anmeldedienst verknüpft. Ein Administrator kann die Verknüpfung lösen.",
+        "rate_limited": "Zu viele Anmeldeversuche. Bitte in ein paar Minuten erneut versuchen.",
+        "failed": "Die Anmeldung über den Anmeldedienst ist fehlgeschlagen. Bitte erneut versuchen.",
+        "unknown": "Die Anmeldung über den Anmeldedienst ist fehlgeschlagen."
+      }
+    }
   },
   "components": {
     "detailDays": {

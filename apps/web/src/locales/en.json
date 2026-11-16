@@ -60,7 +60,24 @@
     "submit": "Sign in",
     "submitting": "Signing in…",
     "wrongCredentials": "Email or password is incorrect.",
-    "failed": "Sign-in failed. Please try again later."
+    "failed": "Sign-in failed. Please try again later.",
+    "or": "or",
+    "oidc": {
+      "button": "Sign in with single sign-on",
+      "error": {
+        "disabled": "Single sign-on is switched off.",
+        "unavailable": "The sign-in provider cannot be reached right now. Please try again later.",
+        "flow_invalid": "The sign-in took too long or was interrupted. Please try again.",
+        "denied": "The sign-in provider declined the sign-in.",
+        "email_missing": "The sign-in provider sent no email address, and without one your account cannot be found. Please ask an administrator.",
+        "no_account": "There is no account here for this sign-in. Please ask an administrator.",
+        "account_inactive": "Your account is deactivated. Please ask an administrator.",
+        "linked_elsewhere": "Your account is already linked to a different identity at the sign-in provider. An administrator can remove the link.",
+        "rate_limited": "Too many sign-in attempts. Please try again in a few minutes.",
+        "failed": "Signing in with single sign-on failed. Please try again.",
+        "unknown": "Signing in with single sign-on failed."
+      }
+    }
   },
   "components": {
     "detailDays": {

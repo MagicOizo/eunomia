@@ -2425,5 +2425,12 @@ Jede Scheibe bekommt beim Start ihren eigenen Plan-Modus; was dabei entschieden 
 - **Audit:** `AUTH_LOGIN_OK` trägt `method=password|oidc`; neu `AUTH_OIDC_LINKED` und `AUTH_OIDC_FAILED` (Code, Adresse falls vom Anbieter, technisches Detail; nie `sub` oder Token). `issueSession` ist aus `service.ts` exportiert — beide Wege enden in derselben Sitzung.
 - `OIDC_START_PATH` und `OIDC_SCOPES` in `shared`; I-1 und I-11 im Sicherheits-Review ergänzt.
 
+### Slice 89 — Knopf (umgesetzt 2026-11-16, `1.3.0-slice.5`)
+- **`GET /login-options`** (`auth/login-options.ts`, öffentlich, I-1): Vertrag `LoginOptions` in `shared/oidc.ts` — `password` (bis Slice 90 immer `true`, das Feld steht schon im Vertrag) und `oidc: { label } | null`. Gelesen über `getLoginOptions` im Settings-Repository **ohne Schlüssel**: nur Schalter und Beschriftung, nie das Secret. Der Knopf erscheint, sobald `login.oidcEnabled` an ist — kein eigener Vollständigkeitsblick, weil der PUT einen unvollständigen Anbieter nicht einschalten lässt; ein nicht mehr entschlüsselbares Secret endet nach dem Klick als `unavailable` mit Satz. Leere Beschriftung → `null`, das Web setzt die Standardbeschriftung.
+- **Limiter** 60 / min auf `/login-options` als feste Konstanten in `app.ts`, keine Umgebungsvariable.
+- **Knopf als Link:** `EuButton` hat ein neues Prop `href` für ein echtes `<a>` — `to` ist ein `RouterLink` und hielte `/api/...` in der SPA fest. Unter dem Formular mit Trenner „oder" als `secondary`; ohne Passwort-Formular (ab 90) allein als `primary`. Bis die Antwort da ist, steht das Formular allein; scheitert die Anfrage, bleibt es dabei.
+- **`oidcError` wird zum Satz** in `lib/oidc-login-text.ts`, eine Tabelle über `OidcLoginError` (neuer Code ohne Satz kompiliert nicht), unbekannter Wert → allgemeiner Satz. Der Code wird per `router.replace` aus der URL genommen (übrige Query wie `redirect` bleibt), ein Passwort-Versuch ersetzt die Meldung. Die Meldung steht jetzt unter beiden Wegen statt zwischen Feldern und Absenden.
+- **Bewusst nicht:** ein Rücksprung auf `?redirect=` nach der Anmeldung über den Anbieter — der Callback führt immer nach `/`.
+
 ## Ausblick (nicht Teil dieser Slices)
 Paperless-Push-API, TOTP-Versand per Mail, ggf. weitere Ausbaustufen — siehe 2.5. (Die E-Mail-Benachrichtigungen samt Einstellungs-UI und Verschlüsselung aus 2.6 sind mit Slice 30/31 erledigt.)

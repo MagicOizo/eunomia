@@ -64,6 +64,9 @@ const DECLARED: Record<string, Declared> = {
   'GET /api/v1/auth/oidc/callback': anonymous(
     'the way back from the sign-in provider, proven by the signed flow cookie and the code',
   ),
+  'GET /api/v1/login-options': anonymous(
+    'the login page draws its ways in before anyone signs in; a switch and a button text',
+  ),
   'GET /api/v1/locale-defaults': anonymous(
     'the login page picks its language before anyone signs in; two instance values, nothing personal',
   ),

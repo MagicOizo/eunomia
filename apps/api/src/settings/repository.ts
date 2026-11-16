@@ -1,4 +1,4 @@
-import { ERROR_CODES } from '@eunomia/shared';
+import { ERROR_CODES, type LoginOptions } from '@eunomia/shared';
 import type { Pool } from 'mariadb';
 
 import { withTransaction } from '../db/transaction.js';
@@ -143,6 +143,29 @@ export async function getLocaleDefaults(
   return {
     locale: parseStoredValue('general.defaultLocale', stored.get('general.defaultLocale') ?? null),
     format: parseStoredValue('general.defaultFormat', stored.get('general.defaultFormat') ?? null),
+  };
+}
+
+/**
+ * What the public login page may know about the ways in (Slice 89), read
+ * without a key: the switch and the button's text, never the secret. Whether
+ * the provider is complete is not looked at here — the PUT refuses to switch
+ * on an incomplete one (settings/login.ts), and a secret that no longer
+ * decrypts turns a click into `unavailable`, which the page then phrases.
+ */
+export async function getLoginOptions(pool: Pool): Promise<LoginOptions> {
+  const stored = await readRows(pool);
+  const enabled = parseStoredValue('login.oidcEnabled', stored.get('login.oidcEnabled') ?? null);
+  const label = parseStoredValue(
+    'login.oidcButtonLabel',
+    stored.get('login.oidcButtonLabel') ?? null,
+  );
+  return {
+    password: true,
+    oidc:
+      enabled === true
+        ? { label: typeof label === 'string' && label.trim() !== '' ? label.trim() : null }
+        : null,
   };
 }
 

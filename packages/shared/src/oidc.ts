@@ -146,3 +146,23 @@ const OIDC_LOGIN_ERROR_VALUES: readonly string[] = Object.values(OIDC_LOGIN_ERRO
 export function isOidcLoginError(value: unknown): value is OidcLoginError {
   return typeof value === 'string' && OIDC_LOGIN_ERROR_VALUES.includes(value);
 }
+
+/**
+ * Which ways in the login page offers (Slice 89), answered by the public
+ * `GET /login-options`. It says only what the page needs to draw itself —
+ * never the issuer, the client or the state of the last test: whoever asks has
+ * not signed in yet.
+ */
+export interface LoginOptions {
+  /**
+   * Whether the password form is shown. Always true until the password sign-in
+   * can be switched off (Slice 90); the field is in the contract from the start
+   * so the page does not have to change shape then.
+   */
+  password: boolean;
+  /**
+   * The button to the sign-in provider, or null when there is none. A null
+   * label leaves the text to the web's own default in the reader's language.
+   */
+  oidc: { label: string | null } | null;
+}

@@ -90,7 +90,9 @@ begründet ändern — sie sind nicht Beschreibung, sondern Vorgabe.
 `/auth/refresh`, `/auth/logout`, `/locale-defaults` (Slice 83: die zwei Instanz-Vorgaben für Sprache
 und Format, damit die Login-Seite ihre Sprache wählen kann), `/auth/oidc/start` und
 `/auth/oidc/callback` (Slice 88: der Weg zum Anmeldedienst und zurück; beide antworten nur mit
-Redirects, der Rückweg ist durch das signierte Flow-Cookie und den Code des Anbieters belegt).
+Redirects, der Rückweg ist durch das signierte Flow-Cookie und den Code des Anbieters belegt),
+`/login-options` (Slice 89: ob das Passwort-Formular offen ist und ob es einen Knopf zum
+Anmeldedienst gibt, samt Beschriftung — nichts über den Anbieter selbst).
 
 **I-2 Jeder Zugriff auf Falldaten ist kontogeprüft.** Wer eine Rechnung, Police, Einreichung,
 Leistungsabrechnung oder Buchung liest oder schreibt, hält die Berechtigung **auf deren Konto** —
